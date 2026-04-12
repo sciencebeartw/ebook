@@ -1950,23 +1950,43 @@
         <div id="splash-default" style="text-align:center;">
             <img src="icon.png" class="splash-logo" alt="山熊科學">
         </div>
-        <!-- LINE 偵測到時顯示的教學畫面（初始隱藏）-->
-        <div id="splash-line-tutorial" style="display:none; width:100%; max-width:400px; padding:20px; box-sizing:border-box;">
-            <div style="text-align:center; margin-bottom:15px;">
-                <img src="icon.png" style="width:60px; height:60px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" alt="山熊科學">
+    </div>
+
+    <!-- LINE/FB/IG 偵測到時顯示的全頁教學層（初始隱藏）-->
+    <div id="line-tutorial-overlay" style="
+        display: none;
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: #f5f5f7;
+        z-index: 25000;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        padding: 24px;
+        box-sizing: border-box;
+    ">
+        <div style="width:100%; max-width:380px;">
+            <!-- Logo -->
+            <div style="text-align:center; margin-bottom:18px;">
+                <img src="icon.png" style="width:70px; height:70px; border-radius:16px; box-shadow:0 4px 16px rgba(0,0,0,0.15);" alt="山熊科學">
+                <div style="margin-top:8px; font-size:13px; color:#666;">山熊科學數位聯絡簿</div>
             </div>
-            <div style="background:rgba(231,76,60,0.1); border:1.5px solid #e74c3c; border-radius:12px; padding:12px 16px; margin-bottom:16px; text-align:center;">
-                <div style="color:#c0392b; font-weight:bold; font-size:15px; margin-bottom:4px;">🛑 請勿在 LINE 內開啟</div>
-                <div style="color:#555; font-size:13px;">Google 安全驗證不支援 LINE 內建瀏覽器</div>
+            <!-- 警告框 -->
+            <div style="background:rgba(231,76,60,0.1); border:2px solid #e74c3c; border-radius:14px; padding:14px 16px; margin-bottom:16px; text-align:center;">
+                <div style="color:#c0392b; font-weight:bold; font-size:16px; margin-bottom:5px;">🛑 請勿在 LINE 內開啟</div>
+                <div style="color:#555; font-size:13px; line-height:1.6;">Google 安全驗證<b>不支援 LINE 內建瀏覽器</b><br>登入將會失敗</div>
             </div>
-            <div style="background:white; border-radius:14px; padding:16px; box-shadow:0 4px 20px rgba(0,0,0,0.08); margin-bottom:16px;">
-                <div style="font-weight:bold; color:#2980b9; font-size:14px; margin-bottom:12px; text-align:center;">👉 請依下方步驟操作：</div>
+            <!-- 教學卡片 -->
+            <div style="background:white; border-radius:16px; padding:18px; box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+                <div style="font-weight:bold; color:#2980b9; font-size:14px; margin-bottom:14px; text-align:center;">👉 請依下方動畫指示操作</div>
+                <!-- 動畫區塊 -->
                 <div class="line-tutorial-container"><div class="lt-dropdown"><div class="lt-dropdown-item">在瀏覽器中開啟</div></div><div class="lt-footer"><div class="lt-menu-btn"><div class="lt-menu-dot"></div><div class="lt-menu-dot"></div><div class="lt-menu-dot"></div></div></div><div class="lt-cursor"><div class="lt-click-ripple"></div></div></div>
-                <div style="text-align:center; font-size:14px; color:#333; margin-top:12px; line-height:1.6;">
+                <!-- 文字說明 -->
+                <div style="text-align:center; font-size:14px; color:#444; margin-top:14px; line-height:1.7;">
                     點擊畫面<b>右下角的 [ ⋮ ]</b><br>選擇<b>「以 Safari 或 Chrome 開啟」</b>
                 </div>
             </div>
-            <div style="text-align:center; color:#aaa; font-size:12px;">切換瀏覽器後，頁面將自動顯示登入畫面</div>
+            <div style="text-align:center; color:#bbb; font-size:11px; margin-top:14px;">切換完成後頁面將自動顯示登入畫面</div>
         </div>
     </div>
 
@@ -2002,13 +2022,14 @@
                         return;
                     }
 
-                    // 【情境 2】LINE / FB / IG → 替換 Splash 為內嵌動畫教學，不依賴 Swal
+                    // 【情境 2】LINE / FB / IG → 顯示全頁教學覆蓋層，完全不依賴 Swal
                     if (isLine || isFB || isIG) {
-                        var splashDefault = document.getElementById('splash-default');
-                        var lineTutorial = document.getElementById('splash-line-tutorial');
-                        if (splashDefault) splashDefault.style.display = 'none';
-                        if (lineTutorial) lineTutorial.style.display = 'flex';
-                        return;  // 不呼叫 showApp，讓用戶手動換瀏覽器
+                        // 隱藏 Splash，顯示 LINE 全頁教學層
+                        var splash = document.getElementById('splash-screen');
+                        var overlay = document.getElementById('line-tutorial-overlay');
+                        if (splash) splash.style.display = 'none';
+                        if (overlay) overlay.style.display = 'flex';
+                        return;  // 不呼叫 showApp。用戶手動换瀏覽器後會開新頁
                     }
 
                     // 【情境 3】一般手機瀏覽器（Safari/Chrome）→ 顯示 PWA 安裝引導，只有一個按鈕
