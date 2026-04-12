@@ -1,0 +1,3099 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <base target="_top">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>山熊科學數位聯絡簿</title>
+    
+    <!-- PWA Settings -->
+    <link rel="manifest" href="ebook.webmanifest">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="山熊聯絡簿">
+    <link rel="apple-touch-icon" href="icon.png">
+    
+    <!-- External Resources -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* ================= 基礎設定 ================= */
+        :root {
+            --primary: #4CAF50;
+            --bg: #f2f3f7;
+            --text: #333;
+            --line-green: #06C755;
+        }
+
+        /* ================= 啟動與引導樣式 ================= */
+        #splash-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #f5f5f7;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 20000;
+            transition: opacity 0.5s ease;
+        }
+
+        .splash-logo {
+            width: 180px;
+            animation: breathe 2s infinite ease-in-out;
+        }
+
+        @keyframes breathe {
+            0%, 100% { transform: scale(0.97); opacity: 0.9; }
+            50% { transform: scale(1.03); opacity: 1; }
+        }
+
+        /* LINE/FB 偵測教學容器 (Ported from Booking System) */
+        .line-tutorial-container {
+            width: 220px; height: 160px; margin: 15px auto; position: relative;
+            border: 2px solid #bdc3c7; border-radius: 10px; background: #ecf0f1;
+            overflow: hidden; font-family: sans-serif; box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .lt-footer {
+            height: 40px; background: #1c1c1e; position: absolute; bottom: 0; left: 0; right: 0;
+            display: flex; align-items: center; justify-content: flex-end; padding-right: 15px;
+        }
+        .lt-menu-btn {
+            width: 24px; height: 24px; display: flex; flex-direction: column;
+            justify-content: space-evenly; align-items: center;
+        }
+        .lt-menu-dot { width: 4px; height: 4px; background: white; border-radius: 50%; }
+        .lt-dropdown {
+            position: absolute; bottom: 45px; right: 10px; background: #333;
+            box-shadow: 0 -3px 8px rgba(0,0,0,0.25); border-radius: 8px; padding: 6px;
+            font-size: 11px; color: white; opacity: 0; transform: scale(0.9);
+            transform-origin: bottom right; animation: dropdownShow 4s infinite;
+        }
+        .lt-dropdown-item { background: #444; padding: 8px 12px; border-radius: 6px; font-weight: bold; }
+        .lt-cursor {
+            width: 16px; height: 16px; background: rgba(52, 152, 219, 0.9);
+            border-radius: 50%; position: absolute; top: 70px; left: 110px;
+            box-shadow: 0 0 0 2px rgba(255,255,255,0.9); animation: cursorMove 4s infinite;
+            z-index: 10;
+        }
+        .lt-click-ripple {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 30px; height: 30px; border: 2px solid #3498db; border-radius: 50%;
+            opacity: 0; animation: rippleEffect 4s infinite;
+        }
+        @keyframes cursorMove {
+            0% { top: 70px; left: 110px; }
+            15%, 25% { top: 135px; left: 192px; }
+            35%, 45% { top: 100px; left: 135px; }
+            100% { top: 70px; left: 110px; }
+        }
+        @keyframes dropdownShow {
+            0%, 15%, 53%, 100% { opacity: 0; transform: scale(0.9); }
+            20%, 48% { opacity: 1; transform: scale(1); }
+        }
+        @keyframes rippleEffect {
+            0%, 18%, 25%, 38%, 45%, 100% { opacity: 0; }
+            20% { opacity: 1; transform: translate(-50%, -50%) scale(1.3); }
+            40% { opacity: 1; transform: translate(-50%, -50%) scale(1.3); }
+        }
+
+        /* PWA 安裝教學專屬樣式 (iOS) */
+        .pwa-tutorial-ios {
+            display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 15px;
+        }
+        .pwa-step { display: flex; align-items: center; gap: 15px; width: 100%; text-align: left; }
+        .pwa-icon-box { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: #eee; border-radius: 10px; flex-shrink: 0; }
+        .pwa-icon-share { width: 24px; height: 24px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23007AFF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8'/%3E%3Cpolyline points='16 6 12 2 8 6'/%3E%3Cline x1='12' y1='2' x2='12' y2='15'/%3E%3C/svg%3E"); background-size: contain; }
+        .pwa-icon-add { width: 24px; height: 24px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='2' ry='2'/%3E%3Cline x1='12' y1='8' x2='12' y2='16'/%3E%3Cline x1='8' y1='12' x2='16' y2='12'/%3E%3C/svg%3E"); background-size: contain; }
+
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            padding: 0;
+            color: var(--text);
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .app-container {
+            max-width: 480px;
+            margin: 0 auto;
+            background: #f2f3f7;
+            min-height: 100vh;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.05);
+            position: relative;
+        }
+
+        /* 登入頁 */
+        #login-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+            background: white;
+        }
+
+        .logo-img {
+            max-width: 150px;
+            margin-bottom: 20px;
+        }
+
+        h2 {
+            margin: 10px 0 5px;
+            color: #444;
+            font-size: 1.8rem;
+            text-align: center;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+
+        .sub-title {
+            font-size: 1.1rem;
+            color: #888;
+            margin-bottom: 30px;
+            text-align: center;
+            line-height: 1.6;
+            font-weight: bold;
+        }
+
+        .input-group {
+            width: 100%;
+            margin-bottom: 15px;
+        }
+
+        input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #eee;
+            border-radius: 12px;
+            font-size: 16px;
+            box-sizing: border-box;
+            transition: 0.3s;
+            background: #fafafa;
+            text-align: center;
+        }
+
+        input:focus {
+            border-color: var(--primary);
+            outline: none;
+            background: white;
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 15px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(76, 175, 80, 0.3);
+        }
+
+        .error-msg {
+            color: #e74c3c;
+            margin-top: 15px;
+            font-weight: bold;
+            min-height: 24px;
+            text-align: center;
+        }
+
+        .forgot-pwd {
+            margin-top: 15px;
+            color: #aaa;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+
+        /* 管理者介面 CSS */
+        #admin-screen {
+            display: none;
+            padding: 20px;
+            background: #f2f3f7;
+            min-height: 100vh;
+        }
+
+        .admin-header {
+            font-size: 1.5rem;
+            font-weight: 900;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .admin-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .admin-card-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+
+        .admin-select {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #fafafa;
+            font-size: 16px;
+        }
+
+        .admin-btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            color: white;
+            margin-top: 5px;
+        }
+
+        .btn-blue {
+            background: #3498db;
+        }
+
+        .btn-green {
+            background: #27ae60;
+        }
+
+        .btn-gray {
+            background: #95a5a6;
+        }
+
+        .btn-red {
+            background: #c0392b;
+        }
+
+        .btn-orange {
+            background: #f39c12;
+        }
+
+        /* 上帝視角紅框 */
+        .admin-mode-border {
+            box-shadow: inset 0 0 0 6px rgba(192, 57, 43, 0.3);
+            min-height: 100vh;
+            position: relative;
+        }
+
+        .admin-mode-border::after {
+            content: "⚠️ 管理者預覽模式";
+            position: fixed;
+            top: 90px;
+            right: 10px;
+            background: rgba(192, 57, 43, 0.8);
+            color: white;
+            font-size: 0.8rem;
+            padding: 4px 10px;
+            border-radius: 20px;
+            z-index: 3000;
+            pointer-events: none;
+        }
+
+        .admin-exit-btn {
+            position: fixed;
+            bottom: 100px;
+            left: 20px;
+            background: #c0392b;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-weight: bold;
+            z-index: 3001;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            cursor: pointer;
+            display: none;
+        }
+
+        /* 編輯彈窗 Modal */
+        .editor-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 5000;
+            align-items: flex-end;
+            justify-content: center;
+        }
+
+        .editor-content {
+            background: white;
+            width: 100%;
+            max-width: 480px;
+            height: 85vh;
+            border-radius: 20px 20px 0 0;
+            display: flex;
+            flex-direction: column;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(100%);
+            }
+
+            to {
+                transform: translateY(0);
+            }
+        }
+
+        .editor-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .editor-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .editor-close {
+            font-size: 1.5rem;
+            color: #999;
+            cursor: pointer;
+        }
+
+        .editor-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .editor-label {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 4px;
+            display: block;
+            font-weight: bold;
+        }
+
+        .editor-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            box-sizing: border-box;
+            font-size: 16px;
+            background: #fafafa;
+        }
+
+        .editor-textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            box-sizing: border-box;
+            height: 100px;
+            font-family: inherit;
+            font-size: 16px;
+            resize: none;
+            background: #fafafa;
+        }
+
+        .editor-footer {
+            padding: 15px 20px;
+            border-top: 1px solid #eee;
+            display: flex;
+            gap: 10px;
+            background: white;
+        }
+
+        /* 連結小幫手 */
+        .link-helper-box {
+            background: #e3f2fd;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border: 1px solid #90caf9;
+        }
+
+        .link-helper-title {
+            font-size: 0.85rem;
+            font-weight: bold;
+            color: #1565c0;
+            margin-bottom: 8px;
+        }
+
+        .link-row {
+            display: flex;
+            gap: 6px;
+        }
+
+        .link-input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .link-btn {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        /* 老師手機版上傳區樣式 */
+        .teacher-upload-box {
+            background-color: #fff3e0;
+            border: 2px dashed #f39c12;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 15px;
+        }
+
+        .teacher-upload-title {
+            font-size: 0.9rem;
+            font-weight: bold;
+            color: #d35400;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        /* 歷史列表 */
+        #postHistoryArea {
+            margin-top: 10px;
+        }
+
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f9f9f9;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            border: 1px solid #eee;
+        }
+
+        .history-info {
+            font-size: 0.95rem;
+            color: #555;
+        }
+
+        .edit-btn-small {
+            background: #f39c12;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+
+        /* Header */
+        #main-screen {
+            display: none;
+            padding-bottom: 80px;
+        }
+
+        .header-bar {
+            background: white;
+            padding: 10px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #eee;
+            height: 90px;
+            box-sizing: border-box;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-grow: 1;
+            overflow: hidden;
+        }
+
+        .header-logo-small {
+            height: 65px;
+            width: auto;
+            flex-shrink: 0;
+        }
+
+        .student-info-box {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .student-info {
+            font-size: 2.5rem;
+            font-weight: 900;
+            color: #2c3e50;
+            line-height: 1.1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            letter-spacing: 1px;
+        }
+
+        .class-info {
+            font-size: 1.15rem;
+            color: #7f8c8d;
+            margin-top: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-weight: bold;
+        }
+
+        .header-right {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            justify-content: center;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
+        .header-btn {
+            font-size: 0.8rem;
+            color: #666;
+            text-decoration: none;
+            border: 1px solid #ddd;
+            padding: 4px 10px;
+            border-radius: 15px;
+            transition: background 0.2s;
+            background: white;
+            white-space: nowrap;
+            cursor: pointer;
+            display: inline-block;
+        }
+
+        .header-btn:active {
+            background: #f0f0f0;
+            transform: scale(0.95);
+        }
+
+        /* 浮動按鈕區 */
+        .float-line-container {
+            position: fixed;
+            bottom: 25px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            z-index: 2000;
+            align-items: center;
+        }
+
+        .line-btn {
+            width: 65px;
+            height: 65px;
+            border-radius: 50%;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            color: white;
+            font-family: Arial, sans-serif;
+            transition: transform 0.2s;
+            animation: bounce 2s ease-in-out infinite;
+        }
+
+        .line-btn:active {
+            transform: scale(0.9);
+            animation: none;
+        }
+
+        .line-btn span.small {
+            font-size: 10px;
+            font-weight: bold;
+            margin-bottom: 2px;
+            letter-spacing: 0px;
+        }
+
+        .line-btn span.large {
+            font-size: 18px;
+            font-weight: 900;
+            letter-spacing: 1px;
+        }
+
+        .btn-bear {
+            background-color: #06C755;
+        }
+
+        .back-top-btn {
+            width: 65px;
+            height: 65px;
+            border-radius: 50%;
+            background-color: #2563eb;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            z-index: 1999;
+            cursor: pointer;
+            transition: opacity 0.3s, transform 0.2s;
+            animation: bounce-delay 2s ease-in-out infinite;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            padding: 0;
+            border: none;
+        }
+
+        .back-top-btn:active {
+            transform: scale(0.9);
+        }
+
+        @keyframes bounce {
+
+            0%,
+            20%,
+            50%,
+            80%,
+            100% {
+                transform: translateY(0);
+            }
+
+            40% {
+                transform: translateY(-10px);
+            }
+
+            60% {
+                transform: translateY(-5px);
+            }
+        }
+
+        @keyframes bounce-delay {
+
+            0%,
+            20%,
+            50%,
+            80%,
+            100% {
+                transform: translateY(0);
+            }
+
+            40% {
+                transform: translateY(-8px);
+            }
+
+            60% {
+                transform: translateY(-4px);
+            }
+        }
+
+        /* Tabs */
+        .sticky-wrapper {
+            position: sticky;
+            top: 0;
+            z-index: 999;
+            background: white;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .tabs {
+            display: flex;
+            background: white;
+            margin-top: 0px;
+        }
+
+        .tab-item {
+            flex: 1;
+            text-align: center;
+            padding: 15px 0;
+            color: #999;
+            font-weight: bold;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            font-size: 1.15rem;
+        }
+
+        .tab-item.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        /* 聯絡簿卡片 CSS */
+        .post-card {
+            background: white;
+            margin: 20px 15px;
+            border-radius: 16px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+        }
+
+        .post-header {
+            background: #e8f5e9;
+            padding: 15px 20px;
+            color: #2e7d32;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1.4rem;
+        }
+
+        .grade-section {
+            padding: 25px 20px;
+            border-bottom: 1px dashed #eee;
+            text-align: center;
+        }
+
+        .main-exam-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .main-exam-range {
+            font-size: 1.15rem;
+            color: #666;
+            margin-bottom: 15px;
+            background: #f9f9f9;
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+        }
+
+        .main-score {
+            font-size: 4.8rem;
+            font-weight: 700;
+            color: #333;
+            line-height: 1;
+            margin: 10px 0;
+            letter-spacing: -2px;
+        }
+
+        .score-unit-big {
+            font-size: 1.6rem;
+            color: #999;
+            font-weight: normal;
+            margin-left: 5px;
+            vertical-align: middle;
+            letter-spacing: 0;
+        }
+
+        .score-sub {
+            font-size: 1.4rem;
+            color: #888;
+            margin-bottom: 20px;
+        }
+
+        .exam-standard-box {
+            margin-top: 15px;
+            font-size: 1.25rem;
+            color: #555;
+            background-color: #fff9c4;
+            border: 1px dashed #fbc02d;
+            padding: 8px 15px;
+            border-radius: 8px;
+            display: inline-block;
+            text-align: left;
+        }
+
+        .makeup-status-tag {
+            display: block;
+            font-weight: bold;
+            font-size: 1.1rem;
+            margin-top: 5px;
+            margin-bottom: 5px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            width: fit-content;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .status-warning {
+            color: #e74c3c;
+            background: #fdecea;
+            border: 1px solid #e74c3c;
+        }
+
+        .status-green {
+            color: #27ae60;
+            background: #eafaf1;
+            border: 1px solid #27ae60;
+        }
+
+        .status-yellow {
+            color: #f39c12;
+            background: #fef9e7;
+            border: 1px solid #f39c12;
+        }
+
+        .status-orange {
+            color: #e67e22;
+            background: #fdf2e9;
+            border: 1px solid #e67e22;
+        }
+
+        .status-red {
+            color: #cc0000;
+            background: #fadbd8;
+            border: 1px solid #cc0000;
+        }
+
+        .home-exam-tag {
+            font-size: 0.95rem;
+            color: #888;
+            display: block;
+            margin-top: -5px;
+            margin-bottom: 10px;
+            font-weight: normal;
+        }
+
+        .reviewing-tag {
+            font-size: 0.95rem;
+            color: #3498db;
+            display: block;
+            margin-top: -5px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        .chart-container-post {
+            background: #fafafa;
+            padding: 15px;
+            border-radius: 12px;
+            margin-top: 15px;
+            text-align: left;
+        }
+
+        .chart-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+            font-size: 1.2rem;
+            height: 24px;
+        }
+
+        .chart-label {
+            width: 105px;
+            color: #888;
+            text-align: right;
+            margin-right: 10px;
+            font-family: monospace;
+            font-weight: bold;
+        }
+
+        .chart-bar-area {
+            flex-grow: 1;
+            background: #eee;
+            height: 100%;
+            border-radius: 4px;
+            overflow: hidden;
+            min-width: 50px;
+        }
+
+        .chart-bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        .chart-count {
+            width: 25px;
+            text-align: right;
+            color: #555;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+
+        .ref-hw-box {
+            margin-top: 20px;
+            text-align: left;
+            background: #fff3e0;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #f39c12;
+        }
+
+        .ref-hw-title {
+            font-weight: bold;
+            color: #d35400;
+            margin-bottom: 10px;
+            font-size: 1rem;
+        }
+
+        .ref-hw-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 1rem;
+            color: #444;
+            border-bottom: 1px dashed rgba(0, 0, 0, 0.1);
+            padding-bottom: 5px;
+        }
+
+        .hw-score-val {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #333;
+        }
+
+        .content-section {
+            padding: 25px 20px;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            color: var(--primary);
+            font-weight: 700;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            letter-spacing: 1px;
+        }
+
+        .section-title::before {
+            content: '';
+            width: 5px;
+            height: 20px;
+            background: var(--primary);
+            margin-right: 10px;
+            border-radius: 3px;
+        }
+
+        .info-block {
+            margin-bottom: 20px;
+        }
+
+        .info-label {
+            font-size: 1.45rem;
+            color: #2c3e50;
+            font-weight: 700;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .info-content {
+            font-size: 1.45rem;
+            color: #555;
+            line-height: 1.6;
+            padding-left: 5px;
+            word-wrap: break-word;
+        }
+
+        /* 老師發布的連結按鈕 (大膠囊) */
+        .btn-link {
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+            background: #3498db;
+            color: white;
+            padding: 12px 15px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 1.15rem;
+            font-weight: bold;
+            margin: 8px 0;
+            text-align: center;
+            box-shadow: 0 3px 6px rgba(52, 152, 219, 0.2);
+        }
+
+        /* 學生上傳的連結按鈕 (小標籤) */
+        .btn-small-tag {
+            display: inline-block;
+            background: #f0f0f0;
+            color: #555;
+            padding: 4px 10px;
+            border-radius: 15px;
+            text-decoration: none;
+            font-size: 1rem;
+            font-weight: bold;
+            border: 1px solid #ccc;
+            margin-left: 5px;
+            vertical-align: middle;
+        }
+
+        .btn-small-tag:hover {
+            background: #e0e0e0;
+        }
+
+        /* ★★★ v3.9.3 修正：強制讓公告與彈窗內文的連結變為小標籤樣式 (並加上圖示) ★★★ */
+        .bulletin-content .btn-link,
+        .emergency-body .btn-link {
+            display: inline-block;
+            width: auto;
+            background: #f0f0f0;
+            color: #555;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 1rem;
+            font-weight: bold;
+            text-align: left;
+            box-shadow: none;
+            border: 1px solid #ccc;
+            margin: 2px 5px 2px 0;
+        }
+
+        .bulletin-content .btn-link:hover,
+        .emergency-body .btn-link:hover {
+            background: #e0e0e0;
+        }
+
+        /* 自動加上迴紋針圖示 */
+        .bulletin-content .btn-link::before,
+        .emergency-body .btn-link::before {
+            content: "📎 ";
+        }
+
+        .score-report-section {
+            background: #fdf2f2;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 12px;
+            border: 2px dashed #e74c3c;
+        }
+
+        .feedback-section {
+            background: #fafafa;
+            padding: 20px;
+            border-top: 1px solid #eee;
+        }
+
+        .history-msg {
+            margin-bottom: 12px;
+            font-size: 1.25rem;
+            color: #444;
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            border-left: 4px solid #ccc;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        .input-box {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .score-input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e74c3c;
+            border-radius: 25px;
+            outline: none;
+            font-size: 1.4rem;
+            text-align: center;
+            font-weight: bold;
+            color: #c0392b;
+        }
+
+        .score-btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 0 25px;
+            border-radius: 25px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1.25rem;
+        }
+
+        .fb-input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 25px;
+            outline: none;
+            font-size: 1.25rem;
+        }
+
+        .fb-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 0 25px;
+            border-radius: 25px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1.25rem;
+        }
+
+        .fb-btn:hover {
+            background: #45a049;
+        }
+
+        .quote-box {
+            background-color: #f1f3f5;
+            border-left: 4px solid #adb5bd;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            font-size: 0.95rem;
+            color: #555;
+        }
+
+        .quote-type {
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: #888;
+            margin-bottom: 3px;
+        }
+
+        /* 學生上傳區樣式 */
+        .student-upload-box {
+            background: #e8f5e9;
+            border: 2px dashed #4CAF50;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .upload-title {
+            font-weight: bold;
+            color: #2e7d32;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .upload-btn-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+
+        .upload-btn-real {
+            border: 2px solid #4CAF50;
+            color: #4CAF50;
+            background-color: white;
+            padding: 8px 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .upload-btn-wrapper input[type=file] {
+            font-size: 100px;
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .upload-status {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: #666;
+            min-height: 20px;
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-box {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            width: 80%;
+            max-width: 350px;
+            text-align: center;
+        }
+
+        .modal-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+
+        .text-red {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+
+        .score-green {
+            color: #28a745;
+        }
+
+        .score-red {
+            color: #e74c3c;
+        }
+
+        .loader-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.8);
+            z-index: 2000;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        .loader-text {
+            margin-top: 10px;
+            color: #666;
+            font-weight: bold;
+        }
+
+        #loader {
+            display: none;
+            margin: 20px auto;
+        }
+
+        #loader-login {
+            display: none;
+            margin: 15px auto;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Tab 2 Style */
+        .score-card {
+            background: #fff;
+            border: 1px solid #f0f0f0;
+            border-top: 5px solid #4CAF50;
+            border-radius: 8px;
+            padding: 20px 16px;
+            margin-bottom: 15px;
+            position: relative;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .score-card:active {
+            background-color: #f9f9f9;
+            transform: scale(0.99);
+        }
+
+        .class-badge {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            font-size: 1.05rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+
+        .card-main {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 15px;
+        }
+
+        .exam-info {
+            display: flex;
+            flex-direction: column;
+            margin-top: 0px;
+        }
+
+        .exam-date {
+            font-size: 1.15rem;
+            color: #999;
+            margin-bottom: 5px;
+        }
+
+        .exam-name {
+            font-weight: 700;
+            color: #333;
+            font-size: 1.6rem;
+        }
+
+        .score-box {
+            text-align: right;
+        }
+
+        .score-val {
+            font-size: 3.2rem;
+            font-weight: 700;
+            line-height: 1;
+            color: #333;
+            letter-spacing: -1px;
+            padding: 5px 0px;
+            display: inline-block;
+        }
+
+        .score-val.score-green {
+            color: #28a745 !important;
+        }
+
+        .score-val.score-red {
+            color: #e74c3c !important;
+        }
+
+        .score-unit {
+            font-size: 1.2rem;
+            color: #aaa;
+            font-weight: normal;
+            margin-left: 2px;
+        }
+
+        .avg-score {
+            font-size: 1.2rem;
+            color: #888;
+            margin-top: 8px;
+        }
+
+        .score-missing {
+            font-size: 2.2rem;
+            color: #999;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+
+        .sub-note {
+            font-size: 1.1rem;
+            color: #999;
+            margin-top: 2px;
+        }
+
+        .expand-area {
+            display: none;
+        }
+
+        .score-card.active .expand-area {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+
+        .detail-box {
+            margin-top: 15px;
+            font-size: 1.25rem;
+            color: #555;
+            background-color: #fff9c4;
+            border: 1px dashed #fbc02d;
+            padding: 10px 15px;
+            border-radius: 8px;
+            text-align: left;
+            line-height: 1.5;
+        }
+
+        .click-hint {
+            font-size: 1.05rem;
+            color: #ccc;
+            text-align: center;
+            margin-top: 5px;
+            opacity: 0.5;
+        }
+
+        .chart-wrapper {
+            margin-top: 15px;
+            padding: 10px;
+            background: #fafafa;
+            border-radius: 8px;
+        }
+
+        /* 公告系統樣式 */
+        .bulletin-card {
+            background: white;
+            margin: 20px 15px;
+            border-radius: 16px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+            border: 2px solid #ccc;
+        }
+
+        .bulletin-card.type-emergency {
+            border-color: #e74c3c;
+        }
+
+        .bulletin-card.type-schedule {
+            border-color: #3498db;
+        }
+
+        .bulletin-card.type-normal {
+            border-color: #f39c12;
+        }
+
+        .bulletin-header {
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #eee;
+            color: #333;
+        }
+
+        .bulletin-card.type-emergency .bulletin-header {
+            background: #fdecea;
+            color: #c0392b;
+        }
+
+        .bulletin-card.type-schedule .bulletin-header {
+            background: #eaf2f8;
+            color: #2980b9;
+        }
+
+        .bulletin-card.type-normal .bulletin-header {
+            background: #fef9e7;
+            color: #d35400;
+        }
+
+        .bulletin-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .bulletin-date {
+            font-size: 1.1rem;
+            opacity: 0.8;
+        }
+
+        .bulletin-tag {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            background: rgba(0, 0, 0, 0.1);
+            margin-right: 8px;
+        }
+
+        .bulletin-content {
+            padding: 20px;
+            font-size: 1.45rem;
+            color: #555;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+
+        .btn-capsule {
+            display: inline-block;
+            background: #3498db;
+            color: white;
+            padding: 10px 25px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-size: 1.25rem;
+            font-weight: bold;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(52, 152, 219, 0.3);
+            margin: 0 auto;
+        }
+
+        .btn-capsule:active {
+            transform: scale(0.95);
+        }
+
+        .btn-center-wrapper {
+            text-align: center;
+            padding-bottom: 20px;
+        }
+
+        /* 緊急彈窗樣式 */
+        .emergency-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .emergency-box {
+            background: white;
+            width: 100%;
+            max-width: 400px;
+            border-radius: 16px;
+            overflow: hidden;
+            border-top: 10px solid #e74c3c;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            animation: popIn 0.3s ease-out;
+        }
+
+        @keyframes popIn {
+            from {
+                transform: scale(0.8);
+                opacity: 0;
+            }
+
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .emergency-header {
+            background: #fdecea;
+            padding: 15px;
+            text-align: center;
+            color: #c0392b;
+            font-weight: 900;
+            font-size: 1.6rem;
+            border-bottom: 1px solid #fadbd8;
+        }
+
+        .emergency-body {
+            padding: 25px 20px;
+            font-size: 1.45rem;
+            line-height: 1.6;
+            color: #333;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+
+        .emergency-footer {
+            padding: 15px;
+            background: #fafafa;
+            text-align: center;
+            border-top: 1px solid #eee;
+        }
+
+        .emergency-btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 30px;
+            font-size: 1.3rem;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+        }
+    </style>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+  <script src="firebase-config.js"></script>
+
+  <!-- Webhook API & Firebase Polyfill (Replace google.script.run) -->
+  <script>
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz3ZwBnTp6gcf5TKzJnHni6oat0_jxsnhGkfXAR-Fu_NI3ZVMu4WrDjssayDUtJrQU/exec";
+
+
+    function doPostAction(action, data, onSuccess, onErr, adminPwd) {
+      if(SCRIPT_URL.includes("請在此填入")) {
+         alert("⚠️ 錯誤：尚未填入 GAS Web App 網址在 index.html 內！");
+         if(onErr) onErr("No Web App URL");
+         return;
+      }
+      fetch(SCRIPT_URL, {
+         method: "POST",
+         headers: { "Content-Type": "text/plain" }, // Bypass CORS preflight
+         body: JSON.stringify({ action: action, data: data, adminPassword: adminPwd || "" })
+      })
+      .then(res => res.json())
+      .then(res => { if(onSuccess) onSuccess(res); })
+      .catch(err => { console.error(err); if(onErr) onErr(err); });
+    }
+    
+    function safeKey(str) {
+      return str.toString()
+        .replace(/\./g, '_dot_').replace(/#/g, '_hash_').replace(/\$/g, '_dollar_')
+        .replace(/\//g, '_slash_').replace(/\[/g, '_lb_').replace(/\]/g, '_rb_')
+        .replace(/\s+/g, '_');
+    }
+
+    async function executeFirebaseRead(studentName, password, bypassPwd, targetClass) {
+        let result = { found: false, className: "", studentName: "", dailyPost: [], grades: [], feedbackHistory: [], bulletins: [] };
+        
+        try {
+            // Admin shortcut
+            if (studentName === "admin" && password === "miao") {
+                return { found: true, isAdmin: true, studentName: "阿喵老師", className: "管理者模式" };
+            }
+
+            const snapS = await db.ref('/students').once('value');
+            const allStudents = snapS.val() || {};
+            
+            let foundClass = "";
+            let foundStudentObj = null;
+            let foundUserKey = "";
+
+            const classesToSearch = targetClass ? [targetClass] : Object.keys(allStudents);
+            
+            for (let c of classesToSearch) {
+                const sClass = safeKey(c);
+                const classKids = allStudents[sClass] || {};
+                for (let k in classKids) {
+                   const kid = classKids[k];
+                   if (!kid || !kid.name) continue;
+                   let isMatch = false;
+                   if (bypassPwd) {
+                       if (kid.name.trim() === studentName.trim()) isMatch = true;
+                   } else {
+                       const pwdObj = kid.password;
+                       const finalPwdStr = (pwdObj || "").toString().replace(/-/g, "").trim();
+                       const inputPwdStr = (password || "").toString().replace(/-/g, "").trim();
+                       if (kid.name.trim() === studentName.trim() && finalPwdStr !== "" && finalPwdStr === inputPwdStr) {
+                           isMatch = true;
+                       }
+                   }
+                   if (isMatch) {
+                       foundClass = c;
+                       foundStudentObj = kid;
+                       foundUserKey = k;
+                       result.found = true;
+                       result.className = c;
+                       result.studentName = kid.name;
+                       break;
+                   }
+                }
+                if (result.found) break;
+            }
+            
+            if (!result.found) return result;
+            
+            const safeC = safeKey(result.className);
+
+            // Fetch Grades
+            const snapG = await db.ref(`/grades/${safeC}/${foundUserKey}/exams`).once('value');
+            const examsObj = snapG.val() || {};
+            let fullGradeList = [];
+            for (let col in examsObj) {
+                const eData = examsObj[col];
+                let studentScoreNum = NaN;
+                if (eData.score) {
+                    const sMatch = eData.score.toString().match(/(\d+(\.\d+)?)/);
+                    if (sMatch) studentScoreNum = parseFloat(sMatch[0]);
+                }
+                let currentUnit = "分";
+                const isP6Class = result.className.indexOf("小六") > -1;
+                const isHomework = (eData.date + eData.examName).indexOf("作業") > -1;
+                if (isP6Class && isHomework) currentUnit = "題";
+                if (eData.score === "尚未繳交") currentUnit = "";
+                
+                let makeupThreshold = 0;
+                if (eData.note && eData.note !== "無詳細備註") {
+                    const thresholdMatch = eData.note.match(/(\d+)/); 
+                    if (thresholdMatch) makeupThreshold = parseInt(thresholdMatch[0]); 
+                }
+
+                const myB = eData.score === "尚未繳交" ? -1 : 0; // Legacy front relies on this. Actually frontend does not compute myBucket heavily if dist presents. Wait, frontend uses `myBucket`. Hmm if I don't have it precisely, dist bars may not show my bar in red. I will try to map it or we can skip for now since it's hard. Let's just put null. Frontend gracefully handles it or I will parse. Wait! FirebaseSync.gs pushed `dist` arrays into exams! 
+            
+                // Let's compute myBucket if dist exists.
+                let myBucketIndex = -1;
+                let rangeLabels = ["0~20","20~40","40~60","60~80","80~100"];
+                if (eData.dist && eData.dist.length > 0) {
+                     const total = eData.dist.length;
+                     const rawMax = Math.max(...eData.dist);
+                     const rawMin = Math.min(...eData.dist);
+                     let maxS = 100; let minS = rawMin;
+                     if (isP6Class && isHomework) maxS = rawMax;
+                     let gap = maxS - minS; if(gap===0) gap=1; let step = gap/5;
+                     for(let b=0; b<5; b++) {
+                         rangeLabels[b] = Math.round(minS+(b*step)) + " ~ " + Math.round(minS+((b+1)*step));
+                     }
+                     
+                     if (!isNaN(studentScoreNum)) {
+                         let sIdx = Math.floor((studentScoreNum - minS) / step);
+                         if (sIdx >= 5) sIdx = 4; if (sIdx < 0) sIdx = 0;
+                         myBucketIndex = sIdx;
+                     }
+                     // Actually FirebaseSync.gs already pushed eData.dist which is ALL SCORES. We need to bucketize it.
+                     const buckets = [0,0,0,0,0];
+                     eData.dist.forEach(v => {
+                         let idx = Math.floor((v - minS) / step);
+                         if (idx >= 5) idx = 4; if (idx < 0) idx = 0;
+                         buckets[idx]++;
+                     });
+                     eData.dist = buckets;
+                     eData.total = total;
+                } else {
+                     eData.dist = [0,0,0,0,0]; eData.total = 0;
+                }
+                
+                const isMissing = isNaN(studentScoreNum) && (eData.score || "").indexOf("尚未繳交") === -1;
+
+                fullGradeList.push({
+                   className: result.className, date: eData.date, exam: eData.examName, note: eData.note, 
+                   makeupThreshold: makeupThreshold, score: eData.score, scoreNum: isNaN(studentScoreNum) ? null : studentScoreNum,
+                   unit: currentUnit, average: eData.average, dist: eData.dist, labels: rangeLabels, myBucket: myBucketIndex,
+                   total: eData.total, isMissing: isMissing, colIndex: parseInt(col.replace('col_','')), cellColor: eData.cellColor
+                });
+            }
+            // Sort by colIndex ascending to EXACTLY match GAS for-loop iteration order (j=5 to length)
+            result.grades = fullGradeList.sort((a, b) => a.colIndex - b.colIndex);
+
+            // Fetch Posts
+            const snapP = await db.ref(`/dailyPosts/${safeC}`).once('value');
+            const postsObj = snapP.val() || {};
+            let classPosts = [];
+            let now = new Date();
+            for (let rowId in postsObj) {
+                const pRow = postsObj[rowId];
+                if (pRow.reserveTime && pRow.reserveTime.trim() !== "") {
+                    if (new Date(pRow.reserveTime) > now) continue;
+                }
+                
+                let postObj = {
+                    date: pRow.date, title: pRow.title, progress: pRow.progress, hw1: pRow.hw1, hw2: pRow.hw2,
+                    makeup: pRow.makeup, quiz: pRow.quiz, range: pRow.range, note: pRow.note, examData: { main: null, others: [] }
+                };
+                
+                let pDate = new Date(pRow.date);
+                let shortDate = (pDate.getMonth() + 1) + "/" + pDate.getDate();
+                
+                let todayMainExam = result.grades.find(g => {
+                   if (g.date === shortDate || g.date === pRow.date) return true;
+                   let regex = new RegExp("(^|[^0-9])" + shortDate.replace('/','\\/') + "([^0-9]|$)", "g");
+                   if (!regex.test(g.date)) return false;
+                   return (g.date.indexOf("小考") > -1 || g.date.indexOf("隨堂") > -1 || g.date.indexOf("複習") > -1 || g.date.indexOf("鑑定") > -1);
+                });
+                if (todayMainExam) {
+                    postObj.examData.main = todayMainExam;
+                    postObj.examData.others = result.grades.filter(g => g.exam === todayMainExam.exam && g.date.indexOf("作業") > -1 && g.colIndex !== todayMainExam.colIndex);
+                }
+                classPosts.push(postObj);
+            }
+            classPosts.sort((a,b) => new Date(b.date) - new Date(a.date));
+            result.dailyPost = classPosts;
+
+            // Fetch Bulletins
+            const snapB = await db.ref(`/bulletins/${safeC}`).once('value');
+            const bullObj = snapB.val() || {};
+            let bulls = [];
+            for (let id in bullObj) {
+                const b = bullObj[id];
+                if (b.className === "全校" || b.className === result.className || b.className.indexOf(result.className) > -1 || result.className.indexOf(b.className) > -1) {
+                    bulls.push({ id: b.id, time: b.time, className: b.className, type: b.type, title: b.title, content: b.content, btnName: b.btnName, btnUrl: b.btnUrl });
+                }
+            }
+            result.bulletins = bulls.reverse(); // Reverse to roughly match desc order
+
+            // Fetch Feedbacks
+            const snapF = await db.ref(`/feedbacks/${safeC}/${foundUserKey}`).once('value');
+            const fbsObj = snapF.val() || {};
+            for (let fbid in fbsObj) {
+                const fb = fbsObj[fbid];
+                result.feedbackHistory.push({ time: fb.time, targetDate: fb.targetDate, type: fb.type, content: fb.content });
+            }
+
+            return result;
+        } catch(e) {
+            console.error("Firebase Read Error:", e);
+            throw e;
+        }
+    }
+
+    function createApiMethods(onSuccess, onErr) {
+      return {
+        getStudentData: async function(u, p) {
+           try { const res = await executeFirebaseRead(u, p, false); if(onSuccess) onSuccess(res); } catch(e){ if(onErr) onErr(e); }
+        },
+        getStudentDataByAdmin: async function(cls, u, pwd) {
+           try { const res = await executeFirebaseRead(u, pwd, true, cls); if(onSuccess) onSuccess(res); } catch(e){ if(onErr) onErr(e); }
+        },
+        getAllClassNames: async function() {
+           try { 
+               const snap = await db.ref('/students').once('value');
+               const alls = snap.val() || {};
+               if(onSuccess) onSuccess(Object.keys(alls));
+           } catch(e) { if(onErr) onErr(e); }
+        },
+        getStudentList: async function(cls) {
+           try {
+               const snap = await db.ref(`/students/${safeKey(cls)}`).once('value');
+               const val = snap.val() || {};
+               let namesObjArr = []; 
+               for(let k in val) if(val[k].name) namesObjArr.push(val[k]);
+               namesObjArr.sort((a,b) => (a.rowIndex || 0) - (b.rowIndex || 0));
+               let names = namesObjArr.map(x => x.name);
+               if(onSuccess) onSuccess(names);
+           } catch(e) { if(onErr) onErr(e); }
+        },
+        getPostHistory: async function(cls) {
+           try {
+               const snap = await db.ref(`/dailyPosts/${safeKey(cls)}`).once('value');
+               const obj = snap.val() || {};
+               let arr = [];
+               for(let k in obj) { let p = obj[k]; p.rowIndex = k; arr.push(p); }
+               arr.sort((a,b) => new Date(b.date) - new Date(a.date));
+               if(onSuccess) onSuccess(arr.slice(0, 10)); // return 10 max
+           } catch(e) { if(onErr) onErr(e); }
+        },
+        getBulletins: async function(cls) {
+           try {
+               const snap = await db.ref(`/bulletins/${safeKey(cls)}`).once('value');
+               const obj = snap.val() || {};
+               let arr = [];
+               for(let k in obj) { let b = obj[k]; b.rowIndex = k; arr.push(b); }
+               arr.reverse();
+               if(onSuccess) onSuccess(arr);
+           } catch(e) { if(onErr) onErr(e); }
+        },
+        uploadFileToDrive: async function(data) {
+           try {
+               const storageRef = firebase.storage().ref();
+               let cName = data.className || "預設";
+               if (cName === "全校") cName = "預設";
+               
+               // Sanitize filename to prevent directory traversal or Firebase forbidden chars
+               const safeName = (data.fileName || "file").toString().replace(/[/\\?%*:|"<>]/g, '-');
+               const timestamp = new Date().getTime();
+               const parentFolder = data.type || "其他";
+               const fullPath = `uploads/${cName}/${parentFolder}/${timestamp}_${safeName}`;
+               
+               const fileRef = storageRef.child(fullPath);
+               const metadata = {
+                   contentDisposition: 'attachment; filename="' + safeName + '"'
+               };
+               
+               // Directly upload the base64 data URL
+               await fileRef.putString(data.base64, 'data_url', metadata);
+               const url = await fileRef.getDownloadURL();
+               
+               if(onSuccess) onSuccess({ success: true, url: url, name: safeName });
+           } catch(e) {
+               console.error("Firebase Storage Upload Error:", e);
+               if(onErr) onErr({ success: false, msg: e.toString() });
+           }
+        },
+        submitFeedback: function(data) { doPostAction("submitFeedback", data, onSuccess, onErr); },
+        saveDailyPost: function(form, pwd) { doPostAction("saveDailyPost", form, onSuccess, onErr, pwd); },
+        deleteDailyPost: function(idx, pwd) { doPostAction("deleteDailyPost", {rowIndex: idx}, onSuccess, onErr, pwd); },
+        saveBulletin: function(form, pwd) { doPostAction("saveBulletin", form, onSuccess, onErr, pwd); },
+        deleteBulletin: function(idx, pwd) { doPostAction("deleteBulletin", {rowIndex: idx}, onSuccess, onErr, pwd); },
+        changeUserPassword: function(u, oldP, newP) { doPostAction("changeUserPassword", {studentName: u, oldPass: oldP, newPass: newP}, onSuccess, onErr); }
+      };
+    }
+
+    const proxyRunner = {
+      withSuccessHandler: function(onSuccess) {
+        return {
+          withFailureHandler: function(onErr) { return createApiMethods(onSuccess, onErr); },
+          ...createApiMethods(onSuccess, console.error)
+        };
+      },
+      withFailureHandler: function(onErr) {
+        return {
+          withSuccessHandler: function(onSuccess) { return createApiMethods(onSuccess, onErr); },
+          ...createApiMethods(null, onErr)
+        };
+      },
+      ...createApiMethods(null, null)
+    };
+
+    window.google = { script: { run: proxyRunner } };
+  </script>
+\n</head>
+
+<body>
+    <!-- 啟動畫面層 -->
+    <div id="splash-screen">
+        <img src="icon.png" class="splash-logo" alt="山熊科學">
+    </div>
+
+        <!-- PWA/Browser Detection & Logic -->
+        <script>
+            (function () {
+                const ua = navigator.userAgent || navigator.vendor || window.opera;
+                const isLine = ua.indexOf("Line/") > -1;
+                const isFB = ua.indexOf("FBAN") > -1 || ua.indexOf("FBAV") > -1;
+                const isIG = ua.indexOf("Instagram") > -1;
+                const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+                const isiOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+                const isAndroid = /Android/.test(ua);
+
+                const splash = document.getElementById('splash-screen');
+                const app = document.getElementById('appContainer');
+
+                // 移除啟動畫背景的函式 (帶動畫)
+                function enterApp() {
+                    splash.style.opacity = '0';
+                    setTimeout(() => {
+                        splash.style.display = 'none';
+                        app.style.display = 'block';
+                    }, 500);
+                }
+
+                document.addEventListener('DOMContentLoaded', () => {
+                    // 1. 如果已經是 App 模式開啓，直接進入
+                    if (isStandalone) {
+                        setTimeout(enterApp, 1500); // 留一點呼吸的時間
+                        return;
+                    }
+
+                    // 2. 如果是在 LINE/FB/IG 等限制型瀏覽器中
+                    if (isLine || isFB || isIG) {
+                        const appName = isLine ? 'LINE' : (isFB ? 'Facebook' : 'Instagram');
+                        const tutorialHtml = isLine
+                            ? '<div class="line-tutorial-container">' +
+                              '<div class="lt-dropdown"><div class="lt-dropdown-item">在瀏覽器中開啟</div></div>' +
+                              '<div class="lt-footer">' +
+                                  '<div class="lt-menu-btn"><div class="lt-menu-dot"></div><div class="lt-menu-dot"></div><div class="lt-menu-dot"></div></div>' +
+                              '</div>' +
+                              '<div class="lt-cursor"><div class="lt-click-ripple"></div></div>' +
+                              '</div>'
+                            : '<div class="line-tutorial-container" style="background:#fff;">' +
+                              '<div style="height:38px; border-bottom:1px solid #ddd; display:flex; justify-content:flex-end; align-items:center; padding-right:12px;">' +
+                                  '<div style="display:flex; gap:3px;"><div style="width:4px; height:4px; background:#333; border-radius:50%;"></div><div style="width:4px; height:4px; background:#333; border-radius:50%;"></div><div style="width:4px; height:4px; background:#333; border-radius:50%;"></div></div>' +
+                              '</div>' +
+                              '<div style="position:absolute; top:43px; right:10px; background:#333; color:white; padding:6px 12px; border-radius:8px; font-size:11px; font-weight:bold;">在瀏覽器中開啟</div>' +
+                              '</div>';
+
+                        const hintText = isLine
+                            ? '請點擊畫面<b>「右下角」的 [ ⋮ ] 或 [ ⋯ ]</b><br>選擇<b>「以 Safari 或 Chrome 開啟」</b>！'
+                            : '請點擊畫面<b>「右上角」的 [ ⋯ ]</b><br>選擇<b>「以 Safari 或 Chrome 開啟」</b>！';
+
+                        setTimeout(() => {
+                            Swal.fire({
+                                title: `🛑 請勿使用 ${appName} 內建瀏覽器`,
+                                html: `<div style="text-align:center; font-size:15px; line-height:1.6;">` +
+                                      `<b style="color:#e74c3c;">Google 安全系統禁止在 ${appName} 內登入帳號</b><br>` +
+                                      `<div style="font-weight:bold; color:#2980b9; margin:15px 0 10px;">👉 請依下方動畫指示操作：</div>` +
+                                      tutorialHtml +
+                                      `<div style="margin-top:10px;">${hintText}</div></div>`,
+                                confirmButtonText: '我知道了，我會切換瀏覽器',
+                                confirmButtonColor: '#e74c3c',
+                                allowOutsideClick: false,
+                                backdrop: `rgba(44, 62, 80, 0.95)`
+                            });
+                        }, 1000);
+                        return;
+                    }
+
+                    // 3. 一般流覽器且非 PWA 模式 (引導安裝)
+                    if (isiOS || isAndroid) {
+                        const pwaGuideHtml = isiOS 
+                            ? `<div class="pwa-tutorial-ios">` +
+                              `<div class="pwa-step"><div class="pwa-icon-box"><div class="pwa-icon-share"></div></div><div>1. 點擊瀏覽器下方的<b>「分享」</b>按鈕</div></div>` +
+                              `<div class="pwa-step"><div class="pwa-icon-box"><div class="pwa-icon-add"></div></div><div>2. 向上捲動並點擊<b>「加入主畫面」</b></div></div>` +
+                              `</div>`
+                            : `<div style="padding:10px; text-align:left;">` +
+                              `<p>1. 點擊瀏覽器右上角的<b>「⋮」選單</b></p>` +
+                              `<p>2. 選擇<b>「安裝應用程式」</b>或<b>「將網頁加入主畫面」</b></p>` +
+                              `</div>`;
+
+                        setTimeout(() => {
+                            Swal.fire({
+                                title: '📱 安裝為桌面 App',
+                                html: `<div style="font-size:15px; line-height:1.5;">將本系統加到桌面，就像 App 一樣隨開即用！<br><br>${pwaGuideHtml}</div>`,
+                                icon: 'info',
+                                showCancelButton: true,
+                                confirmButtonText: '了解！我也要安裝',
+                                cancelButtonText: '暫時不要',
+                                confirmButtonColor: '#4CAF50'
+                            }).then((result) => {
+                                enterApp();
+                            });
+                        }, 1500);
+                    } else {
+                        // 電腦版或其它情況
+                        setTimeout(enterApp, 1500);
+                    }
+                });
+            })();
+        </script>
+
+        <div id="full-loader" class="loader-overlay">
+            <div class="loader" style="display:block;"></div>
+            <div class="loader-text">資料載入中...</div>
+        </div>
+
+        <!-- 緊急彈窗 -->
+        <div id="emergencyModal" class="emergency-modal">
+            <div class="emergency-box">
+                <div class="emergency-header">⚠️ 緊急公告</div>
+                <div class="emergency-body" id="emergencyContent"></div>
+                <div class="emergency-footer">
+                    <button class="emergency-btn" onclick="closeEmergencyModal()">我已閱讀</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="login-screen">
+            <img src="https://www.sciencebear.com.tw/ebook/LOGO.png" class="logo-img logo-target" alt="山熊科學">
+            <h2>數位聯絡簿</h2>
+            <div class="sub-title">小六資優自然<br>國中自然超前班</div>
+            <div class="input-group"><input type="text" id="sName" placeholder="請輸入學生姓名 (或管理者帳號)"></div>
+            <div class="input-group"><input type="password" id="sPass" placeholder="請輸入密碼 (或家長手機)"></div>
+            <button class="login-btn" onclick="doLogin()">登入查看</button>
+            <div class="forgot-pwd">忘記密碼請洽山熊科學</div>
+            <div class="error-msg" id="loginMsg"></div>
+            <div class="loader" id="loader-login"></div>
+        </div>
+
+        <div id="admin-screen">
+            <div class="admin-header">🐻 山熊老師中控台</div>
+            <div class="admin-card">
+                <div class="admin-card-title">👀 上帝視角 (模擬登入)</div>
+                <select id="adminClassSelect" class="admin-select" onchange="loadStudentList()">
+                    <option value="" disabled selected>請選擇班級</option>
+                </select>
+                <select id="adminStudentSelect" class="admin-select" disabled>
+                    <option value="" disabled selected>請先選擇班級</option>
+                </select>
+                <button class="admin-btn btn-blue" onclick="startGodMode()">進入學生畫面</button>
+            </div>
+            <div class="admin-card">
+                <div class="admin-card-title">📝 聯絡簿管理</div>
+                <select id="postTargetClass" class="admin-select" onchange="onClassChange()">
+                    <option value="" disabled selected>請選擇班級</option>
+                </select>
+                <button id="btnNewPost" class="admin-btn btn-green" style="display:none;"
+                    onclick="openPostModal(null)">➕ 發布新聯絡簿</button>
+                <div id="postHistoryArea" style="display:none;">
+                    <div style="font-size:0.9rem; color:#888; margin:15px 0 5px;">▼ 最近 10 筆紀錄 (可修改)</div>
+                    <div id="postHistoryList">載入中...</div>
+                </div>
+            </div>
+
+            <div class="admin-card">
+                <div class="admin-card-title">📢 公告管理 (手機版)</div>
+                <select id="bulletinTargetClass" class="admin-select" onchange="onBulletinClassChange()">
+                    <option value="" disabled selected>請選擇班級</option>
+                </select>
+                <button id="btnNewBulletin" class="admin-btn btn-orange" style="display:none;"
+                    onclick="openBulletinModal(null)">➕ 發布新公告</button>
+                <div id="bulletinHistoryArea" style="display:none;">
+                    <div style="font-size:0.9rem; color:#888; margin:15px 0 5px;">▼ 最近公告</div>
+                    <div id="bulletinHistoryList">載入中...</div>
+                </div>
+            </div>
+
+            <button class="admin-btn btn-gray" onclick="doLogout()" style="margin-top:20px;">登出管理者</button>
+        </div>
+
+        <div id="main-screen">
+            <div class="header-bar">
+                <div class="header-left">
+                    <img src="https://www.sciencebear.com.tw/ebook/LOGO.png" class="header-logo-small logo-target">
+                    <div class="student-info-box">
+                        <div class="student-info" id="headName"></div>
+                        <div class="class-info" id="headClass"></div>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end;">
+                        <a href="javascript:void(0)" class="header-btn" onclick="doRefresh()">刷新</a>
+                        <div style="display:flex; gap:6px;">
+                            <a href="javascript:void(0)" class="header-btn" onclick="openPwdModal()">改密碼</a>
+                            <a href="javascript:void(0)" class="header-btn" onclick="doLogout()">登出</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="sticky-wrapper">
+                <div class="tabs">
+                    <div class="tab-item active" onclick="switchTab(0)">📖 數位聯絡簿</div>
+                    <div class="tab-item" onclick="switchTab(1)">📊 近期成績</div>
+                    <div class="tab-item" onclick="switchTab(2)">🔔 重要公告</div>
+                </div>
+            </div>
+            <div id="tab-content-0"></div>
+            <div id="tab-content-1" style="display:none; padding:15px;"></div>
+            <div id="tab-content-2" style="display:none; padding:15px;"></div>
+        </div>
+
+        <button id="godModeExitBtn" class="admin-exit-btn" onclick="exitGodMode()">退出預覽模式</button>
+
+        <!-- 聯絡簿編輯 Modal -->
+        <div id="editorModal" class="editor-modal">
+            <div class="editor-content">
+                <div class="editor-header">
+                    <div class="editor-title" id="modalTitle">新增聯絡簿</div>
+                    <div class="editor-close" onclick="closePostModal()">✕</div>
+                </div>
+                <div class="editor-body">
+                    <div class="editor-label">班級</div>
+                    <input type="text" id="modalClassName" class="editor-input" readonly
+                        style="background:#eee; color:#555;">
+
+                    <div class="editor-label" style="color:#e67e22;">⏰ 預約發布時間 (選填，留空則立即發布)</div>
+                    <input type="datetime-local" id="postReserveTime" class="editor-input">
+
+                    <div class="editor-label">日期</div>
+                    <input type="date" id="postDate" class="editor-input" onfocus="setFocus(this)">
+                    <div class="editor-label">標題 (自動生成)</div>
+                    <input type="text" id="postTitle" class="editor-input" onfocus="setFocus(this)">
+                    <div class="editor-label">今日進度</div>
+                    <textarea id="postProgress" class="editor-textarea" onfocus="setFocus(this)"></textarea>
+                    <div class="editor-label">作業一</div>
+                    <textarea id="postHw1" class="editor-textarea" onfocus="setFocus(this)"></textarea>
+                    <div class="editor-label">作業二</div>
+                    <textarea id="postHw2" class="editor-textarea" style="height:60px;"
+                        onfocus="setFocus(this)"></textarea>
+
+                    <!-- ★★★ v3.9 新增：老師手機版上傳區 ★★★ -->
+                    <div class="teacher-upload-box">
+                        <span class="teacher-upload-title">📤 檔案上傳工具 (自動插入連結)</span>
+                        <div style="display:flex; gap:5px; margin-bottom:5px;">
+                            <select id="teacherUploadType" class="editor-input" style="flex:1; margin-bottom:0;">
+                                <option value="小考">小考卷</option>
+                                <option value="補考">補考卷</option>
+                                <option value="補充">補充資料</option>
+                            </select>
+                            <input type="file" id="teacherFileInput" class="editor-input"
+                                style="flex:2; margin-bottom:0;" onchange="handleTeacherFileSelect()">
+                        </div>
+                        <div style="display:flex; gap:5px;">
+                            <input type="text" id="teacherRenameInput" class="editor-input"
+                                style="flex:2; margin-bottom:0;" placeholder="檔名 (可修改)">
+                            <button class="edit-btn-small" style="flex:1; background:#3498db;"
+                                onclick="teacherUploadFile()">⬆️ 上傳</button>
+                        </div>
+                        <div id="teacherUploadStatus" style="font-size:0.8rem; color:#666; margin-top:5px;"></div>
+                    </div>
+
+                    <div class="link-helper-box">
+                        <div class="link-helper-title">🔗 連結小幫手</div>
+                        <div class="link-row">
+                            <input type="text" id="linkName" class="link-input" placeholder="按鈕名稱">
+                            <input type="text" id="linkUrl" class="link-input" style="flex:2;" placeholder="網址">
+                            <button type="button" class="link-btn" onclick="insertLink()">插入</button>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; gap:10px;">
+                        <div style="flex:1;">
+                            <div class="editor-label">今日小考</div><input type="text" id="postQuiz" class="editor-input"
+                                onfocus="setFocus(this)">
+                        </div>
+                        <div style="flex:1;">
+                            <div class="editor-label">今日補考</div><input type="text" id="postMakeup" class="editor-input"
+                                onfocus="setFocus(this)">
+                        </div>
+                    </div>
+                    <div class="editor-label">下次範圍</div>
+                    <input type="text" id="postRange" class="editor-input" onfocus="setFocus(this)">
+                    <div class="editor-label">備註/補充資料</div>
+                    <textarea id="postNote" class="editor-textarea" style="height:60px;"
+                        onfocus="setFocus(this)"></textarea>
+                </div>
+                <div class="editor-footer">
+                    <button id="btnDeletePost" class="admin-btn btn-red" style="display:none; width:80px;"
+                        onclick="deletePost()">刪除</button>
+                    <button class="admin-btn btn-green" onclick="submitPost()">儲存確認</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 公告編輯 Modal -->
+        <div id="bulletinModal" class="editor-modal">
+            <div class="editor-content">
+                <div class="editor-header">
+                    <div class="editor-title" id="bulletinModalTitle">發布公告</div>
+                    <div class="editor-close" onclick="closeBulletinModal()">✕</div>
+                </div>
+                <div class="editor-body">
+                    <div class="editor-label">班級</div>
+                    <input type="text" id="bulletinClass" class="editor-input" readonly
+                        style="background:#eee; color:#555;">
+
+                    <div class="editor-label" style="color:#e67e22;">⏰ 預約發布時間 (選填，留空則立即發布)</div>
+                    <input type="datetime-local" id="bulletinReserveTime" class="editor-input">
+
+                    <div class="editor-label">類型</div>
+                    <select id="bulletinType" class="editor-input">
+                        <option value="一般">📢 一般公告</option>
+                        <option value="緊急">🔴 緊急通知 (會跳彈窗)</option>
+                        <option value="課表">📅 課表/永久連結</option>
+                    </select>
+                    <div class="editor-label">標題</div>
+                    <input type="text" id="bulletinTitle" class="editor-input" placeholder="例：下週停課通知"
+                        onfocus="setFocus(this)">
+                    <div class="editor-label">內容</div>
+                    <textarea id="bulletinContent" class="editor-textarea" placeholder="輸入公告內容..."
+                        onfocus="setFocus(this)"></textarea>
+
+                    <!-- ★★★ v3.9 新增：公告上傳區 (智慧填入) ★★★ -->
+                    <div class="teacher-upload-box">
+                        <span class="teacher-upload-title">📤 公告附件上傳 (優先填按鈕)</span>
+                        <div style="display:flex; gap:5px; margin-bottom:5px;">
+                            <select id="bulletinUploadType" class="editor-input" style="flex:1; margin-bottom:0;">
+                                <option value="公告">公告附件</option>
+                                <option value="補充">補充資料</option>
+                            </select>
+                            <input type="file" id="bulletinFileInput" class="editor-input"
+                                style="flex:2; margin-bottom:0;" onchange="handleBulletinFileSelect()">
+                        </div>
+                        <div style="display:flex; gap:5px;">
+                            <input type="text" id="bulletinRenameInput" class="editor-input"
+                                style="flex:2; margin-bottom:0;" placeholder="檔名 (可修改)">
+                            <button class="edit-btn-small" style="flex:1; background:#3498db;"
+                                onclick="bulletinUploadFile()">⬆️ 上傳</button>
+                        </div>
+                        <div id="bulletinUploadStatus" style="font-size:0.8rem; color:#666; margin-top:5px;"></div>
+                    </div>
+
+                    <div class="editor-label">按鈕連結 (選填)</div>
+                    <input type="text" id="bulletinBtnName" class="editor-input" placeholder="按鈕名稱 (例: 查看課表)">
+                    <input type="text" id="bulletinBtnUrl" class="editor-input" placeholder="連結網址 (Google Drive...)">
+                </div>
+                <div class="editor-footer">
+                    <button id="btnDeleteBulletin" class="admin-btn btn-red" style="display:none; width:80px;"
+                        onclick="deleteBulletin()">刪除</button>
+                    <button class="admin-btn btn-green" onclick="submitBulletin()">發布公告</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="float-line-container">
+            <div class="back-top-btn" id="backTopBtn" onclick="window.scrollTo({top:0, behavior:'smooth'})">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 19V5" />
+                    <path d="M5 12l7-7 7 7" />
+                </svg>
+            </div>
+            <a href="https://lin.ee/khOZ78S" target="_blank" class="line-btn btn-bear" title="山熊科學官方LINE">
+                <span class="small">山熊科學</span>
+                <span class="large">LINE</span>
+            </a>
+        </div>
+        <div id="pwdModal" class="modal-overlay">
+            <div class="modal-box">
+                <div class="modal-title">🔐 修改密碼</div>
+                <div class="input-group"><input type="password" id="oldP" placeholder="舊密碼"></div>
+                <div class="input-group"><input type="password" id="newP" placeholder="新密碼 (請勿使用簡易密碼)"></div>
+                <div style="display:flex; gap:10px;"><button class="login-btn" style="background:#ccc;"
+                        onclick="closePwdModal()">取消</button><button class="login-btn"
+                        onclick="doChangePwd()">確認</button></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ★★★ 全域工具函式：解析連結 (v3.9.2) ★★★
+        function parseBtn(text) {
+            if (!text) return "";
+            // 先對 HTML 特殊字元做跳脫 防範 XSS
+            text = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            var withBr = text.replace(/\n/g, '<br>');
+            return withBr.replace(/\[(.*?)\](http[s]?:\/\/[^\s]+)/g, function (match, name, url) {
+                if (name.indexOf("附件") > -1 || name.indexOf("作業") > -1) {
+                    return `<a href="${url}" target="_blank" class="btn-small-tag">📎 ${name}</a>`;
+                } else {
+                    return `<a href="${url}" target="_blank" class="btn-link">${name}</a>`;
+                }
+            });
+        };
+
+        const APP_LOGO = "https://www.sciencebear.com.tw/ebook/LOGO.png";
+        const DEFAULT_HW_TEXT = `1.請記得，要先在課本寫完才能開始上傳。\n2.上傳時注意名字填寫全名，並且前後不要有空格。\n3.送出後記得要查看分數，一題一題訂正在課本上！\n4.未訂正視同作業未完成哦。`;
+        var gData = null, gPass = "", isAdminMode = false, currentEditingPost = null, currentFocusInput = null;
+        var currentEditingBulletin = null;
+
+        document.addEventListener("DOMContentLoaded", function () {
+            document.querySelectorAll('.logo-target').forEach(function (img) { img.src = APP_LOGO; });
+            window.addEventListener('scroll', function () {
+                var btn = document.getElementById('backTopBtn');
+                var login = document.getElementById('login-screen');
+                if (login.style.display === 'none' && window.scrollY > 300) btn.style.display = 'flex'; else btn.style.display = 'none';
+            });
+
+            document.getElementById('sPass').addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') doLogin();
+            });
+            document.getElementById('sName').addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') doLogin();
+            });
+        });
+
+        function setFocus(el) { currentFocusInput = el; }
+        function insertLink() {
+            var name = document.getElementById('linkName').value;
+            var url = document.getElementById('linkUrl').value;
+            if (!name || !url) { alert("請輸入名稱和網址"); return; }
+            if (!currentFocusInput) { alert("請先點選要插入的文字框"); return; }
+            // ★★★ v3.9 修正：連結格式 [名稱]網址 ★★★
+            var tag = `\n[${name}]${url}`;
+            currentFocusInput.value += tag;
+            document.getElementById('linkName').value = "";
+            document.getElementById('linkUrl').value = "";
+        }
+
+        // ★★★ v3.9 新增：老師手機版上傳邏輯 (聯絡簿) ★★★
+        function handleTeacherFileSelect() {
+            var fileInput = document.getElementById('teacherFileInput');
+            if (fileInput.files.length > 0) {
+                document.getElementById('teacherRenameInput').value = fileInput.files[0].name;
+            }
+        }
+
+        function teacherUploadFile() {
+            var fileInput = document.getElementById('teacherFileInput');
+            var renameInput = document.getElementById('teacherRenameInput');
+            var typeSelect = document.getElementById('teacherUploadType');
+            var statusDiv = document.getElementById('teacherUploadStatus');
+
+            if (fileInput.files.length === 0) { alert("請先選擇檔案！"); return; }
+            var file = fileInput.files[0];
+            if (file.size > 10 * 1024 * 1024) { alert("❌ 檔案太大！請限制在 10MB 以內。"); return; }
+            if (!currentFocusInput) { alert("請先點選您想要插入連結的格子"); return; }
+
+            statusDiv.innerText = "⏳ 上傳中...";
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                var base64 = e.target.result;
+                var fileName = renameInput.value || file.name;
+                google.script.run
+                    .withSuccessHandler(function (res) {
+                        if (res.success) {
+                            statusDiv.innerText = "✅ 上傳成功！";
+                            var tag = `\n[${fileName}]${res.url}`;
+                            currentFocusInput.value += tag;
+                            fileInput.value = ""; renameInput.value = "";
+                        } else { statusDiv.innerText = "❌ 失敗：" + res.msg; }
+                    })
+                    .withFailureHandler(function (e) {
+                        statusDiv.innerText = "❌ 上傳錯誤：" + (e.message || e.toString());
+                        console.error("teacherUpload Error:", e);
+                    })
+                    .uploadFileToDrive({ base64: base64, type: typeSelect.value, fileName: fileName });
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // ★★★ v3.9 新增：老師手機版上傳邏輯 (公告 - 智慧填入) ★★★
+        function handleBulletinFileSelect() {
+            var fileInput = document.getElementById('bulletinFileInput');
+            if (fileInput.files.length > 0) {
+                document.getElementById('bulletinRenameInput').value = fileInput.files[0].name;
+            }
+        }
+
+        function bulletinUploadFile() {
+            var fileInput = document.getElementById('bulletinFileInput');
+            var renameInput = document.getElementById('bulletinRenameInput');
+            var typeSelect = document.getElementById('bulletinUploadType');
+            var statusDiv = document.getElementById('bulletinUploadStatus');
+
+            // 取得按鈕欄位
+            var btnNameInput = document.getElementById('bulletinBtnName');
+            var btnUrlInput = document.getElementById('bulletinBtnUrl');
+            var contentInput = document.getElementById('bulletinContent');
+
+            if (fileInput.files.length === 0) { alert("請先選擇檔案！"); return; }
+            var file = fileInput.files[0];
+            if (file.size > 10 * 1024 * 1024) { alert("❌ 檔案太大！請限制在 10MB 以內。"); return; }
+
+            statusDiv.innerText = "⏳ 上傳中...";
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                var base64 = e.target.result;
+                var fileName = renameInput.value || file.name;
+                google.script.run
+                    .withSuccessHandler(function (res) {
+                        if (res.success) {
+                            statusDiv.innerText = "✅ 上傳成功！";
+
+                            // ★★★ 智慧判斷：按鈕空著就填按鈕，否則填內容 ★★★
+                            if (btnNameInput.value === "" && btnUrlInput.value === "") {
+                                btnNameInput.value = fileName;
+                                btnUrlInput.value = res.url;
+                                statusDiv.innerText += " (已填入按鈕)";
+                            } else {
+                                var tag = `\n[${fileName}]${res.url}`;
+                                contentInput.value += tag;
+                                statusDiv.innerText += " (已插入內文)";
+                            }
+
+                            fileInput.value = ""; renameInput.value = "";
+                        } else { statusDiv.innerText = "❌ 失敗：" + res.msg; }
+                    })
+                    .withFailureHandler(function (e) {
+                        statusDiv.innerText = "❌ 上傳錯誤：" + (e.message || e.toString());
+                        console.error("bulletinUpload Error:", e);
+                    })
+                    .uploadFileToDrive({ base64: base64, type: typeSelect.value, fileName: fileName });
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function doLogin() {
+            var name = document.getElementById('sName').value; var pass = document.getElementById('sPass').value;
+            if (!name || !pass) { document.getElementById('loginMsg').innerText = "請輸入完整資訊"; return; }
+            document.getElementById('loader-login').style.display = 'block';
+            document.getElementById('loginMsg').innerText = "";
+            google.script.run.withSuccessHandler(function (result) { loginSuccess(result, pass); }).withFailureHandler(function (e) {
+                document.getElementById('loader-login').style.display = 'none'; document.getElementById('loginMsg').innerText = "連線錯誤：" + e.message;
+            }).getStudentData(name, pass);
+        }
+        function loginSuccess(result, pass) {
+            document.getElementById('loader-login').style.display = 'none';
+            if (!result.found) document.getElementById('loginMsg').innerText = "找不到資料，請確認姓名與密碼。";
+            else {
+                document.getElementById('loginMsg').innerText = "";
+                gPass = pass; // ★ 儲存密碼，供後續管理員 API 呼叫使用
+                if (result.isAdmin) showAdminDashboard(); else enterStudentView(result, pass);
+            }
+        }
+
+        function enterStudentView(result, pass) {
+            document.getElementById('full-loader').style.display = 'none';
+            gData = result;
+            if (pass !== "admin_view") gPass = pass; // ★ 防止神主模式覆蓋真正的密碼
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('admin-screen').style.display = 'none';
+            document.getElementById('main-screen').style.display = 'block';
+            document.getElementById('headName').innerText = result.studentName;
+            document.getElementById('headClass').innerText = result.className.replace(/\d+/g, '');
+
+            renderDailyPosts(result.dailyPost, result.feedbackHistory);
+            renderOldGradeCards(result.grades);
+            renderBulletins(result.bulletins);
+            checkEmergency(result.bulletins);
+
+            window.scrollTo(0, 0);
+            if (isAdminMode) {
+                document.getElementById('appContainer').classList.add('admin-mode-border');
+                document.getElementById('godModeExitBtn').style.display = 'block';
+            } else {
+                document.getElementById('appContainer').classList.remove('admin-mode-border');
+                document.getElementById('godModeExitBtn').style.display = 'none';
+            }
+        }
+
+        function showAdminDashboard() {
+            document.getElementById('login-screen').style.display = 'none'; document.getElementById('main-screen').style.display = 'none'; document.getElementById('admin-screen').style.display = 'block';
+            google.script.run.withSuccessHandler(function (names) {
+                var opts = '<option value="" disabled selected>請選擇班級</option>';
+                names.forEach(function (n) { opts += '<option value="' + n + '">' + n + '</option>'; });
+                document.getElementById('adminClassSelect').innerHTML = opts;
+                document.getElementById('postTargetClass').innerHTML = opts;
+                document.getElementById('bulletinTargetClass').innerHTML = opts;
+            }).getAllClassNames();
+        }
+        function loadStudentList() {
+            var cls = document.getElementById('adminClassSelect').value;
+            var stuSel = document.getElementById('adminStudentSelect');
+            stuSel.innerHTML = '<option>載入中...</option>';
+            google.script.run.withSuccessHandler(function (list) {
+                var opts = '<option value="" disabled selected>請選擇學生</option>';
+                list.forEach(function (s) { opts += '<option value="' + s + '">' + s + '</option>'; });
+                stuSel.innerHTML = opts; stuSel.disabled = false;
+            }).getStudentList(cls);
+        }
+        function startGodMode() {
+            var cls = document.getElementById('adminClassSelect').value; var name = document.getElementById('adminStudentSelect').value;
+            if (!cls || !name) { alert("請先選擇班級與學生"); return; }
+            document.getElementById('full-loader').style.display = 'flex';
+            isAdminMode = true;
+            google.script.run.withSuccessHandler(function (result) { enterStudentView(result, "admin_view"); }).getStudentDataByAdmin(cls, name, gPass);
+        }
+        function exitGodMode() {
+            document.getElementById('full-loader').style.display = 'none';
+            isAdminMode = false;
+            document.getElementById('appContainer').classList.remove('admin-mode-border');
+            document.getElementById('godModeExitBtn').style.display = 'none';
+            document.getElementById('main-screen').style.display = 'none';
+            document.getElementById('admin-screen').style.display = 'block';
+        }
+
+        function onClassChange() {
+            var cls = document.getElementById('postTargetClass').value;
+            if (!cls) return;
+            document.getElementById('btnNewPost').style.display = 'block';
+            document.getElementById('postHistoryArea').style.display = 'block';
+            document.getElementById('postHistoryList').innerHTML = '載入中...';
+            google.script.run.withSuccessHandler(function (posts) {
+                if (posts.length === 0) { document.getElementById('postHistoryList').innerHTML = '<div style="color:#999;">尚無資料</div>'; return; }
+                var html = '';
+                posts.forEach(function (p) {
+                    var safeJson = encodeURIComponent(JSON.stringify(p));
+                    html += '<div class="history-item"><div class="history-info">📅 ' + p.date + ' <br><small>' + p.title + '</small></div><button class="edit-btn-small" onclick="openPostModal(\'' + safeJson + '\')">✏️ 修改</button></div>';
+                });
+                document.getElementById('postHistoryList').innerHTML = html;
+            }).getPostHistory(cls);
+        }
+
+        function onBulletinClassChange() {
+            var cls = document.getElementById('bulletinTargetClass').value;
+            if (!cls) return;
+            document.getElementById('btnNewBulletin').style.display = 'block';
+            document.getElementById('bulletinHistoryArea').style.display = 'block';
+            document.getElementById('bulletinHistoryList').innerHTML = '載入中...';
+            google.script.run.withSuccessHandler(function (list) {
+                if (list.length === 0) { document.getElementById('bulletinHistoryList').innerHTML = '<div style="color:#999;">尚無公告</div>'; return; }
+                var html = '';
+                list.forEach(function (b) {
+                    var safeJson = encodeURIComponent(JSON.stringify(b));
+                    var typeIcon = b.type === '緊急' ? '🔴' : (b.type === '課表' ? '📅' : '📢');
+                    html += '<div class="history-item"><div class="history-info">' + typeIcon + ' ' + b.title + ' <br><small>' + b.time + '</small></div><button class="edit-btn-small" onclick="openBulletinModal(\'' + safeJson + '\')">✏️ 修改</button></div>';
+                });
+                document.getElementById('bulletinHistoryList').innerHTML = html;
+            }).getBulletins(cls);
+        }
+
+        function openPostModal(jsonStr) {
+            var cls = document.getElementById('postTargetClass').value;
+            if (!cls) return;
+            document.getElementById('modalClassName').value = cls;
+            currentFocusInput = null;
+
+            if (jsonStr) {
+                var p = JSON.parse(decodeURIComponent(jsonStr));
+                currentEditingPost = p;
+                document.getElementById('modalTitle').innerText = "編輯聯絡簿";
+                document.getElementById('btnDeletePost').style.display = 'block';
+                document.getElementById('postDate').value = p.date.replace(/\//g, '-');
+                document.getElementById('postTitle').value = p.title;
+                document.getElementById('postProgress').value = p.progress;
+                document.getElementById('postHw1').value = p.hw1;
+                document.getElementById('postHw2').value = p.hw2;
+                document.getElementById('postMakeup').value = p.makeup;
+                document.getElementById('postQuiz').value = p.quiz;
+                document.getElementById('postRange').value = p.range;
+                document.getElementById('postNote').value = p.note;
+                document.getElementById('postReserveTime').value = p.reserveTime || "";
+            } else {
+                currentEditingPost = null;
+                document.getElementById('modalTitle').innerText = "新增聯絡簿";
+                document.getElementById('btnDeletePost').style.display = 'none';
+                var today = new Date(); var m = String(today.getMonth() + 1).padStart(2, '0'); var d = String(today.getDate()).padStart(2, '0');
+                document.getElementById('postDate').value = today.getFullYear() + '-' + m + '-' + d;
+                document.getElementById('postTitle').value = cls.replace(/^\d+/, '');
+                document.getElementById('postProgress').value = "";
+                document.getElementById('postHw1').value = DEFAULT_HW_TEXT;
+                document.getElementById('postHw2').value = "";
+                document.getElementById('postMakeup').value = "";
+                document.getElementById('postQuiz').value = "";
+                document.getElementById('postRange').value = "";
+                document.getElementById('postNote').value = "";
+                document.getElementById('postReserveTime').value = "";
+            }
+            document.getElementById('editorModal').style.display = 'flex';
+        }
+        function closePostModal() { document.getElementById('editorModal').style.display = 'none'; }
+
+        function openBulletinModal(jsonStr) {
+            var cls = document.getElementById('bulletinTargetClass').value;
+            if (!cls) return;
+            document.getElementById('bulletinClass').value = cls;
+
+            if (jsonStr) {
+                var b = JSON.parse(decodeURIComponent(jsonStr));
+                currentEditingBulletin = b;
+                document.getElementById('bulletinModalTitle').innerText = "編輯公告";
+                document.getElementById('btnDeleteBulletin').style.display = 'block';
+                document.getElementById('bulletinType').value = b.type;
+                document.getElementById('bulletinTitle').value = b.title;
+                document.getElementById('bulletinContent').value = b.content;
+                document.getElementById('bulletinBtnName').value = b.btnName;
+                document.getElementById('bulletinBtnUrl').value = b.btnUrl;
+                document.getElementById('bulletinReserveTime').value = b.reserveTime || "";
+            } else {
+                currentEditingBulletin = null;
+                document.getElementById('bulletinModalTitle').innerText = "發布公告";
+                document.getElementById('btnDeleteBulletin').style.display = 'none';
+                document.getElementById('bulletinType').value = "一般";
+                document.getElementById('bulletinTitle').value = "";
+                document.getElementById('bulletinContent').value = "";
+                document.getElementById('bulletinBtnName').value = "";
+                document.getElementById('bulletinBtnUrl').value = "";
+                document.getElementById('bulletinReserveTime').value = "";
+            }
+            document.getElementById('bulletinModal').style.display = 'flex';
+        }
+        function closeBulletinModal() { document.getElementById('bulletinModal').style.display = 'none'; }
+
+        function deletePost() {
+            if (!currentEditingPost) return;
+            if (!confirm("⚠️ 確定要永久刪除這則聯絡簿嗎？")) return;
+            
+            var btn = event.target;
+            var originalText = btn.innerText;
+            btn.disabled = true;
+            btn.innerText = "刪除中...";
+            document.getElementById('full-loader').style.display = 'flex';
+            
+            google.script.run
+                .withSuccessHandler(function (res) {
+                    document.getElementById('full-loader').style.display = 'none';
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                    if (res.success) { alert("🗑️ 已刪除！"); closePostModal(); onClassChange(); }
+                    else { alert("❌ 刪除失敗：" + res.msg); }
+                })
+                .withFailureHandler(function(err) {
+                    document.getElementById('full-loader').style.display = 'none';
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                    alert("❌ 刪除出錯：" + err);
+                })
+                .deleteDailyPost(currentEditingPost.rowIndex, gPass);
+        }
+
+        function deleteBulletin() {
+            if (!currentEditingBulletin) return;
+            if (!confirm("⚠️ 確定要刪除這則公告嗎？")) return;
+            
+            var btn = event.target;
+            var originalText = btn.innerText;
+            btn.disabled = true;
+            btn.innerText = "刪除中...";
+            document.getElementById('full-loader').style.display = 'flex';
+            
+            google.script.run
+                .withSuccessHandler(function (res) {
+                    document.getElementById('full-loader').style.display = 'none';
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                    if (res.success) { alert("🗑️ 已刪除！"); closeBulletinModal(); onBulletinClassChange(); }
+                    else { alert("❌ 刪除失敗：" + res.msg); }
+                })
+                .withFailureHandler(function(err) {
+                    document.getElementById('full-loader').style.display = 'none';
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                    alert("❌ 刪除出錯：" + err);
+                })
+                .deleteBulletin(currentEditingBulletin.rowIndex, gPass);
+        }
+
+        function submitPost() {
+            var btn = event.target;
+            var originalText = btn.innerText;
+            var idx = currentEditingPost ? currentEditingPost.rowIndex : null;
+            var formData = {
+                rowIndex: idx,
+                reserveTime: document.getElementById('postReserveTime').value,
+                date: document.getElementById('postDate').value,
+                className: document.getElementById('modalClassName').value,
+                title: document.getElementById('postTitle').value,
+                progress: document.getElementById('postProgress').value,
+                hw1: document.getElementById('postHw1').value,
+                hw2: document.getElementById('postHw2').value,
+                quiz: document.getElementById('postQuiz').value,
+                makeup: document.getElementById('postMakeup').value,
+                range: document.getElementById('postRange').value,
+                note: document.getElementById('postNote').value
+            };
+            if (!formData.date) { alert("日期為必填！"); return; }
+            
+            // Disable button to prevent double submission
+            btn.disabled = true;
+            btn.innerText = "儲存中...";
+            document.getElementById('full-loader').style.display = 'flex';
+            
+            google.script.run
+                .withSuccessHandler(function (res) {
+                    document.getElementById('full-loader').style.display = 'none';
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                    if (res.success) {
+                        var action = res.mode === 'update' ? "修改成功！" : "發布成功！";
+                        alert("✅ " + action + "\n(Firebase 資料同步通常需要 1~3 秒才會生效)"); 
+                        closePostModal(); 
+                        onClassChange(); 
+                    } else { 
+                        alert("❌ 失敗：" + res.msg); 
+                    }
+                })
+                .withFailureHandler(function(err) {
+                    document.getElementById('full-loader').style.display = 'none';
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                    alert("❌ 系統連線錯誤：" + err);
+                })
+                .saveDailyPost(formData, gPass);
+        }
+
+        function submitBulletin() {
+            var btn = event.target;
+            var originalText = btn.innerText;
+            var idx = currentEditingBulletin ? currentEditingBulletin.rowIndex : null;
+            var id = currentEditingBulletin ? currentEditingBulletin.id : null;
+            var formData = {
+                rowIndex: idx,
+                id: id,
+                reserveTime: document.getElementById('bulletinReserveTime').value,
+                className: document.getElementById('bulletinClass').value,
+                type: document.getElementById('bulletinType').value,
+                title: document.getElementById('bulletinTitle').value,
+                content: document.getElementById('bulletinContent').value,
+                btnName: document.getElementById('bulletinBtnName').value,
+                btnUrl: document.getElementById('bulletinBtnUrl').value
+            };
+            if (!formData.title || !formData.content) { alert("標題與內容為必填！"); return; }
+            
+            // Disable button
+            btn.disabled = true;
+            btn.innerText = "發布中...";
+            document.getElementById('full-loader').style.display = 'flex';
+            
+            google.script.run
+                .withSuccessHandler(function (res) {
+                    document.getElementById('full-loader').style.display = 'none';
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                    if (res.success) {
+                        alert("✅ 公告發布成功！\n(Firebase 資料同步通常需要 1~3 秒才會生效)"); 
+                        closeBulletinModal(); 
+                        onBulletinClassChange();
+                    } else { 
+                        alert("❌ 失敗：" + res.msg); 
+                    }
+                })
+                .withFailureHandler(function(err) {
+                    document.getElementById('full-loader').style.display = 'none';
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                    alert("❌ 系統連線錯誤：" + err);
+                })
+                .saveBulletin(formData, gPass);
+        }
+
+        function doLogout() {
+            if (isAdminMode) exitGodMode();
+            gData = null; gPass = "";
+            document.getElementById('sName').value = ""; document.getElementById('sPass').value = ""; document.getElementById('loginMsg').innerText = "";
+            document.getElementById('tab-content-0').innerHTML = ""; document.getElementById('tab-content-1').innerHTML = ""; document.getElementById('tab-content-2').innerHTML = "";
+            document.getElementById('main-screen').style.display = 'none'; document.getElementById('admin-screen').style.display = 'none';
+            document.getElementById('login-screen').style.display = 'flex'; document.getElementById('backTopBtn').style.display = 'none';
+        }
+        function doRefresh() {
+            if (!gData || !gPass) return;
+            document.getElementById('full-loader').style.display = 'flex';
+            if (isAdminMode) google.script.run.withSuccessHandler(function (result) { enterStudentView(result, "admin_view"); alert("資料已更新！"); }).getStudentDataByAdmin(gData.className, gData.studentName, gPass);
+            else google.script.run.withSuccessHandler(function (result) { loginSuccess(result, gPass); alert("資料已更新！"); }).getStudentData(gData.studentName, gPass);
+        }
+        function switchTab(idx) {
+            var tabs = document.querySelectorAll('.tab-item');
+            tabs.forEach(function (t) { t.classList.remove('active'); });
+            tabs[idx].classList.add('active');
+            document.getElementById('tab-content-0').style.display = (idx === 0) ? 'block' : 'none';
+            document.getElementById('tab-content-1').style.display = (idx === 1) ? 'block' : 'none';
+            document.getElementById('tab-content-2').style.display = (idx === 2) ? 'block' : 'none';
+            window.scrollTo(0, 0);
+        }
+
+        function getDisplayLogic(exam, feedbackHistory) { var rawScore = (exam.score || "").toString(); var sheetNum = exam.scoreNum; var myColor = (exam.cellColor || "").toLowerCase(); var result = { mainScore: "", mainClass: "", statusHtml: "", effectiveNum: null, showReviewing: false, needsReport: false }; if (sheetNum !== null && !isNaN(sheetNum)) { result.effectiveNum = sheetNum; result.mainScore = sheetNum; if (exam.myBucket === 4) result.mainClass = " score-green"; else if (exam.myBucket <= 1 && exam.myBucket >= 0) result.mainClass = " score-red"; if (rawScore.indexOf("假") > -1) result.statusHtml += "<div class='home-exam-tag'>(請假回報)</div>"; } else { result.needsReport = true; var overrideNum = getFeedbackOverrideNum(exam, feedbackHistory); if (overrideNum !== null) { result.effectiveNum = overrideNum; result.mainScore = overrideNum; result.showReviewing = true; } else { if (rawScore.indexOf("尚未繳交") > -1) { result.mainScore = "尚未繳交"; result.mainClass = " text-red"; } else { result.mainScore = "缺考"; } } } if (result.showReviewing) result.statusHtml += "<div class='reviewing-tag'>(待審核)</div>"; if (myColor) { if (myColor === "#00ff00") result.statusHtml += "<div class='makeup-status-tag status-green'>👍 補考結果：觀念理解良好</div>"; else if (myColor === "#ffff00") result.statusHtml += "<div class='makeup-status-tag status-yellow'>🙂 補考結果：觀念大致理解</div>"; else if (myColor === "#ff9900") result.statusHtml += "<div class='makeup-status-tag status-orange'>😐 補考結果：觀念不太理解</div>"; else if (myColor === "#ff0000") result.statusHtml += "<div class='makeup-status-tag status-red'>💪 補考結果：觀念必須加強</div>"; } if (result.statusHtml.indexOf("補考結果") === -1) { if (result.effectiveNum !== null && exam.makeupThreshold > 0) { if (result.effectiveNum < exam.makeupThreshold) result.statusHtml += "<div class='makeup-status-tag status-warning'>⚠️ 未達標需補考</div>"; } } return result; }
+        function getFeedbackOverrideNum(exam, feedbackHistory) { if (!feedbackHistory || feedbackHistory.length === 0) return null; var rawScore = (exam.score || "").toString(); var hasNum = (exam.scoreNum !== null && !isNaN(exam.scoreNum)); if (exam.isMissing || (rawScore.indexOf("假") > -1 && !hasNum)) { for (var k = feedbackHistory.length - 1; k >= 0; k--) { var fb = feedbackHistory[k]; if (fb.type === "補考回報") { var fbDatePart = fb.targetDate.substring(5).replace('-', '/'); var fbDatePart2 = fb.targetDate.substring(5).replace('-', '/').replace(/^0/, '').replace(/\/0/, '/'); if (exam.date.indexOf(fbDatePart) > -1 || exam.date.indexOf(fbDatePart2) > -1 || exam.date == fbDatePart2) { var match = fb.content.match(/(\d+(\.\d+)?)/); if (match) return parseFloat(match[0]); } } } } return null; }
+
+        // ★★★ v3.9 新增：學生上傳佇列處理 ★★★
+        var uploadQueue = [];
+        var isUploading = false;
+        var currentUploadDate = "";
+
+        function handleStudentUpload(input, dateStr) {
+            if (input.files.length === 0) return;
+            if (input.files.length > 5) {
+                alert("一次最多只能上傳 5 個檔案！");
+                input.value = "";
+                return;
+            }
+
+            currentUploadDate = dateStr;
+            uploadQueue = Array.from(input.files);
+            processUploadQueue(dateStr);
+        }
+
+        function processUploadQueue(dateStr) {
+            if (uploadQueue.length === 0) {
+                alert("✅ 所有檔案上傳完成！");
+                document.getElementById('upload-status-' + dateStr.replace(/\//g, '-')).innerText = "";
+                return;
+            }
+
+            var file = uploadQueue.shift();
+            var statusDiv = document.getElementById('upload-status-' + dateStr.replace(/\//g, '-'));
+
+            if (file.size > 10 * 1024 * 1024) {
+                alert("❌ 檔案 " + file.name + " 超過 10MB，已略過。");
+                processUploadQueue(dateStr);
+                return;
+            }
+
+            statusDiv.innerText = "⏳ 正在上傳：" + file.name + "...";
+
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                var base64 = e.target.result;
+                // 檔名格式：YYYYMMDD_班級_姓名_原始檔名
+                var today = new Date();
+                var datePrefix = today.getFullYear() + String(today.getMonth() + 1).padStart(2, '0') + String(today.getDate()).padStart(2, '0');
+                var newName = datePrefix + "_" + gData.className + "_" + gData.studentName + "_" + file.name;
+
+                google.script.run
+                    .withSuccessHandler(function (res) {
+                        if (res.success) {
+                            // ★★★ v3.9 修正：學生上傳後，回填檔名強制為 [📄附件] ★★★
+                            var content = `[📄附件]${res.url}`;
+                            sendFeedback(dateStr.replace(/\//g, '-'), dateStr, '作業上傳', content, function () {
+                                processUploadQueue(dateStr); // 繼續下一個
+                            });
+                        } else {
+                            alert("❌ 上傳失敗：" + res.msg);
+                            processUploadQueue(dateStr);
+                        }
+                    })
+                    .withFailureHandler(function (e) {
+                        var statusDiv = document.getElementById('upload-status-' + dateStr.replace(/\//g, '-'));
+                        if (statusDiv) statusDiv.innerText = "";
+                        alert("❌ 上傳錯誤：" + (e.message || e.toString()));
+                        console.error("studentUpload Error:", e);
+                        processUploadQueue(dateStr);
+                    })
+                    .uploadFileToDrive({
+                        base64: base64,
+                        type: "學生作業",
+                        fileName: newName
+                    });
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function renderDailyPosts(posts, history) {
+            var container = document.getElementById('tab-content-0'); if (!posts || posts.length === 0) { container.innerHTML = "<div style='text-align:center; padding:30px; color:#999;'>目前沒有聯絡簿資料</div>"; return; } var html = ""; posts.forEach(function (post) {
+                var gradeHtml = ""; var exam = post.examData.main; var others = post.examData.others; var scoreReportHtml = ""; if (exam) {
+                    var logic = getDisplayLogic(exam, history); var unitDisplay = ""; if (!isNaN(parseFloat(logic.mainScore))) unitDisplay = "<span class='score-unit-big'>" + (exam.unit || "分") + "</span>"; var scoreDisplay = "<span class='" + logic.mainClass + "'>" + logic.mainScore + "</span>" + unitDisplay; var standardHtml = ""; if (exam.note && exam.note !== "") standardHtml = "<div class='exam-standard-box'>🎯 補考標準：" + exam.note + "</div>"; if (logic.needsReport) { var safeDate = post.date.replace(/\//g, '-'); scoreReportHtml = "<div class='score-report-section'><div style='font-weight:bold; color:#c0392b; margin-bottom:10px; font-size:1.35rem;'>📝 回報補考分數</div><div class='input-box'><input type='number' class='score-input' id='score-in-" + safeDate + "' placeholder='輸入分數'><button class='score-btn' onclick=\"submitScoreReport('" + safeDate + "', '" + post.date + "')\">送出</button></div></div>"; } var chartHtml = ""; if (exam.dist) { var total = exam.total; for (var i = 4; i >= 0; i--) { var count = exam.dist[i]; var percent = (total > 0) ? (count / total) * 100 : 0; var label = exam.labels ? exam.labels[i] : ""; var barColor = "#5b9bd5"; if (!exam.isMissing && i === exam.myBucket) { if (i === 4) barColor = "#27ae60"; else if (i === 3 || i === 2) barColor = "#f39c12"; else barColor = "#e74c3c"; } chartHtml += "<div class='chart-row'><div class='chart-label'>" + label + "</div><div class='chart-bar-area'><div class='chart-bar-fill' style='width: " + percent + "%; background-color: " + barColor + ";'></div></div><div class='chart-count'>" + (count > 0 ? count : '') + "</div></div>"; } chartHtml = "<div class='chart-container-post'>" + chartHtml + "</div>"; } var refHwHtml = ""; if (others.length > 0) { refHwHtml = "<div class='ref-hw-box'><div class='ref-hw-title'>📝 相同範圍作業分數：</div>"; others.forEach(function (o) { var sDisplay = o.score; var hwColorClass = ""; if (sDisplay == "#N/A") sDisplay = "<span class='text-red' style='font-size:1rem'>尚未繳交</span>"; else { var m = sDisplay.match(/(\d+(\.\d+)?)/); if (m) { var u = o.unit || "題"; if (o.myBucket === 4) hwColorClass = " score-green"; else if (o.myBucket <= 1 && o.myBucket >= 0) hwColorClass = " score-red"; sDisplay = "<span class='hw-score-val" + hwColorClass + "'>" + m[0] + "</span><span class='score-unit'>" + u + "</span>"; } } refHwHtml += "<div class='ref-hw-item'><span>" + o.date + " " + o.exam + "</span><div>" + sDisplay + "</div></div>"; }); refHwHtml += "</div>"; }
+
+                    var examTitle = "今日小考成績";
+                    if (exam.date.indexOf("複習") > -1) examTitle = "今日複習考成績";
+                    else if (exam.date.indexOf("鑑定") > -1) examTitle = "今日鑑定考成績";
+                    else if (exam.date.indexOf("隨堂") > -1) examTitle = "今日隨堂考成績";
+
+                    gradeHtml = "<div class='grade-section'><div class='main-exam-title'>" + examTitle + "</div><div class='main-exam-range'>" + exam.exam + "</div><div class='main-score'>" + scoreDisplay + "</div>" + logic.statusHtml + "<div class='score-sub'>班平均: " + exam.average + "</div>" + standardHtml + scoreReportHtml + chartHtml + refHwHtml + "</div>";
+                } var contentHtml = "";
+
+                // ★★★ v3.9 修正：連結解析邏輯 (支援小標籤) ★★★
+                var parseBtn = function (text) {
+                    if (!text) return "";
+                    // 先對 HTML 特殊字元做跳脫 防範 XSS
+                    text = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                    var withBr = text.replace(/\n/g, '<br>');
+                    // ★★★ v3.9.1 新增：引用區塊解析 ★★★
+                    withBr = withBr.replace(/\[quote:([^\]]+)\](.*?)\[\/quote\]/g, function(match, type, qContent) {
+                        return `<div class="quote-box"><div class="quote-type">${type}</div><div class="quote-content">${qContent}</div></div>`;
+                    });
+                    // 老師發布的連結 -> 藍色大膠囊
+                    // 學生上傳的連結 -> 灰色小標籤 (透過 class="btn-small-tag" 區分)
+                    return withBr.replace(/\[(.*?)\](http[s]?:\/\/[^\s]+)/g, function (match, name, url) {
+                        if (name.indexOf("附件") > -1 || name.indexOf("作業") > -1) {
+                            return `<a href="${url}" target="_blank" class="btn-small-tag">📎 ${name}</a>`;
+                        } else {
+                            return `<a href="${url}" target="_blank" class="btn-link">${name}</a>`;
+                        }
+                    });
+                };
+
+                var labelHw1 = "今日作業"; if (post.hw2 && post.hw2.toString().trim() !== "") labelHw1 = "今日作業一"; var fields = [{ label: "今日課程進度", val: post.progress }, { label: "今日小考考卷", val: post.quiz }, { label: labelHw1, val: post.hw1 }, { label: "今日作業二", val: post.hw2 }, { label: "今日補考考卷", val: post.makeup }, { label: "下次小考範圍", val: post.range }, { label: "補充資料", val: post.note }]; fields.forEach(function (f) { if (f.val) contentHtml += "<div class='info-block'><span class='info-label'>" + f.label + "</span><div class='info-content'>" + parseBtn(f.val) + "</div></div>"; }); var pDateShort = post.date.substring(5).replace("-", "/"); var pDateFull = post.date.replace(/-/g, "/"); var myHistory = history.filter(function (h) { return h.targetDate == pDateShort || h.targetDate == post.date || h.targetDate == pDateFull; }); var historyHtml = ""; myHistory.forEach(function (h) { if (h.type !== "補考回報") { var displayType = (h.type === "家長留言" || h.type === "家長/學生" || h.type === "學生留言") ? "學生留言" : h.type; historyHtml += "<div class='history-msg'><b>" + displayType + ":</b> " + parseBtn(h.content) + " <br><span style='font-size:1.05rem;color:#aaa; display:block; text-align:right; margin-top:5px;'>(" + h.time.substring(5, 16) + ")</span></div>"; }}); var inputPlaceholder = "留言給老師..."; var safeDateId = post.date.replace(/\//g, '-');
+
+                var uploadHtml = `
+        <div class="student-upload-box">
+            <span class="upload-title">📤 作業/筆記上傳區</span>
+            <div class="upload-btn-wrapper">
+                <button class="upload-btn-real">➕ 選擇檔案 (可多選)</button>
+                <input type="file" multiple onchange="handleStudentUpload(this, '${post.date}')">
+            </div>
+            <div id="upload-status-${safeDateId}" class="upload-status"></div>
+        </div>
+    `;
+
+                // ★★★ v3.9 修正：家長留言 -> 留言內容 ★★★
+                var feedbackHtml = "<div class='feedback-section'>" + uploadHtml + "<div class='section-title'>💬 留言內容</div><div id='history-" + safeDateId + "'>" + historyHtml + "</div><div class='input-box'><input type='text' class='fb-input' id='input-" + safeDateId + "' placeholder='" + inputPlaceholder + "'><button class='fb-btn' onclick=\"sendFeedback('" + safeDateId + "', '" + post.date + "', '學生留言')\">送出</button></div></div>"; var headerTitle = post.date + (post.title ? " " + post.title : ""); html += "<div class='post-card'><div class='post-header'><span>📅 " + headerTitle + "</span></div>" + gradeHtml + "<div class='content-section'><div class='section-title'>📢 聯絡事項</div>" + contentHtml + "</div>" + feedbackHtml + "</div>";
+            }); container.innerHTML = html;
+        }
+
+        function renderOldGradeCards(grades) {
+            var container = document.getElementById('tab-content-1'); if (!grades || grades.length === 0) { container.innerHTML = "<p style='color:#666; padding:10px;'>目前尚無成績紀錄。</p>"; return; } var html = ""; grades.forEach(function (item) {
+                var logic = getDisplayLogic(item, gData ? gData.feedbackHistory : []); var unitDisplay = ""; if (!isNaN(parseFloat(logic.mainScore))) unitDisplay = "<span class='score-unit'>" + item.unit + "</span>"; var displayScore = "<div class='score-val" + logic.mainClass + "'>" + logic.mainScore + unitDisplay + "</div>"; var chartHtml = ""; var total = item.total || 1; for (var i = 4; i >= 0; i--) { var count = item.dist[i]; var percent = (total > 0) ? (count / total) * 100 : 0; var label = item.labels[i]; var barColor = "#5b9bd5"; if (!item.isMissing && i === item.myBucket) { if (i === 4) barColor = "#27ae60"; else if (i === 3 || i === 2) barColor = "#f39c12"; else barColor = "#e74c3c"; } chartHtml += "<div class='chart-row'><div class='chart-label'>" + label + "</div><div class='chart-bar-area'><div class='chart-bar-fill' style='width: " + percent + "%; background-color: " + barColor + ";'></div></div><div class='chart-count'>" + (count > 0 ? count : '') + "</div></div>"; }
+
+                html += `
+        <div class='score-card' onclick='toggleCard(this)'>
+            <div class='class-badge'>${item.className}</div>
+            <div class='card-main'>
+                <div class='exam-info'><span class='exam-date'>${item.date}</span><span class='exam-name'>${item.exam}</span></div>
+                <div class='score-box'>${displayScore}${item.subNote || ""}${logic.statusHtml}<div class='avg-score'>班平均 ${item.average}</div></div>
+            </div>
+            <div class='expand-area'>
+                <div class='detail-box'><strong>🎯 補考標準：</strong><br>${item.note}</div>
+                <div class='chart-wrapper'>${chartHtml}</div>
+            </div>
+            <div class='click-hint'>▼</div>
+        </div>`;
+            });
+            container.innerHTML = html;
+        }
+
+        function toggleCard(card) { card.classList.toggle('active'); var hint = card.querySelector('.click-hint'); hint.innerText = card.classList.contains('active') ? "▲" : "▼"; }
+
+        function sendFeedback(safeId, realDate, type, contentOverride, callback) {
+            var inputId = 'input-' + safeId;
+            var val = contentOverride || document.getElementById(inputId).value;
+            if (!val) return;
+
+            var btn = document.querySelector("#" + inputId + " + button");
+            if (btn && !contentOverride) { btn.innerText = "傳送中..."; btn.disabled = true; }
+
+            var form = { className: gData.className, studentName: gData.studentName, targetDate: realDate, type: type, content: val };
+
+            google.script.run.withSuccessHandler(function (res) {
+                var historyDiv = document.getElementById('history-' + safeId);
+                var timeStr = res.time.substring(5, 16);
+
+                // ★★★ v3.9 修正：連結解析邏輯 (支援小標籤) ★★★
+                var parseBtn = function (text) {
+                    if (!text) return "";
+                    // 先對 HTML 特殊字元做跳脫 防範 XSS
+                    text = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                    var withBr = text.replace(/\n/g, '<br>');
+                    return withBr.replace(/\[(.*?)\](http[s]?:\/\/[^\s]+)/g, function (match, name, url) {
+                        if (name.indexOf("附件") > -1 || name.indexOf("作業") > -1) {
+                            return `<a href="${url}" target="_blank" class="btn-small-tag">📎 ${name}</a>`;
+                        } else {
+                            return `<a href="${url}" target="_blank" class="btn-link">${name}</a>`;
+                        }
+                    });
+                };
+
+                var newMsg = "<div class='history-msg'><b>" + type + ":</b> " + parseBtn(val) + " <br><span style='font-size:0.8rem;color:#aaa; display:block; text-align:right; margin-top:5px;'>(" + timeStr + ")</span></div>";
+                historyDiv.innerHTML += newMsg;
+
+                if (!contentOverride) {
+                    document.getElementById(inputId).value = "";
+                    btn.innerText = "送出"; btn.disabled = false;
+                    alert("已送出！");
+                }
+                if (callback) callback();
+
+            }).withFailureHandler(function (e) {
+                alert("錯誤: " + e.message);
+                if (btn) { btn.innerText = "送出"; btn.disabled = false; }
+            }).submitFeedback(form);
+        }
+
+        function submitScoreReport(safeId, realDate) { var inputId = 'score-in-' + safeId; var val = document.getElementById(inputId).value; if (!val) return; var btn = document.querySelector("#" + inputId + " + button"); btn.innerText = "送出..."; btn.disabled = true; var form = { className: gData.className, studentName: gData.studentName, targetDate: realDate, type: '補考回報', content: val }; google.script.run.withSuccessHandler(function (res) { gData.feedbackHistory.push({ time: res.time, type: '補考回報', targetDate: realDate, content: val }); renderDailyPosts(gData.dailyPost, gData.feedbackHistory); renderOldGradeCards(gData.grades); alert("回報成功！分數已更新 (審核中)"); }).withFailureHandler(function (e) { alert("錯誤: " + e.message); btn.innerText = "送出"; btn.disabled = false; }).submitFeedback(form); }
+        function openPwdModal() { document.getElementById('pwdModal').style.display = 'flex'; }
+        function closePwdModal() { document.getElementById('pwdModal').style.display = 'none'; }
+        function doChangePwd() { 
+            var btn = event.target;
+            var originalText = btn.innerText;
+            var oldP = document.getElementById('oldP').value; 
+            var newP = document.getElementById('newP').value; 
+            if (!oldP || !newP) { alert("請輸入完整"); return; } 
+            
+            btn.disabled = true;
+            btn.innerText = "修改中...";
+            
+            google.script.run
+                .withSuccessHandler(function (res) { 
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                    if (res.success) { alert("✅ 修改成功！"); closePwdModal(); } 
+                    else { alert("❌ " + res.msg); } 
+                })
+                .withFailureHandler(function(err) {
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                    alert("❌ 系統連線錯誤：" + err);
+                })
+                .changeUserPassword(gData.studentName, oldP, newP); 
+        }
+
+        function renderBulletins(list) {
+            var container = document.getElementById('tab-content-2');
+            if (!list || list.length === 0) {
+                container.innerHTML = "<div style='text-align:center; padding:30px; color:#999;'>目前沒有公告</div>";
+                return;
+            }
+            var html = "";
+            list.forEach(function (b) {
+                var cardClass = "bulletin-card";
+                var tagClass = "tag-gray";
+                if (b.type === "緊急") { cardClass += " type-emergency"; tagClass = "tag-red"; }
+                else if (b.type === "課表") { cardClass += " type-schedule"; tagClass = "tag-blue"; }
+                else { cardClass += " type-normal"; tagClass = "tag-gray"; }
+
+                var btnHtml = "";
+                if (b.btnName && b.btnUrl) {
+                    btnHtml = `<div class="btn-center-wrapper"><a href="${b.btnUrl}" target="_blank" class="btn-capsule">${b.btnName}</a></div>`;
+                }
+
+                html += `
+            <div class="${cardClass}">
+                <div class="bulletin-header">
+                    <div><span class="bulletin-tag ${tagClass}">${b.type}</span><span class="bulletin-title">${b.title}</span></div>
+                    <div class="bulletin-date">${b.time.substring(5, 16)}</div>
+                </div>
+                <div class="bulletin-content">${parseBtn(b.content)}</div>
+                ${btnHtml}
+            </div>`;
+            });
+            container.innerHTML = html;
+        }
+
+        function checkEmergency(list) {
+            if (!list || list.length === 0) return;
+            var emergency = list.find(b => b.type === "緊急");
+            if (emergency) {
+                document.getElementById('emergencyContent').innerHTML = parseBtn(emergency.content);
+                document.getElementById('emergencyModal').style.display = 'flex';
+            }
+        }
+
+        function closeEmergencyModal() {
+            document.getElementById('emergencyModal').style.display = 'none';
+        }
+    </script>
+</body>
+
+</html>

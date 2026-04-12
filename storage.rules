@@ -1,0 +1,28 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // 家長上傳的圖片（請假單、作業截圖等）
+    match /feedbacks/{allPaths=**} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // 學費單、成績單圖片（戰情室產生後上傳）
+    match /bills/{allPaths=**} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /reports/{allPaths=**} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ★ 新增：老師/學生在 ebook-app 上傳的附件（考卷、筆記、作業等）
+    match /uploads/{allPaths=**} {
+      allow read: if true;
+      allow write: if true;
+    }
+  }
+}
