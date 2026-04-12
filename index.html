@@ -1956,15 +1956,16 @@
                 const isLine = ua.indexOf("Line/") > -1;
                 const isFB = ua.indexOf("FBAN") > -1 || ua.indexOf("FBAV") > -1;
                 const isIG = ua.indexOf("Instagram") > -1;
-                const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
                 const isiOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
                 const isAndroid = /Android/.test(ua);
 
                 const splash = document.getElementById('splash-screen');
                 const app = document.getElementById('appContainer');
+                let warningActive = false;
 
                 // 移除啟動畫背景的函式 (帶動畫)
                 function enterApp() {
+                    if (warningActive) return; // 如果警告正在顯示，不要自動移除
                     splash.style.opacity = '0';
                     setTimeout(() => {
                         splash.style.display = 'none';
@@ -1972,82 +1973,82 @@
                     }, 500);
                 }
 
-                document.addEventListener('DOMContentLoaded', () => {
+                function startDetection() {
                     // 1. 如果已經是 App 模式開啓，直接進入
-                    if (isStandalone) {
-                        setTimeout(enterApp, 1500); // 留一點呼吸的時間
+                    if (navigator.standalone || window.matchMedia('(display-mode: standalone)').matches) {
+                        setTimeout(enterApp, 1500);
                         return;
                     }
 
                     // 2. 如果是在 LINE/FB/IG 等限制型瀏覽器中
                     if (isLine || isFB || isIG) {
+                        warningActive = true;
                         const appName = isLine ? 'LINE' : (isFB ? 'Facebook' : 'Instagram');
                         const tutorialHtml = isLine
-                            ? '<div class="line-tutorial-container">' +
-                              '<div class="lt-dropdown"><div class="lt-dropdown-item">在瀏覽器中開啟</div></div>' +
-                              '<div class="lt-footer">' +
-                                  '<div class="lt-menu-btn"><div class="lt-menu-dot"></div><div class="lt-menu-dot"></div><div class="lt-menu-dot"></div></div>' +
-                              '</div>' +
-                              '<div class="lt-cursor"><div class="lt-click-ripple"></div></div>' +
-                              '</div>'
-                            : '<div class="line-tutorial-container" style="background:#fff;">' +
-                              '<div style="height:38px; border-bottom:1px solid #ddd; display:flex; justify-content:flex-end; align-items:center; padding-right:12px;">' +
-                                  '<div style="display:flex; gap:3px;"><div style="width:4px; height:4px; background:#333; border-radius:50%;"></div><div style="width:4px; height:4px; background:#333; border-radius:50%;"></div><div style="width:4px; height:4px; background:#333; border-radius:50%;"></div></div>' +
-                              '</div>' +
-                              '<div style="position:absolute; top:43px; right:10px; background:#333; color:white; padding:6px 12px; border-radius:8px; font-size:11px; font-weight:bold;">在瀏覽器中開啟</div>' +
-                              '</div>';
+                            ? '<div class="line-tutorial-container"><div class="lt-dropdown"><div class="lt-dropdown-item">在瀏覽器中開啟</div></div><div class="lt-footer"><div class="lt-menu-btn"><div class="lt-menu-dot"></div><div class="lt-menu-dot"></div><div class="lt-menu-dot"></div></div></div><div class="lt-cursor"><div class="lt-click-ripple"></div></div></div>'
+                            : '<div class="line-tutorial-container" style="background:#fff;"><div style="height:38px; border-bottom:1px solid #ddd; display:flex; justify-content:flex-end; align-items:center; padding-right:12px;"><div style="display:flex; gap:3px;"><div style="width:4px; height:4px; background:#333; border-radius:50%;"></div><div style="width:4px; height:4px; background:#333; border-radius:50%;"></div><div style="width:4px; height:4px; background:#333; border-radius:50%;"></div></div></div><div style="position:absolute; top:43px; right:10px; background:#333; color:white; padding:6px 12px; border-radius:8px; font-size:11px; font-weight:bold;">在瀏覽器中開啟</div></div>';
 
                         const hintText = isLine
                             ? '請點擊畫面<b>「右下角」的 [ ⋮ ] 或 [ ⋯ ]</b><br>選擇<b>「以 Safari 或 Chrome 開啟」</b>！'
                             : '請點擊畫面<b>「右上角」的 [ ⋯ ]</b><br>選擇<b>「以 Safari 或 Chrome 開啟」</b>！';
 
                         setTimeout(() => {
-                            Swal.fire({
-                                title: `🛑 請勿使用 ${appName} 內建瀏覽器`,
-                                html: `<div style="text-align:center; font-size:15px; line-height:1.6;">` +
-                                      `<b style="color:#e74c3c;">Google 安全系統禁止在 ${appName} 內登入帳號</b><br>` +
-                                      `<div style="font-weight:bold; color:#2980b9; margin:15px 0 10px;">👉 請依下方動畫指示操作：</div>` +
-                                      tutorialHtml +
-                                      `<div style="margin-top:10px;">${hintText}</div></div>`,
-                                confirmButtonText: '我知道了，我會切換瀏覽器',
-                                confirmButtonColor: '#e74c3c',
-                                allowOutsideClick: false,
-                                backdrop: `rgba(44, 62, 80, 0.95)`
-                            });
-                        }, 1000);
+                            if (typeof Swal !== 'undefined') {
+                                Swal.fire({
+                                    title: `🛑 請勿使用 ${appName} 內建瀏覽器`,
+                                    html: `<div style="text-align:center; font-size:15px; line-height:1.6;"><b style="color:#e74c3c;">Google 安全系統禁止在 ${appName} 內登入帳號</b><br><div style="font-weight:bold; color:#2980b9; margin:15px 0 10px;">👉 請依下方動畫指示操作：</div>${tutorialHtml}<div style="margin-top:10px;">${hintText}</div></div>`,
+                                    confirmButtonText: '我知道了，我會切換瀏覽器',
+                                    confirmButtonColor: '#e74c3c',
+                                    allowOutsideClick: false,
+                                    backdrop: `rgba(44, 62, 80, 0.95)`
+                                });
+                            } else {
+                                alert(`🛑 嚴重警告：請勿使用 ${appName} 內建瀏覽器！\n\nGoogle 禁止在內建瀏覽器內登入帳號，您將無法使用。\n👉 請點擊選單，選擇「以 Safari 或 Chrome 開啟」！`);
+                            }
+                        }, 800);
                         return;
                     }
 
                     // 3. 一般流覽器且非 PWA 模式 (引導安裝)
                     if (isiOS || isAndroid) {
                         const pwaGuideHtml = isiOS 
-                            ? `<div class="pwa-tutorial-ios">` +
-                              `<div class="pwa-step"><div class="pwa-icon-box"><div class="pwa-icon-share"></div></div><div>1. 點擊瀏覽器下方的<b>「分享」</b>按鈕</div></div>` +
-                              `<div class="pwa-step"><div class="pwa-icon-box"><div class="pwa-icon-add"></div></div><div>2. 向上捲動並點擊<b>「加入主畫面」</b></div></div>` +
-                              `</div>`
-                            : `<div style="padding:10px; text-align:left;">` +
-                              `<p>1. 點擊瀏覽器右上角的<b>「⋮」選單</b></p>` +
-                              `<p>2. 選擇<b>「安裝應用程式」</b>或<b>「將網頁加入主畫面」</b></p>` +
-                              `</div>`;
+                            ? `<div class="pwa-tutorial-ios"><div class="pwa-step"><div class="pwa-icon-box"><div class="pwa-icon-share"></div></div><div>1. 點擊瀏覽器下方的<b>「分享」</b>按鈕</div></div><div class="pwa-step"><div class="pwa-icon-box"><div class="pwa-icon-add"></div></div><div>2. 向上捲動並點擊<b>「加入主畫面」</b></div></div></div>`
+                            : `<div style="padding:10px; text-align:left;"><p>1. 點擊瀏覽器右上角的<b>「⋮」選單</b></p><p>2. 選擇<b>「安裝應用程式」</b>或<b>「將網頁加入主畫面」</b></p></div>`;
 
                         setTimeout(() => {
-                            Swal.fire({
-                                title: '📱 安裝為桌面 App',
-                                html: `<div style="font-size:15px; line-height:1.5;">將本系統加到桌面，就像 App 一樣隨開即用！<br><br>${pwaGuideHtml}</div>`,
-                                icon: 'info',
-                                showCancelButton: true,
-                                confirmButtonText: '了解！我也要安裝',
-                                cancelButtonText: '暫時不要',
-                                confirmButtonColor: '#4CAF50'
-                            }).then((result) => {
+                            if (typeof Swal !== 'undefined') {
+                                Swal.fire({
+                                    title: '📱 安裝為桌面 App',
+                                    html: `<div style="font-size:15px; line-height:1.5;">將本系統加到桌面，就像 App 一樣隨開即用！<br><br>${pwaGuideHtml}</div>`,
+                                    icon: 'info',
+                                    showCancelButton: true,
+                                    confirmButtonText: '了解！我也要安裝',
+                                    cancelButtonText: '暫時不要',
+                                    confirmButtonColor: '#4CAF50'
+                                }).then((result) => { enterApp(); });
+                            } else {
                                 enterApp();
-                            });
-                        }, 1500);
+                            }
+                        }, 1200);
                     } else {
-                        // 電腦版或其它情況
-                        setTimeout(enterApp, 1500);
+                        setTimeout(enterApp, 1000);
                     }
-                });
+                }
+
+                // 立即檢查並啟動
+                if (document.readyState === 'interactive' || document.readyState === 'complete') {
+                    startDetection();
+                } else {
+                    document.addEventListener('DOMContentLoaded', startDetection);
+                }
+
+                // 最終保險：5秒後如果還卡在 Splash (且沒警告)，強制進入
+                setTimeout(() => {
+                    if (splash.style.display !== 'none' && !warningActive) {
+                        console.log("Emergency app entry triggered.");
+                        enterApp();
+                    }
+                }, 5000);
             })();
         </script>
 
@@ -2068,7 +2069,7 @@
         </div>
 
         <div id="login-screen">
-            <img src="https://www.sciencebear.com.tw/ebook/LOGO.png" class="logo-img logo-target" alt="山熊科學">
+            <img src="LOGO.png" class="logo-img logo-target" alt="山熊科學">
             <h2>數位聯絡簿</h2>
             <div class="sub-title">小六資優自然<br>國中自然超前班</div>
             <div class="input-group"><input type="text" id="sName" placeholder="請輸入學生姓名 (或管理者帳號)"></div>
