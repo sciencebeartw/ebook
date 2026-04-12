@@ -1961,104 +1961,115 @@
 
         <!-- PWA/Browser Detection & Logic -->
         <script>
+            // ★★★ 環境偵測與啟動畫面邏輯 ★★★
             (function () {
-                const ua = navigator.userAgent || navigator.vendor || window.opera;
-                const isLine = ua.indexOf("Line/") > -1;
-                const isFB = ua.indexOf("FBAN") > -1 || ua.indexOf("FBAV") > -1;
-                const isIG = ua.indexOf("Instagram") > -1;
-                const isiOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
-                const isAndroid = /Android/.test(ua);
+                // UA 偵測
+                var ua = (navigator.userAgent || navigator.vendor || window.opera);
+                var uaLower = ua.toLowerCase();
+                var isLine = ua.indexOf("Line/") > -1;
+                var isFB = ua.indexOf("FBAN") > -1 || ua.indexOf("FBAV") > -1;
+                var isIG = ua.indexOf("Instagram") > -1;
+                var isiOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+                var isAndroid = /Android/.test(ua);
+                var isStandalone = (window.navigator.standalone === true) || window.matchMedia('(display-mode: standalone)').matches;
 
-                const splash = document.getElementById('splash-screen');
-                const app = document.getElementById('appContainer');
-                let warningActive = false;
-
-                // 移除啟動畫背景的函式 (帶動畫)
-                window.forceEnterApp = function() {
-                    if (warningActive) return; // 如果警告正在顯示，不要自動移除
+                // ✅ 顯示 App 主畫面（隱藏 Splash），任何情況都可以呼叫
+                window.showApp = function() {
+                    var splash = document.getElementById('splash-screen');
+                    var app = document.getElementById('appContainer');
+                    if (!splash || !app) return;
+                    splash.style.transition = 'opacity 0.5s ease';
                     splash.style.opacity = '0';
-                    setTimeout(() => {
+                    setTimeout(function() {
                         splash.style.display = 'none';
                         app.style.display = 'block';
                     }, 500);
-                }
+                };
 
-                var startDetection = function() {
-                    // 1. 如果已經是 App 模式開啓，直接進入
-                    if (navigator.standalone || window.matchMedia('(display-mode: standalone)').matches) {
-                        setTimeout(enterApp, 1500);
+                function startDetection() {
+                    // 【情境 1】已是桌面 App（PWA Standalone），直接進入
+                    if (isStandalone) {
+                        setTimeout(window.showApp, 1200);
                         return;
                     }
 
-                    // 2. 如果是在 LINE/FB/IG 等限制型瀏覽器中
+                    // 【情境 2】LINE / FB / IG 內建瀏覽器 → 顯示警告，不進入 App
                     if (isLine || isFB || isIG) {
-                        warningActive = true;
-                        const appName = isLine ? 'LINE' : (isFB ? 'Facebook' : 'Instagram');
-                        const tutorialHtml = isLine
+                        var appName = isLine ? 'LINE' : (isFB ? 'Facebook' : 'Instagram');
+                        var tutorialHtml = isLine
                             ? '<div class="line-tutorial-container"><div class="lt-dropdown"><div class="lt-dropdown-item">在瀏覽器中開啟</div></div><div class="lt-footer"><div class="lt-menu-btn"><div class="lt-menu-dot"></div><div class="lt-menu-dot"></div><div class="lt-menu-dot"></div></div></div><div class="lt-cursor"><div class="lt-click-ripple"></div></div></div>'
-                            : '<div class="line-tutorial-container" style="background:#fff;"><div style="height:38px; border-bottom:1px solid #ddd; display:flex; justify-content:flex-end; align-items:center; padding-right:12px;"><div style="display:flex; gap:3px;"><div style="width:4px; height:4px; background:#333; border-radius:50%;"></div><div style="width:4px; height:4px; background:#333; border-radius:50%;"></div><div style="width:4px; height:4px; background:#333; border-radius:50%;"></div></div></div><div style="position:absolute; top:43px; right:10px; background:#333; color:white; padding:6px 12px; border-radius:8px; font-size:11px; font-weight:bold;">在瀏覽器中開啟</div></div>';
+                            : '<div class="line-tutorial-container" style="background:#fff;"><div style="height:38px;border-bottom:1px solid #ddd;display:flex;justify-content:flex-end;align-items:center;padding-right:12px;"><div style="display:flex;gap:3px;"><div style="width:4px;height:4px;background:#333;border-radius:50%;"></div><div style="width:4px;height:4px;background:#333;border-radius:50%;"></div><div style="width:4px;height:4px;background:#333;border-radius:50%;"></div></div></div><div style="position:absolute;top:43px;right:10px;background:#333;color:white;padding:6px 12px;border-radius:8px;font-size:11px;font-weight:bold;">在瀏覽器中開啟</div></div>';
+                        var hintText = isLine
+                            ? '請點擊畫面<b>右下角的 [ ⋮ ] 或 [ ⋯ ]</b><br>選擇<b>「以 Safari 或 Chrome 開啟」</b>！'
+                            : '請點擊畫面<b>右上角的 [ ⋯ ]</b><br>選擇<b>「以 Safari 或 Chrome 開啟」</b>！';
 
-                        const hintText = isLine
-                            ? '請點擊畫面<b>「右下角」的 [ ⋮ ] 或 [ ⋯ ]</b><br>選擇<b>「以 Safari 或 Chrome 開啟」</b>！'
-                            : '請點擊畫面<b>「右上角」的 [ ⋯ ]</b><br>選擇<b>「以 Safari 或 Chrome 開啟」</b>！';
+                        // 顯示手動按鈕（6秒後仍未離開 LINE，可手動繞過）
+                        setTimeout(function() {
+                            var btn = document.getElementById('splash-manual-btn');
+                            if (btn) btn.style.display = 'block';
+                        }, 6000);
 
-                        setTimeout(() => {
+                        setTimeout(function() {
                             if (typeof Swal !== 'undefined') {
                                 Swal.fire({
-                                    title: `🛑 請勿使用 ${appName} 內建瀏覽器`,
-                                    html: `<div style="text-align:center; font-size:15px; line-height:1.6;"><b style="color:#e74c3c;">Google 安全系統禁止在 ${appName} 內登入帳號</b><br><div style="font-weight:bold; color:#2980b9; margin:15px 0 10px;">👉 請依下方動畫指示操作：</div>${tutorialHtml}<div style="margin-top:10px;">${hintText}</div></div>`,
+                                    title: '🛑 請勿使用 ' + appName + ' 內建瀏覽器',
+                                    html: '<div style="text-align:center;font-size:15px;line-height:1.6;"><b style="color:#e74c3c;">Google 安全系統禁止在 ' + appName + ' 內登入帳號</b><br><div style="font-weight:bold;color:#2980b9;margin:15px 0 10px;">👉 請依下方動畫指示操作：</div>' + tutorialHtml + '<div style="margin-top:10px;">' + hintText + '</div></div>',
                                     confirmButtonText: '我知道了，我會切換瀏覽器',
                                     confirmButtonColor: '#e74c3c',
                                     allowOutsideClick: false,
-                                    backdrop: `rgba(44, 62, 80, 0.95)`
+                                    backdrop: 'rgba(44, 62, 80, 0.95)'
                                 });
                             } else {
-                                alert(`🛑 嚴重警告：請勿使用 ${appName} 內建瀏覽器！\n\nGoogle 禁止在內建瀏覽器內登入帳號，您將無法使用。\n👉 請點擊選單，選擇「以 Safari 或 Chrome 開啟」！`);
+                                alert('🛑 警告：請勿使用 ' + appName + ' 內建瀏覽器！\n\nGoogle 禁止在內建瀏覽器內登入帳號。\n👉 請點擊選單，選擇「以瀏覽器開啟」！');
                             }
                         }, 800);
-                        return;
+                        return;  // 👈 不呼叫 showApp，留在 Splash 畫面
                     }
 
-                    // 3. 一般流覽器且非 PWA 模式 (引導安裝)
+                    // 【情境 3】一般手機瀏覽器（Safari/Chrome）→ 引導安裝後再進入
                     if (isiOS || isAndroid) {
-                        const pwaGuideHtml = isiOS 
-                            ? `<div class="pwa-tutorial-ios"><div class="pwa-step"><div class="pwa-icon-box"><div class="pwa-icon-share"></div></div><div>1. 點擊瀏覽器下方的<b>「分享」</b>按鈕</div></div><div class="pwa-step"><div class="pwa-icon-box"><div class="pwa-icon-add"></div></div><div>2. 向上捲動並點擊<b>「加入主畫面」</b></div></div></div>`
-                            : `<div style="padding:10px; text-align:left;"><p>1. 點擊瀏覽器右上角的<b>「⋮」選單</b></p><p>2. 選擇<b>「安裝應用程式」</b>或<b>「將網頁加入主畫面」</b></p></div>`;
+                        var pwaBtn = isiOS
+                            ? '<div class="pwa-tutorial-ios"><div class="pwa-step"><div class="pwa-icon-box"><div class="pwa-icon-share"></div></div><div>1. 點擊瀏覽器下方的<b>「分享」</b>按鈕</div></div><div class="pwa-step"><div class="pwa-icon-box"><div class="pwa-icon-add"></div></div><div>2. 向上捲動並點擊<b>「加入主畫面」</b></div></div></div>'
+                            : '<div style="padding:10px;text-align:left;"><p>1. 點擊右上角的<b>「⋮」選單</b></p><p>2. 選擇<b>「安裝應用程式」</b>或<b>「將網頁加入主畫面」</b></p></div>';
 
-                        setTimeout(() => {
+                        setTimeout(function() {
                             if (typeof Swal !== 'undefined') {
                                 Swal.fire({
                                     title: '📱 安裝為桌面 App',
-                                    html: `<div style="font-size:15px; line-height:1.5;">將本系統加到桌面，就像 App 一樣隨開即用！<br><br>${pwaGuideHtml}</div>`,
+                                    html: '<div style="font-size:15px;line-height:1.5;">將本系統加到桌面，就像 App 一樣隨開即用！<br><br>' + pwaBtn + '</div>',
                                     icon: 'info',
                                     showCancelButton: true,
                                     confirmButtonText: '了解！我也要安裝',
                                     cancelButtonText: '暫時不要',
                                     confirmButtonColor: '#4CAF50'
-                                }).then((result) => { window.forceEnterApp(); });
+                                }).then(function() { window.showApp(); });
                             } else {
-                                window.forceEnterApp();
+                                window.showApp();
                             }
-                        }, 1200);
-                    } else {
-                        setTimeout(enterApp, 1000);
+                        }, 1000);
+                        return;
                     }
+
+                    // 【情境 4】電腦版或其他 → 直接進入
+                    setTimeout(window.showApp, 800);
                 }
 
-                // 立即檢查並啟動
-                if (document.readyState === 'interactive' || document.readyState === 'complete') {
-                    startDetection();
-                } else {
+                // 確保 DOM 就緒後執行偵測
+                if (document.readyState === 'loading') {
                     document.addEventListener('DOMContentLoaded', startDetection);
+                } else {
+                    // DOM 已就緒（包含 LINE 快取場景），直接執行
+                    startDetection();
                 }
 
-                // 最終保險：5秒後如果還卡在 Splash (且沒警告)，強制進入
-                setTimeout(() => {
-                    if (splash.style.display !== 'none' && !warningActive) {
-                        console.log("Emergency app entry triggered.");
-                        window.forceEnterApp();
+                // 最終保險：8秒後若 Splash 仍在，且不是 LINE/FB/IG，強制進入
+                setTimeout(function() {
+                    var splash = document.getElementById('splash-screen');
+                    if (splash && splash.style.display !== 'none' && !isLine && !isFB && !isIG) {
+                        console.warn('[ebook-app] Emergency entry triggered after 8s');
+                        window.showApp();
                     }
-                }, 5000);
+                }, 8000);
             })();
         </script>
 
