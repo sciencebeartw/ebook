@@ -2407,11 +2407,9 @@
             reader.onload = function(e) {
                 try {
                     var dataUrl = e.target.result;
-                    // ★ 從 data URL 本身抽取實際 content type
-                    //   iOS 選照片時 file.type 可能是 image/heic，但 FileReader 會自動轉 JPEG
-                    //   data URL 格式： data:image/jpeg;base64,... → 抽取 image/jpeg
+                    // 從 data URL 本身抽取實際 content type
+                    // iOS 選照片時 file.type 可能是 image/heic，但 FileReader 會自動轉 JPEG
                     var actualType = dataUrl.substring(dataUrl.indexOf(':') + 1, dataUrl.indexOf(';'));
-                    // 若抽不到或是 heic/heif，強制使用 image/jpeg（iOS 已經在 FileReader 時轉好了）
                     if (!actualType || actualType === 'image/heic' || actualType === 'image/heif') {
                         actualType = 'image/jpeg';
                     }
@@ -2420,8 +2418,16 @@
                     var fileRef = storageRef.child(path);
                     var safeName = file.name.replace(/[/\\?%*:|"<>]/g, '-');
                     var metadata = { contentType: actualType };
+
                     fileRef.putString(dataUrl, 'data_url', metadata)
                         .then(function() { return fileRef.getDownloadURL(); })
+                        .then(function(url) {
+                            // ★ 等待 Firebase CDN 傳播（避免手機剛傳完馬上點開空白）
+                            // Firebase CDN 邊緣節點同步新檔案約需 1~5 秒
+                            return new Promise(function(resolve) {
+                                setTimeout(function() { resolve(url); }, 2500);
+                            });
+                        })
                         .then(function(url) { onSuccess({ success: true, url: url, name: safeName }); })
                         .catch(function(err) { console.error('Firebase Storage Upload Error:', err); onError(err); });
                 } catch(ex) { console.error('Upload Exception:', ex); onError(ex); }
