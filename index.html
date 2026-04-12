@@ -2406,12 +2406,21 @@
             var reader = new FileReader();
             reader.onload = function(e) {
                 try {
+                    var dataUrl = e.target.result;
+                    // ★ 從 data URL 本身抽取實際 content type
+                    //   iOS 選照片時 file.type 可能是 image/heic，但 FileReader 會自動轉 JPEG
+                    //   data URL 格式： data:image/jpeg;base64,... → 抽取 image/jpeg
+                    var actualType = dataUrl.substring(dataUrl.indexOf(':') + 1, dataUrl.indexOf(';'));
+                    // 若抽不到或是 heic/heif，強制使用 image/jpeg（iOS 已經在 FileReader 時轉好了）
+                    if (!actualType || actualType === 'image/heic' || actualType === 'image/heif') {
+                        actualType = 'image/jpeg';
+                    }
+
                     var storageRef = firebase.storage().ref();
                     var fileRef = storageRef.child(path);
                     var safeName = file.name.replace(/[/\\?%*:|"<>]/g, '-');
-                    // ★ 關鍵：一定要帶 contentType，否則 iOS Safari 顯示空白頁
-                    var metadata = { contentType: file.type || 'application/octet-stream' };
-                    fileRef.putString(e.target.result, 'data_url', metadata)
+                    var metadata = { contentType: actualType };
+                    fileRef.putString(dataUrl, 'data_url', metadata)
                         .then(function() { return fileRef.getDownloadURL(); })
                         .then(function(url) { onSuccess({ success: true, url: url, name: safeName }); })
                         .catch(function(err) { console.error('Firebase Storage Upload Error:', err); onError(err); });
@@ -3008,10 +3017,25 @@
                 var historyDiv = document.getElementById('history-' + safeId);
                 var timeStr = res.time.substring(5, 16);
 
-                // ★★★ v3.9 修正：連結解析邏輯 (支援小標籤) ★★★
+                // ★★★ 同步寫入 Firebase RTDB（確保刷新後資料不消失，且 URL 乾淨無污染）★★★
+                try {
+                    var safeC = gData.className.replace(/[.#$[\]]/g, '-');
+                    var safeN = gData.studentName.replace(/[.#$[\]]/g, '-');
+                    var fbId = 'fb_' + new Date().getTime();
+                    db.ref('/feedbacks/' + safeC + '/' + safeN + '/' + fbId).set({
+                        time: res.time,
+                        targetDate: realDate,
+                        type: type,
+                        content: val  // ★ 直接存原始內容，無 GAS 的 ' 前綴污染
+                    }).catch(function(e) { console.warn('Firebase feedback write failed:', e); });
+                } catch(fbErr) { console.warn('Firebase feedback write error:', fbErr); }
+
+                // 更新本地記憶體，確保本次 session 不需要刷新就能看到
+                gData.feedbackHistory.push({ time: res.time, targetDate: realDate, type: type, content: val });
+
+                // ★★★ v3.9 連結解析邏輯 (支援小標籤) ★★★
                 var parseBtn = function (text) {
                     if (!text) return "";
-                    // 先對 HTML 特殊字元做跳脫 防範 XSS
                     text = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
                     var withBr = text.replace(/\n/g, '<br>');
                     return withBr.replace(/\[(.*?)\](http[s]?:\/\/[^\s]+)/g, function (match, name, url) {
