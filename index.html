@@ -1941,12 +1941,22 @@
 
     window.google = { script: { run: proxyRunner } };
   </script>
-\n</head>
+</head>
 
 <body>
     <!-- 啟動畫面層 -->
     <div id="splash-screen">
-        <img src="icon.png" class="splash-logo" alt="山熊科學">
+        <div style="text-align:center;">
+            <img src="icon.png" class="splash-logo" alt="山熊科學">
+            <div id="splash-manual-btn" style="display:none; margin-top:30px;">
+                <button onclick="forceEnterApp()" style="padding:12px 25px; background:#4CAF50; color:white; border:none; border-radius:12px; font-size:16px; font-weight:bold; box-shadow:0 10px 20px rgba(0,0,0,0.1); cursor:pointer;">
+                    點此進入系統
+                </button>
+                <div style="color:#888; font-size:12px; margin-top:12px; line-height:1.4;">
+                    如果您已更換瀏覽器但仍卡在此處<br>請點擊按鈕手動進入。
+                </div>
+            </div>
+        </div>
     </div>
 
         <!-- PWA/Browser Detection & Logic -->
@@ -1964,7 +1974,7 @@
                 let warningActive = false;
 
                 // 移除啟動畫背景的函式 (帶動畫)
-                function enterApp() {
+                window.forceEnterApp = function() {
                     if (warningActive) return; // 如果警告正在顯示，不要自動移除
                     splash.style.opacity = '0';
                     setTimeout(() => {
@@ -1973,7 +1983,7 @@
                     }, 500);
                 }
 
-                function startDetection() {
+                var startDetection = function() {
                     // 1. 如果已經是 App 模式開啓，直接進入
                     if (navigator.standalone || window.matchMedia('(display-mode: standalone)').matches) {
                         setTimeout(enterApp, 1500);
@@ -2025,9 +2035,9 @@
                                     confirmButtonText: '了解！我也要安裝',
                                     cancelButtonText: '暫時不要',
                                     confirmButtonColor: '#4CAF50'
-                                }).then((result) => { enterApp(); });
+                                }).then((result) => { window.forceEnterApp(); });
                             } else {
-                                enterApp();
+                                window.forceEnterApp();
                             }
                         }, 1200);
                     } else {
@@ -2046,13 +2056,13 @@
                 setTimeout(() => {
                     if (splash.style.display !== 'none' && !warningActive) {
                         console.log("Emergency app entry triggered.");
-                        enterApp();
+                        window.forceEnterApp();
                     }
                 }, 5000);
             })();
         </script>
 
-        <div id="full-loader" class="loader-overlay">
+        <div class="app-container" id="appContainer" style="display: none;"><div id="full-loader" class="loader-overlay">
             <div class="loader" style="display:block;"></div>
             <div class="loader-text">資料載入中...</div>
         </div>
@@ -2124,7 +2134,7 @@
         <div id="main-screen">
             <div class="header-bar">
                 <div class="header-left">
-                    <img src="https://www.sciencebear.com.tw/ebook/LOGO.png" class="header-logo-small logo-target">
+                    <img src="LOGO.png" class="header-logo-small logo-target">
                     <div class="student-info-box">
                         <div class="student-info" id="headName"></div>
                         <div class="class-info" id="headClass"></div>
@@ -3095,6 +3105,6 @@
             document.getElementById('emergencyModal').style.display = 'none';
         }
     </script>
-</body>
+</div></body>
 
 </html>

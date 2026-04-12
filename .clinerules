@@ -1,0 +1,22 @@
+# eBook-App 專案開發規範
+
+本專案為「山熊科學數位聯絡簿」，核心技術為 GAS + Firebase + PWA。
+
+## 🗣️ 語言準則
+- **全面繁體中文**：所有溝通、註解、文件皆必須使用繁體中文。
+
+## 🛠 技術棧
+- **Frontend**: Vanilla JS (ES6+), CSS3 (Flexbox/Grid), PWA (Manifest, Service Worker).
+- **Backend**: Google Apps Script (GAS) 處理權限與試算表邏輯。
+- **Realtime Data**: Firebase Realtime Database.
+- **File Storage**: Firebase Storage.
+
+## 📐 開發規範
+1. **PWA 相容性**：修改 `index.html` 時，必須維持 `ebook.webmanifest` 的連結與相關 meta tags 的正確性。
+2. **環境偵測圖層**：維持 Splash Screen (啟動畫面) -> Detection (環境偵測) -> Login (登入) 的層層過濾邏輯。
+3. **Firebase 同步**：GAS 端修改資料後，必須確保呼叫 `SpreadsheetApp.flush()` 與 `BearFirebase_Sync...` 的同步函式。
+4. **UI 反饋**：按鈕在執行非同步操作時必須 `disabled` 並顯示載入中狀態。
+
+## 註解格式
+`// ★★★ [模組名稱] ★★★`
+用於區分大功能塊。
