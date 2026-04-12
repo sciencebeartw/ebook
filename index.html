@@ -2398,39 +2398,51 @@
                 document.getElementById('teacherRenameInput').value = fileInput.files[0].name;
             }
         }
+        // ★★★ 共用：直接上傳到 Firebase Storage（不走 GAS）★★★
+        function uploadToFirebase(file, path, onSuccess, onError) {
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    var storageRef = firebase.storage().ref();
+                    var fileRef = storageRef.child(path);
+                    var safeName = file.name.replace(/[/\\?%*:|"<>]/g, '-');
+                    var metadata = { contentDisposition: 'attachment; filename="' + safeName + '"' };
+                    fileRef.putString(e.target.result, 'data_url', metadata)
+                        .then(function() { return fileRef.getDownloadURL(); })
+                        .then(function(url) { onSuccess({ success: true, url: url, name: safeName }); })
+                        .catch(function(err) { console.error('Firebase Storage Upload Error:', err); onError(err); });
+                } catch(ex) { console.error('Upload Exception:', ex); onError(ex); }
+            };
+            reader.readAsDataURL(file);
+        }
 
+        // ★★★ v3.9 老師聯絡簿附件上傳 → Firebase Storage ★★★
         function teacherUploadFile() {
             var fileInput = document.getElementById('teacherFileInput');
             var renameInput = document.getElementById('teacherRenameInput');
             var typeSelect = document.getElementById('teacherUploadType');
             var statusDiv = document.getElementById('teacherUploadStatus');
 
-            if (fileInput.files.length === 0) { alert("請先選擇檔案！"); return; }
+            if (fileInput.files.length === 0) { alert('請先選擇檔案！'); return; }
             var file = fileInput.files[0];
-            if (file.size > 10 * 1024 * 1024) { alert("❌ 檔案太大！請限制在 10MB 以內。"); return; }
-            if (!currentFocusInput) { alert("請先點選您想要插入連結的格子"); return; }
+            if (file.size > 10 * 1024 * 1024) { alert('❌ 檔案太大！請限制在 10MB 以內。'); return; }
+            if (!currentFocusInput) { alert('請先點選您想要插入連結的格子'); return; }
 
-            statusDiv.innerText = "⏳ 上傳中...";
-            var reader = new FileReader();
-            reader.onload = function (e) {
-                var base64 = e.target.result;
-                var fileName = renameInput.value || file.name;
-                google.script.run
-                    .withSuccessHandler(function (res) {
-                        if (res.success) {
-                            statusDiv.innerText = "✅ 上傳成功！";
-                            var tag = `\n[${fileName}]${res.url}`;
-                            currentFocusInput.value += tag;
-                            fileInput.value = ""; renameInput.value = "";
-                        } else { statusDiv.innerText = "❌ 失敗：" + res.msg; }
-                    })
-                    .withFailureHandler(function (e) {
-                        statusDiv.innerText = "❌ 上傳錯誤：" + (e.message || e.toString());
-                        console.error("teacherUpload Error:", e);
-                    })
-                    .uploadFileToDrive({ base64: base64, type: typeSelect.value, fileName: fileName });
-            };
-            reader.readAsDataURL(file);
+            statusDiv.innerText = '⏳ 上傳中...';
+            var fileName = renameInput.value || file.name;
+            var safeName = fileName.replace(/[/\\?%*:|"<>]/g, '-');
+            var timestamp = new Date().getTime();
+            var cls = (gData && gData.className) ? gData.className : '全站';
+            var path = 'uploads/' + cls + '/' + (typeSelect.value || '其他') + '/' + timestamp + '_' + safeName;
+
+            uploadToFirebase(file, path,
+                function(res) {
+                    statusDiv.innerText = '✅ 上傳成功！';
+                    currentFocusInput.value += '\n[' + fileName + ']' + res.url;
+                    fileInput.value = ''; renameInput.value = '';
+                },
+                function(err) { statusDiv.innerText = '❌ 上傳錯誤：' + (err.message || err.toString()); }
+            );
         }
 
         // ★★★ v3.9 新增：老師手機版上傳邏輯 (公告 - 智慧填入) ★★★
@@ -2441,52 +2453,42 @@
             }
         }
 
+        // ★★★ v3.9 老師公告附件上傳 → Firebase Storage ★★★
         function bulletinUploadFile() {
             var fileInput = document.getElementById('bulletinFileInput');
             var renameInput = document.getElementById('bulletinRenameInput');
             var typeSelect = document.getElementById('bulletinUploadType');
             var statusDiv = document.getElementById('bulletinUploadStatus');
-
-            // 取得按鈕欄位
             var btnNameInput = document.getElementById('bulletinBtnName');
             var btnUrlInput = document.getElementById('bulletinBtnUrl');
             var contentInput = document.getElementById('bulletinContent');
 
-            if (fileInput.files.length === 0) { alert("請先選擇檔案！"); return; }
+            if (fileInput.files.length === 0) { alert('請先選擇檔案！'); return; }
             var file = fileInput.files[0];
-            if (file.size > 10 * 1024 * 1024) { alert("❌ 檔案太大！請限制在 10MB 以內。"); return; }
+            if (file.size > 10 * 1024 * 1024) { alert('❌ 檔案太大！請限制在 10MB 以內。'); return; }
 
-            statusDiv.innerText = "⏳ 上傳中...";
-            var reader = new FileReader();
-            reader.onload = function (e) {
-                var base64 = e.target.result;
-                var fileName = renameInput.value || file.name;
-                google.script.run
-                    .withSuccessHandler(function (res) {
-                        if (res.success) {
-                            statusDiv.innerText = "✅ 上傳成功！";
+            statusDiv.innerText = '⏳ 上傳中...';
+            var fileName = renameInput.value || file.name;
+            var safeName = fileName.replace(/[/\\?%*:|"<>]/g, '-');
+            var timestamp = new Date().getTime();
+            var path = 'uploads/公告/' + (typeSelect.value || '其他') + '/' + timestamp + '_' + safeName;
 
-                            // ★★★ 智慧判斷：按鈕空著就填按鈕，否則填內容 ★★★
-                            if (btnNameInput.value === "" && btnUrlInput.value === "") {
-                                btnNameInput.value = fileName;
-                                btnUrlInput.value = res.url;
-                                statusDiv.innerText += " (已填入按鈕)";
-                            } else {
-                                var tag = `\n[${fileName}]${res.url}`;
-                                contentInput.value += tag;
-                                statusDiv.innerText += " (已插入內文)";
-                            }
-
-                            fileInput.value = ""; renameInput.value = "";
-                        } else { statusDiv.innerText = "❌ 失敗：" + res.msg; }
-                    })
-                    .withFailureHandler(function (e) {
-                        statusDiv.innerText = "❌ 上傳錯誤：" + (e.message || e.toString());
-                        console.error("bulletinUpload Error:", e);
-                    })
-                    .uploadFileToDrive({ base64: base64, type: typeSelect.value, fileName: fileName });
-            };
-            reader.readAsDataURL(file);
+            uploadToFirebase(file, path,
+                function(res) {
+                    statusDiv.innerText = '✅ 上傳成功！';
+                    // 智慧判斷：按鈕空著就填按鈕，否則插入內文
+                    if (btnNameInput.value === '' && btnUrlInput.value === '') {
+                        btnNameInput.value = fileName;
+                        btnUrlInput.value = res.url;
+                        statusDiv.innerText += ' (已填入按鈕)';
+                    } else {
+                        contentInput.value += '\n[' + fileName + ']' + res.url;
+                        statusDiv.innerText += ' (已插入內文)';
+                    }
+                    fileInput.value = ''; renameInput.value = '';
+                },
+                function(err) { statusDiv.innerText = '❌ 上傳錯誤：' + (err.message || err.toString()); }
+            );
         }
 
         function doLogin() {
@@ -2868,10 +2870,12 @@
             processUploadQueue(dateStr);
         }
 
+        // ★★★ v3.9 學生作業上傳佇列 → Firebase Storage ★★★
         function processUploadQueue(dateStr) {
             if (uploadQueue.length === 0) {
-                alert("✅ 所有檔案上傳完成！");
-                document.getElementById('upload-status-' + dateStr.replace(/\//g, '-')).innerText = "";
+                alert('✅ 所有檔案上傳完成！');
+                var sd = document.getElementById('upload-status-' + dateStr.replace(/\//g, '-'));
+                if (sd) sd.innerText = '';
                 return;
             }
 
@@ -2879,48 +2883,36 @@
             var statusDiv = document.getElementById('upload-status-' + dateStr.replace(/\//g, '-'));
 
             if (file.size > 10 * 1024 * 1024) {
-                alert("❌ 檔案 " + file.name + " 超過 10MB，已略過。");
+                alert('❌ 檔案 ' + file.name + ' 超過 10MB，已略過。');
                 processUploadQueue(dateStr);
                 return;
             }
 
-            statusDiv.innerText = "⏳ 正在上傳：" + file.name + "...";
+            if (statusDiv) statusDiv.innerText = '⏳ 正在上傳：' + file.name + '...';
 
-            var reader = new FileReader();
-            reader.onload = function (e) {
-                var base64 = e.target.result;
-                // 檔名格式：YYYYMMDD_班級_姓名_原始檔名
-                var today = new Date();
-                var datePrefix = today.getFullYear() + String(today.getMonth() + 1).padStart(2, '0') + String(today.getDate()).padStart(2, '0');
-                var newName = datePrefix + "_" + gData.className + "_" + gData.studentName + "_" + file.name;
+            // 檔名格式：YYYYMMDD_班級_姓名_原始檔名
+            var today = new Date();
+            var datePrefix = today.getFullYear() + String(today.getMonth() + 1).padStart(2, '0') + String(today.getDate()).padStart(2, '0');
+            var cls = (gData && gData.className) ? gData.className : '未知班級';
+            var stu = (gData && gData.studentName) ? gData.studentName : '未知學生';
+            var safeName = (datePrefix + '_' + cls + '_' + stu + '_' + file.name).replace(/[/\\?%*:|"<>]/g, '-');
+            var timestamp = new Date().getTime();
+            var path = 'uploads/' + cls + '/學生作業/' + timestamp + '_' + safeName;
 
-                google.script.run
-                    .withSuccessHandler(function (res) {
-                        if (res.success) {
-                            // ★★★ v3.9 修正：學生上傳後，回填檔名強制為 [📄附件] ★★★
-                            var content = `[📄附件]${res.url}`;
-                            sendFeedback(dateStr.replace(/\//g, '-'), dateStr, '作業上傳', content, function () {
-                                processUploadQueue(dateStr); // 繼續下一個
-                            });
-                        } else {
-                            alert("❌ 上傳失敗：" + res.msg);
-                            processUploadQueue(dateStr);
-                        }
-                    })
-                    .withFailureHandler(function (e) {
-                        var statusDiv = document.getElementById('upload-status-' + dateStr.replace(/\//g, '-'));
-                        if (statusDiv) statusDiv.innerText = "";
-                        alert("❌ 上傳錯誤：" + (e.message || e.toString()));
-                        console.error("studentUpload Error:", e);
-                        processUploadQueue(dateStr);
-                    })
-                    .uploadFileToDrive({
-                        base64: base64,
-                        type: "學生作業",
-                        fileName: newName
+            uploadToFirebase(file, path,
+                function(res) {
+                    // 上傳成功：用 [📄附件] 格式寫入回饋
+                    var content = '[📄附件]' + res.url;
+                    sendFeedback(dateStr.replace(/\//g, '-'), dateStr, '作業上傳', content, function() {
+                        processUploadQueue(dateStr); // 繼續下一個
                     });
-            };
-            reader.readAsDataURL(file);
+                },
+                function(err) {
+                    if (statusDiv) statusDiv.innerText = '';
+                    alert('❌ 上傳錯誤：' + (err.message || err.toString()));
+                    processUploadQueue(dateStr); // 略過繼續
+                }
+            );
         }
 
         function renderDailyPosts(posts, history) {
