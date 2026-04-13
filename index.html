@@ -3029,7 +3029,12 @@
                         }
                         gData.grades = fullGradeList.sort((a, b) => a.colIndex - b.colIndex);
                         renderOldGradeCards(gData.grades);
-                        renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
+                        
+                        // 當成績更新時，也必須重新映射給聯絡簿，否則聯絡簿會顯示舊的或遺失的成績 ref
+                        if (gData.dailyPost) {
+                            remapDailyPostGrades();
+                            renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
+                        }
                     });
 
                     // 5. 聯絡簿內容監聽
@@ -3044,13 +3049,33 @@
                                 date: pRow.date, title: pRow.title, progress: pRow.progress, hw1: pRow.hw1, hw2: pRow.hw2,
                                 makeup: pRow.makeup, quiz: pRow.quiz, range: pRow.range, note: pRow.note, examData: { main: null, others: [] }
                             };
-                            let dMatch = gData.grades.find(g => (g.date === pRow.date || pRow.date.indexOf(g.date)>-1) && (g.exam.indexOf("小考") > -1 || g.exam.indexOf("隨堂") > -1));
-                            if (dMatch) postObj.examData.main = dMatch;
                             classPosts.push(postObj);
                         }
                         gData.dailyPost = classPosts.sort((a,b) => new Date(b.date) - new Date(a.date));
+                        
+                        remapDailyPostGrades(); // 從 grades 陣列進行映射
                         renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
                     });
+
+                    function remapDailyPostGrades() {
+                        if (!gData.dailyPost || !gData.grades) return;
+                        gData.dailyPost.forEach(postObj => {
+                            postObj.examData = { main: null, others: [] };
+                            let pDate = new Date(postObj.date);
+                            let shortDate = (pDate.getMonth() + 1) + "/" + pDate.getDate();
+                            
+                            let todayMainExam = gData.grades.find(g => {
+                               if (g.date === shortDate || g.date === postObj.date) return true;
+                               let regex = new RegExp("(^|[^0-9])" + shortDate.replace('/','\\/') + "([^0-9]|$)", "g");
+                               if (!regex.test(g.date)) return false;
+                               return (g.date.indexOf("小考") > -1 || g.date.indexOf("隨堂") > -1 || g.date.indexOf("複習") > -1 || g.date.indexOf("鑑定") > -1);
+                            });
+                            if (todayMainExam) {
+                                postObj.examData.main = todayMainExam;
+                                postObj.examData.others = gData.grades.filter(g => g.exam === todayMainExam.exam && g.date.indexOf("作業") > -1 && g.colIndex !== todayMainExam.colIndex);
+                            }
+                        });
+                    }
                 }
             } catch(e) { console.warn('Firebase real-time listener error:', e); }
 
