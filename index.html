@@ -1327,6 +1327,127 @@
             display: block;
         }
 
+        /* ===== 棒卡申請區（橘色） ===== */
+        .sticker-apply-box {
+            background: #fff7ed;
+            border: 2px dashed #fb923c;
+            border-radius: 12px;
+            padding: 14px 15px;
+            margin-bottom: 18px;
+        }
+
+        .sticker-apply-title {
+            font-weight: bold;
+            color: #ea580c;
+            margin-bottom: 10px;
+            display: block;
+            font-size: 1.15rem;
+        }
+
+        .sticker-apply-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 6px;
+            flex-wrap: wrap;
+        }
+
+        .sticker-reason-select {
+            flex: 1;
+            min-width: 0;
+            padding: 8px 12px;
+            border: 1.5px solid #fed7aa;
+            border-radius: 20px;
+            font-size: 1.1rem;
+            outline: none;
+            background: white;
+            color: #431407;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23fb923c' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 30px;
+        }
+
+        .sticker-reason-custom {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1.5px solid #fed7aa;
+            border-radius: 20px;
+            font-size: 1.1rem;
+            outline: none;
+            background: white;
+            margin-top: 6px;
+            display: none;
+        }
+
+        .sticker-count-select {
+            width: 90px;
+            padding: 8px 10px;
+            border: 1.5px solid #fed7aa;
+            border-radius: 20px;
+            font-size: 1.1rem;
+            outline: none;
+            background: white;
+            text-align: center;
+            color: #431407;
+        }
+
+        .sticker-submit-btn {
+            background: linear-gradient(135deg, #fb923c 0%, #ea580c 100%);
+            color: white;
+            border: none;
+            padding: 8px 18px;
+            border-radius: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1.1rem;
+            white-space: nowrap;
+            box-shadow: 0 3px 10px rgba(234,88,12,0.3);
+            transition: transform 0.15s;
+        }
+
+        .sticker-submit-btn:active { transform: scale(0.96); }
+
+        .sticker-hint {
+            font-size: 0.9rem;
+            color: #fb923c;
+            margin-top: 4px;
+        }
+
+        /* 棒卡申請氣泡樣式 */
+        .history-msg-body.sticker-body {
+            background: #fff7ed;
+            border: 1px solid #fed7aa;
+        }
+
+        .sticker-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            color: white;
+            font-weight: 800;
+            font-size: 1rem;
+            padding: 2px 10px;
+            border-radius: 20px;
+            margin-left: 6px;
+        }
+
+        .sticker-status {
+            font-size: 0.9rem;
+            color: #6b7280;
+            padding: 2px 8px;
+            background: #f3f4f6;
+            border-radius: 10px;
+            margin-top: 4px;
+            display: inline-block;
+        }
+
+        .sticker-status.approved {
+            background: #dcfce7;
+            color: #15803d;
+        }
+
         .upload-btn-wrapper {
             position: relative;
             overflow: hidden;
@@ -3345,10 +3466,21 @@ if (exam.dist) {
         <div class="sticker-apply-box">
             <span class="sticker-apply-title">⭐ 棒卡申請</span>
             <div class="sticker-apply-row">
-                <input type="text" class="sticker-reason-input" id="sticker-reason-${safeDateId}" placeholder="得棒名目（例：今日默背成功）">
-                <input type="number" class="sticker-count-input" id="sticker-count-${safeDateId}" placeholder="棒數(≥5)" min="5" max="50">
+                <select class="sticker-reason-select" id="sticker-reason-${safeDateId}" onchange="onStickerReasonChange('${safeDateId}')">
+                    <option value="__placeholder__" disabled selected>請選擇得棒名目</option>
+                    <option value="小考高分">🏅 小考高分</option>
+                    <option value="即時練習">✏️ 即時練習</option>
+                    <option value="__custom__">✍️ 自行填寫...</option>
+                </select>
+                <select class="sticker-count-select" id="sticker-count-${safeDateId}">
+                    <option value="5">5棒</option>
+                    <option value="10">10棒</option>
+                    <option value="15">15棒</option>
+                    <option value="20">20棒</option>
+                </select>
                 <button class="sticker-submit-btn" onclick="submitStickerApply('${safeDateId}', '${post.date}')">送出申請</button>
             </div>
+            <input type="text" class="sticker-reason-custom" id="sticker-custom-${safeDateId}" placeholder="請輸入得棒名目...">
             <div class="sticker-hint">申請後由老師審核，通過後計入總棒數 ⭐</div>
         </div>
     `;
@@ -3562,22 +3694,42 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             alert('已退回申請');
             if (typeof loadStickerReviews === 'function') loadStickerReviews();
         }
+        function onStickerReasonChange(safeId) {
+            var sel = document.getElementById('sticker-reason-' + safeId);
+            var custom = document.getElementById('sticker-custom-' + safeId);
+            if (sel && custom) {
+                custom.style.display = (sel.value === '__custom__') ? 'block' : 'none';
+            }
+        }
+
         function submitStickerApply(safeId, realDate) {
-            var reasonEl = document.getElementById('sticker-reason-' + safeId);
+            var selEl = document.getElementById('sticker-reason-' + safeId);
+            var customEl = document.getElementById('sticker-custom-' + safeId);
             var countEl = document.getElementById('sticker-count-' + safeId);
-            var reason = reasonEl ? reasonEl.value.trim() : '';
+            var reason = selEl ? selEl.value : '';
+            if (reason === '__custom__') reason = customEl ? customEl.value.trim() : '';
             var count = countEl ? parseInt(countEl.value) : 0;
-            if (!reason) { alert('請填寫得棒名目！'); return; }
+            if (!reason || reason === '__placeholder__') { alert('請選擇得棒名目！'); return; }
             if (!count || count < 5) { alert('最少申請 5 棒！'); return; }
             var content = JSON.stringify({ reason: reason, count: count, status: "待審核" });
             var form = { className: gData.className, studentName: gData.studentName, targetDate: realDate, type: '棒卡申請', content: content };
             google.script.run.withSuccessHandler(function(res) {
-                gData.feedbackHistory.push({ time: res.time, type: '棒卡申請', targetDate: realDate, content: content });
-                if (reasonEl) reasonEl.value = '';
-                if (countEl) countEl.value = '';
+                // ★ 同時寫入 Firebase RTDB，確保刷新後可見
+                try {
+                    var safeC = gData.className.replace(/[.#$[\]]/g, '-');
+                    var safeN = gData.studentName.replace(/[.#$[\]]/g, '-');
+                    var fbId = 'fb_' + new Date().getTime();
+                    db.ref('/feedbacks/' + safeC + '/' + safeN + '/' + fbId).set({
+                        time: res.time, targetDate: realDate, type: '棒卡申請', content: content
+                    }).catch(function(e) { console.warn('FB sticker write failed:', e); });
+                } catch(e) { console.warn('FB sticker write error:', e); }
+
+                gData.feedbackHistory.push({ time: res.time, type: '棒卡申請', targetDate: realDate, content: content, fbKey: fbId });
+                if (selEl) { selEl.selectedIndex = 0; }
+                if (customEl) { customEl.value = ''; customEl.style.display = 'none'; }
                 renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
             }).withFailureHandler(function(e) {
-                alert('錯誤: ' + e.message);
+                alert('棒卡申請送出失敗: ' + e.message);
             }).submitFeedback(form);
         }
 
