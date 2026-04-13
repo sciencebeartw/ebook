@@ -521,29 +521,31 @@
             padding-bottom: 80px;
         }
 
-                                        .header-bar {
+                                                .header-bar {
             background: #ffffff;
-            padding: 10px 18px;
+            padding: 10px 12px;
             display: grid;
             grid-template-columns: auto 1fr auto;
             align-items: center;
-            gap: 20px;
+            gap: 12px;
             border-bottom: 3.5px solid #10b981;
             box-shadow: 0 4px 15px rgba(0,0,0,0.03);
             min-height: 100px;
+            overflow: hidden;
         }
 
         .header-logo-container {
             display: flex;
             align-items: center;
             justify-content: center;
-            height: 90px;
+            height: 85px;
+            flex-shrink: 0;
         }
 
         .header-logo-full {
-            height: 95%;
+            height: 100%;
             width: auto;
-            max-height: 85px;
+            max-height: 80px;
             object-fit: contain;
         }
 
@@ -553,44 +555,52 @@
             justify-content: space-between;
             height: 80px;
             padding: 5px 0;
+            overflow: hidden;
         }
 
         .class-info-top {
-            font-size: 0.9rem;
+            font-size: 0.8rem;
             color: #64748b;
             font-weight: 700;
             letter-spacing: 0.5px;
             line-height: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .name-badge-row {
             display: flex;
             align-items: center;
-            gap: 15px;
+            gap: 10px;
             margin-top: auto;
+            flex-wrap: nowrap;
         }
 
         .student-info {
-            font-size: 2.8rem;
+            font-size: 2.2rem;
             font-weight: 950;
             color: #064e3b;
-            line-height: 0.9;
-            letter-spacing: -1px;
+            line-height: 1;
+            letter-spacing: -0.5px;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .sticker-badge-header {
             display: inline-flex;
             align-items: center;
-            gap: 5px;
+            gap: 3px;
             background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-            border: 2px solid #fbbf24;
-            border-radius: 25px;
-            padding: 5px 15px;
+            border: 1.5px solid #fbbf24;
+            border-radius: 20px;
+            padding: 3px 10px;
             font-weight: 900;
-            font-size: 1.15rem;
+            font-size: 1rem;
             color: #92400e;
-            box-shadow: 0 4px 12px rgba(251, 191, 36, 0.25);
+            box-shadow: 0 4px 10px rgba(251, 191, 36, 0.2);
             white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .header-action-container {
@@ -600,47 +610,43 @@
             justify-content: space-between;
             height: 80px;
             padding: 5px 0;
+            flex-shrink: 0;
         }
 
         .bears-lab-title {
             font-family: 'Outfit', 'Inter', sans-serif;
-            font-weight: 900;
-            font-size: 1.7rem;
+            font-weight: 950;
+            font-size: 1.45rem;
             background: linear-gradient(135deg, #10b981 0%, #059669 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             line-height: 1;
+            white-space: nowrap;
         }
 
         .header-btn-row {
             display: flex;
-            gap: 10px;
+            gap: 6px;
             margin-top: auto;
         }
 
         .header-icon-btn {
             text-decoration: none;
             background: #ffffff;
-            width: 38px;
-            height: 38px;
+            width: 32px;
+            height: 32px;
             display: flex;
             align-items: center;
             justify-content: center;
             border-radius: 50%;
-            transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            border: 1.5px solid #f1f5f9;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.06);
+            transition: all 0.2s;
+            border: 1px solid #f1f5f9;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.06);
         }
 
         .refresh-btn { color: #0ea5e9; }
         .pwd-btn { color: #f59e0b; }
         .logout-btn { color: #ef4444; }
-
-        .header-icon-btn:hover {
-            transform: translateY(-2px) scale(1.05);
-            border-color: currentColor;
-            background: #ffffff;
-        }
 
         .header-icon-btn:active {
             transform: scale(0.9);
