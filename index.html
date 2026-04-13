@@ -522,13 +522,15 @@
         }
 
         .header-bar {
-            background: white;
-            padding: 10px 15px;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            padding: 12px 15px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 1px solid #eee;
-            height: 90px;
+            border-bottom: 1px solid rgba(16, 185, 129, 0.1);
+            height: auto;
             box-sizing: border-box;
         }
 
@@ -541,7 +543,7 @@
         }
 
         .header-logo-small {
-            height: 65px;
+            height: 60px;
             width: auto;
             flex-shrink: 0;
         }
@@ -554,24 +556,23 @@
         }
 
         .student-info {
-            font-size: 2.5rem;
+            font-size: 1.5rem;
             font-weight: 900;
-            color: #2c3e50;
-            line-height: 1.1;
+            color: #064e3b;
+            line-height: 1.2;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
         }
 
         .class-info {
-            font-size: 1.15rem;
-            color: #7f8c8d;
-            margin-top: 4px;
+            font-size: 0.85rem;
+            color: #64748b;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            font-weight: bold;
+            font-weight: 600;
         }
 
         .sticker-badge-header {
@@ -591,11 +592,40 @@
 
         .header-right {
             display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            justify-content: center;
-            gap: 6px;
+            flex-direction: row;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
             flex-shrink: 0;
+        }
+
+
+        .bears-lab-title {
+            font-family: 'Outfit', 'Inter', sans-serif;
+            font-weight: 900;
+            font-size: 1.3rem;
+            background: linear-gradient(135deg, #34d399 0%, #059669 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 2px;
+        }
+
+        .header-icon-btn {
+            font-size: 1.2rem;
+            text-decoration: none;
+            background: #f1f5f9;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: 0.2s;
+            border: 1px solid #e2e8f0;
+        }
+        .header-icon-btn:active {
+            transform: scale(0.9);
+            background: #e2e8f0;
         }
 
         .header-btn {
@@ -2483,19 +2513,18 @@
                 <div class="header-left">
                     <img src="LOGO.png" class="header-logo-small logo-target">
                     <div class="student-info-box">
-                        <div class="student-info" id="headName"></div>
-                        <div class="class-info" id="headClass"></div>
+                        <div class="bears-lab-title">Bear's Lab</div>
+                        <div style="display:flex; align-items:baseline; gap:8px;">
+                            <div class="student-info" id="headName"></div>
+                            <div class="class-info" id="headClass"></div>
+                        </div>
                         <div class="sticker-badge-header" id="headStickers" style="display:none;">⭐ <span id="headStickerCount">0</span> 棒</div>
                     </div>
                 </div>
                 <div class="header-right">
-                    <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end;">
-                        <a href="javascript:void(0)" class="header-btn" onclick="doRefresh()">刷新</a>
-                        <div style="display:flex; gap:6px;">
-                            <a href="javascript:void(0)" class="header-btn" onclick="openPwdModal()">改密碼</a>
-                            <a href="javascript:void(0)" class="header-btn" onclick="doLogout()">登出</a>
-                        </div>
-                    </div>
+                    <a href="javascript:void(0)" class="header-icon-btn" onclick="doRefresh()" title="重整">🔄</a>
+                    <a href="javascript:void(0)" class="header-icon-btn" onclick="openPwdModal()" title="改密碼">🔑</a>
+                    <a href="javascript:void(0)" class="header-icon-btn" onclick="doLogout()" title="登出">🚪</a>
                 </div>
             </div>
             <div class="sticky-wrapper">
@@ -3696,15 +3725,26 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     if (!text) return "";
                     
                     // 1. 處理阿喵老師對棒卡申請的回覆（取代醜陋的 JSON）
-                    text = text.replace(/\[quote:棒卡申請\](.*?)\[\/quote\]/g, function(match, content) {
+                    // 支援 [quote:棒卡申請]{...}[/quote] 或者是舊版的 "棒卡申請\n{...}"
+                    var renderStickerCard = function(contentStr) {
                         try {
-                            var d = JSON.parse(content);
+                            var d = JSON.parse(contentStr);
                             return `<div style="background:#fff7ed; border-left:4px solid #fb923c; padding:6px 10px; margin-bottom:8px; border-radius:4px; font-size:0.9rem; color:#431407;">` +
                                    `<b style="color:#d97706;">⭐ 棒卡申請:</b> ${d.reason} (+${d.count}棒)` +
                                    `</div>`;
                         } catch(e) {
                             return `<div style="background:#f3f4f6; border-left:4px solid #ccc; padding:6px 10px; margin-bottom:8px; border-radius:4px; font-size:0.9rem; color:#555;">[回覆棒卡申請]</div>`;
                         }
+                    };
+
+                    // 新版 quote 格式
+                    text = text.replace(/\[quote:棒卡申請\](.*?)\[\/quote\]/g, function(match, content) {
+                        return renderStickerCard(content);
+                    });
+                    
+                    // 舊版 raw 格式 (假設老師回覆字串開頭包含了 "棒卡申請\n{" 或類似的格式)
+                    text = text.replace(/棒卡申請\s*\n?(\{.*?\})/g, function(match, content) {
+                        return renderStickerCard(content);
                     });
 
                     text = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
