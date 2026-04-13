@@ -2964,9 +2964,7 @@
                     // 3. 重要公告監聽 (班級 + 全校)
                     db.ref('/bulletins').on('value', function(snap) {
                         const allBulls = snap.val() || {};
-                        const classBulls = allBulls[safeC] || {};
                         let bulls = [];
-                        // 這裡邏輯跟 executeFirebaseRead 一致，過濾出該生的公告
                         for (let cls in allBulls) {
                             const bObj = allBulls[cls];
                             for (let id in bObj) {
@@ -2978,6 +2976,80 @@
                         }
                         gData.bulletins = bulls.reverse();
                         renderBulletins(gData.bulletins);
+                    });
+
+                    // 4. 成績資料監聽 (近期成績更新)
+                    db.ref('/grades/' + safeC + '/' + (result.foundUserKey || '') + '/exams').on('value', function(snap) {
+                        if (!snap.exists()) return;
+                        const examsObj = snap.val() || {};
+                        let fullGradeList = [];
+                        for (let col in examsObj) {
+                            const eData = examsObj[col];
+                            let scNum = NaN;
+                            if (eData.score) {
+                                const m = eData.score.toString().match(/(\d+(\.\d+)?)/);
+                                if (m) scNum = parseFloat(m[0]);
+                            }
+                            let isP6 = result.className.indexOf("小六") > -1;
+                            let isHW = (eData.date + eData.examName).indexOf("作業") > -1;
+                            let unit = (isP6 && isHW) ? "題" : (eData.score === "尚未繳交" ? "" : "分");
+                            
+                            let threshold = 0;
+                            if (eData.note && eData.note !== "無詳細備註") {
+                                const tm = eData.note.match(/(\d+)/); 
+                                if (tm) threshold = parseInt(tm[0]); 
+                            }
+                            
+                            let myBucket = -1; let labels = ["0~20","20~40","40~60","60~80","80~100"];
+                            if (eData.dist && eData.dist.length > 0) {
+                                if (eData.dist.length !== 5) {
+                                    const rawDist = eData.dist;
+                                    const minS = Math.min(...rawDist); const maxS = (isP6 && isHW) ? Math.max(...rawDist) : 100;
+                                    let gap = (maxS - minS) || 1; let step = gap/5;
+                                    const buckets = [0,0,0,0,0];
+                                    rawDist.forEach(v => {
+                                        let idx = Math.floor((v - minS) / step);
+                                        if (idx >= 5) idx = 4; if (idx < 0) idx = 0;
+                                        buckets[idx]++;
+                                    });
+                                    for(let b=0; b<5; b++) labels[b] = Math.round(minS+(b*step)) + " ~ " + Math.round(minS+((b+1)*step));
+                                    if (!isNaN(scNum)) {
+                                        myBucket = Math.floor((scNum - minS) / step);
+                                        if (myBucket >= 5) myBucket = 4; if (myBucket < 0) myBucket = 0;
+                                    }
+                                    eData.dist = buckets;
+                                }
+                            }
+                            fullGradeList.push({
+                                className: result.className, date: eData.date, exam: eData.examName, note: eData.note, 
+                                makeupThreshold: threshold, score: eData.score, scoreNum: isNaN(scNum) ? null : scNum,
+                                unit: unit, average: eData.average, dist: eData.dist, labels: labels, myBucket: myBucket,
+                                colIndex: parseInt(col.replace('col_','')), cellColor: eData.cellColor
+                            });
+                        }
+                        gData.grades = fullGradeList.sort((a, b) => a.colIndex - b.colIndex);
+                        renderOldGradeCards(gData.grades);
+                        renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
+                    });
+
+                    // 5. 聯絡簿內容監聽
+                    db.ref('/dailyPosts/' + safeC).on('value', function(snap) {
+                        const postsObj = snap.val() || {};
+                        let classPosts = [];
+                        let now = new Date();
+                        for (let rowId in postsObj) {
+                            const pRow = postsObj[rowId];
+                            if (pRow.reserveTime && new Date(pRow.reserveTime) > now) continue;
+                            let postObj = {
+                                date: pRow.date, title: pRow.title, progress: pRow.progress, hw1: pRow.hw1, hw2: pRow.hw2,
+                                makeup: pRow.makeup, quiz: pRow.quiz, range: pRow.range, note: pRow.note, examData: { main: null, others: [] }
+                            };
+                            let dMatch = gData.grades.find(g => (g.date === pRow.date || pRow.date.indexOf(g.date)>-1) && (g.exam.indexOf("小考") > -1 || g.exam.indexOf("隨堂") > -1));
+                            if (dMatch) postObj.examData.main = dMatch;
+                            classPosts.push(postObj);
+                        }
+                        gData.dailyPost = classPosts.sort((a,b) => new Date(b.date) - new Date(a.date));
+                        renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
                     });
                 }
             } catch(e) { console.warn('Firebase real-time listener error:', e); }
@@ -3778,17 +3850,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var content = JSON.stringify({ reason: reason, count: count, status: "待審核" });
             var form = { className: gData.className, studentName: gData.studentName, targetDate: realDate, type: '棒卡申請', content: content };
             google.script.run.withSuccessHandler(function(res) {
-                // ★ 同時寫入 Firebase RTDB
-                try {
-                    var safeC = gData.className.replace(/[.#$[\]]/g, '-');
-                    var safeN = gData.studentName.replace(/[.#$[\]]/g, '-');
-                    var fbId = 'fb_' + new Date().getTime();
-                    db.ref('/feedbacks/' + safeC + '/' + safeN + '/' + fbId).set({
-                        time: res.time, targetDate: realDate, type: '棒卡申請', content: content
-                    }).catch(function(e) { console.warn('FB sticker write failed:', e); });
-                } catch(e) { console.warn('FB sticker write error:', e); }
-
-                // 不需要手動 push 與 re-render，因為 Firebase .on('value') 監聽器會處理即時更新
+                // 不需要手動寫入 Firebase，因為 GAS 的 submitFeedback 內部會觸發 SyncFeedbacks 完成寫入
+                // 且 Firebase .on('value') 監聽器會處理即時更新
                 if (selEl) { selEl.selectedIndex = 0; }
                 if (customEl) { customEl.value = ''; customEl.style.display = 'none'; }
                 if (submitBtn) { submitBtn.innerText = "送出申請"; submitBtn.disabled = false; }
@@ -3811,76 +3874,37 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var form = { className: gData.className, studentName: gData.studentName, targetDate: realDate, type: type, content: val };
 
             google.script.run.withSuccessHandler(function (res) {
-                var historyDiv = document.getElementById('history-' + safeId);
-                var timeStr = res.time.substring(5, 16);
-
-                // ★★★ 同步寫入 Firebase RTDB（確保刷新後資料不消失，且 URL 乾淨無污染）★★★
-                try {
-                    var safeC = gData.className.replace(/[.#$[\]]/g, '-');
-                    var safeN = gData.studentName.replace(/[.#$[\]]/g, '-');
-                    var fbId = 'fb_' + new Date().getTime();
-                    db.ref('/feedbacks/' + safeC + '/' + safeN + '/' + fbId).set({
-                        time: res.time,
-                        targetDate: realDate,
-                        type: type,
-                        content: val  // ★ 直接存原始內容，無 GAS 的 ' 前綴污染
-                    }).catch(function(e) { console.warn('Firebase feedback write failed:', e); });
-                } catch(fbErr) { console.warn('Firebase feedback write error:', fbErr); }
-
-                // 不需要手動 push 與 re-render，監聽器會處理即時更新
-
-                // ★★★ v3.9 連結與棒卡回覆解析邏輯 ★★★
-                var parseBtn = function (text) {
-                    if (!text) return "";
-                    
-                    // 1. 處理阿喵老師對棒卡申請的回覆（取代醜陋的 JSON）
-                    // 支援 [quote:棒卡申請]{...}[/quote] 或者是舊版的 "棒卡申請\n{...}"
-                    var renderStickerCard = function(contentStr) {
-                        try {
-                            var d = JSON.parse(contentStr);
-                            return `<div style="background:#fff7ed; border-left:4px solid #fb923c; padding:6px 10px; margin-bottom:8px; border-radius:4px; font-size:0.9rem; color:#431407;">` +
-                                   `<b style="color:#d97706;">⭐ 棒卡申請:</b> ${d.reason} (+${d.count}棒)` +
-                                   `</div>`;
-                        } catch(e) {
-                            return `<div style="background:#f3f4f6; border-left:4px solid #ccc; padding:6px 10px; margin-bottom:8px; border-radius:4px; font-size:0.9rem; color:#555;">[回覆棒卡申請]</div>`;
-                        }
-                    };
-
-                    // 新版 quote 格式
-                    text = text.replace(/\[quote:棒卡申請\](.*?)\[\/quote\]/g, function(match, content) {
-                        return renderStickerCard(content);
-                    });
-                    
-                    // 舊版 raw 格式 (假設老師回覆字串開頭包含了 "棒卡申請\n{" 或類似的格式)
-                    text = text.replace(/棒卡申請\s*\n?(\{.*?\})/g, function(match, content) {
-                        return renderStickerCard(content);
-                    });
-
-                    text = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-                    var withBr = text.replace(/\n/g, '<br>');
-                    return withBr.replace(/\[(.*?)\](http[s]?:\/\/[^\s]+)/g, function (match, name, url) {
-                        if (name.indexOf("附件") > -1 || name.indexOf("作業") > -1) {
-                            return `<a href="${url}" target="_blank" class="btn-small-tag">${SVG.clip}${name}</a>`;
-                        } else {
-                            return `<a href="${url}" target="_blank" class="btn-link">${name}</a>`;
-                        }
-                    });
-                };
-
+                // 不需要手動寫入 Firebase 或 historyDiv，監聽器會處理即時更新
                 if (!contentOverride) {
-                    document.getElementById(inputId).value = "";
-                    btn.innerText = "送出"; btn.disabled = false;
+                    var el = document.getElementById(inputId);
+                    if (el) el.value = "";
+                    if (btn) { btn.innerText = "送出"; btn.disabled = false; }
                     alert("已送出！");
                 }
                 if (callback) callback();
-
             }).withFailureHandler(function (e) {
                 alert("錯誤: " + e.message);
                 if (btn) { btn.innerText = "送出"; btn.disabled = false; }
             }).submitFeedback(form);
         }
 
-        function submitScoreReport(safeId, realDate) { var inputId = 'score-in-' + safeId; var val = document.getElementById(inputId).value; if (!val) return; var btn = document.querySelector("#" + inputId + " + button"); btn.innerText = "送出..."; btn.disabled = true; var form = { className: gData.className, studentName: gData.studentName, targetDate: realDate, type: '補考回報', content: val }; google.script.run.withSuccessHandler(function (res) { gData.feedbackHistory.push({ time: res.time, type: '補考回報', targetDate: realDate, content: val }); renderDailyPosts(gData.dailyPost, gData.feedbackHistory); renderOldGradeCards(gData.grades); alert("回報成功！分數已更新 (審核中)"); }).withFailureHandler(function (e) { alert("錯誤: " + e.message); btn.innerText = "送出"; btn.disabled = false; }).submitFeedback(form); }
+        function submitScoreReport(safeId, realDate) { 
+            var inputId = 'score-in-' + safeId; 
+            var val = document.getElementById(inputId).value; 
+            if (!val) return; 
+            var btn = document.querySelector("#" + inputId + " + button"); 
+            btn.innerText = "送出..."; btn.disabled = true; 
+            var form = { className: gData.className, studentName: gData.studentName, targetDate: realDate, type: '補考回報', content: val }; 
+            google.script.run.withSuccessHandler(function (res) { 
+                // 監聽器會處理數據更新，此處僅清理輸入
+                document.getElementById(inputId).value = "";
+                btn.innerText = "送出"; btn.disabled = false;
+                alert("回報成功！分數已更新 (審核中)"); 
+            }).withFailureHandler(function (e) { 
+                alert("錯誤: " + e.message); 
+                btn.innerText = "送出"; btn.disabled = false; 
+            }).submitFeedback(form); 
+        }
         function openPwdModal() { document.getElementById('pwdModal').style.display = 'flex'; }
         function closePwdModal() { document.getElementById('pwdModal').style.display = 'none'; }
         function doChangePwd() { 
