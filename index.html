@@ -3746,7 +3746,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var content = JSON.stringify({ reason: reason, count: count, status: "待審核" });
             var form = { className: gData.className, studentName: gData.studentName, targetDate: realDate, type: '棒卡申請', content: content };
             google.script.run.withSuccessHandler(function(res) {
-                // ★ 同時寫入 Firebase RTDB，確保刷新後可見
+                // ★ 同時寫入 Firebase RTDB
                 try {
                     var safeC = gData.className.replace(/[.#$[\]]/g, '-');
                     var safeN = gData.studentName.replace(/[.#$[\]]/g, '-');
@@ -3756,12 +3756,12 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     }).catch(function(e) { console.warn('FB sticker write failed:', e); });
                 } catch(e) { console.warn('FB sticker write error:', e); }
 
-                gData.feedbackHistory.push({ time: res.time, type: '棒卡申請', targetDate: realDate, content: content, fbKey: fbId });
+                // 不需要手動 push 與 re-render，因為 Firebase .on('value') 監聽器會處理即時更新
                 if (selEl) { selEl.selectedIndex = 0; }
                 if (customEl) { customEl.value = ''; customEl.style.display = 'none'; }
+                if (submitBtn) { submitBtn.innerText = "送出申請"; submitBtn.disabled = false; }
                 
                 alert("棒卡申請已送出！請等待老師審核。");
-                renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
             }).withFailureHandler(function(e) {
                 alert('棒卡申請送出失敗: ' + e.message);
                 if (submitBtn) { submitBtn.innerText = "送出申請"; submitBtn.disabled = false; }
@@ -3795,8 +3795,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     }).catch(function(e) { console.warn('Firebase feedback write failed:', e); });
                 } catch(fbErr) { console.warn('Firebase feedback write error:', fbErr); }
 
-                // 更新本地記憶體，確保本次 session 不需要刷新就能看到
-                gData.feedbackHistory.push({ time: res.time, targetDate: realDate, type: type, content: val });
+                // 不需要手動 push 與 re-render，監聽器會處理即時更新
 
                 // ★★★ v3.9 連結與棒卡回覆解析邏輯 ★★★
                 var parseBtn = function (text) {
