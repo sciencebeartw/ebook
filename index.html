@@ -948,9 +948,9 @@
         }
 
         .status-warning {
-            color: #e74c3c;
-            background: #fdecea;
-            border: 1px solid #e74c3c;
+            color: #cc0000;
+            background: #ffebeb;
+            border: 1.5px solid #cc0000;
         }
 
         .status-green {
@@ -1181,7 +1181,7 @@
         /* 自動加上迴紋針圖示 */
         .bulletin-content .btn-link::before,
         .emergency-body .btn-link::before {
-            content: "📎 ";
+            content: "";
         }
 
         .score-report-section {
@@ -3350,7 +3350,7 @@
                 return;
             }
 
-            if (statusDiv) statusDiv.innerText = '⏳ 正在上傳：' + file.name + '...';
+            if (statusDiv) statusDiv.innerHTML = SVG.hourglass + ' 正在上傳：' + file.name + '...';
 
             // 檔名格式：YYYYMMDD_班級_姓名_原始檔名
             var today = new Date();
@@ -3364,7 +3364,7 @@
             uploadToFirebase(file, path,
                 function(res) {
                     // 上傳成功：用 [📄附件] 格式寫入回饋
-                    var content = '[📄附件]' + res.url;
+                    var content = '[附件]' + res.url;
                     sendFeedback(dateStr.replace(/\//g, '-'), dateStr, '作業上傳', content, function() {
                         processUploadQueue(dateStr); // 繼續下一個
                     });
@@ -3866,11 +3866,6 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                         }
                     });
                 };
-
-                var sName2 = (gData && gData.studentName) ? gData.studentName : "學";
-                var sChar2 = sName2.length >= 2 ? sName2.charAt(sName2.length - 2) : sName2.charAt(0);
-                var newMsg = "<div class='history-msg'><div class='history-msg-avatar avatar-student'>" + sChar2 + "</div><div class='history-msg-body'>" + parseBtn(val) + "<div class='history-msg-time'>" + timeStr + "</div></div></div>";
-                historyDiv.innerHTML += newMsg;
 
                 if (!contentOverride) {
                     document.getElementById(inputId).value = "";
