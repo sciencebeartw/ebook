@@ -2421,12 +2421,6 @@
                 // 使用原生二進制上傳，最穩定且不吃前端記憶體
                 fileRef.put(file, metadata)
                     .then(function() { return fileRef.getDownloadURL(); })
-                    .then(function(url) {
-                        // 等待 Firebase CDN 發布邊緣節點（避免手機剛傳完馬上點開空白）
-                        return new Promise(function(resolve) {
-                            setTimeout(function() { resolve(url); }, 2500);
-                        });
-                    })
                     .then(function(url) { onSuccess({ success: true, url: url, name: safeName }); })
                     .catch(function(err) { console.error('Firebase Storage Upload Error:', err); onError(err); });
             } catch(ex) { 

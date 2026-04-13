@@ -13,7 +13,9 @@
 **雙軌架構 (Dual-Track Architecture)**:
 為確保與舊有系統的完整相容，目前的系統設計為：
 - **讀取 (Reads)**：透過 Firebase 取得資料，達到極速載入 (依靠 `FirebaseSync.gs` 進行同步)。
-- **寫入 (Writes)**：學生留言、上傳作業仍透過 HTTP POST (Fetch 呼叫 `doPost`) 打回原版 GAS 專案，讓老師保留在 Google 試算表/Drive 管理檔案的習慣。
+- **寫入 (Writes)**：學生留言、上傳作業除了透過 HTTP POST (Fetch 呼叫 `doPost`) 打回原版 GAS 專案存檔，**也會同時利用 Firebase SDK 直接寫入 RTDB / Storage**。
+- **檔案上傳 (Storage)**：**【極度重要】** 所有的檔案上傳（聯絡簿附件、公告附件、學生作業）皆已改為 Firebase 原生的**純二進制 `put(file)` 上傳**。絕對不可使用 `FileReader` 轉 Base64 上傳（這會導致手機 Safari 因記憶體耗盡而損壞 JPEG 圖檔）。
+- **同步機制**：GAS 後台有提供「🐻 山熊老師專用 → 手動同步資料到 Firebase」按鈕，按下即可將試算表編輯更新到 Firebase (預防背景 5 分鐘同步不及時)。
 
 **目前狀態**：關卡四進行中 (還原舊版介面並落實雙軌架構)
 
