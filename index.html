@@ -3509,8 +3509,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     '<div style="font-size:0.85rem; color:#64748b; margin:4px 0;">' + item.time.substring(5, 16) + ' ｜ <b style="color:' + statusColor + '">' + item.status + '</b></div>' +
                     (item.status === '待審核' ?
                         '<div style="display:flex; gap:8px; margin-top:8px;">' +
-                        '<button onclick="approveStickerApply('' + item.fbKey + '','' + item.cls + '','' + item.stuName + '',' + item.count + ')" style="flex:1; background:linear-gradient(135deg,#4ade80,#22c55e); color:white; border:none; border-radius:20px; padding:8px; font-weight:700; cursor:pointer; font-size:1rem;">✓ 通過</button>' +
-                        '<button onclick="rejectStickerApply('' + item.fbKey + '','' + item.cls + '','' + item.stuName + '')" style="flex:1; background:#fee2e2; color:#dc2626; border:none; border-radius:20px; padding:8px; font-weight:700; cursor:pointer; font-size:1rem;">✗ 退回</button>' +
+                        '<button onclick="approveStickerApply(\'' + item.fbKey + '\',\'' + item.cls + '\',\'' + item.stuName + '\',' + item.count + ')" style="flex:1; background:linear-gradient(135deg,#4ade80,#22c55e); color:white; border:none; border-radius:20px; padding:8px; font-weight:700; cursor:pointer; font-size:1rem;">✓ 通過</button>' +
+                        '<button onclick="rejectStickerApply(\'' + item.fbKey + '\',\'' + item.cls + '\',\'' + item.stuName + '\')" style="flex:1; background:#fee2e2; color:#dc2626; border:none; border-radius:20px; padding:8px; font-weight:700; cursor:pointer; font-size:1rem;">✗ 退回</button>' +
                         '</div>' : '') +
                     '</div>';
             });
