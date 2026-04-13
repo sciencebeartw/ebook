@@ -2867,12 +2867,8 @@
             document.getElementById('headName').innerText = result.studentName;
             document.getElementById('headClass').innerText = result.className.replace(/\d+/g, '');
             var stickerCount = result.stickers || 0;
-            if (stickerCount > 0) {
-                document.getElementById('headStickers').style.display = 'inline-flex';
-                document.getElementById('headStickerCount').innerText = stickerCount;
-            } else {
-                document.getElementById('headStickers').style.display = 'none';
-            }
+            document.getElementById('headStickers').style.display = 'inline-flex';
+            document.getElementById('headStickerCount').innerText = stickerCount;
 
             renderDailyPosts(result.dailyPost, result.feedbackHistory);
             renderOldGradeCards(result.grades);
@@ -3613,6 +3609,15 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         }
 
         function submitStickerApply(safeId, realDate) {
+            var btnStr = "sticker-btn-" + safeId;
+            var submitBtn = document.getElementById(btnStr);
+            if (!submitBtn) {
+                // Find it if it doesn't have an ID
+                var parentRow = document.getElementById('sticker-reason-' + safeId).parentElement;
+                submitBtn = parentRow.querySelector('.sticker-submit-btn');
+                submitBtn.id = btnStr;
+            }
+
             var selEl = document.getElementById('sticker-reason-' + safeId);
             var customEl = document.getElementById('sticker-custom-' + safeId);
             var countSelEl = document.getElementById('sticker-count-' + safeId);
@@ -3628,6 +3633,9 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             if (!reason || reason === '__placeholder__') { alert('請選擇或填寫得棒名目！'); return; }
             if (!count || count < 5) { alert('最少申請 5 棒！'); return; }
             
+            submitBtn.innerText = "傳送中...";
+            submitBtn.disabled = true;
+
             var content = JSON.stringify({ reason: reason, count: count, status: "待審核" });
             var form = { className: gData.className, studentName: gData.studentName, targetDate: realDate, type: '棒卡申請', content: content };
             google.script.run.withSuccessHandler(function(res) {
@@ -3644,9 +3652,12 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 gData.feedbackHistory.push({ time: res.time, type: '棒卡申請', targetDate: realDate, content: content, fbKey: fbId });
                 if (selEl) { selEl.selectedIndex = 0; }
                 if (customEl) { customEl.value = ''; customEl.style.display = 'none'; }
+                
+                alert("棒卡申請已送出！請等待老師審核。");
                 renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
             }).withFailureHandler(function(e) {
                 alert('棒卡申請送出失敗: ' + e.message);
+                if (submitBtn) { submitBtn.innerText = "送出申請"; submitBtn.disabled = false; }
             }).submitFeedback(form);
         }
 
@@ -3680,9 +3691,22 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 // 更新本地記憶體，確保本次 session 不需要刷新就能看到
                 gData.feedbackHistory.push({ time: res.time, targetDate: realDate, type: type, content: val });
 
-                // ★★★ v3.9 連結解析邏輯 (支援小標籤) ★★★
+                // ★★★ v3.9 連結與棒卡回覆解析邏輯 ★★★
                 var parseBtn = function (text) {
                     if (!text) return "";
+                    
+                    // 1. 處理阿喵老師對棒卡申請的回覆（取代醜陋的 JSON）
+                    text = text.replace(/\[quote:棒卡申請\](.*?)\[\/quote\]/g, function(match, content) {
+                        try {
+                            var d = JSON.parse(content);
+                            return `<div style="background:#fff7ed; border-left:4px solid #fb923c; padding:6px 10px; margin-bottom:8px; border-radius:4px; font-size:0.9rem; color:#431407;">` +
+                                   `<b style="color:#d97706;">⭐ 棒卡申請:</b> ${d.reason} (+${d.count}棒)` +
+                                   `</div>`;
+                        } catch(e) {
+                            return `<div style="background:#f3f4f6; border-left:4px solid #ccc; padding:6px 10px; margin-bottom:8px; border-radius:4px; font-size:0.9rem; color:#555;">[回覆棒卡申請]</div>`;
+                        }
+                    });
+
                     text = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
                     var withBr = text.replace(/\n/g, '<br>');
                     return withBr.replace(/\[(.*?)\](http[s]?:\/\/[^\s]+)/g, function (match, name, url) {
