@@ -2402,37 +2402,37 @@
             }
         }
         // ★★★ 共用：直接上傳到 Firebase Storage（不走 GAS）★★★
+        // v3.9 改版：全面捨棄 FileReader(Base64) 避免手機記憶體不足導致大圖損毀
+        // 改採原生 fileRef.put(file) 二進制串流上傳
         function uploadToFirebase(file, path, onSuccess, onError) {
-            var reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    var dataUrl = e.target.result;
-                    // 從 data URL 本身抽取實際 content type
-                    // iOS 選照片時 file.type 可能是 image/heic，但 FileReader 會自動轉 JPEG
-                    var actualType = dataUrl.substring(dataUrl.indexOf(':') + 1, dataUrl.indexOf(';'));
-                    if (!actualType || actualType === 'image/heic' || actualType === 'image/heif') {
-                        actualType = 'image/jpeg';
-                    }
+            try {
+                var storageRef = firebase.storage().ref();
+                var fileRef = storageRef.child(path);
+                var safeName = file.name.replace(/[/\\?%*:|"<>]/g, '-');
+                
+                // 決定 Content-Type
+                var actualType = file.type;
+                if (!actualType || actualType === 'image/heic' || actualType === 'image/heif') {
+                    // iOS 若未自動轉型，強制標記為 jpeg 給瀏覽器預覽（實務上 iOS Safari 取檔時已轉成 jpeg 串流）
+                    actualType = 'image/jpeg';
+                }
+                var metadata = { contentType: actualType };
 
-                    var storageRef = firebase.storage().ref();
-                    var fileRef = storageRef.child(path);
-                    var safeName = file.name.replace(/[/\\?%*:|"<>]/g, '-');
-                    var metadata = { contentType: actualType };
-
-                    fileRef.putString(dataUrl, 'data_url', metadata)
-                        .then(function() { return fileRef.getDownloadURL(); })
-                        .then(function(url) {
-                            // ★ 等待 Firebase CDN 傳播（避免手機剛傳完馬上點開空白）
-                            // Firebase CDN 邊緣節點同步新檔案約需 1~5 秒
-                            return new Promise(function(resolve) {
-                                setTimeout(function() { resolve(url); }, 2500);
-                            });
-                        })
-                        .then(function(url) { onSuccess({ success: true, url: url, name: safeName }); })
-                        .catch(function(err) { console.error('Firebase Storage Upload Error:', err); onError(err); });
-                } catch(ex) { console.error('Upload Exception:', ex); onError(ex); }
-            };
-            reader.readAsDataURL(file);
+                // 使用原生二進制上傳，最穩定且不吃前端記憶體
+                fileRef.put(file, metadata)
+                    .then(function() { return fileRef.getDownloadURL(); })
+                    .then(function(url) {
+                        // 等待 Firebase CDN 發布邊緣節點（避免手機剛傳完馬上點開空白）
+                        return new Promise(function(resolve) {
+                            setTimeout(function() { resolve(url); }, 2500);
+                        });
+                    })
+                    .then(function(url) { onSuccess({ success: true, url: url, name: safeName }); })
+                    .catch(function(err) { console.error('Firebase Storage Upload Error:', err); onError(err); });
+            } catch(ex) { 
+                console.error('Upload Direct Exception:', ex); 
+                onError(ex); 
+            }
         }
 
         // ★★★ v3.9 老師聯絡簿附件上傳 → Firebase Storage ★★★
