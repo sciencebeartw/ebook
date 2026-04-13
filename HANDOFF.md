@@ -93,6 +93,8 @@ WEgppN5tL4LNQcVRk8g6ffkqZxPIYCzCwe11ZfeP
 5. **ebook-app/index.html 穩定版** - 已解決手機照片上傳損毀問題，並優化上傳速度。
 6. **手動同步功能** - 已在 GAS 介面新增按鈕，解決同步延遲問題。
 7. **二進位上傳 (Binary Stream)** - 已棄用 Base64，全面改用 Firebase SDK 原生上傳。
+8. **UI/UX 大升級 (Phase 3.10)** - 拔除所有醜陋 Emoji，改成內建渲染精準對齊 (`em`) 的客製化 SVG 群（涵蓋作業附件、棒卡狀態、成績標籤）；重新配色狀態警示標籤。
+9. **Zero-Ghosting 即時渲染 (Realtime Sync)** - 廢除前端手動插入 DOM 開源；成績/聯絡簿/公告全面接入 `db.ref(...).on('value')`。實現「後台一動、前台瞬間變更」，徹底解決多次傳送、假重影與失去連結等 Race Condition 問題。
 
 ---
 
