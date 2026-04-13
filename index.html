@@ -521,80 +521,65 @@
             padding-bottom: 80px;
         }
 
-                .header-bar {
+                        .header-bar {
             background: rgba(255, 255, 255, 0.85);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
-            padding: 12px 15px;
-            display: grid;
-            grid-template-columns: auto 1fr auto;
-            gap: 15px;
+            padding: 10px 15px;
+            display: flex;
+            justify-content: space-between;
             align-items: center;
-            border-bottom: 1px solid rgba(16, 185, 129, 0.1);
+            border-bottom: 2px solid rgba(16, 185, 129, 0.1);
         }
 
-        .header-col-logo {
+        .header-left {
             display: flex;
             align-items: center;
-            justify-content: center;
+            flex-wrap: wrap;
+            gap: 12px;
         }
 
         .header-logo-large {
-            height: 75px;
+            height: 70px;
             width: auto;
             border-radius: 12px;
         }
 
-        .header-col-center {
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            height: 75px;
-        }
-
-        .student-info-top {
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-start;
-        }
-
         .student-info {
-            font-size: 1.65rem;
+            font-size: 2.2rem;
             font-weight: 900;
             color: #064e3b;
-            line-height: 1.1;
-            white-space: nowrap;
+            letter-spacing: 0.5px;
         }
 
-        .class-info {
-            font-size: 0.8rem;
-            color: #64748b;
-            white-space: nowrap;
-            font-weight: 700;
-            margin-top: 2px;
-        }
-
-        .header-col-right {
+        .header-right {
             display: flex;
             flex-direction: column;
             align-items: flex-end;
-            justify-content: space-between;
-            height: 75px;
+            gap: 3px;
         }
 
         .bears-lab-title {
             font-family: 'Outfit', 'Inter', sans-serif;
             font-weight: 900;
-            font-size: 1.4rem;
-            background: linear-gradient(135deg, #34d399 0%, #059669 100%);
+            font-size: 1.5rem;
+            background: linear-gradient(135deg, #22c55e 0%, #059669 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            margin-bottom: 2px;
+            line-height: 1;
+        }
+
+        .class-info {
+            font-size: 0.85rem;
+            color: #475569;
+            font-weight: 700;
+            letter-spacing: 0.5px;
         }
 
         .header-btn-row {
             display: flex;
-            gap: 8px;
+            gap: 6px;
+            margin-top: 2px;
         }
 
         .header-icon-btn {
@@ -619,16 +604,16 @@
         .sticker-badge-header {
             display: inline-flex;
             align-items: center;
+            justify-content: center;
             gap: 4px;
             background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
             border: 1.5px solid #fbbf24;
             border-radius: 20px;
-            padding: 2px 10px;
+            padding: 4px 12px;
             font-weight: 800;
-            font-size: 0.95rem;
+            font-size: 1.05rem;
             color: #92400e;
             white-space: nowrap;
-            margin-top: auto;
         }
 
         .float-line-container {
@@ -2493,25 +2478,14 @@
 
         <div id="main-screen">
             <div class="header-bar">
-                <!-- 左欄：大 LOGO -->
-                <div class="header-col-logo">
+                <div class="header-left">
                     <img src="LOGO.png" class="header-logo-large logo-target">
+                    <div class="student-info" id="headName"></div>
+                    <div class="sticker-badge-header" id="headStickers" style="display:inline-flex;">⭐ <span id="headStickerCount">0</span> 棒</div>
                 </div>
-                
-                <!-- 中欄：姓名(上方) 棒卡數(下方) -->
-                <div class="header-col-center">
-                    <div class="student-info-top">
-                        <div class="student-info" id="headName">方沁竹</div>
-                        <div class="class-info" id="headClass">小六資優自然</div>
-                    </div>
-                    <div>
-                        <div class="sticker-badge-header" id="headStickers" style="display:inline-flex;">⭐ <span id="headStickerCount">0</span> 棒</div>
-                    </div>
-                </div>
-
-                <!-- 右欄：Bear's Lab (上方) 三個按鈕 (下方) -->
-                <div class="header-col-right">
+                <div class="header-right">
                     <div class="bears-lab-title">Bear's Lab</div>
+                    <div class="class-info" id="headClass"></div>
                     <div class="header-btn-row">
                         <a href="javascript:void(0)" class="header-icon-btn" onclick="doRefresh()" title="重整" style="color:#0ea5e9;">
                             <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
@@ -3358,8 +3332,34 @@ if (exam.dist) {
                     text = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
                     var withBr = text.replace(/\n/g, '<br>');
                     // ★★★ v3.9.1 新增：引用區塊解析 ★★★
-                    withBr = withBr.replace(/\[quote:([^\]]+)\](.*?)\[\/quote\]/g, function(match, type, qContent) {
-                        return `<div class="quote-box"><div class="quote-type">${type}</div><div class="quote-content">${qContent}</div></div>`;
+                    withBr = withBr.replace(/\[quote:([^\]]+)\](.*?)\[\/quote\]/gi, function(match, type, qContent) {
+                        var contentClean = qContent.trim().replace(/<br>/g, "\n");
+                        // 檢查被 quote 的內容是否為舊版 JSON
+                        var d = null;
+                        if (contentClean.startsWith('{') && contentClean.endsWith('}')) {
+                            try { d = JSON.parse(contentClean); } catch(e) {}
+                        }
+                        // 或因為換行等關係而隱藏了 {}
+                        if (!d && contentClean.includes('"{') && contentClean.includes('}"')) {
+                            try {
+                                var matchJson = contentClean.match(/(\{.*?\})/);
+                                if(matchJson) d = JSON.parse(matchJson[1]);
+                            } catch(e) {}
+                        }
+                        
+                        if (d && d.reason) {
+                            var statusColor = d.status === '待審核' ? '#f59e0b' : (d.status === '退回' ? '#ef4444' : '#10b981');
+                            var statusIcon = d.status === '待審核' ? '⌛' : (d.status === '退回' ? '❌' : '✅');
+                            var rendered = `<div style="font-weight:bold; font-size:1.1rem; color:#431407; margin-bottom:4px;">⭐ ${d.reason} <span style="background:linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); color:white; padding:2px 8px; border-radius:12px; font-size:0.9rem;">+${d.count}棒</span></div><div style="font-weight:bold; color:${statusColor}; font-size:0.95rem; background:rgba(255,255,255,0.7); display:inline-block; padding:2px 8px; border-radius:4px; margin-top:4px;">${statusIcon} ${d.status}</div>`;
+                            return `<div class="quote-box" style="background:#fef3c7; border:none; border-radius:8px; padding:12px; margin:8px 0; box-shadow:0 2px 4px rgba(0,0,0,0.05);">
+                                      <div class="quote-content">${rendered}</div>
+                                    </div>`;
+                        } else {
+                            return `<div class="quote-box">
+                                      <div class="quote-type">💬 引用：${type}</div>
+                                      <div class="quote-content">${qContent}</div>
+                                    </div>`;
+                        }
                     });
                     // 老師發布的連結 -> 藍色大膠囊
                     // 學生上傳的連結 -> 灰色小標籤 (透過 class="btn-small-tag" 區分)
