@@ -1628,9 +1628,9 @@
     --bg-color: #f0fdf4; 
     --surface-color: rgba(255, 255, 255, 0.85);
     --surface-border: rgba(255, 255, 255, 0.6);
-    --primary-gradient: linear-gradient(135deg, #34d399 0%, #059669 100%);
+    --primary-gradient: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
     --secondary-gradient: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-    --danger-gradient: linear-gradient(135deg, #fb7185 0%, #e11d48 100%);
+    --danger-gradient: linear-gradient(135deg, #f87171 0%, #dc2626 100%);
     --text-main: #064e3b; 
     --text-muted: #64748b;
     --shadow-subtle: 0 10px 40px -10px rgba(5, 150, 105, 0.1);
@@ -1668,7 +1668,7 @@ body {
     border-bottom: 1px solid rgba(16, 185, 129, 0.1); 
 }
 .header-left .logo-text {
-    font-size: 1.3rem !important; font-weight: 800 !important; background: var(--primary-gradient) !important; -webkit-background-clip: text !important; -webkit-text-fill-color: transparent !important; margin: 0 !important; font-family: 'Outfit' !important; color: transparent !important;
+    font-size: 1.3rem !important; font-weight: 800 !important; background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%) !important; -webkit-background-clip: text !important; -webkit-text-fill-color: transparent !important; margin: 0 !important; font-family: 'Outfit' !important; color: transparent !important;
 }
 
 /* Feed List overrides */
@@ -1704,8 +1704,9 @@ body {
 /* 📊 CSS 柱狀圖 (Bar Chart) */
 .bar-chart-container { display: flex; align-items: flex-end; justify-content: space-around; height: 180px; padding-top: 30px; padding-bottom: 5px; margin-top: 10px; border-bottom: 1px solid #e2e8f0; }
 .bar-col { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 8px; width: 45px; height: 100%; }
-.bar-fill { width: 100%; background: #d1fae5; border-radius: 8px 8px 0 0; transition: height 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.3s; position: relative; height: 0%; }
-.bar-fill.active-bar { background: var(--primary-gradient); box-shadow: 0 0 15px rgba(16, 185, 129, 0.4); }
+.bar-fill { width: 100%; background: #d1fae5; border-radius: 8px 8px 0 0; transition: background 0.3s; position: relative;  }
+@keyframes growBar { 0% { height: 0%; } 100% { height: var(--target-height); } }
+.bar-fill.active-bar { background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%); box-shadow: 0 0 15px rgba(16, 185, 129, 0.4); }
 .bar-fill::after { content: attr(data-val); position: absolute; top: -25px; width: 100%; text-align: center; font-size: 0.85rem; font-weight: 900; color: #064e3b; font-family: 'Outfit'; }
 .bar-label { font-size: 0.8rem; font-weight: 800; color: var(--text-muted); text-align: center; font-family: 'Outfit';}
 
@@ -1736,7 +1737,7 @@ body {
     content: '';
     position: absolute;
     top: 0; left: 0; width: 100%; height: 6px;
-    background: var(--danger-gradient);
+    background: linear-gradient(135deg, #ef4444 0%, #dc3545 100%);
 }
 .emergency-header {
     background: none !important;
@@ -1756,7 +1757,7 @@ body {
     text-align: center;
 }
 .emergency-btn {
-    background: var(--danger-gradient) !important;
+    background: linear-gradient(135deg, #ef4444 0%, #dc3545 100%) !important;
     border-radius: 20px !important;
     box-shadow: 0 10px 20px rgba(225, 29, 72, 0.3) !important;
     font-weight: 800 !important;
@@ -3143,13 +3144,13 @@ body {
                          }
                     }
 
-                    var grad = "var(--primary-gradient)";
+                    var grad = "linear-gradient(135deg, #4ade80 0%, #22c55e 100%)";
                     if (logic.needsReport || isNaN(sc) || logic.mainScore === "尚未繳交" || bkt <= 1) {
-                        grad = "var(--danger-gradient)"; // Red
+                        grad = "linear-gradient(135deg, #ef4444 0%, #dc3545 100%)"; // Red
                     } else if (bkt === 2 || bkt === 3) {
-                        grad = "var(--secondary-gradient)"; // Yellow/Orange
+                        grad = "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)"; // Yellow/Orange
                     } else {
-                        grad = "var(--primary-gradient)"; // Green
+                        grad = "linear-gradient(135deg, #4ade80 0%, #22c55e 100%)"; // Green
                     }
 
                     if (logic.needsReport || isNaN(sc) || logic.mainScore === "尚未繳交") {
@@ -3195,17 +3196,17 @@ body {
                                 }
                             }
                             var activeClass = isMyGroup ? "active-bar" : "";
-                            var fillGrad = "#e2e8f0";
+                            var fillGrad = "#5b9bd5";
                             var boxShad = "";
                             if (isMyGroup) {
-                                if (idx === 4) { fillGrad = "var(--primary-gradient)"; boxShad = "box-shadow: 0 0 10px rgba(16,185,129,0.3);"; }
-                                else if (idx === 2 || idx === 3) { fillGrad = "var(--secondary-gradient)"; boxShad = "box-shadow: 0 0 10px rgba(245,158,11,0.3);"; }
-                                else { fillGrad = "var(--danger-gradient)"; boxShad = "box-shadow: 0 0 10px rgba(225,29,72,0.3);"; }
+                                if (idx === 4) { fillGrad = "linear-gradient(135deg, #4ade80 0%, #22c55e 100%)"; boxShad = "box-shadow: 0 0 10px rgba(34,197,94,0.3);"; }
+                                else if (idx === 2 || idx === 3) { fillGrad = "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)"; boxShad = "box-shadow: 0 0 10px rgba(245,158,11,0.3);"; }
+                                else { fillGrad = "linear-gradient(135deg, #ef4444 0%, #dc3545 100%)"; boxShad = "box-shadow: 0 0 10px rgba(225,29,72,0.3);"; }
                             }
                             var h = (val / maxVal * 100) + '%';
                             barCols += `
                             <div class="bar-col">
-                                <div class="bar-fill" data-val="${val}" style="height: ${h}; background: ${fillGrad}; ${boxShad}"></div>
+                                <div class="bar-fill" data-val="${val}" style="--target-height: ${h}; background: ${fillGrad}; ${boxShad}"></div>
                                 <div class="bar-label">${lbl}</div>
                             </div>`;
                         });
@@ -3271,7 +3272,7 @@ body {
 
                 var fbInputSection = `<div style='display:flex; gap:10px; margin-top:10px;'>
                     <input type='text' id='input-${safeDateId}' placeholder='回覆或留言給老師...' style='flex:1; padding:10px; border-radius:12px; border:1px solid #e2e8f0; font-size:0.95rem; outline:none;'>
-                    <button style='background:var(--primary-gradient); color:white; border:none; border-radius:12px; padding:0 20px; font-weight:bold;' onclick="sendFeedback('${safeDateId}', '${post.date}', '學生留言')">送出</button>
+                    <button style='background:linear-gradient(135deg, #4ade80 0%, #22c55e 100%); color:white; border:none; border-radius:12px; padding:0 20px; font-weight:bold;' onclick="sendFeedback('${safeDateId}', '${post.date}', '學生留言')">送出</button>
                 </div>`;
 
                 html += `
@@ -3297,6 +3298,20 @@ body {
                 </div>`;
             }); 
             container.innerHTML = html;
+
+            var observer = new IntersectionObserver(function(entries, obs) {
+                entries.forEach(function(entry) {
+                    if (entry.isIntersecting) {
+                        entry.target.style.animation = 'growBar 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
+                        obs.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.1 });
+            document.querySelectorAll('.bar-fill').forEach(function(el) {
+                el.style.animation = 'none';
+                observer.observe(el);
+            });
+    
         }
 
 
@@ -3321,6 +3336,20 @@ body {
                 </div>`;
             });
             container.innerHTML = html;
+
+            var observer = new IntersectionObserver(function(entries, obs) {
+                entries.forEach(function(entry) {
+                    if (entry.isIntersecting) {
+                        entry.target.style.animation = 'growBar 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
+                        obs.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.1 });
+            document.querySelectorAll('.bar-fill').forEach(function(el) {
+                el.style.animation = 'none';
+                observer.observe(el);
+            });
+    
         }
 
         function toggleCard(card) { card.classList.toggle('active'); var hint = card.querySelector('.click-hint'); hint.innerText = card.classList.contains('active') ? "▲" : "▼"; }
@@ -3443,6 +3472,20 @@ body {
             </div>`;
             });
             container.innerHTML = html;
+
+            var observer = new IntersectionObserver(function(entries, obs) {
+                entries.forEach(function(entry) {
+                    if (entry.isIntersecting) {
+                        entry.target.style.animation = 'growBar 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
+                        obs.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.1 });
+            document.querySelectorAll('.bar-fill').forEach(function(el) {
+                el.style.animation = 'none';
+                observer.observe(el);
+            });
+    
         }
 
         function checkEmergency(list) {
@@ -3463,7 +3506,7 @@ body {
             document.getElementById('gradeDetailSheet').style.bottom = '-100%';
             setTimeout(() => { 
                 document.getElementById('overlay_v2').style.display = 'none'; 
-                document.querySelectorAll('#gradeDetailSheet .bar-fill').forEach(b => b.style.height = '0%');
+                document.querySelectorAll('#gradeDetailSheet .bar-fill').forEach(b => b.style.setProperty('--target-height', '0%'));
             }, 300);
         }
 
@@ -3482,10 +3525,10 @@ body {
             
             let scoreNum = parseFloat(scoreStr);
             if (!isNaN(scoreNum) && scoreNum >= 80) {
-                document.getElementById('gd-score').style.background = 'var(--primary-gradient)';
+                document.getElementById('gd-score').style.background = 'linear-gradient(135deg, #4ade80 0%, #22c55e 100%)';
                 document.getElementById('gd-score').style.webkitBackgroundClip = 'text';
             } else {
-                document.getElementById('gd-score').style.background = 'var(--danger-gradient)';
+                document.getElementById('gd-score').style.background = 'linear-gradient(135deg, #ef4444 0%, #dc3545 100%)';
                 document.getElementById('gd-score').style.webkitBackgroundClip = 'text';
             }
 

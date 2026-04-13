@@ -20,7 +20,7 @@
         /* ================= 基礎設定 ================= */
         :root {
             --primary: #4CAF50;
-            --bg: #f2f3f7;
+            --bg: #f0fdf4;
             --text: #333;
             --line-green: #06C755;
         }
@@ -722,26 +722,31 @@
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
         }
 
-        .tabs {
-            display: flex;
-            background: white;
-            margin-top: 0px;
+        .tabs { 
+            display: flex; 
+            background: transparent; 
+            margin: 15px 15px 5px 15px; 
+            padding: 0;
+            gap: 10px;
         }
-
-        .tab-item {
-            flex: 1;
-            text-align: center;
-            padding: 15px 0;
-            color: #999;
-            font-weight: bold;
-            border-bottom: 3px solid transparent;
-            cursor: pointer;
-            font-size: 1.15rem;
+        .tab-item { 
+            flex: 1; 
+            text-align: center; 
+            padding: 12px 0; 
+            color: #64748b; 
+            font-weight: bold; 
+            border-radius: 30px; 
+            cursor: pointer; 
+            font-size: 1.25rem; 
+            background: rgba(255, 255, 255, 0.7);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
         }
-
-        .tab-item.active {
-            color: var(--primary);
-            border-bottom-color: var(--primary);
+        .tab-item.active { 
+            color: white; 
+            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%); 
+            box-shadow: 0 4px 15px rgba(34, 197, 94, 0.3);
+            border: none;
         }
 
         /* 聯絡簿卡片 CSS */
@@ -753,15 +758,63 @@
             overflow: hidden;
         }
 
+        #tab-content-0 {
+            position: relative;
+        }
+
+        /* Timeline wrapper — pale green outer card */
+        .post-card-wrapper {
+            position: relative;
+            background: #f0fdf4;
+            border-radius: 20px;
+            margin: 20px 15px;
+            padding: 14px 12px 14px 34px;
+        }
+
+        /* Override the original margin on inner card since wrapper handles it */
+        .post-card-wrapper .post-card {
+            margin: 0 !important;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+        }
+
+        /* Dot */
+        .post-card-wrapper::after {
+            content: '';
+            position: absolute;
+            left: 10px;
+            top: 18px;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #22c55e;
+            box-shadow: 0 0 0 3px rgba(34,197,94,0.2);
+            z-index: 1;
+        }
+
+        /* Connecting vertical line */
+        .post-card-wrapper::before {
+            content: '';
+            position: absolute;
+            left: 16px;
+            top: 32px;
+            bottom: -20px;
+            width: 2px;
+            background: linear-gradient(to bottom, #22c55e, rgba(34,197,94,0.05));
+        }
+
+        .post-card-wrapper:last-child::before {
+            display: none;
+        }
+
         .post-header {
             background: #e8f5e9;
-            padding: 15px 20px;
+            padding: 12px 15px;
             color: #2e7d32;
             font-weight: bold;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-size: 1.4rem;
+            font-size: 1.25rem;
         }
 
         .grade-section {
@@ -798,6 +851,15 @@
         
             font-family: 'Outfit', sans-serif !important;}
 
+        /* 缺考、尚未繳交 等文字型分數縮小 */
+        .main-score.text-grey-status {
+            font-size: 2.6rem !important;
+            color: #64748b !important;
+            font-family: 'Noto Sans TC', sans-serif !important;
+            letter-spacing: 0px !important;
+            font-weight: 700 !important;
+        }
+
         .score-unit-big {
             font-size: 1.6rem;
             color: #999;
@@ -814,15 +876,17 @@
         }
 
         .exam-standard-box {
-            margin-top: 15px;
-            font-size: 1.25rem;
-            color: #555;
-            background-color: #fff9c4;
-            border: 1px dashed #fbc02d;
-            padding: 8px 15px;
-            border-radius: 8px;
-            display: inline-block;
-            text-align: left;
+            margin: 16px auto;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #b45309;
+            background-color: #fffbeb;
+            border: 2px dashed #fbbf24;
+            padding: 10px 20px;
+            border-radius: 16px;
+            display: block;
+            text-align: center;
+            max-width: 90%;
         }
 
         .makeup-status-tag {
@@ -836,6 +900,12 @@
             width: fit-content;
             margin-left: auto;
             margin-right: auto;
+        }
+
+        #tab-content-1 .makeup-status-tag, .grade-detail .makeup-status-tag {
+            font-size: 0.85rem !important;
+            padding: 3px 10px !important;
+            border-radius: 12px !important;
         }
 
         .status-warning {
@@ -996,7 +1066,7 @@
         }
 
         .info-label {
-            font-size: 1.45rem;
+            font-size: 1.25rem;
             color: #2c3e50;
             font-weight: 700;
             margin-bottom: 8px;
@@ -1004,7 +1074,7 @@
         }
 
         .info-content {
-            font-size: 1.45rem;
+            font-size: 1.15rem;
             color: #555;
             line-height: 1.6;
             padding-left: 5px;
@@ -1084,20 +1154,65 @@
         }
 
         .feedback-section {
-            background: #fafafa;
-            padding: 20px;
-            border-top: 1px solid #eee;
+            background: transparent;
+            padding: 20px 16px;
+            border-top: 1px solid rgba(0,0,0,0.06);
+        }
+
+        .feedback-title {
+            font-size: 1.05rem;
+            color: #64748b;
+            font-weight: 700;
+            margin-bottom: 14px;
         }
 
         .history-msg {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
             margin-bottom: 12px;
             font-size: 1.25rem;
-            color: #444;
-            background: white;
-            padding: 10px;
-            border-radius: 8px;
-            border-left: 4px solid #ccc;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        .history-msg-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+
+        .history-msg-avatar.avatar-student {
+            background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
+            color: #475569;
+        }
+
+        .history-msg-avatar.avatar-teacher {
+            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+            color: white;
+        }
+
+        .history-msg-body {
+            background: #f1f5f9;
+            border-radius: 4px 16px 16px 16px;
+            padding: 10px 14px;
+            flex: 1;
+        }
+
+        .history-msg-body.teacher-body {
+            background: #e8fdf1;
+            border-radius: 16px 4px 16px 16px;
+        }
+
+        .history-msg-time {
+            font-size: 0.9rem;
+            color: #94a3b8;
+            margin-top: 4px;
+            text-align: right;
         }
 
         .input-box {
@@ -1131,26 +1246,36 @@
 
         .fb-input {
             flex: 1;
-            padding: 12px;
-            border: 1px solid #ddd;
+            padding: 12px 18px;
+            border: 1.5px solid #e2e8f0;
             border-radius: 25px;
             outline: none;
             font-size: 1.25rem;
+            background: #f8fafc;
+            transition: border-color 0.2s;
+        }
+
+        .fb-input:focus {
+            border-color: #4ade80;
         }
 
         .fb-btn {
-            background: #4CAF50;
+            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
             color: white;
             border: none;
-            padding: 0 25px;
+            padding: 0 22px;
             border-radius: 25px;
             font-weight: bold;
             cursor: pointer;
             font-size: 1.25rem;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+            transition: all 0.2s;
         }
 
         .fb-btn:hover {
-            background: #45a049;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(34, 197, 94, 0.4);
         }
 
         .quote-box {
@@ -1426,13 +1551,14 @@
 
         .detail-box {
             margin-top: 15px;
-            font-size: 1.25rem;
-            color: #555;
-            background-color: #fff9c4;
-            border: 1px dashed #fbc02d;
-            padding: 10px 15px;
-            border-radius: 8px;
-            text-align: left;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #b45309;
+            background-color: #fffbeb;
+            border: 2px dashed #fbbf24;
+            padding: 10px 20px;
+            border-radius: 16px;
+            text-align: center;
             line-height: 1.5;
         }
 
@@ -1547,83 +1673,133 @@
             padding-bottom: 20px;
         }
 
-        /* 緊急彈窗樣式 */
+        /* 緊急彈窗樣式 - Modern */
         .emergency-modal {
             display: none;
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.85);
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.55);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
             z-index: 9999;
             align-items: center;
             justify-content: center;
-            padding: 20px;
+            padding: 24px;
             box-sizing: border-box;
         }
-
         .emergency-box {
             background: white;
             width: 100%;
-            max-width: 400px;
-            border-radius: 16px;
+            max-width: 380px;
+            border-radius: 24px;
             overflow: hidden;
-            border-top: 10px solid #e74c3c;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-            animation: popIn 0.3s ease-out;
+            border-top: 6px solid #ef4444;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
+            animation: popIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
-
         @keyframes popIn {
-            from {
-                transform: scale(0.8);
-                opacity: 0;
-            }
-
-            to {
-                transform: scale(1);
-                opacity: 1;
-            }
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
         }
-
         .emergency-header {
-            background: #fdecea;
-            padding: 15px;
+            background: white;
+            padding: 28px 20px 10px;
             text-align: center;
-            color: #c0392b;
+            color: #dc2626;
             font-weight: 900;
-            font-size: 1.6rem;
-            border-bottom: 1px solid #fadbd8;
+            font-size: 1.7rem;
         }
-
         .emergency-body {
-            padding: 25px 20px;
+            padding: 16px 24px 24px;
             font-size: 1.45rem;
             line-height: 1.6;
-            color: #333;
-            max-height: 60vh;
+            color: #555;
+            text-align: center;
+            max-height: 55vh;
             overflow-y: auto;
         }
-
         .emergency-footer {
-            padding: 15px;
-            background: #fafafa;
+            padding: 0 20px 24px;
             text-align: center;
-            border-top: 1px solid #eee;
         }
-
         .emergency-btn {
-            background: #e74c3c;
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
             color: white;
             border: none;
-            padding: 12px 30px;
-            border-radius: 30px;
-            font-size: 1.3rem;
-            font-weight: bold;
+            padding: 16px 30px;
+            border-radius: 50px;
+            font-size: 1.35rem;
+            font-weight: 800;
             cursor: pointer;
             width: 100%;
+            box-shadow: 0 8px 20px rgba(239, 68, 68, 0.35);
+            transition: all 0.2s;
+            letter-spacing: 2px;
         }
-    </style>
+        .emergency-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px rgba(239, 68, 68, 0.5);
+        }
+    
+        /* V2 Vertical Bar Chart for index.html */
+        .v2-bar-chart-container {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-around;
+            height: 120px;
+            margin: 25px 10px 10px 10px;
+            padding-bottom: 25px;
+            border-bottom: 2px solid #e2e8f0;
+            position: relative;
+        }
+
+        .v2-bar-col {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            height: 100%;
+            width: 35px;
+            position: relative;
+        }
+
+        .v2-bar-fill {
+            width: 100%;
+            border-radius: 8px 8px 0 0;
+            position: relative;
+            
+        }
+
+        @keyframes growBar {
+            0% { height: 0%; }
+            100% { height: var(--target-height); }
+        }
+
+        
+        .v2-bar-fill::after {
+            content: attr(data-val);
+            position: absolute;
+            top: -25px;
+            width: 100%;
+            text-align: center;
+            font-size: 0.85rem;
+            font-weight: 900;
+            color: #064e3b;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .v2-bar-label {
+            position: absolute;
+            bottom: -25px;
+            font-size: 0.8rem;
+            font-weight: 800;
+            color: #64748b;
+            text-align: center;
+            font-family: 'Outfit', sans-serif;
+            width: 200%;
+        }
+</style>
 
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -2171,9 +2347,9 @@
             </div>
             <div class="sticky-wrapper">
                 <div class="tabs">
-                    <div class="tab-item active" onclick="switchTab(0)">📖 數位聯絡簿</div>
-                    <div class="tab-item" onclick="switchTab(1)">📊 近期成績</div>
-                    <div class="tab-item" onclick="switchTab(2)">🔔 重要公告</div>
+                    <div class="tab-item active" onclick="switchTab(0)">聯絡簿</div>
+                    <div class="tab-item" onclick="switchTab(1)">近期成績</div>
+                    <div class="tab-item" onclick="switchTab(2)">重要公告</div>
                 </div>
             </div>
             <div id="tab-content-0"></div>
@@ -2867,7 +3043,7 @@
             window.scrollTo(0, 0);
         }
 
-        function getDisplayLogic(exam, feedbackHistory) { var rawScore = (exam.score || "").toString(); var sheetNum = exam.scoreNum; var myColor = (exam.cellColor || "").toLowerCase(); var result = { mainScore: "", mainClass: "", statusHtml: "", effectiveNum: null, showReviewing: false, needsReport: false }; if (sheetNum !== null && !isNaN(sheetNum)) { result.effectiveNum = sheetNum; result.mainScore = sheetNum; if (exam.myBucket === 4) result.mainClass = " score-green"; else if (exam.myBucket <= 1 && exam.myBucket >= 0) result.mainClass = " score-red"; if (rawScore.indexOf("假") > -1) result.statusHtml += "<div class='home-exam-tag'>(請假回報)</div>"; } else { result.needsReport = true; var overrideNum = getFeedbackOverrideNum(exam, feedbackHistory); if (overrideNum !== null) { result.effectiveNum = overrideNum; result.mainScore = overrideNum; result.showReviewing = true; } else { if (rawScore.indexOf("尚未繳交") > -1) { result.mainScore = "尚未繳交"; result.mainClass = " text-red"; } else { result.mainScore = "缺考"; } } } if (result.showReviewing) result.statusHtml += "<div class='reviewing-tag'>(待審核)</div>"; if (myColor) { if (myColor === "#00ff00") result.statusHtml += "<div class='makeup-status-tag status-green'>👍 補考結果：觀念理解良好</div>"; else if (myColor === "#ffff00") result.statusHtml += "<div class='makeup-status-tag status-yellow'>🙂 補考結果：觀念大致理解</div>"; else if (myColor === "#ff9900") result.statusHtml += "<div class='makeup-status-tag status-orange'>😐 補考結果：觀念不太理解</div>"; else if (myColor === "#ff0000") result.statusHtml += "<div class='makeup-status-tag status-red'>💪 補考結果：觀念必須加強</div>"; } if (result.statusHtml.indexOf("補考結果") === -1) { if (result.effectiveNum !== null && exam.makeupThreshold > 0) { if (result.effectiveNum < exam.makeupThreshold) result.statusHtml += "<div class='makeup-status-tag status-warning'>⚠️ 未達標需補考</div>"; } } return result; }
+        function getDisplayLogic(exam, feedbackHistory) { var rawScore = (exam.score || "").toString(); var sheetNum = exam.scoreNum; var myColor = (exam.cellColor || "").toLowerCase(); var result = { mainScore: "", mainClass: "", statusHtml: "", effectiveNum: null, showReviewing: false, needsReport: false }; if (sheetNum !== null && !isNaN(sheetNum)) { result.effectiveNum = sheetNum; result.mainScore = sheetNum; if (exam.myBucket === 4) result.mainClass = " score-green"; else if (exam.myBucket <= 1 && exam.myBucket >= 0) result.mainClass = " score-red"; if (rawScore.indexOf("假") > -1) result.statusHtml += "<div class='home-exam-tag'>(請假回報)</div>"; } else { result.needsReport = true; var overrideNum = getFeedbackOverrideNum(exam, feedbackHistory); if (overrideNum !== null) { result.effectiveNum = overrideNum; result.mainScore = overrideNum; result.showReviewing = true; } else { if (rawScore.indexOf("尚未繳交") > -1) { result.mainScore = "尚未繳交"; result.mainClass = " text-grey-status"; } else { result.mainScore = "缺考"; result.mainClass = " text-grey-status"; } } } if (result.showReviewing) result.statusHtml += "<div class='reviewing-tag'>(待審核)</div>"; if (myColor) { if (myColor === "#00ff00") result.statusHtml += "<div class='makeup-status-tag status-green'>👍 補考結果：觀念理解良好</div>"; else if (myColor === "#ffff00") result.statusHtml += "<div class='makeup-status-tag status-yellow'>🙂 補考結果：觀念大致理解</div>"; else if (myColor === "#ff9900") result.statusHtml += "<div class='makeup-status-tag status-orange'>😐 補考結果：觀念不太理解</div>"; else if (myColor === "#ff0000") result.statusHtml += "<div class='makeup-status-tag status-red'>💪 補考結果：觀念必須加強</div>"; } if (result.statusHtml.indexOf("補考結果") === -1) { if (result.effectiveNum !== null && exam.makeupThreshold > 0) { if (result.effectiveNum < exam.makeupThreshold) result.statusHtml += "<div class='makeup-status-tag status-warning'>⚠️ 未達標需補考</div>"; } } return result; }
         function getFeedbackOverrideNum(exam, feedbackHistory) { if (!feedbackHistory || feedbackHistory.length === 0) return null; var rawScore = (exam.score || "").toString(); var hasNum = (exam.scoreNum !== null && !isNaN(exam.scoreNum)); if (exam.isMissing || (rawScore.indexOf("假") > -1 && !hasNum)) { for (var k = feedbackHistory.length - 1; k >= 0; k--) { var fb = feedbackHistory[k]; if (fb.type === "補考回報") { var fbDatePart = fb.targetDate.substring(5).replace('-', '/'); var fbDatePart2 = fb.targetDate.substring(5).replace('-', '/').replace(/^0/, '').replace(/\/0/, '/'); if (exam.date.indexOf(fbDatePart) > -1 || exam.date.indexOf(fbDatePart2) > -1 || exam.date == fbDatePart2) { var match = fb.content.match(/(\d+(\.\d+)?)/); if (match) return parseFloat(match[0]); } } } } return null; }
 
         // ★★★ v3.9 新增：學生上傳佇列處理 ★★★
@@ -2936,7 +3112,42 @@
         function renderDailyPosts(posts, history) {
             var container = document.getElementById('tab-content-0'); if (!posts || posts.length === 0) { container.innerHTML = "<div style='text-align:center; padding:30px; color:#999;'>目前沒有聯絡簿資料</div>"; return; } var html = ""; posts.forEach(function (post) {
                 var gradeHtml = ""; var exam = post.examData.main; var others = post.examData.others; var scoreReportHtml = ""; if (exam) {
-                    var logic = getDisplayLogic(exam, history); var unitDisplay = ""; if (!isNaN(parseFloat(logic.mainScore))) unitDisplay = "<span class='score-unit-big'>" + (exam.unit || "分") + "</span>"; var scoreDisplay = "<span class='" + logic.mainClass + "'>" + logic.mainScore + "</span>" + unitDisplay; var standardHtml = ""; if (exam.note && exam.note !== "") standardHtml = "<div class='exam-standard-box'>🎯 補考標準：" + exam.note + "</div>"; if (logic.needsReport) { var safeDate = post.date.replace(/\//g, '-'); scoreReportHtml = "<div class='score-report-section'><div style='font-weight:bold; color:#c0392b; margin-bottom:10px; font-size:1.35rem;'>📝 回報補考分數</div><div class='input-box'><input type='number' class='score-input' id='score-in-" + safeDate + "' placeholder='輸入分數'><button class='score-btn' onclick=\"submitScoreReport('" + safeDate + "', '" + post.date + "')\">送出</button></div></div>"; } var chartHtml = ""; if (exam.dist) { var total = exam.total; for (var i = 4; i >= 0; i--) { var count = exam.dist[i]; var percent = (total > 0) ? (count / total) * 100 : 0; var label = exam.labels ? exam.labels[i] : ""; var barColor = "#5b9bd5"; if (!exam.isMissing && i === exam.myBucket) { if (i === 4) barColor = "#27ae60"; else if (i === 3 || i === 2) barColor = "#f39c12"; else barColor = "#e74c3c"; } chartHtml += "<div class='chart-row'><div class='chart-label'>" + label + "</div><div class='chart-bar-area'><div class='chart-bar-fill' style='width: " + percent + "%; background-color: " + barColor + ";'></div></div><div class='chart-count'>" + (count > 0 ? count : '') + "</div></div>"; } chartHtml = "<div class='chart-container-post'>" + chartHtml + "</div>"; } var refHwHtml = ""; if (others.length > 0) { refHwHtml = "<div class='ref-hw-box'><div class='ref-hw-title'>📝 相同範圍作業分數：</div>"; others.forEach(function (o) { var sDisplay = o.score; var hwColorClass = ""; if (sDisplay == "#N/A") sDisplay = "<span class='text-red' style='font-size:1rem'>尚未繳交</span>"; else { var m = sDisplay.match(/(\d+(\.\d+)?)/); if (m) { var u = o.unit || "題"; if (o.myBucket === 4) hwColorClass = " score-green"; else if (o.myBucket <= 1 && o.myBucket >= 0) hwColorClass = " score-red"; sDisplay = "<span class='hw-score-val" + hwColorClass + "'>" + m[0] + "</span><span class='score-unit'>" + u + "</span>"; } } refHwHtml += "<div class='ref-hw-item'><span>" + o.date + " " + o.exam + "</span><div>" + sDisplay + "</div></div>"; }); refHwHtml += "</div>"; }
+                    var logic = getDisplayLogic(exam, history); var unitDisplay = ""; if (!isNaN(parseFloat(logic.mainScore))) unitDisplay = "<span class='score-unit-big'>" + (exam.unit || "分") + "</span>"; var scoreDisplay = "<span class='" + logic.mainClass + "'>" + logic.mainScore + "</span>" + unitDisplay; var standardHtml = ""; if (exam.note && exam.note !== "") standardHtml = "<div class='exam-standard-box'>🎯 補考標準：" + exam.note + "</div>"; if (logic.needsReport) { var safeDate = post.date.replace(/\//g, '-'); scoreReportHtml = "<div class='score-report-section'><div style='font-weight:bold; color:#c0392b; margin-bottom:10px; font-size:1.35rem;'>📝 回報補考分數</div><div class='input-box'><input type='number' class='score-input' id='score-in-" + safeDate + "' placeholder='輸入分數'><button class='score-btn' onclick=\"submitScoreReport('" + safeDate + "', '" + post.date + "')\">送出</button></div></div>"; } var chartHtml = "";
+if (exam.dist) {
+    var dist = exam.dist || [0,0,0,0,0];
+    var labels = exam.labels || ["0~20","20~40","40~60","60~80","80~100"];
+    var maxVal = Math.max(...dist);
+    if (maxVal === 0) maxVal = 1;
+    
+    var barCols = "";
+    dist.forEach((val, idx) => {
+        var lbl = labels[idx] || "";
+        var isMyGroup = false;
+        
+        var scNum = parseFloat(logic.mainScore);
+        if (!isNaN(scNum)) {
+            if (exam.myBucket !== undefined && exam.myBucket !== -1) {
+                if (idx === exam.myBucket) isMyGroup = true;
+            } else if (lbl.includes("-") || lbl.includes("~")) {
+                var pts = lbl.split(/-|~/);
+                if(scNum >= parseInt(pts[0]) && scNum <= parseInt(pts[1])) isMyGroup = true;
+                if(scNum === 100 && idx === dist.length - 1) isMyGroup = true;
+            }
+        }
+        
+        var fillGrad = "#5b9bd5";
+        var boxShad = "";
+        if (isMyGroup) {
+            if (idx === 4) { fillGrad = "linear-gradient(135deg, #4ade80 0%, #22c55e 100%)"; boxShad = "box-shadow: 0 0 10px rgba(34,197,94,0.3);"; }
+            else if (idx === 2 || idx === 3) { fillGrad = "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)"; boxShad = "box-shadow: 0 0 10px rgba(245,158,11,0.3);"; }
+            else { fillGrad = "linear-gradient(135deg, #ef4444 0%, #dc3545 100%)"; boxShad = "box-shadow: 0 0 10px rgba(239,68,68,0.3);"; }
+        }
+        
+        var h = (val / maxVal * 100) + '%';
+        barCols += `<div class="v2-bar-col"><div class="v2-bar-fill" data-val="${val}" style="--target-height: ${h}; background: ${fillGrad}; ${boxShad}"></div><div class="v2-bar-label">${lbl}</div></div>`;
+    });
+    chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
+} var refHwHtml = ""; if (others.length > 0) { refHwHtml = "<div class='ref-hw-box'><div class='ref-hw-title'>📝 相同範圍作業分數：</div>"; others.forEach(function (o) { var sDisplay = o.score; var hwColorClass = ""; if (sDisplay == "#N/A") sDisplay = "<span class='text-red' style='font-size:1rem'>尚未繳交</span>"; else { var m = sDisplay.match(/(\d+(\.\d+)?)/); if (m) { var u = o.unit || "題"; if (o.myBucket === 4) hwColorClass = " score-green"; else if (o.myBucket <= 1 && o.myBucket >= 0) hwColorClass = " score-red"; sDisplay = "<span class='hw-score-val" + hwColorClass + "'>" + m[0] + "</span><span class='score-unit'>" + u + "</span>"; } } refHwHtml += "<div class='ref-hw-item'><span>" + o.date + " " + o.exam + "</span><div>" + sDisplay + "</div></div>"; }); refHwHtml += "</div>"; }
 
                     var examTitle = "今日小考成績";
                     if (exam.date.indexOf("複習") > -1) examTitle = "今日複習考成績";
@@ -2967,7 +3178,14 @@
                     });
                 };
 
-                var labelHw1 = "今日作業"; if (post.hw2 && post.hw2.toString().trim() !== "") labelHw1 = "今日作業一"; var fields = [{ label: "今日課程進度", val: post.progress }, { label: "今日小考考卷", val: post.quiz }, { label: labelHw1, val: post.hw1 }, { label: "今日作業二", val: post.hw2 }, { label: "今日補考考卷", val: post.makeup }, { label: "下次小考範圍", val: post.range }, { label: "補充資料", val: post.note }]; fields.forEach(function (f) { if (f.val) contentHtml += "<div class='info-block'><span class='info-label'>" + f.label + "</span><div class='info-content'>" + parseBtn(f.val) + "</div></div>"; }); var pDateShort = post.date.substring(5).replace("-", "/"); var pDateFull = post.date.replace(/-/g, "/"); var myHistory = history.filter(function (h) { return h.targetDate == pDateShort || h.targetDate == post.date || h.targetDate == pDateFull; }); var historyHtml = ""; myHistory.forEach(function (h) { if (h.type !== "補考回報") { var displayType = (h.type === "家長留言" || h.type === "家長/學生" || h.type === "學生留言") ? "學生留言" : h.type; historyHtml += "<div class='history-msg'><b>" + displayType + ":</b> " + parseBtn(h.content) + " <br><span style='font-size:1.05rem;color:#aaa; display:block; text-align:right; margin-top:5px;'>(" + h.time.substring(5, 16) + ")</span></div>"; }}); var inputPlaceholder = "留言給老師..."; var safeDateId = post.date.replace(/\//g, '-');
+                var labelHw1 = "今日作業"; if (post.hw2 && post.hw2.toString().trim() !== "") labelHw1 = "今日作業一"; var fields = [{ label: "今日課程進度", val: post.progress }, { label: "今日小考考卷", val: post.quiz }, { label: labelHw1, val: post.hw1 }, { label: "今日作業二", val: post.hw2 }, { label: "今日補考考卷", val: post.makeup }, { label: "下次小考範圍", val: post.range }, { label: "補充資料", val: post.note }]; fields.forEach(function (f) { if (f.val) contentHtml += "<div class='info-block'><span class='info-label'>" + f.label + "</span><div class='info-content'>" + parseBtn(f.val) + "</div></div>"; }); var pDateShort = post.date.substring(5).replace("-", "/"); var pDateFull = post.date.replace(/-/g, "/"); var myHistory = history.filter(function (h) { return h.targetDate == pDateShort || h.targetDate == post.date || h.targetDate == pDateFull; }); var historyHtml = ""; myHistory.forEach(function (h) { if (h.type !== "補考回報") { var displayType = (h.type === "家長留言" || h.type === "家長/學生" || h.type === "學生留言") ? "學生留言" : h.type; var isTeacher = (h.type !== "學生留言" && h.type !== "家長留言" && h.type !== "家長/學生" && h.type !== "作業上傳");
+                        var avatarClass = isTeacher ? "avatar-teacher" : "avatar-student";
+                        var bodyClass = isTeacher ? "teacher-body" : "";
+                        var sName = (gData && gData.studentName) ? gData.studentName : "學";
+                        var sChar = sName.length >= 2 ? sName.charAt(sName.length - 2) : sName.charAt(0);
+                        var tName = (gData && gData.className) ? "喵" : "師";
+                        var avatarChar = isTeacher ? tName : sChar;
+                        historyHtml += "<div class='history-msg'><div class='history-msg-avatar " + avatarClass + "'>" + avatarChar + "</div><div class='history-msg-body " + bodyClass + "'>" + parseBtn(h.content) + "<div class='history-msg-time'>" + h.time.substring(5, 16) + "</div></div></div>"; }}); var inputPlaceholder = "留言給老師..."; var safeDateId = post.date.replace(/\//g, '-');
 
                 var uploadHtml = `
         <div class="student-upload-box">
@@ -2981,13 +3199,49 @@
     `;
 
                 // ★★★ v3.9 修正：家長留言 -> 留言內容 ★★★
-                var feedbackHtml = "<div class='feedback-section'>" + uploadHtml + "<div class='section-title'>💬 留言內容</div><div id='history-" + safeDateId + "'>" + historyHtml + "</div><div class='input-box'><input type='text' class='fb-input' id='input-" + safeDateId + "' placeholder='" + inputPlaceholder + "'><button class='fb-btn' onclick=\"sendFeedback('" + safeDateId + "', '" + post.date + "', '學生留言')\">送出</button></div></div>"; var headerTitle = post.date + (post.title ? " " + post.title : ""); html += "<div class='post-card'><div class='post-header'><span>📅 " + headerTitle + "</span></div>" + gradeHtml + "<div class='content-section'><div class='section-title'>📢 聯絡事項</div>" + contentHtml + "</div>" + feedbackHtml + "</div>";
+                var feedbackHtml = "<div class='feedback-section'>" + uploadHtml + "<div class='section-title'>💬 留言內容</div><div id='history-" + safeDateId + "'>" + historyHtml + "</div><div class='input-box'><input type='text' class='fb-input' id='input-" + safeDateId + "' placeholder='" + inputPlaceholder + "'><button class='fb-btn' onclick=\"sendFeedback('" + safeDateId + "', '" + post.date + "', '學生留言')\">送出</button></div></div>"; var headerTitle = post.date + (post.title ? " " + post.title : ""); html += "<div class='post-card-wrapper'><div class='post-card'><div class='post-header'><span>📅 " + headerTitle + "</span></div>" + gradeHtml + "<div class='content-section'><div class='section-title'>📢 聯絡事項</div>" + contentHtml + "</div>" + feedbackHtml + "</div></div>";
             }); container.innerHTML = html;
+
+            var observer = new IntersectionObserver(function(entries, obs) {
+                entries.forEach(function(entry) {
+                    if (entry.isIntersecting) {
+                        entry.target.style.animation = 'growBar 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
+                        obs.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.1 });
+            document.querySelectorAll('.v2-bar-fill').forEach(function(el) {
+                el.style.animation = 'none';
+                observer.observe(el);
+            });
+    
         }
 
         function renderOldGradeCards(grades) {
             var container = document.getElementById('tab-content-1'); if (!grades || grades.length === 0) { container.innerHTML = "<p style='color:#666; padding:10px;'>目前尚無成績紀錄。</p>"; return; } var html = ""; grades.forEach(function (item) {
-                var logic = getDisplayLogic(item, gData ? gData.feedbackHistory : []); var unitDisplay = ""; if (!isNaN(parseFloat(logic.mainScore))) unitDisplay = "<span class='score-unit'>" + item.unit + "</span>"; var displayScore = "<div class='score-val" + logic.mainClass + "'>" + logic.mainScore + unitDisplay + "</div>"; var chartHtml = ""; var total = item.total || 1; for (var i = 4; i >= 0; i--) { var count = item.dist[i]; var percent = (total > 0) ? (count / total) * 100 : 0; var label = item.labels[i]; var barColor = "#5b9bd5"; if (!item.isMissing && i === item.myBucket) { if (i === 4) barColor = "#27ae60"; else if (i === 3 || i === 2) barColor = "#f39c12"; else barColor = "#e74c3c"; } chartHtml += "<div class='chart-row'><div class='chart-label'>" + label + "</div><div class='chart-bar-area'><div class='chart-bar-fill' style='width: " + percent + "%; background-color: " + barColor + ";'></div></div><div class='chart-count'>" + (count > 0 ? count : '') + "</div></div>"; }
+                var logic = getDisplayLogic(item, gData ? gData.feedbackHistory : []); var unitDisplay = ""; if (!isNaN(parseFloat(logic.mainScore))) unitDisplay = "<span class='score-unit'>" + item.unit + "</span>"; var displayScore = "<div class='score-val" + logic.mainClass + "'>" + logic.mainScore + unitDisplay + "</div>"; var chartHtml = ""; 
+var dist = item.dist || [0,0,0,0,0];
+var labels = item.labels || ["0~20","20~40","40~60","60~80","80~100"];
+var maxVal = Math.max(...dist);
+if (maxVal === 0) maxVal = 1;
+
+var barCols = "";
+dist.forEach((val, idx) => {
+    var lbl = labels[idx] || "";
+    var isMyGroup = (!item.isMissing && idx === item.myBucket);
+    
+    var fillGrad = "#5b9bd5";
+    var boxShad = "";
+    if (isMyGroup) {
+        if (idx === 4) { fillGrad = "linear-gradient(135deg, #4ade80 0%, #22c55e 100%)"; boxShad = "box-shadow: 0 0 10px rgba(34,197,94,0.3);"; }
+        else if (idx === 2 || idx === 3) { fillGrad = "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)"; boxShad = "box-shadow: 0 0 10px rgba(245,158,11,0.3);"; }
+        else { fillGrad = "linear-gradient(135deg, #ef4444 0%, #dc3545 100%)"; boxShad = "box-shadow: 0 0 10px rgba(239,68,68,0.3);"; }
+    }
+    
+    var h = (val / maxVal * 100) + '%';
+    barCols += `<div class="v2-bar-col"><div class="v2-bar-fill" data-val="${val}" style="--target-height: ${h}; background: ${fillGrad}; ${boxShad}"></div><div class="v2-bar-label">${lbl}</div></div>`;
+});
+chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
 
                 html += `
         <div class='score-card' onclick='toggleCard(this)'>
@@ -2997,13 +3251,27 @@
                 <div class='score-box'>${displayScore}${item.subNote || ""}${logic.statusHtml}<div class='avg-score'>班平均 ${item.average}</div></div>
             </div>
             <div class='expand-area'>
-                <div class='detail-box'><strong>🎯 補考標準：</strong><br>${item.note}</div>
+                <div class='detail-box'>🎯 補考標準：${item.note}</div>
                 <div class='chart-wrapper'>${chartHtml}</div>
             </div>
             <div class='click-hint'>▼</div>
         </div>`;
             });
             container.innerHTML = html;
+
+            var observer = new IntersectionObserver(function(entries, obs) {
+                entries.forEach(function(entry) {
+                    if (entry.isIntersecting) {
+                        entry.target.style.animation = 'growBar 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
+                        obs.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.1 });
+            document.querySelectorAll('.v2-bar-fill').forEach(function(el) {
+                el.style.animation = 'none';
+                observer.observe(el);
+            });
+    
         }
 
         function toggleCard(card) { card.classList.toggle('active'); var hint = card.querySelector('.click-hint'); hint.innerText = card.classList.contains('active') ? "▲" : "▼"; }
@@ -3052,7 +3320,9 @@
                     });
                 };
 
-                var newMsg = "<div class='history-msg'><b>" + type + ":</b> " + parseBtn(val) + " <br><span style='font-size:0.8rem;color:#aaa; display:block; text-align:right; margin-top:5px;'>(" + timeStr + ")</span></div>";
+                var sName2 = (gData && gData.studentName) ? gData.studentName : "學";
+                var sChar2 = sName2.length >= 2 ? sName2.charAt(sName2.length - 2) : sName2.charAt(0);
+                var newMsg = "<div class='history-msg'><div class='history-msg-avatar avatar-student'>" + sChar2 + "</div><div class='history-msg-body'>" + parseBtn(val) + "<div class='history-msg-time'>" + timeStr + "</div></div></div>";
                 historyDiv.innerHTML += newMsg;
 
                 if (!contentOverride) {
@@ -3126,6 +3396,20 @@
             </div>`;
             });
             container.innerHTML = html;
+
+            var observer = new IntersectionObserver(function(entries, obs) {
+                entries.forEach(function(entry) {
+                    if (entry.isIntersecting) {
+                        entry.target.style.animation = 'growBar 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
+                        obs.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.1 });
+            document.querySelectorAll('.v2-bar-fill').forEach(function(el) {
+                el.style.animation = 'none';
+                observer.observe(el);
+            });
+    
         }
 
         function checkEmergency(list) {
