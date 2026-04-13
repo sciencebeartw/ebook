@@ -1936,105 +1936,6 @@
             width: 200%;
         }
 
-        /* ===== 棒卡申請區 ===== */
-        .sticker-apply-box {
-            background: #eff6ff;
-            border: 2px dashed #93c5fd;
-            border-radius: 12px;
-            padding: 14px 15px;
-            margin-bottom: 18px;
-        }
-
-        .sticker-apply-title {
-            font-weight: bold;
-            color: #1d4ed8;
-            margin-bottom: 10px;
-            display: block;
-            font-size: 1.15rem;
-        }
-
-        .sticker-apply-row {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-            margin-bottom: 6px;
-        }
-
-        .sticker-reason-input {
-            flex: 1;
-            padding: 8px 12px;
-            border: 1.5px solid #bfdbfe;
-            border-radius: 20px;
-            font-size: 1.1rem;
-            outline: none;
-            background: white;
-        }
-
-        .sticker-reason-input:focus {
-            border-color: #3b82f6;
-        }
-
-        .sticker-count-input {
-            width: 65px;
-            padding: 8px 10px;
-            border: 1.5px solid #bfdbfe;
-            border-radius: 20px;
-            font-size: 1.1rem;
-            outline: none;
-            background: white;
-            text-align: center;
-        }
-
-        .sticker-submit-btn {
-            background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
-            color: white;
-            border: none;
-            padding: 8px 18px;
-            border-radius: 20px;
-            font-weight: bold;
-            cursor: pointer;
-            font-size: 1.1rem;
-            white-space: nowrap;
-            box-shadow: 0 3px 10px rgba(59,130,246,0.3);
-        }
-
-        .sticker-hint {
-            font-size: 0.9rem;
-            color: #93c5fd;
-            margin-top: 4px;
-        }
-
-        /* 棒卡申請氣泡樣式 */
-        .history-msg-body.sticker-body {
-            background: #eff6ff;
-            border: 1px solid #bfdbfe;
-        }
-
-        .sticker-badge {
-            display: inline-block;
-            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-            color: white;
-            font-weight: 800;
-            font-size: 1rem;
-            padding: 2px 10px;
-            border-radius: 20px;
-            margin-left: 6px;
-        }
-
-        .sticker-status {
-            font-size: 0.9rem;
-            color: #6b7280;
-            padding: 2px 8px;
-            background: #f3f4f6;
-            border-radius: 10px;
-            margin-top: 4px;
-            display: inline-block;
-        }
-
-        .sticker-status.approved {
-            background: #dcfce7;
-            color: #15803d;
-        }
 
         </style>
 
@@ -3472,12 +3373,14 @@ if (exam.dist) {
                     <option value="即時練習">✏️ 即時練習</option>
                     <option value="__custom__">✍️ 自行填寫...</option>
                 </select>
-                <select class="sticker-count-select" id="sticker-count-${safeDateId}">
+                <select class="sticker-count-select" id="sticker-count-${safeDateId}" onchange="onStickerCountChange('${safeDateId}')">
                     <option value="5">5棒</option>
                     <option value="10">10棒</option>
                     <option value="15">15棒</option>
                     <option value="20">20棒</option>
+                    <option value="__custom__">自訂...</option>
                 </select>
+                <input type="number" class="sticker-count-custom" id="sticker-count-custom-${safeDateId}" placeholder="棒數" min="5" style="display:none; width:65px; padding:8px; border:1.5px solid #fed7aa; border-radius:20px; outline:none;">
                 <button class="sticker-submit-btn" onclick="submitStickerApply('${safeDateId}', '${post.date}')">送出申請</button>
             </div>
             <input type="text" class="sticker-reason-custom" id="sticker-custom-${safeDateId}" placeholder="請輸入得棒名目...">
@@ -3701,16 +3604,30 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 custom.style.display = (sel.value === '__custom__') ? 'block' : 'none';
             }
         }
+        function onStickerCountChange(safeId) {
+            var sel = document.getElementById('sticker-count-' + safeId);
+            var custom = document.getElementById('sticker-count-custom-' + safeId);
+            if (sel && custom) {
+                custom.style.display = (sel.value === '__custom__') ? 'block' : 'none';
+            }
+        }
 
         function submitStickerApply(safeId, realDate) {
             var selEl = document.getElementById('sticker-reason-' + safeId);
             var customEl = document.getElementById('sticker-custom-' + safeId);
-            var countEl = document.getElementById('sticker-count-' + safeId);
+            var countSelEl = document.getElementById('sticker-count-' + safeId);
+            var countCustomEl = document.getElementById('sticker-count-custom-' + safeId);
+            
             var reason = selEl ? selEl.value : '';
             if (reason === '__custom__') reason = customEl ? customEl.value.trim() : '';
-            var count = countEl ? parseInt(countEl.value) : 0;
-            if (!reason || reason === '__placeholder__') { alert('請選擇得棒名目！'); return; }
+            
+            var countStr = countSelEl ? countSelEl.value : '';
+            if (countStr === '__custom__') countStr = countCustomEl ? countCustomEl.value.trim() : '';
+            var count = parseInt(countStr) || 0;
+            
+            if (!reason || reason === '__placeholder__') { alert('請選擇或填寫得棒名目！'); return; }
             if (!count || count < 5) { alert('最少申請 5 棒！'); return; }
+            
             var content = JSON.stringify({ reason: reason, count: count, status: "待審核" });
             var form = { className: gData.className, studentName: gData.studentName, targetDate: realDate, type: '棒卡申請', content: content };
             google.script.run.withSuccessHandler(function(res) {
