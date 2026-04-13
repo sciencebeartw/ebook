@@ -521,60 +521,101 @@
             padding-bottom: 80px;
         }
 
-        .header-bar {
+                .header-bar {
             background: rgba(255, 255, 255, 0.85);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
             padding: 12px 15px;
-            display: flex;
-            justify-content: space-between;
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 15px;
             align-items: center;
             border-bottom: 1px solid rgba(16, 185, 129, 0.1);
-            height: auto;
-            box-sizing: border-box;
         }
 
-        .header-left {
+        .header-col-logo {
             display: flex;
             align-items: center;
-            gap: 12px;
-            flex-grow: 1;
-            overflow: hidden;
+            justify-content: center;
         }
 
-        .header-logo-small {
-            height: 60px;
+        .header-logo-large {
+            height: 75px;
             width: auto;
-            flex-shrink: 0;
+            border-radius: 12px;
         }
 
-        .student-info-box {
+        .header-col-center {
             display: flex;
             flex-direction: column;
-            justify-content: center;
-            overflow: hidden;
+            justify-content: space-between;
+            height: 75px;
+        }
+
+        .student-info-top {
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
         }
 
         .student-info {
-            font-size: 1.5rem;
+            font-size: 1.65rem;
             font-weight: 900;
             color: #064e3b;
-            line-height: 1.2;
+            line-height: 1.1;
             white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            letter-spacing: 0.5px;
         }
 
         .class-info {
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             color: #64748b;
             white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            font-weight: 600;
+            font-weight: 700;
+            margin-top: 2px;
         }
 
+        .header-col-right {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            justify-content: space-between;
+            height: 75px;
+        }
+
+        .bears-lab-title {
+            font-family: 'Outfit', 'Inter', sans-serif;
+            font-weight: 900;
+            font-size: 1.4rem;
+            background: linear-gradient(135deg, #34d399 0%, #059669 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 2px;
+        }
+
+        .header-btn-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .header-icon-btn {
+            text-decoration: none;
+            background: #ffffff;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: 0.2s;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+        }
+
+        .header-icon-btn:active {
+            background: #f1f5f9;
+            transform: scale(0.9);
+        }
+        
         .sticker-badge-header {
             display: inline-flex;
             align-items: center;
@@ -582,73 +623,14 @@
             background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
             border: 1.5px solid #fbbf24;
             border-radius: 20px;
-            padding: 3px 12px;
+            padding: 2px 10px;
             font-weight: 800;
-            font-size: 1.1rem;
+            font-size: 0.95rem;
             color: #92400e;
-            margin-top: 5px;
             white-space: nowrap;
+            margin-top: auto;
         }
 
-        .header-right {
-            display: flex;
-            flex-direction: row;
-            align-items: center;
-            justify-content: flex-end;
-            gap: 8px;
-            flex-shrink: 0;
-        }
-
-
-        .bears-lab-title {
-            font-family: 'Outfit', 'Inter', sans-serif;
-            font-weight: 900;
-            font-size: 1.3rem;
-            background: linear-gradient(135deg, #34d399 0%, #059669 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 2px;
-        }
-
-        .header-icon-btn {
-            font-size: 1.2rem;
-            text-decoration: none;
-            background: #f1f5f9;
-            width: 38px;
-            height: 38px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 50%;
-            transition: 0.2s;
-            border: 1px solid #e2e8f0;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-        }
-        .header-icon-btn:active {
-            transform: scale(0.9);
-            background: #e2e8f0;
-        }
-
-        .header-btn {
-            font-size: 0.8rem;
-            color: #666;
-            text-decoration: none;
-            border: 1px solid #ddd;
-            padding: 4px 10px;
-            border-radius: 15px;
-            transition: background 0.2s;
-            background: white;
-            white-space: nowrap;
-            cursor: pointer;
-            display: inline-block;
-        }
-
-        .header-btn:active {
-            background: #f0f0f0;
-            transform: scale(0.95);
-        }
-
-        /* 浮動按鈕區 */
         .float-line-container {
             position: fixed;
             bottom: 25px;
@@ -2511,32 +2493,36 @@
 
         <div id="main-screen">
             <div class="header-bar">
-                <!-- 左側：LOGO 與 名稱/班級 -->
-                <div class="header-left-col">
-                    <img src="LOGO.png" class="header-logo-small logo-target">
-                    <div class="student-info-box">
-                        <div class="student-info" id="headName"></div>
-                        <div class="class-info" id="headClass"></div>
-                    </div>
+                <!-- 左欄：大 LOGO -->
+                <div class="header-col-logo">
+                    <img src="LOGO.png" class="header-logo-large logo-target">
                 </div>
                 
-                <!-- 中間：標題與棒卡數 -->
-                <div class="header-center-col">
-                    <div class="bears-lab-title">Bear's Lab</div>
-                    <div class="sticker-badge-header" id="headStickers" style="display:inline-flex;">⭐ <span id="headStickerCount">0</span> 棒</div>
+                <!-- 中欄：姓名(上方) 棒卡數(下方) -->
+                <div class="header-col-center">
+                    <div class="student-info-top">
+                        <div class="student-info" id="headName">方沁竹</div>
+                        <div class="class-info" id="headClass">小六資優自然</div>
+                    </div>
+                    <div>
+                        <div class="sticker-badge-header" id="headStickers" style="display:inline-flex;">⭐ <span id="headStickerCount">0</span> 棒</div>
+                    </div>
                 </div>
 
-                <!-- 右側：三個按鈕 -->
-                <div class="header-right-col">
-                    <a href="javascript:void(0)" class="header-icon-btn" onclick="doRefresh()" title="重整" style="color:#0ea5e9;">
-                        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-                    </a>
-                    <a href="javascript:void(0)" class="header-icon-btn" onclick="openPwdModal()" title="改密碼" style="color:#f59e0b;">
-                        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>
-                    </a>
-                    <a href="javascript:void(0)" class="header-icon-btn" onclick="doLogout()" title="登出" style="color:#ef4444;">
-                        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-                    </a>
+                <!-- 右欄：Bear's Lab (上方) 三個按鈕 (下方) -->
+                <div class="header-col-right">
+                    <div class="bears-lab-title">Bear's Lab</div>
+                    <div class="header-btn-row">
+                        <a href="javascript:void(0)" class="header-icon-btn" onclick="doRefresh()" title="重整" style="color:#0ea5e9;">
+                            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                        </a>
+                        <a href="javascript:void(0)" class="header-icon-btn" onclick="openPwdModal()" title="改密碼" style="color:#f59e0b;">
+                            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>
+                        </a>
+                        <a href="javascript:void(0)" class="header-icon-btn" onclick="doLogout()" title="登出" style="color:#ef4444;">
+                            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                        </a>
+                    </div>
                 </div>
             </div>
             <div class="sticky-wrapper">
@@ -2907,9 +2893,20 @@
             document.getElementById('main-screen').style.display = 'block';
             document.getElementById('headName').innerText = result.studentName;
             document.getElementById('headClass').innerText = result.className.replace(/\d+/g, '');
-            var stickerCount = result.stickers || 0;
+            var initStickerCount = result.stickers || 0; // fallback if FB not ready
             document.getElementById('headStickers').style.display = 'inline-flex';
-            document.getElementById('headStickerCount').innerText = stickerCount;
+            document.getElementById('headStickerCount').innerText = initStickerCount;
+            
+            // ★即時綁定 Firebase 棒卡數 (如果 Firebase 可用)
+            try {
+                if (typeof db !== 'undefined') {
+                    var safeC = result.className.replace(/[.#$[\]]/g, '-');
+                    var safeN = result.studentName.replace(/[.#$[\]]/g, '-');
+                    db.ref('/students/' + safeC + '/' + safeN + '/stickers').on('value', function(snap) {
+                        document.getElementById('headStickerCount').innerText = snap.val() || 0;
+                    });
+                }
+            } catch(e) { console.warn('Sticker FB listener err:', e); }
 
             renderDailyPosts(result.dailyPost, result.feedbackHistory);
             renderOldGradeCards(result.grades);
