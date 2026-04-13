@@ -17,7 +17,7 @@
 - **檔案上傳 (Storage)**：**【極度重要】** 所有的檔案上傳（聯絡簿附件、公告附件、學生作業）皆已改為 Firebase 原生的**純二進制 `put(file)` 上傳**。絕對不可使用 `FileReader` 轉 Base64 上傳（這會導致手機 Safari 因記憶體耗盡而損壞 JPEG 圖檔）。
 - **同步機制**：GAS 後台有提供「🐻 山熊老師專用 → 手動同步資料到 Firebase」按鈕，按下即可將試算表編輯更新到 Firebase (預防背景 5 分鐘同步不及時)。
 
-**目前狀態**：關卡四進行中 (還原舊版介面並落實雙軌架構)
+**目前狀態**：關卡四接近完成 (上帝模式功能優化中、上傳穩定性已解決)
 
 ---
 
@@ -90,7 +90,9 @@ WEgppN5tL4LNQcVRk8g6ffkqZxPIYCzCwe11ZfeP
 2. **Firebase Rules 設定** - 手動在控制台設定（開發模式）
 3. **GAS 同步精靈** - `GAS/喵/FirebaseSync.gs` 已手動�貼入 GAS 編輯器並成功執行
 4. **Firebase 有真實資料** - 學生、成績、聯絡簿都同步進去了
-5. **ebook-app/index.html 初版** - 已建立，但功能不完整（見下方 TODO）
+5. **ebook-app/index.html 穩定版** - 已解決手機照片上傳損毀問題，並優化上傳速度。
+6. **手動同步功能** - 已在 GAS 介面新增按鈕，解決同步延遲問題。
+7. **二進位上傳 (Binary Stream)** - 已棄用 Base64，全面改用 Firebase SDK 原生上傳。
 
 ---
 
@@ -273,5 +275,11 @@ function safeKey(str) {
 
 ### 📌 附件儲存系統 (Firebase Storage)
 *   **現狀**：已全面停止使用 Google Drive 作為對外附件的儲存與發布中樞。
-*   **機制**：所有「老師上傳聯絡簿教材」與「學生上傳作業」的請求，皆在前端轉為 Base64 後，由瀏覽器直接傳送至 Firebase Storage 雲端空間。
-*   **優勢**：獲得帶有正確 `Content-Disposition: attachment` 標頭的直連網址 (Download URL)，確保在手機瀏覽器或 LINE 內部瀏覽器中皆能一鍵點開預覽或無縫下載，大幅提升家長操作體驗，完美取代了舊有 GAS 容易 Timeout 的瓶頸。
+*   **機制**：所有「老師上傳聯絡簿教材」與「學生上傳作業」皆已改為 Firebase 原生的**二進位 `put(file)` 直傳**。
+*   **優勢**：不再透過 Base64 轉換（避免手機記憶體爆失），確保檔案 100% 完整，且獲得直連網址 (Download URL)，在手機端或 LINE 內部瀏覽器一鍵點開。
+
+### 🗑 儲存空間維護建議（省錢祕訣）
+*   **問題**：學生作業（特別是照片）長久累積會佔用 Firebase Storage 容量。
+*   **對策一：Firebase 生命週期規則**：可前往 Google Cloud Console 設定規則，例如「超過 180 天的檔案自動刪除」。這是最推薦的「自動清理」法。
+*   **對策二：每學期手動清理**：學期結束後，直接在 Firebase 控制台的 Storage 分頁，將 `uploads/` 內對應班級的資料夾刪除即可。
+*   **對策三：成績歸檔**：學生畢業後（班級加 `_`），可考慮手動清理該班級的 Firebase 節點以節省空間。
