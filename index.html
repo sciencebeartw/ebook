@@ -2871,16 +2871,50 @@
             document.getElementById('headStickers').style.display = 'inline-flex';
             document.getElementById('headStickerCount').innerText = initStickerCount;
             
-            // ★即時綁定 Firebase 棒卡數 (如果 Firebase 可用)
+            // ★即時監聽系統
             try {
                 if (typeof db !== 'undefined') {
-                    var safeC = result.className.replace(/[.#$[\]]/g, '-');
-                    var safeN = result.studentName.replace(/[.#$[\]]/g, '-');
+                    const safeC = result.className.replace(/[.#$[\]]/g, '-');
+                    const safeN = result.studentName.replace(/[.#$[\]]/g, '-');
+
+                    // 1. 棒卡數監聽
                     db.ref('/students/' + safeC + '/' + safeN + '/stickers').on('value', function(snap) {
                         document.getElementById('headStickerCount').innerText = snap.val() || 0;
                     });
+
+                    // 2. 留言回報監聽 (包含審核狀態與老師回覆)
+                    db.ref('/feedbacks/' + safeC + '/' + safeN).on('value', function(snap) {
+                        const fbsObj = snap.val() || {};
+                        let newFbs = [];
+                        for (let fbid in fbsObj) {
+                            const fb = fbsObj[fbid];
+                            newFbs.push({ time: fb.time, targetDate: fb.targetDate, type: fb.type, content: fb.content, fbKey: fbid });
+                        }
+                        gData.feedbackHistory = newFbs;
+                        // 重新渲染聯絡簿區塊，確保狀態即時更新
+                        renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
+                    });
+
+                    // 3. 重要公告監聽 (班級 + 全校)
+                    db.ref('/bulletins').on('value', function(snap) {
+                        const allBulls = snap.val() || {};
+                        const classBulls = allBulls[safeC] || {};
+                        let bulls = [];
+                        // 這裡邏輯跟 executeFirebaseRead 一致，過濾出該生的公告
+                        for (let cls in allBulls) {
+                            const bObj = allBulls[cls];
+                            for (let id in bObj) {
+                                const b = bObj[id];
+                                if (b.className === "全校" || b.className === result.className || b.className.indexOf(result.className) > -1 || result.className.indexOf(b.className) > -1) {
+                                    bulls.push({ id: b.id, time: b.time, className: b.className, type: b.type, title: b.title, content: b.content, btnName: b.btnName, btnUrl: b.btnUrl });
+                                }
+                            }
+                        }
+                        gData.bulletins = bulls.reverse();
+                        renderBulletins(gData.bulletins);
+                    });
                 }
-            } catch(e) { console.warn('Sticker FB listener err:', e); }
+            } catch(e) { console.warn('Firebase real-time listener error:', e); }
 
             renderDailyPosts(result.dailyPost, result.feedbackHistory);
             renderOldGradeCards(result.grades);
