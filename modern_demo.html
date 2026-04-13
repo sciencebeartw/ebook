@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>山熊科學｜新世代聯絡簿 (Bear Green Demo)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=Outfit:wght@500;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* 🌲 山熊科學綠色系 (Bear Green Palette) */
+            --bg-color: #f0fdf4; /* 極淡的薄荷綠背景 */
+            --surface-color: rgba(255, 255, 255, 0.85);
+            --surface-border: rgba(255, 255, 255, 0.6);
+            /* 主漸層：翠綠到深綠 */
+            --primary-gradient: linear-gradient(135deg, #34d399 0%, #059669 100%);
+            /* 蜂蜜金漸層（搭配綠色很美，作為點綴） */
+            --secondary-gradient: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            --danger-gradient: linear-gradient(135deg, #fb7185 0%, #e11d48 100%);
+            --warning-gradient: linear-gradient(135deg, #fcd34d 0%, #f59e0b 100%);
+            
+            --text-main: #064e3b; /* 極深的墨綠色代替純黑 */
+            --text-muted: #64748b;
+            --shadow-subtle: 0 10px 40px -10px rgba(5, 150, 105, 0.1);
+            --blur: blur(20px);
+            --radius-lg: 30px;
+            --radius-md: 20px;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            font-family: 'Inter', sans-serif; background-color: var(--bg-color); margin: 0; padding: 0; min-height: 100vh; color: var(--text-main);
+            /* 隱約的綠色光暈背景 */
+            background-image: 
+                radial-gradient(at 0% 0%, hsla(147, 100%, 94%, 1) 0, transparent 50%), 
+                radial-gradient(at 100% 0%, hsla(147, 60%, 88%, 1) 0, transparent 50%), 
+                radial-gradient(at 100% 100%, hsla(160, 100%, 96%, 1) 0, transparent 50%);
+            background-attachment: fixed; overflow-x: hidden; display: flex; flex-direction: column; align-items: center;
+        }
+
+        /* 數字超美字體來自這裡 */
+        h1, h2, h3, .number-display, .btn { font-family: 'Outfit', 'Inter', sans-serif; }
+
+        .glass-header {
+            position: sticky; top: 0; z-index: 90; width: 100%; max-width: 500px; background: rgba(255, 255, 255, 0.7); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+            border-bottom: 1px solid rgba(16, 185, 129, 0.1); padding: 15px 25px; display: flex; justify-content: space-between; align-items: center;
+        }
+
+        .header-title { font-size: 1.3rem; font-weight: 800; background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0; }
+        
+        /* 🐻 小熊幣 (榮譽系統) */
+        .bear-coin { background: #fffbeb; border: 1px solid #fef3c7; color: #d97706; padding: 4px 10px; border-radius: 20px; font-weight: 800; font-size: 0.8rem; display: flex; align-items: center; gap: 4px; box-shadow: 0 4px 10px rgba(245, 158, 11, 0.1); margin-right: 10px;}
+        
+        .user-profile { display: flex; align-items: center; gap: 10px; }
+        .avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--primary-gradient); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; box-shadow: 0 4px 15px rgba(5, 150, 105, 0.3); }
+        
+        .app-container { width: 100%; max-width: 500px; padding: 24px; padding-bottom: 120px; flex: 1; }
+        
+        .tab-content { display: none; animation: fadeIn 0.4s ease forwards; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .glass-card { background: var(--surface-color); backdrop-filter: var(--blur); border: 1px solid white; border-radius: var(--radius-lg); padding: 24px; margin-bottom: 24px; box-shadow: var(--shadow-subtle); transition: 0.3s; position: relative; overflow: hidden; }
+        .glass-card:active { transform: scale(0.98); }
+        .section-title { font-size: 1.2rem; font-weight: 900; margin: 0 0 20px 0; display: flex; justify-content: space-between; align-items: center; }
+        
+        /* 聯絡簿 Feed 樣式 */
+        .feed-post { border-left: 4px solid #10b981; padding-left: 16px; margin-bottom: 40px; position: relative; }
+        .feed-post::before { content: ''; position: absolute; left: -8px; top: 0; width: 12px; height: 12px; border-radius: 50%; background: #10b981; box-shadow: 0 0 0 4px white; }
+        .feed-post-danger { border-left-color: #e11d48; }
+        .feed-post-danger::before { background: #e11d48; }
+        .feed-post-warning { border-left-color: #f59e0b; }
+        .feed-post-warning::before { background: #f59e0b; }
+
+        .feed-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;}
+        .feed-date { font-weight: 800; color: #10b981; font-size: 0.9rem; font-family: 'Outfit'; }
+        .feed-date-danger { color: #e11d48; }
+        .feed-date-warning { color: #f59e0b; }
+        
+        /* 貼文內的小考成績膠囊 (特化加大) */
+        .feed-score-pill { background: #ecfdf5; border: 1px solid #a7f3d0; color: #059669; font-weight: 900; font-size: 1.1rem; padding: 6px 14px; border-radius: 20px; display: flex; align-items: center; gap:6px; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.15); font-family: 'Outfit';}
+        .feed-score-pill.fail { background: #fff1f2; border-color: #fecdd3; color: #e11d48; box-shadow: 0 4px 10px rgba(225, 29, 72, 0.15); }
+        .feed-score-pill.absent { background: #f1f5f9; border-color: #cbd5e1; color: #64748b; box-shadow: 0 4px 10px rgba(100, 116, 139, 0.15); }
+        
+        .feed-title { font-size: 1.15rem; font-weight: 800; margin: 0 0 10px 0; color: var(--text-main); }
+        
+        /* 分類標籤 (實驗/講說/測驗) */
+        .category-tag { font-size: 0.75rem; padding: 4px 10px; border-radius: 8px; margin-right: 5px; font-weight: 800; background: #e0f2fe; color: #0284c7;}
+        .category-tag.danger { background: #ffe4e6; color: #e11d48; }
+        .category-tag.warning { background: #fef3c7; color: #d97706; }
+        
+        .feed-desc { font-size: 0.95rem; color: var(--text-main); line-height: 1.6; margin: 0 0 15px 0; background: rgba(16, 185, 129, 0.05); padding: 15px; border-radius: 15px; border: 1px solid rgba(16, 185, 129, 0.1);}
+        .feed-media { width: 100%; height: 180px; background: #e2e8f0; border-radius: 15px; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 0.9rem; margin-bottom: 15px; overflow: hidden; position: relative;}
+        
+        /* 內嵌留言區 */
+        .post-comments { padding-top: 15px; border-top: 1px dashed rgba(0,0,0,0.1); margin-top: 15px; }
+        .comment-item { display:flex; gap:10px; margin-bottom:10px; font-size: 0.85rem;}
+        .c-avatar { width: 24px; height: 24px; border-radius: 50%; background: #94a3b8; flex-shrink: 0; display:flex; align-items:center; justify-content:center; color:white; font-size:0.6rem; font-weight:bold;}
+        .c-bubble { background: #f1f5f9; padding: 8px 12px; border-radius: 15px; border-top-left-radius: 4px; color: #334155; line-height:1.4; flex:1;}
+        .c-input { display:flex; gap:8px; margin-top:10px;}
+        .c-input input { flex:1; background:#f8fafc; border:1px solid #e2e8f0; border-radius:20px; padding:8px 15px; font-size:0.85rem; outline:none;}
+        .c-input button { background:var(--primary-gradient); color:white; border:none; border-radius:20px; padding:0 15px; font-weight:bold; cursor:pointer;}
+
+        /* 成績系統樣式 */
+        .grade-item { display: flex; align-items: center; justify-content: space-between; padding: 16px; background: white; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); margin-bottom: 12px; cursor: pointer; transition: 0.2s; border: 1px solid transparent;}
+        .grade-item:hover { border-color: #10b981; transform: translateX(5px); }
+        .g-info { flex: 1; }
+        .g-title { font-weight: 800; font-size: 1rem; color: var(--text-main); margin-bottom: 4px; }
+        .g-date { font-size: 0.8rem; color: var(--text-muted); }
+        .g-score { font-family: 'Outfit'; font-size: 2rem; font-weight: 900; }
+        .score-pass { color: #059669; }
+        .score-fail { color: #ef4444; }
+
+        /* 📊 CSS 柱狀圖 (Bar Chart) */
+        .bar-chart-container { display: flex; align-items: flex-end; justify-content: space-around; height: 180px; padding-top: 30px; padding-bottom: 5px; margin-top: 10px; border-bottom: 1px solid #e2e8f0; }
+        .bar-col { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 8px; width: 45px; height: 100%; }
+        .bar-fill { width: 100%; background: #d1fae5; border-radius: 8px 8px 0 0; transition: height 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.3s; position: relative; height: 0%; /* 預設高度0，靠JS增長 */ }
+        
+        /* 標示使用者落點的發光柱子 */
+        .bar-fill.active-bar { background: var(--primary-gradient); box-shadow: 0 0 15px rgba(16, 185, 129, 0.4); }
+        .bar-fill::after { content: attr(data-val); position: absolute; top: -25px; width: 100%; text-align: center; font-size: 0.85rem; font-weight: 900; color: #064e3b; font-family: 'Outfit'; }
+        .bar-label { font-size: 0.8rem; font-weight: 800; color: var(--text-muted); text-align: center; font-family: 'Outfit';}
+
+        /* Bottom Nav */
+        .bottom-nav { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: calc(100% - 40px); max-width: 440px; background: rgba(6, 78, 59, 0.95); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: 30px; padding: 8px; display: flex; justify-content: space-between; box-shadow: 0 20px 40px rgba(5, 150, 105, 0.3); z-index: 100; }
+        .nav-item { flex: 1; text-align: center; padding: 12px 0; color: rgba(255,255,255,0.6); font-size: 0.85rem; font-weight: bold; border-radius: 20px; transition: 0.3s; cursor: pointer; }
+        .nav-item.active { background: white; color: #064e3b; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); }
+
+        /* Modal Sheets */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.4); backdrop-filter: blur(5px); z-index: 999; display: none; opacity: 0; transition: 0.3s; }
+        .bottom-sheet { position: fixed; bottom: -100%; left: 50%; transform: translateX(-50%); width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; background: #fff; border-radius: 30px 30px 0 0; padding: 30px; box-shadow: 0 -10px 40px rgba(0,0,0,0.2); z-index: 1000; transition: bottom 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .sheet-handle { width: 50px; height: 5px; background: #cbd5e1; border-radius: 5px; margin: 0 auto 20px auto; }
+        .btn-primary { width: 100%; background: var(--primary-gradient); color: white; border: none; padding: 16px; border-radius: 15px; font-size: 1.1rem; font-weight: 800; cursor: pointer; margin-top: 15px; box-shadow: 0 10px 20px rgba(16, 185, 129, 0.3); }
+        
+    </style>
+</head>
+<body>
+
+    <header class="glass-header">
+        <h1 class="header-title">Bear's Lab</h1>
+        <div class="user-profile">
+            <div class="bear-coin">🪙 120</div>
+            <div style="text-align: right; line-height: 1.2;">
+                <!-- 讀取真實資料的方沁竹狀態 -->
+                <div style="font-weight: 800; font-size: 0.95rem;">方沁竹</div>
+                <div style="font-size: 0.7rem; color: var(--text-muted);">小六資優自然</div>
+            </div>
+            <div class="avatar">沁</div>
+        </div>
+    </header>
+
+    <main class="app-container">
+        
+        <!-- 🎯 TAB 1: 聯絡簿 Feed -->
+        <div id="tab-feed" class="tab-content active">
+            
+            <section class="glass-card" style="margin-bottom: 40px;">
+                 <div class="section-title">數位聯絡簿 <span class="category-tag" style="background:#fef3c7; color:#d97706;">時間軸</span></div>
+                 
+                 <!-- 最新的一天 (缺考狀態) -->
+                 <div class="feed-post feed-post-danger">
+                     <div class="feed-header">
+                         <div class="feed-date feed-date-danger">2026/04/13 (六)</div>
+                         <div class="feed-score-pill fail">⚠️ 狀態: 缺考需補考</div>
+                     </div>
+                     <h3 class="feed-title"><span class="category-tag danger">需補考</span> 電流的磁效應</h3>
+                     
+                     <div class="feed-desc" style="background: #fff1f2; border: 1px solid #ffe4e6;">
+                         <strong>系統通知：</strong><br>
+                         同學今天因假單未出席測驗。請在下次上課前，列印雲端附件的黃卷完成補考，並拍照回傳於此處。
+                     </div>
+                     
+                     <div style="background: white; border-radius: 12px; padding: 15px; box-shadow: 0 4px 10px rgba(225, 29, 72, 0.1); border: 2px dashed #fda4af;">
+                         <div style="color:#e11d48; font-weight:900; font-size:1.05rem; text-align:center; margin-bottom:10px;">📸 尚未繳交補考</div>
+                         <button style="width:100%; background:var(--danger-gradient); border:none; padding:12px; border-radius:10px; font-weight:bold; color:white; cursor:pointer; font-size:1rem; box-shadow: 0 4px 15px rgba(225, 29, 72, 0.3);" onclick="openSheet('uploadSheet')">立刻上傳補考考卷</button>
+                     </div>
+                 </div>
+
+                 <!-- 歷史紀錄 (補考已回傳，等待批改狀態) -->
+                 <div class="feed-post feed-post-warning">
+                     <div class="feed-header">
+                         <div class="feed-date feed-date-warning">2026/04/06 (六)</div>
+                         <div class="feed-score-pill absent" style="background:#fffbeb; color:#d97706; border-color:#fef3c7;">⏳ 補考批改中</div>
+                     </div>
+                     <h3 class="feed-title"><span class="category-tag warning">審核中</span> 力與運動總複習</h3>
+                     
+                     <div class="feed-desc" style="background: #fffbeb; border: 1px solid #fef3c7; color:#b45309;">
+                         太棒了！你已經上傳了補考成績，阿喵老師正在努力批改中。批改完成後分數會自動更新在這裡。💪
+                     </div>
+                     
+                     <div style="background: white; border-radius: 12px; padding: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.03); border: 1px solid #f1f5f9;">
+                         <span style="color:#d97706; font-weight:800; font-size:0.9rem;">📝 本週回家作業</span><br>
+                         <p style="font-size:0.9rem; margin:8px 0; color:var(--text-muted);">完成講義 P.45 - P.50，並拍下第 50 頁上傳。</p>
+                         <button style="width:100%; background:#ecfdf5; border:1px dashed #34d399; padding:10px; border-radius:10px; font-weight:bold; color:#059669; cursor:pointer;" onclick="openSheet('uploadSheet')">📤 上傳本週作業</button>
+                     </div>
+
+                     <!-- 單篇聯絡簿的專屬留言區 -->
+                     <div class="post-comments">
+                         <div style="font-size:0.8rem; font-weight:bold; color:var(--text-muted); margin-bottom:10px;">留言區 (2)</div>
+                         <div class="comment-item">
+                             <div class="c-avatar">沁</div>
+                             <div class="c-bubble">老師，我剛剛已經把補考上傳了！但有一題我不太會寫。</div>
+                         </div>
+                         <div class="comment-item">
+                             <div class="c-avatar" style="background:var(--primary-gradient);">喵</div>
+                             <div class="c-bubble">沒問題！我改完會順便把你不會的那題錄影片講解給你聽喔！</div>
+                         </div>
+                         <div class="c-input">
+                             <input type="text" placeholder="在聯絡簿下留言提問...">
+                             <button onclick="alert('留言送出！直接綁定這天的課程。')">傳送</button>
+                         </div>
+                     </div>
+                 </div>
+
+                 <!-- 歷史紀錄 (一般正常顯示成績) -->
+                 <div class="feed-post" style="border-left-color: #10b981;">
+                     <div class="feed-header">
+                         <div class="feed-date" style="color: #10b981;">2026/03/30 (六)</div>
+                         <div class="feed-score-pill">💯 小考: 100分 🏆</div>
+                     </div>
+                     <h3 class="feed-title"><span class="category-tag">理論</span> 功與能總整理</h3>
+                     <div class="feed-desc" style="background: rgba(16, 185, 129, 0.05);">
+                         大家都考得非常好，特別恭喜滿分的同學！
+                     </div>
+                     
+                     <div style="color:#059669; font-size:0.85rem; font-weight:bold; cursor:pointer;">展開留言 (0) ▾</div>
+                 </div>
+            </section>
+        </div>
+
+
+        <!-- 🎯 TAB 2: 成績與分析系統 -->
+        <div id="tab-grades" class="tab-content">
+            <h2 class="section-title">成績與趨勢分析</h2>
+            
+            <div class="grade-item" onclick="openGradeBarChart('電流的磁效應小考', 92, 84.2, 2, 6, 12, 4)">
+                <div class="g-info">
+                    <div class="g-title">電流的磁效應小考</div>
+                    <div class="g-date">04/13 • 點擊看分佈圖</div>
+                </div>
+                <div class="g-score score-pass">92</div>
+            </div>
+
+            <div class="grade-item" onclick="openGradeBarChart('牛頓定律總複習', 100, 75.3, 5, 8, 10, 2)">
+                <div class="g-info">
+                    <div class="g-title">牛頓定律總複習</div>
+                    <div class="g-date">04/06 • 點擊看分佈圖 <span>🏆</span></div>
+                </div>
+                <div class="g-score" style="background: var(--secondary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">100</div>
+            </div>
+
+            <div class="grade-item">
+                <div class="g-info" onclick="openGradeBarChart('力矩與靜力平衡', 65, 70.1, 8, 10, 5, 1)">
+                    <div class="g-title">力矩與靜力平衡</div>
+                    <div class="g-date" style="color:#e11d48;">03/23 • (未達標)</div>
+                </div>
+                <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
+                    <div class="g-score score-fail" style="color:#e11d48;">65</div>
+                    <button class="btn-makeup" style="background:var(--danger-gradient); color:white; border:none; padding:6px 12px; border-radius:15px; font-weight:bold; font-size:0.75rem;">補考回傳</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 🎯 TAB 3: 公告區塊 -->
+        <div id="tab-announcements" class="tab-content">
+            <h2 class="section-title">班級公告與行事曆</h2>
+            
+            <section class="glass-card" style="border-left: 4px solid #f59e0b;">
+                <div style="font-weight: 900; font-size: 1.1rem; color: #b45309; margin-bottom: 8px;">📢 補習班重要公告</div>
+                <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 10px;">發布於 2026/04/10</div>
+                <div style="font-size: 0.95rem; line-height: 1.6; color: var(--text-main);">
+                    各位家長您好，下週適逢段考週，本班將於週六下午 14:00 - 17:00 開放自習教室，有老師駐點解題，歡迎同學多加上網登記劃位！
+                </div>
+            </section>
+            
+            <section class="glass-card" style="border-left: 4px solid #3b82f6;">
+                <div style="font-weight: 900; font-size: 1.1rem; color: #1d4ed8; margin-bottom: 8px;">📅 下期學費繳納提醒</div>
+                <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 10px;">發布於 2026/04/05</div>
+                <div style="font-size: 0.95rem; line-height: 1.6; color: var(--text-main);">
+                    五月份的學費帳單已經產出，請各位家長撥空透過下方連結，或至補習班櫃檯繳交。
+                </div>
+                <button class="btn-primary" style="margin-top: 15px; background: #eff6ff; color: #2563eb; box-shadow: none; border: 1px solid #bfdbfe; font-size: 1rem;">查看電子帳單</button>
+            </section>
+        </div>
+
+    </main>
+
+    <!-- 底部導航 Bar -->
+    <div class="bottom-nav">
+        <div class="nav-item active" onclick="switchTab('feed', this)">📖 聯絡簿</div>
+        <div class="nav-item" onclick="switchTab('grades', this)">📊 成績單</div>
+        <div class="nav-item" onclick="switchTab('announcements', this)">📢 公告</div>
+    </div>
+
+
+    <!-- ============================================== -->
+    <!-- 下方滑出式浮層 (Bottom Sheets) -->
+    <!-- ============================================== -->
+    <div class="modal-overlay" id="overlay" onclick="closeSheets()"></div>
+
+    <!-- 上傳作業/補考面板 -->
+    <div class="bottom-sheet" id="uploadSheet">
+        <div class="sheet-handle"></div>
+        <h2 style="margin:0 0 5px 0;">上傳檔案</h2>
+        <p style="color:var(--text-muted); font-size:0.9rem; margin-bottom:20px;">上傳作業還能賺取小熊幣獎勵喔！</p>
+        
+        <div style="border: 2px dashed #a7f3d0; border-radius: 15px; padding: 40px 20px; text-align: center; color: #059669; background: #ecfdf5; cursor:pointer;">
+            <div style="font-size:3rem; margin-bottom:10px;">📸</div>
+            <div style="font-weight:900; font-size:1.2rem;">點擊開啟相機拍照</div>
+            <div style="font-size:0.9rem; margin-top:5px; font-weight:bold;">檔案會直接傳送給老師批改</div>
+        </div>
+        <button class="btn-primary" onclick="alert('成功上傳！等待老師批改。獲得 10 點小熊幣 🪙'); closeSheets();">確認直傳</button>
+    </div>
+
+    <!-- 📊 進階柱狀圖分析 Modal -->
+    <div class="bottom-sheet" id="gradeDetailSheet">
+        <div class="sheet-handle"></div>
+        <h2 id="gd-title" style="margin:0 0 0 0; color:#064e3b; font-weight:900; font-size: 1.5rem;">考試名稱</h2>
+        <div style="color:var(--text-muted); font-size:1rem; font-weight:bold; margin-bottom:20px;">班級分數柱狀圖分析</div>
+        
+        <div style="text-align:center; margin-bottom: 20px;">
+            <div class="number-display" id="gd-score" style="font-size:4rem; line-height:1;">92</div>
+            <div style="font-size:1rem; font-weight:bold; color:var(--text-muted); margin-top:5px;">你的分數 (班均: <span id="gd-avg">84</span>)</div>
+        </div>
+
+        <div class="bar-chart-container">
+            <div class="bar-col">
+                <div class="bar-fill" id="bar1" data-val="0" style="height: 0%;"></div>
+                <div class="bar-label">0-60</div>
+            </div>
+            <div class="bar-col">
+                <div class="bar-fill" id="bar2" data-val="0" style="height: 0%;"></div>
+                <div class="bar-label">60-80</div>
+            </div>
+            <div class="bar-col">
+                <div class="bar-fill" id="bar3" data-val="0" style="height: 0%;"></div>
+                <div class="bar-label">80-90</div>
+            </div>
+            <div class="bar-col">
+                <div class="bar-fill" id="bar4" data-val="0" style="height: 0%;"></div>
+                <div class="bar-label">90-100</div>
+            </div>
+        </div>
+        
+        <div style="text-align:center; font-size:0.9rem; color:#059669; margin-top:15px; font-weight:900;">↑ 深綠色光亮柱子代表你的落點區間 ↑</div>
+        
+        <button class="btn-primary" style="background:#f8fafc; color:#1e293b; box-shadow:none; margin-top:20px; border:1px solid #e2e8f0;" onclick="closeSheets()">關閉圖表</button>
+    </div>
+
+
+    <script>
+        function switchTab(tabId, element) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            document.getElementById('tab-' + tabId).classList.add('active');
+            element.classList.add('active');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function openSheet(id) {
+            document.getElementById('overlay').style.display = 'block';
+            setTimeout(() => { document.getElementById('overlay').style.opacity = '1'; }, 10);
+            document.getElementById(id).style.bottom = '0';
+        }
+
+        function closeSheets() {
+            document.getElementById('overlay').style.opacity = '0';
+            document.querySelectorAll('.bottom-sheet').forEach(sheet => { sheet.style.bottom = '-100%'; });
+            setTimeout(() => { document.getElementById('overlay').style.display = 'none'; }, 300);
+            
+            // 關閉時重置柱子高度，確保下次依然有動畫
+            setTimeout(() => {
+                document.querySelectorAll('.bar-fill').forEach(b => { 
+                    b.style.height = '0%'; 
+                    b.classList.remove('active-bar'); 
+                });
+            }, 400);
+        }
+
+        // 動態生成帶有動畫的柱狀圖
+        function openGradeBarChart(title, score, avg, p1, p2, p3, p4) {
+            document.getElementById('gd-title').textContent = title;
+            document.getElementById('gd-score').textContent = score;
+            document.getElementById('gd-avg').textContent = avg;
+            
+            // 決定顏色 (及格綠色、不及格紅色)
+            if(score >= 80) {
+                document.getElementById('gd-score').style.background = 'var(--primary-gradient)';
+                document.getElementById('gd-score').style.webkitBackgroundClip = 'text';
+            } else {
+                document.getElementById('gd-score').style.background = 'var(--danger-gradient)';
+                document.getElementById('gd-score').style.webkitBackgroundClip = 'text';
+            }
+
+            // 確保打開前所有柱子是 0，等待彈出動畫完成後再升起
+            const bars = document.querySelectorAll('.bar-fill');
+            bars.forEach(b => { b.style.height = '0%'; b.classList.remove('active-bar'); });
+
+            openSheet('gradeDetailSheet');
+
+            // 延遲更新以觸發 CSS Transition (給模態框打開的時間)
+            setTimeout(() => {
+                const max = Math.max(p1, p2, p3, p4);
+
+                document.getElementById('bar1').style.height = (p1 / max * 100) + '%';
+                document.getElementById('bar1').setAttribute('data-val', p1 + '人');
+                
+                document.getElementById('bar2').style.height = (p2 / max * 100) + '%';
+                document.getElementById('bar2').setAttribute('data-val', p2 + '人');
+                
+                document.getElementById('bar3').style.height = (p3 / max * 100) + '%';
+                document.getElementById('bar3').setAttribute('data-val', p3 + '人');
+                
+                document.getElementById('bar4').style.height = (p4 / max * 100) + '%';
+                document.getElementById('bar4').setAttribute('data-val', p4 + '人');
+
+                // 判斷哪個落點加上發光特效
+                if(score < 60) document.getElementById('bar1').classList.add('active-bar');
+                else if(score < 80) document.getElementById('bar2').classList.add('active-bar');
+                else if(score < 90) document.getElementById('bar3').classList.add('active-bar');
+                else document.getElementById('bar4').classList.add('active-bar');
+            }, 300); // 延遲 300ms 讓 Bottom Sheet 滑出來之後再升起柱子
+        }
+    </script>
+</body>
+</html>

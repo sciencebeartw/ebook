@@ -795,8 +795,7 @@
             line-height: 1;
             margin: 10px 0;
             letter-spacing: -2px;
-        
-            font-family: 'Outfit', sans-serif !important;}
+        }
 
         .score-unit-big {
             font-size: 1.6rem;
@@ -965,8 +964,7 @@
             font-size: 1.8rem;
             font-weight: 700;
             color: #333;
-        
-            font-family: 'Outfit', sans-serif !important;}
+        }
 
         .content-section {
             padding: 25px 20px;
@@ -1378,8 +1376,7 @@
             letter-spacing: -1px;
             padding: 5px 0px;
             display: inline-block;
-        
-            font-family: 'Outfit', sans-serif !important;}
+        }
 
         .score-val.score-green {
             color: #28a745 !important;
@@ -1623,7 +1620,157 @@
             cursor: pointer;
             width: 100%;
         }
-    </style>
+    
+/* ==================================================== */
+/* 🐻 BEAR GREEN V2 overrides - Start */
+/* ==================================================== */
+:root {
+    --bg-color: #f0fdf4; 
+    --surface-color: rgba(255, 255, 255, 0.85);
+    --surface-border: rgba(255, 255, 255, 0.6);
+    --primary-gradient: linear-gradient(135deg, #34d399 0%, #059669 100%);
+    --secondary-gradient: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+    --danger-gradient: linear-gradient(135deg, #fb7185 0%, #e11d48 100%);
+    --text-main: #064e3b; 
+    --text-muted: #64748b;
+    --shadow-subtle: 0 10px 40px -10px rgba(5, 150, 105, 0.1);
+    --blur: blur(20px);
+    --radius-lg: 30px;
+}
+
+
+body {
+    font-family: 'Inter', sans-serif !important;
+    color: var(--text-main) !important;
+    background-color: var(--bg-color) !important;
+    background-image: 
+        radial-gradient(at 0% 0%, hsla(147, 100%, 94%, 1) 0, transparent 50%), 
+        radial-gradient(at 100% 0%, hsla(147, 60%, 88%, 1) 0, transparent 50%), 
+        radial-gradient(at 100% 100%, hsla(160, 100%, 96%, 1) 0, transparent 50%) !important;
+    background-attachment: fixed !important;
+}
+.app-container {
+    background: transparent !important;
+    padding-bottom: 120px !important;
+}
+#main-screen {
+    background: transparent !important;
+}
+.glass-header, .header-bar {
+    background: rgba(255, 255, 255, 0.7) !important; 
+    backdrop-filter: var(--blur) !important; 
+    -webkit-backdrop-filter: var(--blur) !important;
+    border-bottom: 1px solid rgba(16, 185, 129, 0.1) !important; 
+}
+
+.header-bar {
+    background: rgba(255, 255, 255, 0.7); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+    border-bottom: 1px solid rgba(16, 185, 129, 0.1); 
+}
+.header-left .logo-text {
+    font-size: 1.3rem !important; font-weight: 800 !important; background: var(--primary-gradient) !important; -webkit-background-clip: text !important; -webkit-text-fill-color: transparent !important; margin: 0 !important; font-family: 'Outfit' !important; color: transparent !important;
+}
+
+/* Feed List overrides */
+.glass-card { background: var(--surface-color); backdrop-filter: var(--blur); border: 1px solid white; border-radius: var(--radius-lg); padding: 24px; margin-bottom: 24px; box-shadow: var(--shadow-subtle); position: relative; overflow: hidden; }
+.feed-post { border-left: 4px solid #10b981; padding-left: 16px; margin-bottom: 40px; position: relative; border-bottom: none!important; }
+.feed-post::before { content: ''; position: absolute; left: -8px; top: 0; width: 12px; height: 12px; border-radius: 50%; background: #10b981; box-shadow: 0 0 0 4px white; }
+.feed-post-danger { border-left-color: #e11d48; border-bottom: none!important; }
+.feed-post-danger::before { background: #e11d48; }
+
+.feed-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;}
+.feed-date { font-weight: 800; color: #10b981; font-size: 0.9rem; font-family: 'Outfit'; }
+.feed-date-danger { color: #e11d48; }
+
+.feed-score-pill { background: #ecfdf5; border: 1px solid #d1fae5; color: #059669; font-weight: 800; font-size: 1rem; padding: 4px 10px; border-radius: 20px; display: flex; align-items: center; gap:4px; font-family: 'Outfit'; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.15);}
+.feed-score-pill.fail { background: #fff1f2; border-color: #fecdd3; color: #e11d48; box-shadow: 0 4px 10px rgba(225, 29, 72, 0.15); }
+
+.feed-title { font-size: 1.15rem; font-weight: 800; margin: 0 0 10px 0; color: var(--text-main); }
+.category-tag { font-size: 0.75rem; padding: 4px 10px; border-radius: 8px; margin-right: 5px; font-weight: 800; background: #e0f2fe; color: #0284c7;}
+.category-tag.danger { background: #ffe4e6; color: #e11d48; }
+.feed-desc { font-size: 0.95rem; color: var(--text-main); line-height: 1.6; margin: 0 0 15px 0; background: rgba(16, 185, 129, 0.05); padding: 15px; border-radius: 15px; white-space: pre-wrap;}
+
+/* Grades overrides */
+#grades-list { display: flex; flex-direction: column; gap: 0; }
+.grade-item { display: flex; align-items: center; justify-content: space-between; padding: 16px; background: white; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); margin-bottom: 12px; cursor: pointer; transition: 0.2s; border: 1px solid transparent;}
+.grade-item:hover { border-color: #10b981; transform: translateX(5px); }
+.g-info { flex: 1; }
+.g-title { font-weight: 800; font-size: 1rem; color: var(--text-main); margin-bottom: 4px; }
+.g-date { font-size: 0.8rem; color: var(--text-muted); }
+.g-score { font-family: 'Outfit'; font-size: 2rem; font-weight: 900; }
+.score-pass { color: #059669; }
+.score-fail { color: #e11d48; }
+
+/* 📊 CSS 柱狀圖 (Bar Chart) */
+.bar-chart-container { display: flex; align-items: flex-end; justify-content: space-around; height: 180px; padding-top: 30px; padding-bottom: 5px; margin-top: 10px; border-bottom: 1px solid #e2e8f0; }
+.bar-col { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 8px; width: 45px; height: 100%; }
+.bar-fill { width: 100%; background: #d1fae5; border-radius: 8px 8px 0 0; transition: height 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.3s; position: relative; height: 0%; }
+.bar-fill.active-bar { background: var(--primary-gradient); box-shadow: 0 0 15px rgba(16, 185, 129, 0.4); }
+.bar-fill::after { content: attr(data-val); position: absolute; top: -25px; width: 100%; text-align: center; font-size: 0.85rem; font-weight: 900; color: #064e3b; font-family: 'Outfit'; }
+.bar-label { font-size: 0.8rem; font-weight: 800; color: var(--text-muted); text-align: center; font-family: 'Outfit';}
+
+/* Bottom Sheet */
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.4); backdrop-filter: blur(5px); z-index: 999; display: none; opacity: 0; transition: 0.3s; }
+.bottom-sheet { position: fixed; bottom: -100%; left: 50%; transform: translateX(-50%); width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; background: #fff; border-radius: 30px 30px 0 0; padding: 30px; box-shadow: 0 -10px 40px rgba(0,0,0,0.2); z-index: 1000; transition: bottom 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+.sheet-handle { width: 50px; height: 5px; background: #cbd5e1; border-radius: 5px; margin: 0 auto 20px auto; }
+/* 🐻 V2 overrides - End */
+
+/* Emergency popup overrides */
+.emergency-modal {
+    background: rgba(0, 0, 0, 0.5) !important;
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+}
+.emergency-box {
+    background: rgba(255, 255, 255, 0.95) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    border: 1px solid rgba(255,255,255,0.8) !important;
+    border-top: none !important;
+    border-radius: 30px !important;
+    box-shadow: 0 20px 50px rgba(225, 29, 72, 0.2) !important;
+    position: relative;
+    padding-bottom: 20px;
+}
+.emergency-box::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 6px;
+    background: var(--danger-gradient);
+}
+.emergency-header {
+    background: none !important;
+    color: #e11d48 !important;
+    font-family: 'Outfit', sans-serif !important;
+    font-weight: 900 !important;
+    font-size: 1.6rem !important;
+    text-align: center;
+    padding: 25px 20px 10px 20px !important;
+    border: none !important;
+}
+.emergency-body {
+    color: #334155 !important;
+    font-size: 1.1rem !important;
+    line-height: 1.6 !important;
+    padding: 20px 30px 30px 30px !important;
+    text-align: center;
+}
+.emergency-btn {
+    background: var(--danger-gradient) !important;
+    border-radius: 20px !important;
+    box-shadow: 0 10px 20px rgba(225, 29, 72, 0.3) !important;
+    font-weight: 800 !important;
+    font-family: 'Inter', sans-serif !important;
+    color: white !important;
+    border: none !important;
+    padding: 15px 30px !important;
+    font-size: 1.1rem !important;
+    width: 60% !important;
+    margin: 0 auto !important;
+    display: block !important;
+}
+</style>
+
 
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -1945,7 +2092,7 @@
     window.google = { script: { run: proxyRunner } };
   </script>
 
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=Outfit:wght@500;700;900&display=swap" rel="stylesheet">
 </head>
 
 <body>
@@ -2933,75 +3080,245 @@
             );
         }
 
+
+        
         function renderDailyPosts(posts, history) {
-            var container = document.getElementById('tab-content-0'); if (!posts || posts.length === 0) { container.innerHTML = "<div style='text-align:center; padding:30px; color:#999;'>目前沒有聯絡簿資料</div>"; return; } var html = ""; posts.forEach(function (post) {
-                var gradeHtml = ""; var exam = post.examData.main; var others = post.examData.others; var scoreReportHtml = ""; if (exam) {
-                    var logic = getDisplayLogic(exam, history); var unitDisplay = ""; if (!isNaN(parseFloat(logic.mainScore))) unitDisplay = "<span class='score-unit-big'>" + (exam.unit || "分") + "</span>"; var scoreDisplay = "<span class='" + logic.mainClass + "'>" + logic.mainScore + "</span>" + unitDisplay; var standardHtml = ""; if (exam.note && exam.note !== "") standardHtml = "<div class='exam-standard-box'>🎯 補考標準：" + exam.note + "</div>"; if (logic.needsReport) { var safeDate = post.date.replace(/\//g, '-'); scoreReportHtml = "<div class='score-report-section'><div style='font-weight:bold; color:#c0392b; margin-bottom:10px; font-size:1.35rem;'>📝 回報補考分數</div><div class='input-box'><input type='number' class='score-input' id='score-in-" + safeDate + "' placeholder='輸入分數'><button class='score-btn' onclick=\"submitScoreReport('" + safeDate + "', '" + post.date + "')\">送出</button></div></div>"; } var chartHtml = ""; if (exam.dist) { var total = exam.total; for (var i = 4; i >= 0; i--) { var count = exam.dist[i]; var percent = (total > 0) ? (count / total) * 100 : 0; var label = exam.labels ? exam.labels[i] : ""; var barColor = "#5b9bd5"; if (!exam.isMissing && i === exam.myBucket) { if (i === 4) barColor = "#27ae60"; else if (i === 3 || i === 2) barColor = "#f39c12"; else barColor = "#e74c3c"; } chartHtml += "<div class='chart-row'><div class='chart-label'>" + label + "</div><div class='chart-bar-area'><div class='chart-bar-fill' style='width: " + percent + "%; background-color: " + barColor + ";'></div></div><div class='chart-count'>" + (count > 0 ? count : '') + "</div></div>"; } chartHtml = "<div class='chart-container-post'>" + chartHtml + "</div>"; } var refHwHtml = ""; if (others.length > 0) { refHwHtml = "<div class='ref-hw-box'><div class='ref-hw-title'>📝 相同範圍作業分數：</div>"; others.forEach(function (o) { var sDisplay = o.score; var hwColorClass = ""; if (sDisplay == "#N/A") sDisplay = "<span class='text-red' style='font-size:1rem'>尚未繳交</span>"; else { var m = sDisplay.match(/(\d+(\.\d+)?)/); if (m) { var u = o.unit || "題"; if (o.myBucket === 4) hwColorClass = " score-green"; else if (o.myBucket <= 1 && o.myBucket >= 0) hwColorClass = " score-red"; sDisplay = "<span class='hw-score-val" + hwColorClass + "'>" + m[0] + "</span><span class='score-unit'>" + u + "</span>"; } } refHwHtml += "<div class='ref-hw-item'><span>" + o.date + " " + o.exam + "</span><div>" + sDisplay + "</div></div>"; }); refHwHtml += "</div>"; }
+            var container = document.getElementById('tab-content-0'); 
+            if (!posts || posts.length === 0) { container.innerHTML = "<div style='text-align:center; padding:30px; color:#999;'>目前沒有聯絡簿資料</div>"; return; } 
+            var html = ""; 
 
-                    var examTitle = "今日小考成績";
-                    if (exam.date.indexOf("複習") > -1) examTitle = "今日複習考成績";
-                    else if (exam.date.indexOf("鑑定") > -1) examTitle = "今日鑑定考成績";
-                    else if (exam.date.indexOf("隨堂") > -1) examTitle = "今日隨堂考成績";
+            var parseBtn = function (text) {
+                if (!text) return "";
+                text = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                var withBr = text.replace(/\n/g, '<br>');
+                withBr = withBr.replace(/\[quote:([^\]]+)\](.*?)\[\/quote\]/g, function(match, type, qContent) {
+                    return `<div class="quote-box"><div class="quote-type">${type}</div><div class="quote-content">${qContent}</div></div>`;
+                });
+                return withBr.replace(/\[(.*?)\](http[s]?:\/\/[^\s]+)/g, function (match, name, url) {
+                    if (name.indexOf("附件") > -1 || name.indexOf("作業") > -1) {
+                        return `<a href="${url}" target="_blank" class="btn-small-tag">📎 ${name}</a>`;
+                    } else {
+                        return `<a href="${url}" target="_blank" class="btn-link">${name}</a>`;
+                    }
+                });
+            };
 
-                    gradeHtml = "<div class='grade-section'><div class='main-exam-title'>" + examTitle + "</div><div class='main-exam-range'>" + exam.exam + "</div><div class='main-score'>" + scoreDisplay + "</div>" + logic.statusHtml + "<div class='score-sub'>班平均: " + exam.average + "</div>" + standardHtml + scoreReportHtml + chartHtml + refHwHtml + "</div>";
-                } var contentHtml = "";
+            posts.forEach(function (post) {
+                var safeDateId = post.date.replace(/\//g, '-');
+                var exam = post.examData.main; 
+                var others = post.examData.others; 
+                var scoreReportHtml = ""; 
+                
+                var postStyle = "feed-post";
+                var dateStyle = "feed-date";
+                var titlePrefix = `<span class="category-tag">課程</span>`;
+                var rightPillHtml = "";
+                var bigChartHtml = "";
 
-                // ★★★ v3.9 修正：連結解析邏輯 (支援小標籤) ★★★
-                var parseBtn = function (text) {
-                    if (!text) return "";
-                    // 先對 HTML 特殊字元做跳脫 防範 XSS
-                    text = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-                    var withBr = text.replace(/\n/g, '<br>');
-                    // ★★★ v3.9.1 新增：引用區塊解析 ★★★
-                    withBr = withBr.replace(/\[quote:([^\]]+)\](.*?)\[\/quote\]/g, function(match, type, qContent) {
-                        return `<div class="quote-box"><div class="quote-type">${type}</div><div class="quote-content">${qContent}</div></div>`;
-                    });
-                    // 老師發布的連結 -> 藍色大膠囊
-                    // 學生上傳的連結 -> 灰色小標籤 (透過 class="btn-small-tag" 區分)
-                    return withBr.replace(/\[(.*?)\](http[s]?:\/\/[^\s]+)/g, function (match, name, url) {
-                        if (name.indexOf("附件") > -1 || name.indexOf("作業") > -1) {
-                            return `<a href="${url}" target="_blank" class="btn-small-tag">📎 ${name}</a>`;
-                        } else {
-                            return `<a href="${url}" target="_blank" class="btn-link">${name}</a>`;
-                        }
-                    });
-                };
+                if (exam) {
+                    var logic = getDisplayLogic(exam, history); 
+                    if (logic.needsReport) { 
+                        scoreReportHtml = `<div class='score-report-section' style='margin-bottom:15px; border:2px dashed #f59e0b; padding:10px; border-radius:15px;'>
+                            <div style='font-weight:bold; color:#b45309; margin-bottom:10px; font-size:1rem;'>📝 回報補考分數</div>
+                            <div class='input-box' style='display:flex; gap:10px;'>
+                                <input type='number' class='score-input' id='score-in-${safeDateId}' placeholder='輸入分數' style='flex:1; padding:8px; border-radius:8px; border:1px solid #d1d5db;'>
+                                <button class='btn-primary' style='width:auto; margin:0; padding:8px 15px; height:auto; box-shadow:none;' onclick="submitScoreReport('${safeDateId}', '${post.date}')">送出</button>
+                            </div>
+                        </div>`; 
+                    } 
 
-                var labelHw1 = "今日作業"; if (post.hw2 && post.hw2.toString().trim() !== "") labelHw1 = "今日作業一"; var fields = [{ label: "今日課程進度", val: post.progress }, { label: "今日小考考卷", val: post.quiz }, { label: labelHw1, val: post.hw1 }, { label: "今日作業二", val: post.hw2 }, { label: "今日補考考卷", val: post.makeup }, { label: "下次小考範圍", val: post.range }, { label: "補充資料", val: post.note }]; fields.forEach(function (f) { if (f.val) contentHtml += "<div class='info-block'><span class='info-label'>" + f.label + "</span><div class='info-content'>" + parseBtn(f.val) + "</div></div>"; }); var pDateShort = post.date.substring(5).replace("-", "/"); var pDateFull = post.date.replace(/-/g, "/"); var myHistory = history.filter(function (h) { return h.targetDate == pDateShort || h.targetDate == post.date || h.targetDate == pDateFull; }); var historyHtml = ""; myHistory.forEach(function (h) { if (h.type !== "補考回報") { var displayType = (h.type === "家長留言" || h.type === "家長/學生" || h.type === "學生留言") ? "學生留言" : h.type; historyHtml += "<div class='history-msg'><b>" + displayType + ":</b> " + parseBtn(h.content) + " <br><span style='font-size:1.05rem;color:#aaa; display:block; text-align:right; margin-top:5px;'>(" + h.time.substring(5, 16) + ")</span></div>"; }}); var inputPlaceholder = "留言給老師..."; var safeDateId = post.date.replace(/\//g, '-');
+                    var sc = parseFloat(logic.mainScore);
+                    var isDanger = false;
+                    var warnLabel = "";
+
+                    var bkt = exam.myBucket;
+                    if (bkt === undefined || bkt === -1) {
+                         if (!isNaN(sc)) {
+                             if (sc >= 80) bkt = 4;
+                             else if (sc >= 60) bkt = 3;
+                             else if (sc >= 40) bkt = 2;
+                             else bkt = 0;
+                         } else {
+                             bkt = 0;
+                         }
+                    }
+
+                    var grad = "var(--primary-gradient)";
+                    if (logic.needsReport || isNaN(sc) || logic.mainScore === "尚未繳交" || bkt <= 1) {
+                        grad = "var(--danger-gradient)"; // Red
+                    } else if (bkt === 2 || bkt === 3) {
+                        grad = "var(--secondary-gradient)"; // Yellow/Orange
+                    } else {
+                        grad = "var(--primary-gradient)"; // Green
+                    }
+
+                    if (logic.needsReport || isNaN(sc) || logic.mainScore === "尚未繳交") {
+                        postStyle = "feed-post feed-post-danger";
+                        dateStyle = "feed-date feed-date-danger";
+                        titlePrefix = `<span class="category-tag danger">需補考</span>`;
+                        rightPillHtml = `<div class="feed-score-pill fail">⚠️ 缺考/未交</div>`;
+                        isDanger = true;
+                        warnLabel = `<div style="display:inline-block; margin-top:10px; padding:4px 15px; border-radius:20px; border:1px solid #fecdd3; background:#fff1f2; color:#e11d48; font-size:0.9rem; font-weight:bold;">⚠️ 未達標需補考</div>`;
+                    } else if (sc < 60) {
+                        postStyle = "feed-post feed-post-danger";
+                        dateStyle = "feed-date feed-date-danger";
+                        titlePrefix = `<span class="category-tag danger">未達標</span>`;
+                        rightPillHtml = `<div class="feed-score-pill fail">小考: ${sc}分</div>`;
+                        isDanger = true;
+                        warnLabel = `<div style="display:inline-block; margin-top:10px; padding:4px 15px; border-radius:20px; border:1px solid #fecdd3; background:#fff1f2; color:#e11d48; font-size:0.9rem; font-weight:bold;">⚠️ 未達標需補考</div>`;
+                    } else if (sc === 100) {
+                        rightPillHtml = `<div class="feed-score-pill">💯 小考: 100分</div>`;
+                    } else {
+                        rightPillHtml = `<div class="feed-score-pill">📝 小考: ${sc}分</div>`;
+                    }
+
+                    var bigScoreText = logic.needsReport ? (logic.mainScore === "尚未繳交" ? "未交" : "缺考") : logic.mainScore;
+
+                    var distHtml = "";
+                    if (exam.dist) {
+                        var dist = exam.dist || [0,0,0,0,0];
+                        var labels = exam.labels || ["0~20","20~40","40~60","60~80","80~100"];
+                        var maxVal = Math.max(...dist);
+                        if (maxVal === 0) maxVal = 1;
+                        
+                        var barCols = "";
+                        dist.forEach((val, idx) => {
+                            var lbl = labels[idx] || "";
+                            var isMyGroup = false;
+                            if (!isNaN(sc)) {
+                                if (exam.myBucket !== undefined && exam.myBucket !== -1) {
+                                    if (idx === exam.myBucket) isMyGroup = true;
+                                } else if (lbl.includes("-") || lbl.includes("~")) {
+                                    var pts = lbl.split(/-|~/);
+                                    if(sc >= parseInt(pts[0]) && sc <= parseInt(pts[1])) isMyGroup = true;
+                                    if(sc === 100 && idx === dist.length - 1) isMyGroup = true;
+                                }
+                            }
+                            var activeClass = isMyGroup ? "active-bar" : "";
+                            var fillGrad = "#e2e8f0";
+                            var boxShad = "";
+                            if (isMyGroup) {
+                                if (idx === 4) { fillGrad = "var(--primary-gradient)"; boxShad = "box-shadow: 0 0 10px rgba(16,185,129,0.3);"; }
+                                else if (idx === 2 || idx === 3) { fillGrad = "var(--secondary-gradient)"; boxShad = "box-shadow: 0 0 10px rgba(245,158,11,0.3);"; }
+                                else { fillGrad = "var(--danger-gradient)"; boxShad = "box-shadow: 0 0 10px rgba(225,29,72,0.3);"; }
+                            }
+                            var h = (val / maxVal * 100) + '%';
+                            barCols += `
+                            <div class="bar-col">
+                                <div class="bar-fill" data-val="${val}" style="height: ${h}; background: ${fillGrad}; ${boxShad}"></div>
+                                <div class="bar-label">${lbl}</div>
+                            </div>`;
+                        });
+                        distHtml = `<div class="bar-chart-container" style="height: 120px; margin: 15px 0;">${barCols}</div>`;
+                    }
+
+                    var standardHtml = "";
+                    if (exam.note) standardHtml = `<div style="background:#fef3c7; border: 1px dashed #f59e0b; padding:10px 15px; border-radius:12px; margin: 15px 0; font-size:0.9rem; font-weight:bold; color:#b45309;">🎯 補考標準：${exam.note}</div>`;
+
+                    bigChartHtml = `
+                    <div style="background:#f8fafc; border-radius:20px; padding:20px; margin:20px 0; text-align:center;">
+                        <h4 style="margin:0 0 5px 0; color:#334155; font-size:1.1rem; font-weight:900;">今日小考成績</h4>
+                        <div style="display:inline-block; background:#e2e8f0; color:#475569; padding:4px 12px; border-radius:12px; font-size:0.85rem; font-weight:bold; margin-bottom:15px;">${exam.exam || "測驗"}</div>
+                        
+                        <div class="number-display" style="font-size:4.5rem; line-height:1; font-family:'Outfit', sans-serif !important; font-weight:900; background:${grad}; -webkit-background-clip:text; color:transparent; -webkit-text-fill-color:transparent;">
+                            ${bigScoreText}<span style="font-size:1.5rem; color:#64748b; -webkit-text-fill-color:initial; background:none;">分</span>
+                        </div>
+                        ${warnLabel}
+                        <div style="font-size:1rem; font-weight:bold; color:#64748b; margin-top:10px;">班平均: ${exam.average || "-"}</div>
+                        
+                        ${standardHtml}
+                        ${distHtml}
+                    </div>`;
+                }
+
+                var contentHtml = "";
+                var labelHw1 = "今日作業"; if (post.hw2 && post.hw2.toString().trim() !== "") labelHw1 = "今日作業一"; 
+                var fields = [
+                    { label: "課程進度", val: post.progress }, 
+                    { label: "小考考卷", val: post.quiz }, 
+                    { label: labelHw1, val: post.hw1 }, 
+                    { label: "今日作業二", val: post.hw2 }, 
+                    { label: "補考考卷", val: post.makeup }, 
+                    { label: "下週範圍", val: post.range }, 
+                    { label: "補充資料", val: post.note }
+                ]; 
+                
+                var feedDescInner = "";
+                fields.forEach(function (f) { 
+                    if (f.val) feedDescInner += `<strong>${f.label}：</strong>${parseBtn(f.val)}<br>`; 
+                }); 
+
+                var pDateShort = post.date.substring(5).replace("-", "/"); var pDateFull = post.date.replace(/-/g, "/"); 
+                var myHistory = history.filter(function (h) { return h.targetDate == pDateShort || h.targetDate == post.date || h.targetDate == pDateFull; }); 
+                var historyHtml = ""; 
+                myHistory.forEach(function (h) { 
+                    if (h.type !== "補考回報") { 
+                        var displayType = (h.type === "家長留言" || h.type === "家長/學生" || h.type === "學生留言") ? "留言" : h.type; 
+                        historyHtml += "<div style='background:#f1f5f9; padding:8px 12px; border-radius:10px; margin-bottom:8px; font-size:0.9rem;'><b>" + displayType + ":</b> " + parseBtn(h.content) + " <span style='font-size:0.75rem;color:#94a3b8; float:right;'>" + h.time.substring(5, 16) + "</span></div>"; 
+                    }
+                }); 
 
                 var uploadHtml = `
-        <div class="student-upload-box">
-            <span class="upload-title">📤 作業/筆記上傳區</span>
-            <div class="upload-btn-wrapper">
-                <button class="upload-btn-real">➕ 選擇檔案 (可多選)</button>
-                <input type="file" multiple onchange="handleStudentUpload(this, '${post.date}')">
-            </div>
-            <div id="upload-status-${safeDateId}" class="upload-status"></div>
-        </div>
-    `;
+                    <div style="background:#e0f2fe; padding:12px; border-radius:12px; margin-bottom:15px; border:1px solid #bae6fd;">
+                        <span style="font-weight:bold; color:#0284c7; display:block; margin-bottom:8px; font-size:0.9rem;">📤 作業/筆記上傳區</span>
+                        <div style="position:relative; overflow:hidden; display:inline-block; width:100%;">
+                            <button class="btn-primary" style="background:#0ea5e9; margin:0; padding:10px; font-size:0.95rem; box-shadow:none; pointer-events:none;">➕ 選擇檔案 (可多選)</button>
+                            <input type="file" multiple onchange="handleStudentUpload(this, '${post.date}')" style="position:absolute; top:0; right:0; min-width:100%; min-height:100%; font-size:100px; text-align:right; filter:alpha(opacity=0); opacity:0; outline:none; cursor:inherit; display:block;">
+                        </div>
+                        <div id="upload-status-${safeDateId}" style="margin-top:5px; font-size:0.85rem; color:#0369a1; font-weight:bold;"></div>
+                    </div>
+                `;
 
-                // ★★★ v3.9 修正：家長留言 -> 留言內容 ★★★
-                var feedbackHtml = "<div class='feedback-section'>" + uploadHtml + "<div class='section-title'>💬 留言內容</div><div id='history-" + safeDateId + "'>" + historyHtml + "</div><div class='input-box'><input type='text' class='fb-input' id='input-" + safeDateId + "' placeholder='" + inputPlaceholder + "'><button class='fb-btn' onclick=\"sendFeedback('" + safeDateId + "', '" + post.date + "', '學生留言')\">送出</button></div></div>"; var headerTitle = post.date + (post.title ? " " + post.title : ""); html += "<div class='post-card'><div class='post-header'><span>📅 " + headerTitle + "</span></div>" + gradeHtml + "<div class='content-section'><div class='section-title'>📢 聯絡事項</div>" + contentHtml + "</div>" + feedbackHtml + "</div>";
-            }); container.innerHTML = html;
-        }
-
-        function renderOldGradeCards(grades) {
-            var container = document.getElementById('tab-content-1'); if (!grades || grades.length === 0) { container.innerHTML = "<p style='color:#666; padding:10px;'>目前尚無成績紀錄。</p>"; return; } var html = ""; grades.forEach(function (item) {
-                var logic = getDisplayLogic(item, gData ? gData.feedbackHistory : []); var unitDisplay = ""; if (!isNaN(parseFloat(logic.mainScore))) unitDisplay = "<span class='score-unit'>" + item.unit + "</span>"; var displayScore = "<div class='score-val" + logic.mainClass + "'>" + logic.mainScore + unitDisplay + "</div>"; var chartHtml = ""; var total = item.total || 1; for (var i = 4; i >= 0; i--) { var count = item.dist[i]; var percent = (total > 0) ? (count / total) * 100 : 0; var label = item.labels[i]; var barColor = "#5b9bd5"; if (!item.isMissing && i === item.myBucket) { if (i === 4) barColor = "#27ae60"; else if (i === 3 || i === 2) barColor = "#f39c12"; else barColor = "#e74c3c"; } chartHtml += "<div class='chart-row'><div class='chart-label'>" + label + "</div><div class='chart-bar-area'><div class='chart-bar-fill' style='width: " + percent + "%; background-color: " + barColor + ";'></div></div><div class='chart-count'>" + (count > 0 ? count : '') + "</div></div>"; }
+                var fbInputSection = `<div style='display:flex; gap:10px; margin-top:10px;'>
+                    <input type='text' id='input-${safeDateId}' placeholder='回覆或留言給老師...' style='flex:1; padding:10px; border-radius:12px; border:1px solid #e2e8f0; font-size:0.95rem; outline:none;'>
+                    <button style='background:var(--primary-gradient); color:white; border:none; border-radius:12px; padding:0 20px; font-weight:bold;' onclick="sendFeedback('${safeDateId}', '${post.date}', '學生留言')">送出</button>
+                </div>`;
 
                 html += `
-        <div class='score-card' onclick='toggleCard(this)'>
-            <div class='class-badge'>${item.className}</div>
-            <div class='card-main'>
-                <div class='exam-info'><span class='exam-date'>${item.date}</span><span class='exam-name'>${item.exam}</span></div>
-                <div class='score-box'>${displayScore}${item.subNote || ""}${logic.statusHtml}<div class='avg-score'>班平均 ${item.average}</div></div>
-            </div>
-            <div class='expand-area'>
-                <div class='detail-box'><strong>🎯 補考標準：</strong><br>${item.note}</div>
-                <div class='chart-wrapper'>${chartHtml}</div>
-            </div>
-            <div class='click-hint'>▼</div>
-        </div>`;
+                <div class="glass-card" style="padding:15px 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 2px solid transparent;">
+                    <div class="${postStyle}">
+                        <div class="feed-header">
+                            <div class="${dateStyle}">${post.date}</div>
+                            ${rightPillHtml}
+                        </div>
+                        <h3 class="feed-title">${titlePrefix} ${post.title || "本日課程"}</h3>
+                        
+                        ${bigChartHtml}
+
+                        <div class="feed-desc">${feedDescInner}</div>
+                        ${scoreReportHtml}
+                        <div style="border-top:1px dashed #cbd5e1; margin-top:15px; padding-top:15px;">
+                            ${uploadHtml}
+                            <div style="font-weight:bold; color:#64748b; font-size:0.9rem; margin-bottom:10px;">💬 聯絡簿交流區</div>
+                            <div id='history-${safeDateId}'>${historyHtml}</div>
+                            ${fbInputSection}
+                        </div>
+                    </div>
+                </div>`;
+            }); 
+            container.innerHTML = html;
+        }
+
+
+        function renderOldGradeCards(grades) {
+            var container = document.getElementById('tab-content-1'); 
+            if (!grades || grades.length === 0) { container.innerHTML = "<p style='color:#666; padding:10px;'>目前尚無成績紀錄。</p>"; return; } 
+            var html = ""; 
+            grades.forEach(function (item) {
+                var sc = item.scoreNum;
+                var passClass = (isNaN(sc) || item.isMissing) ? "score-fail" : (sc >= 80 ? "score-pass" : "score-fail");
+                var examTitle = item.exam || "測驗";
+                var myScoreStr = item.score;
+                if(item.isMissing) myScoreStr = "缺考";
+
+                html += `
+                <div class="grade-item" onclick="openGradeBarChart(${item.colIndex})">
+                    <div class="g-info">
+                        <div class="g-title">${examTitle}</div>
+                        <div class="g-date">${item.date} • 點擊看分佈圖</div>
+                    </div>
+                    <div class="g-score ${passClass}">${myScoreStr}</div>
+                </div>`;
             });
             container.innerHTML = html;
         }
@@ -3140,7 +3457,94 @@
         function closeEmergencyModal() {
             document.getElementById('emergencyModal').style.display = 'none';
         }
-    </script>
-</div></body>
+    
+        function closeV2Sheets() {
+            document.getElementById('overlay_v2').style.opacity = '0';
+            document.getElementById('gradeDetailSheet').style.bottom = '-100%';
+            setTimeout(() => { 
+                document.getElementById('overlay_v2').style.display = 'none'; 
+                document.querySelectorAll('#gradeDetailSheet .bar-fill').forEach(b => b.style.height = '0%');
+            }, 300);
+        }
+
+        function openGradeBarChart(colIdx) {
+            const eData = gData.grades.find(g => g.colIndex === colIdx);
+            if (!eData) return;
+
+            document.getElementById('overlay_v2').style.display = 'block';
+            setTimeout(() => document.getElementById('overlay_v2').style.opacity = '1', 10);
+            document.getElementById('gradeDetailSheet').style.bottom = '0';
+
+            document.getElementById('gd-title').textContent = eData.exam || "測驗";
+            let scoreStr = eData.isMissing ? "缺考" : eData.score;
+            document.getElementById('gd-score').textContent = scoreStr;
+            document.getElementById('gd-avg').textContent = eData.average || "-";
+            
+            let scoreNum = parseFloat(scoreStr);
+            if (!isNaN(scoreNum) && scoreNum >= 80) {
+                document.getElementById('gd-score').style.background = 'var(--primary-gradient)';
+                document.getElementById('gd-score').style.webkitBackgroundClip = 'text';
+            } else {
+                document.getElementById('gd-score').style.background = 'var(--danger-gradient)';
+                document.getElementById('gd-score').style.webkitBackgroundClip = 'text';
+            }
+
+            const chartArea = document.getElementById('bar-chart-area');
+            chartArea.innerHTML = "";
+            let dist = eData.dist || [0,0,0,0,0];
+            let labels = eData.labels || ["0~20","20~40","40~60","60~80","80~100"];
+            
+            let maxVal = Math.max(...dist);
+            if (maxVal === 0) maxVal = 1;
+
+            dist.forEach((val, idx) => {
+                let lbl = labels[idx] || "";
+                let isMyGroup = false;
+                if (!isNaN(scoreNum)) {
+                    if (eData.myBucket !== undefined && eData.myBucket !== -1) {
+                         if (idx === eData.myBucket) isMyGroup = true;
+                    } else if (lbl.includes("-") || lbl.includes("~")) {
+                         let pts = lbl.split(/-|~/);
+                         if(scoreNum >= parseInt(pts[0]) && scoreNum <= parseInt(pts[1])) isMyGroup = true;
+                         if(scoreNum === 100 && idx === dist.length - 1) isMyGroup = true;
+                    }
+                }
+                
+                let activeClass = isMyGroup ? "active-bar" : "";
+                chartArea.innerHTML += `
+                <div class="bar-col">
+                    <div class="bar-fill ${activeClass}" id="barFill_${idx}" data-val="${val}人" style="height: 0%;"></div>
+                    <div class="bar-label">${lbl}</div>
+                </div>`;
+            });
+
+            setTimeout(() => {
+                dist.forEach((val, idx) => {
+                    let bar = document.getElementById('barFill_' + idx);
+                    if (bar) bar.style.height = (val / maxVal * 100) + '%';
+                });
+            }, 300);
+        }
+
+</script>
+</div>
+    <!-- 📊 進階柱狀圖分析 Modal -->
+    <div class="modal-overlay" id="overlay_v2" onclick="closeV2Sheets()"></div>
+    <div class="bottom-sheet" id="gradeDetailSheet">
+        <div class="sheet-handle"></div>
+        <h2 id="gd-title" style="margin:0; color:#064e3b; font-weight:900; font-size: 1.5rem;">測驗名稱</h2>
+        <div style="color:#64748b; font-size:1rem; font-weight:bold; margin-bottom:20px;">班級分數柱狀圖分析</div>
+        
+        <div style="text-align:center; margin-bottom: 20px;">
+            <div id="gd-score" class="number-display" style="font-size:4rem; line-height:1; font-family:'Outfit', sans-serif !important; font-weight:900;">-</div>
+            <div style="font-size:1rem; font-weight:bold; color:#64748b; margin-top:5px;">你的分數 (班均: <span id="gd-avg">-</span>)</div>
+        </div>
+
+        <div class="bar-chart-container" id="bar-chart-area"></div>
+        
+        <div style="text-align:center; font-size:0.9rem; color:#059669; margin-top:15px; font-weight:900;">↑ 深綠色光亮柱子代表你的落點區間 ↑</div>
+        <button class="btn-primary" style="width:100%; padding:15px; border-radius:15px; font-weight:bold; border:1px solid #e2e8f0; background:#f8fafc; color:#1e293b; margin-top:20px; font-size:1.1rem; cursor:pointer;" onclick="closeV2Sheets()">關閉圖表</button>
+    </div>
+</body>
 
 </html>
