@@ -574,6 +574,21 @@
             font-weight: bold;
         }
 
+        .sticker-badge-header {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border: 1.5px solid #fbbf24;
+            border-radius: 20px;
+            padding: 3px 12px;
+            font-weight: 800;
+            font-size: 1.1rem;
+            color: #92400e;
+            margin-top: 5px;
+            white-space: nowrap;
+        }
+
         .header-right {
             display: flex;
             flex-direction: column;
@@ -1799,7 +1814,108 @@
             font-family: 'Outfit', sans-serif;
             width: 200%;
         }
-</style>
+
+        /* ===== 棒卡申請區 ===== */
+        .sticker-apply-box {
+            background: #eff6ff;
+            border: 2px dashed #93c5fd;
+            border-radius: 12px;
+            padding: 14px 15px;
+            margin-bottom: 18px;
+        }
+
+        .sticker-apply-title {
+            font-weight: bold;
+            color: #1d4ed8;
+            margin-bottom: 10px;
+            display: block;
+            font-size: 1.15rem;
+        }
+
+        .sticker-apply-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .sticker-reason-input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1.5px solid #bfdbfe;
+            border-radius: 20px;
+            font-size: 1.1rem;
+            outline: none;
+            background: white;
+        }
+
+        .sticker-reason-input:focus {
+            border-color: #3b82f6;
+        }
+
+        .sticker-count-input {
+            width: 65px;
+            padding: 8px 10px;
+            border: 1.5px solid #bfdbfe;
+            border-radius: 20px;
+            font-size: 1.1rem;
+            outline: none;
+            background: white;
+            text-align: center;
+        }
+
+        .sticker-submit-btn {
+            background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+            color: white;
+            border: none;
+            padding: 8px 18px;
+            border-radius: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1.1rem;
+            white-space: nowrap;
+            box-shadow: 0 3px 10px rgba(59,130,246,0.3);
+        }
+
+        .sticker-hint {
+            font-size: 0.9rem;
+            color: #93c5fd;
+            margin-top: 4px;
+        }
+
+        /* 棒卡申請氣泡樣式 */
+        .history-msg-body.sticker-body {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+        }
+
+        .sticker-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            color: white;
+            font-weight: 800;
+            font-size: 1rem;
+            padding: 2px 10px;
+            border-radius: 20px;
+            margin-left: 6px;
+        }
+
+        .sticker-status {
+            font-size: 0.9rem;
+            color: #6b7280;
+            padding: 2px 8px;
+            background: #f3f4f6;
+            border-radius: 10px;
+            margin-top: 4px;
+            display: inline-block;
+        }
+
+        .sticker-status.approved {
+            background: #dcfce7;
+            color: #15803d;
+        }
+
+        </style>
 
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -1839,7 +1955,7 @@
     }
 
     async function executeFirebaseRead(studentName, password, bypassPwd, targetClass) {
-        let result = { found: false, className: "", studentName: "", dailyPost: [], grades: [], feedbackHistory: [], bulletins: [] };
+        let result = { found: false, className: "", studentName: "", dailyPost: [], grades: [], feedbackHistory: [], bulletins: [], stickers: 0 };
         
         try {
             // Admin shortcut
@@ -2010,7 +2126,7 @@
             const fbsObj = snapF.val() || {};
             for (let fbid in fbsObj) {
                 const fb = fbsObj[fbid];
-                result.feedbackHistory.push({ time: fb.time, targetDate: fb.targetDate, type: fb.type, content: fb.content });
+                result.feedbackHistory.push({ time: fb.time, targetDate: fb.targetDate, type: fb.type, content: fb.content, fbKey: fbid });
             }
 
             return result;
@@ -2323,6 +2439,20 @@
                 </div>
             </div>
 
+            <div class="admin-card">
+                <div class="admin-card-title">⭐ 棒卡申請審核</div>
+                <div style="margin-bottom:10px; display:flex; gap:8px; flex-wrap:wrap;">
+                    <select id="stickerClassSelect" class="admin-select" onchange="loadStickerApplicants()" style="flex:1;">
+                        <option value="" disabled selected>請選擇班級</option>
+                    </select>
+                    <select id="stickerStudentSelect" class="admin-select" style="flex:1;">
+                        <option value="" disabled selected>請選擇學生</option>
+                    </select>
+                </div>
+                <button class="admin-btn btn-blue" onclick="loadStickerReviews()">載入棒卡申請</button>
+                <div id="stickerReviewList" style="margin-top:12px; max-height:400px; overflow-y:auto;"></div>
+            </div>
+
             <button class="admin-btn btn-gray" onclick="doLogout()" style="margin-top:20px;">登出管理者</button>
         </div>
 
@@ -2333,6 +2463,7 @@
                     <div class="student-info-box">
                         <div class="student-info" id="headName"></div>
                         <div class="class-info" id="headClass"></div>
+                        <div class="sticker-badge-header" id="headStickers" style="display:none;">⭐ <span id="headStickerCount">0</span> 棒</div>
                     </div>
                 </div>
                 <div class="header-right">
@@ -2713,6 +2844,13 @@
             document.getElementById('main-screen').style.display = 'block';
             document.getElementById('headName').innerText = result.studentName;
             document.getElementById('headClass').innerText = result.className.replace(/\d+/g, '');
+            var stickerCount = result.stickers || 0;
+            if (stickerCount > 0) {
+                document.getElementById('headStickers').style.display = 'inline-flex';
+                document.getElementById('headStickerCount').innerText = stickerCount;
+            } else {
+                document.getElementById('headStickers').style.display = 'none';
+            }
 
             renderDailyPosts(result.dailyPost, result.feedbackHistory);
             renderOldGradeCards(result.grades);
@@ -3178,14 +3316,22 @@ if (exam.dist) {
                     });
                 };
 
-                var labelHw1 = "今日作業"; if (post.hw2 && post.hw2.toString().trim() !== "") labelHw1 = "今日作業一"; var fields = [{ label: "今日課程進度", val: post.progress }, { label: "今日小考考卷", val: post.quiz }, { label: labelHw1, val: post.hw1 }, { label: "今日作業二", val: post.hw2 }, { label: "今日補考考卷", val: post.makeup }, { label: "下次小考範圍", val: post.range }, { label: "補充資料", val: post.note }]; fields.forEach(function (f) { if (f.val) contentHtml += "<div class='info-block'><span class='info-label'>" + f.label + "</span><div class='info-content'>" + parseBtn(f.val) + "</div></div>"; }); var pDateShort = post.date.substring(5).replace("-", "/"); var pDateFull = post.date.replace(/-/g, "/"); var myHistory = history.filter(function (h) { return h.targetDate == pDateShort || h.targetDate == post.date || h.targetDate == pDateFull; }); var historyHtml = ""; myHistory.forEach(function (h) { if (h.type !== "補考回報") { var displayType = (h.type === "家長留言" || h.type === "家長/學生" || h.type === "學生留言") ? "學生留言" : h.type; var isTeacher = (h.type !== "學生留言" && h.type !== "家長留言" && h.type !== "家長/學生" && h.type !== "作業上傳");
+                var labelHw1 = "今日作業"; if (post.hw2 && post.hw2.toString().trim() !== "") labelHw1 = "今日作業一"; var fields = [{ label: "今日課程進度", val: post.progress }, { label: "今日小考考卷", val: post.quiz }, { label: labelHw1, val: post.hw1 }, { label: "今日作業二", val: post.hw2 }, { label: "今日補考考卷", val: post.makeup }, { label: "下次小考範圍", val: post.range }, { label: "補充資料", val: post.note }]; fields.forEach(function (f) { if (f.val) contentHtml += "<div class='info-block'><span class='info-label'>" + f.label + "</span><div class='info-content'>" + parseBtn(f.val) + "</div></div>"; }); var pDateShort = post.date.substring(5).replace("-", "/"); var pDateFull = post.date.replace(/-/g, "/"); var myHistory = history.filter(function (h) { return h.targetDate == pDateShort || h.targetDate == post.date || h.targetDate == pDateFull; }); var historyHtml = ""; myHistory.forEach(function (h) { if (h.type !== "補考回報") { var displayType = (h.type === "家長留言" || h.type === "家長/學生" || h.type === "學生留言") ? "學生留言" : h.type; var isTeacher = (h.type !== "學生留言" && h.type !== "家長留言" && h.type !== "家長/學生" && h.type !== "作業上傳" && h.type !== "棒卡申請");
                         var avatarClass = isTeacher ? "avatar-teacher" : "avatar-student";
                         var bodyClass = isTeacher ? "teacher-body" : "";
                         var sName = (gData && gData.studentName) ? gData.studentName : "學";
                         var sChar = sName.length >= 2 ? sName.charAt(sName.length - 2) : sName.charAt(0);
                         var tName = (gData && gData.className) ? "喵" : "師";
                         var avatarChar = isTeacher ? tName : sChar;
-                        historyHtml += "<div class='history-msg'><div class='history-msg-avatar " + avatarClass + "'>" + avatarChar + "</div><div class='history-msg-body " + bodyClass + "'>" + parseBtn(h.content) + "<div class='history-msg-time'>" + h.time.substring(5, 16) + "</div></div></div>"; }}); var inputPlaceholder = "留言給老師..."; var safeDateId = post.date.replace(/\//g, '-');
+                        if (h.type === "棒卡申請") {
+                            var stickerData = {};
+                            try { stickerData = JSON.parse(h.content); } catch(e) { stickerData = { reason: h.content, count: '?', status: "待審核" }; }
+                            var statusLabel = stickerData.status || "待審核";
+                            var statusClass = (statusLabel === "通過") ? "approved" : "";
+                            historyHtml += "<div class='history-msg'><div class='history-msg-avatar avatar-student'>" + avatarChar + "</div><div class='history-msg-body sticker-body'><span>⭐ " + stickerData.reason + "</span><span class='sticker-badge'>+" + stickerData.count + "棒</span><br><span class='sticker-status " + statusClass + "'>" + (statusLabel === "通過" ? "✅ " : "⏳ ") + statusLabel + "</span><div class='history-msg-time'>" + h.time.substring(5, 16) + "</div></div></div>";
+                        } else {
+                            historyHtml += "<div class='history-msg'><div class='history-msg-avatar " + avatarClass + "'>" + avatarChar + "</div><div class='history-msg-body " + bodyClass + "'>" + parseBtn(h.content) + "<div class='history-msg-time'>" + h.time.substring(5, 16) + "</div></div></div>";
+                        } }}); var inputPlaceholder = "留言給老師..."; var safeDateId = post.date.replace(/\//g, '-');
 
                 var uploadHtml = `
         <div class="student-upload-box">
@@ -3195,6 +3341,15 @@ if (exam.dist) {
                 <input type="file" multiple onchange="handleStudentUpload(this, '${post.date}')">
             </div>
             <div id="upload-status-${safeDateId}" class="upload-status"></div>
+        </div>
+        <div class="sticker-apply-box">
+            <span class="sticker-apply-title">⭐ 棒卡申請</span>
+            <div class="sticker-apply-row">
+                <input type="text" class="sticker-reason-input" id="sticker-reason-${safeDateId}" placeholder="得棒名目（例：今日默背成功）">
+                <input type="number" class="sticker-count-input" id="sticker-count-${safeDateId}" placeholder="棒數(≥5)" min="5" max="50">
+                <button class="sticker-submit-btn" onclick="submitStickerApply('${safeDateId}', '${post.date}')">送出申請</button>
+            </div>
+            <div class="sticker-hint">申請後由老師審核，通過後計入總棒數 ⭐</div>
         </div>
     `;
 
@@ -3275,6 +3430,156 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         }
 
         function toggleCard(card) { card.classList.toggle('active'); var hint = card.querySelector('.click-hint'); hint.innerText = card.classList.contains('active') ? "▲" : "▼"; }
+
+
+
+        function renderSidebarStickers(feedbacks, studentName, className) {
+            var list = feedbacks.filter(function(h) { return h.type === '棒卡申請'; });
+            if (list.length === 0) return '<div style="color:#999; font-size:0.9rem; padding:8px 0;">尚無棒卡申請</div>';
+            var html = '';
+            list.forEach(function(h) {
+                var data = {};
+                try { data = JSON.parse(h.content); } catch(e) { data = { reason: h.content, count: '?', status: '待審核' }; }
+                var status = data.status || '待審核';
+                var statusColor = status === '通過' ? '#15803d' : (status === '退回' ? '#dc2626' : '#92400e');
+                var statusBg = status === '通過' ? '#dcfce7' : (status === '退回' ? '#fee2e2' : '#fef3c7');
+                var fbKey = h.fbKey || '';
+                html += "<div style='background:" + statusBg + "; border-radius:12px; padding:10px 12px; margin-bottom:10px;'>" +
+                    "<div style='font-weight:700; color:#1e293b; font-size:1rem;'>⭐ " + data.reason + " <span style='color:#d97706; font-weight:900;'>+" + data.count + "棒</span></div>" +
+                    "<div style='font-size:0.85rem; color:#64748b; margin-top:2px;'>" + h.time.substring(5, 16) + " ｜ <span style='background:" + statusBg + "; color:" + statusColor + "; font-weight:700; padding:1px 8px; border-radius:10px;'>" + status + "</span></div>" +
+                    (status === '待審核' ? "<div style='display:flex; gap:8px; margin-top:8px;'>" +
+                        "<button onclick=\"approveStickerApply('" + fbKey + "','" + className + "','" + studentName + "'," + data.count + ");\" style='flex:1; background:linear-gradient(135deg,#4ade80,#22c55e); color:white; border:none; border-radius:20px; padding:6px; font-weight:700; cursor:pointer;'>✓ 通過</button>" +
+                        "<button onclick=\"rejectStickerApply('" + fbKey + "','" + className + "','" + studentName + "');\" style='flex:1; background:#fee2e2; color:#dc2626; border:none; border-radius:20px; padding:6px; font-weight:700; cursor:pointer;'>✗ 退回</button>" +
+                    "</div>" : '') +
+                    "</div>";
+            });
+            return html;
+        }
+
+
+        async function loadStickerApplicants() {
+            var cls = document.getElementById('stickerClassSelect') ? document.getElementById('stickerClassSelect').value : '';
+            if (!cls) return;
+            var snap = await db.ref('/students/' + safeKey(cls)).once('value');
+            var kids = snap.val() || {};
+            var sel = document.getElementById('stickerStudentSelect');
+            sel.innerHTML = '<option value="" disabled selected>請選擇學生</option>';
+            for (var k in kids) {
+                if (kids[k].name) {
+                    var opt = document.createElement('option');
+                    opt.value = kids[k].name;
+                    opt.textContent = kids[k].name + '（棒：' + (kids[k].stickers || 0) + '）';
+                    sel.appendChild(opt);
+                }
+            }
+        }
+
+        async function loadStickerReviews() {
+            var clsSel = document.getElementById('stickerClassSelect');
+            var stuSel = document.getElementById('stickerStudentSelect');
+            var cls = clsSel ? clsSel.value : '';
+            var stuName = stuSel ? stuSel.value : '';
+            if (!cls || !stuName) { alert('請先選擇班級和學生'); return; }
+            var safeC = safeKey(cls);
+            // Find student key
+            var snapS = await db.ref('/students/' + safeC).once('value');
+            var kids = snapS.val() || {};
+            var stuKey = '';
+            for (var k in kids) { if (kids[k] && kids[k].name === stuName) { stuKey = k; break; } }
+            if (!stuKey) { alert('找不到學生'); return; }
+            var snapF = await db.ref('/feedbacks/' + safeC + '/' + stuKey).once('value');
+            var fbs = snapF.val() || {};
+            var pendingList = [];
+            for (var fid in fbs) {
+                var fb = fbs[fid];
+                if (fb.type === '棒卡申請') {
+                    var d = {};
+                    try { d = JSON.parse(fb.content); } catch(e) { d = { reason: fb.content, count: '?', status: '待審核' }; }
+                    pendingList.push({ fbKey: fid, stuKey: stuKey, reason: d.reason, count: d.count, status: d.status || '待審核', time: fb.time, safeC: safeC, stuName: stuName, cls: cls });
+                }
+            }
+            var listDiv = document.getElementById('stickerReviewList');
+            if (pendingList.length === 0) { listDiv.innerHTML = '<div style="color:#999; padding:10px;">無棒卡申請記錄</div>'; return; }
+            var html = '';
+            pendingList.forEach(function(item) {
+                var statusBg = item.status === '通過' ? '#dcfce7' : (item.status === '退回' ? '#fee2e2' : '#fef9c3');
+                var statusColor = item.status === '通過' ? '#15803d' : (item.status === '退回' ? '#dc2626' : '#92400e');
+                html += '<div style="background:' + statusBg + '; border-radius:12px; padding:12px; margin-bottom:10px;">' +
+                    '<div style="font-weight:700; font-size:1.05rem;">⭐ ' + item.reason + ' <span style="color:#d97706;">+' + item.count + '棒</span></div>' +
+                    '<div style="font-size:0.85rem; color:#64748b; margin:4px 0;">' + item.time.substring(5, 16) + ' ｜ <b style="color:' + statusColor + '">' + item.status + '</b></div>' +
+                    (item.status === '待審核' ?
+                        '<div style="display:flex; gap:8px; margin-top:8px;">' +
+                        '<button onclick="approveStickerApply('' + item.fbKey + '','' + item.cls + '','' + item.stuName + '',' + item.count + ')" style="flex:1; background:linear-gradient(135deg,#4ade80,#22c55e); color:white; border:none; border-radius:20px; padding:8px; font-weight:700; cursor:pointer; font-size:1rem;">✓ 通過</button>' +
+                        '<button onclick="rejectStickerApply('' + item.fbKey + '','' + item.cls + '','' + item.stuName + '')" style="flex:1; background:#fee2e2; color:#dc2626; border:none; border-radius:20px; padding:8px; font-weight:700; cursor:pointer; font-size:1rem;">✗ 退回</button>' +
+                        '</div>' : '') +
+                    '</div>';
+            });
+            listDiv.innerHTML = html;
+        }
+        async function approveStickerApply(fbKey, className, studentName, count) {
+            if (!confirm('確認通過 +' + count + ' 棒？')) return;
+            const safeC = safeKey(className);
+            // Find student key
+            const snapS = await db.ref('/students/' + safeC).once('value');
+            const kids = snapS.val() || {};
+            let stuKey = '';
+            for (let k in kids) { if (kids[k].name === studentName) { stuKey = k; break; } }
+            if (!stuKey) { alert('找不到學生'); return; }
+            // Update sticker count
+            const currentRef = db.ref('/students/' + safeC + '/' + stuKey + '/stickers');
+            const snap = await currentRef.once('value');
+            const current = parseInt(snap.val()) || 0;
+            await currentRef.set(current + parseInt(count));
+            // Update feedback status
+            if (fbKey) {
+                const fbRef = db.ref('/feedbacks/' + safeC + '/' + stuKey + '/' + fbKey + '/content');
+                const contenSnap = await fbRef.once('value');
+                try {
+                    var d = JSON.parse(contenSnap.val()); d.status = '通過';
+                    await fbRef.set(JSON.stringify(d));
+                } catch(e) {}
+            }
+            alert('已通過！棒卡 +' + count + '，目前共 ' + (current + parseInt(count)) + ' 棒');
+            if (typeof loadStickerReviews === 'function') loadStickerReviews();
+        }
+
+        async function rejectStickerApply(fbKey, className, studentName) {
+            if (!confirm('確認退回申請？')) return;
+            const safeC = safeKey(className);
+            const snapS = await db.ref('/students/' + safeC).once('value');
+            const kids = snapS.val() || {};
+            let stuKey = '';
+            for (let k in kids) { if (kids[k].name === studentName) { stuKey = k; break; } }
+            if (!stuKey) return;
+            if (fbKey) {
+                const fbRef = db.ref('/feedbacks/' + safeC + '/' + stuKey + '/' + fbKey + '/content');
+                const contenSnap = await fbRef.once('value');
+                try {
+                    var d = JSON.parse(contenSnap.val()); d.status = '退回';
+                    await fbRef.set(JSON.stringify(d));
+                } catch(e) {}
+            }
+            alert('已退回申請');
+            if (typeof loadStickerReviews === 'function') loadStickerReviews();
+        }
+        function submitStickerApply(safeId, realDate) {
+            var reasonEl = document.getElementById('sticker-reason-' + safeId);
+            var countEl = document.getElementById('sticker-count-' + safeId);
+            var reason = reasonEl ? reasonEl.value.trim() : '';
+            var count = countEl ? parseInt(countEl.value) : 0;
+            if (!reason) { alert('請填寫得棒名目！'); return; }
+            if (!count || count < 5) { alert('最少申請 5 棒！'); return; }
+            var content = JSON.stringify({ reason: reason, count: count, status: "待審核" });
+            var form = { className: gData.className, studentName: gData.studentName, targetDate: realDate, type: '棒卡申請', content: content };
+            google.script.run.withSuccessHandler(function(res) {
+                gData.feedbackHistory.push({ time: res.time, type: '棒卡申請', targetDate: realDate, content: content });
+                if (reasonEl) reasonEl.value = '';
+                if (countEl) countEl.value = '';
+                renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
+            }).withFailureHandler(function(e) {
+                alert('錯誤: ' + e.message);
+            }).submitFeedback(form);
+        }
 
         function sendFeedback(safeId, realDate, type, contentOverride, callback) {
             var inputId = 'input-' + safeId;
