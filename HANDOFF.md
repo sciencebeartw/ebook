@@ -285,3 +285,75 @@ function safeKey(str) {
 *   **對策一：Firebase 生命週期規則**：可前往 Google Cloud Console 設定規則，例如「超過 180 天的檔案自動刪除」。這是最推薦的「自動清理」法。
 *   **對策二：每學期手動清理**：學期結束後，直接在 Firebase 控制台的 Storage 分頁，將 `uploads/` 內對應班級的資料夾刪除即可。
 *   **對策三：成績歸檔**：學生畢業後（班級加 `_`），可考慮手動清理該班級的 Firebase 節點以節省空間。
+
+---
+
+# 🐻 山熊科學 終極行政中心 (Bear Admin Center) 重構與整合企劃書
+
+## 目標願景 (The Ultimate Goal)
+目前山熊科學的系統分散在四大 GAS 專案中（喵、2026學生資料、總複習、鑑定考成績單），且後端行政操作多依賴緩慢的 Google Spreadsheet 讀寫。
+
+本企劃的終極目標是建立一個**「單一入口、極速反應、跨平台（手機/電腦皆宜）」的全新行政中心 (Bear Admin Center)**。
+未來所有的發布、審核、產出學費單與成績單，不再需要開啟雜亂的 GAS 畫面，全部集中於這個用 Firebase 架構打造的現代化後台，達成**毫秒級（Sub-second）的操作體驗**。
+
+---
+
+## 🗄️ 第一階段：全域資料極速化 (FirebaseSync 全面部署)
+為了讓產生學費單、成績單達到「秒速」，必須先讓所有 GAS 專案的資料上雲（Realtime Database）。
+
+### 1.1 `GAS/喵` (聯絡簿系統) 資料擴充
+*   **目前進度**：已完成。學生成績、聯絡簿、公告等資料已可上傳。
+*   **下一步**：確認 `FirebaseSync.gs` 持續穩定運作。
+
+### 1.2 `GAS/2026學生資料` (學費與訊息中心) 資料上雲
+*   **實作**：撰寫專屬的 `FirebaseSync.gs`。
+*   **同步標的**：學費單的金額明細、繳費狀態；Message Center 的推播名單與記錄。
+*   **效益**：未來產生學費單時，不需再透過 GAS 讀取試算表，直接讀取 Firebase，實現一秒百張的速度。
+
+### 1.3 `GAS/鑑定考成績單生成器` (成績單系統) 資料上雲
+*   **實作**：撰寫專屬的 `FirebaseSync.gs`。
+*   **同步標的**：各科原始分數、PR 值、排名級距。
+*   **效益**：行政後台可瞬間載入成績圖表，一鍵批次產出雷達圖與成績單。
+
+---
+
+## 💾 第二階段：全域儲存空間升級 (Firebase Storage 轉換)
+徹底淘汰 `google.script.run.uploadFileToDrive`，避免跨域干擾與 Base64 記憶體溢出。
+
+### 2.1 聯絡簿與公告附件全面轉移
+*   **目標**：修改 `GAS/喵/` 下的 `bulletineditor.html` 與 `dailyposteditor.html`。
+*   **實作**：套用 `ebook-app/index.html` 中成功的 `firebase.storage().ref().put()` 二進制串流上傳技術。
+*   **效益**：老師上傳速度飛升，且解決檔案大小限制。
+
+---
+
+## 🏛️ 第三階段：熊總部行政中心 (Bear Admin Center) 介面開發
+建立一個適合電腦大螢幕（同時相容手機）的全新 React/Vue 或全新原生 HTML/JS 控制面板介面。
+
+> [!IMPORTANT]
+> 此控制面板必須加上 **Firebase Auth (Google 登入)** 以及 **Email 白名單機制**，保護所有機密資料。
+> 此介面獨立於家長端，建議路徑為 `bear-admin/dashboard/index.html` 或直接建立新的子資料夾。
+
+### 核心模組 1：聯絡簿與教務區 (源自 `GAS/喵`)
+*   **上帝視角 (God Mode)**：無縫切換瀏覽任何學生的電子聯絡簿現況。
+*   **聯絡簿與公告發布台**：整合原本分散的編輯器，介面更寬廣、更適合編輯大量文字與夾帶多個附件。
+*   **訊息與棒卡審核中心**：移植 `FeedbackSidebar.html`，統一回覆學生留言與發放棒卡。
+*   **緊急通知庫**：移植 `alertpage.html` 的推播功能。
+
+### 核心模組 2：財務與訊息中心 (源自 `GAS/2026學生資料`)
+*   **學費單生成器 (Bill Generator)**：移植 `Billgenerator.html`。
+    *   **優化**：串接 Firebase 極速讀取後，支援「一鍵全部產出為 Zip」或單獨檢視。
+*   **LINE 推播中心 (Message Center)**：移植 `messagecenter.html`，管理大宗家長群發。
+
+### 核心模組 3：大型考試事務 (源自 `GAS/總複習` & `GAS/鑑定考`)
+*   **總複習發布區**：移植 `GAS/總複習/index.html`。
+*   **鑑定考成績單生成器 (Report Generator)**：移植 `Reportgenerator.html`。
+    *   **優化**：利用 Firebase 繪製動態雷達圖，自動化產出精美 PDF。
+
+---
+
+## ⚙️ 第四階段：伺服器 API (Webhook) 中繼
+雖然讀取可以全靠 Firebase，但某些「發送 LINE 訊息」或「寫入特殊試算表日誌」的功能仍需要 GAS 後端。
+
+*   **實作**：將所有的 GAS 專案的 `Code.gs` 都整理出一個統一標準的 `doPost(e)` Webhook (如同我們在 `GAS/喵` 做的一樣)。
+*   **架構**：Firebase Admin Center (前端) -- [HTTP POST] --> GAS Webhook -- [操作 Google Sheets / LINE API]。
