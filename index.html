@@ -2126,7 +2126,10 @@
                 let currentUnit = "分";
                 const isP6Class = result.className.indexOf("小六") > -1;
                 const isHomework = (eData.date + eData.examName).indexOf("作業") > -1;
-                if (isP6Class && isHomework) currentUnit = "題";
+                
+                let rawMaxForUnit = 100;
+                if (eData.dist && eData.dist.length > 0) rawMaxForUnit = Math.max(...eData.dist);
+                if (isHomework && rawMaxForUnit <= 60) currentUnit = "題";
                 if (eData.score === "尚未繳交") currentUnit = "";
                 
                 let makeupThreshold = 0;
@@ -2145,7 +2148,7 @@
                      const rawMax = Math.max(...eData.dist);
                      const rawMin = Math.min(...eData.dist);
                      let maxS = 100; let minS = rawMin;
-                     if (isP6Class && isHomework) maxS = rawMax;
+                     if (isHomework && rawMax < 90) maxS = rawMax;
                      let gap = maxS - minS; if(gap===0) gap=1; let step = gap/5;
                      for(let b=0; b<5; b++) {
                          rangeLabels[b] = Math.round(minS+(b*step)) + " ~ " + Math.round(minS+((b+1)*step));
@@ -3101,7 +3104,11 @@
                             }
                             let isP6 = result.className.indexOf("小六") > -1;
                             let isHW = (eData.date + eData.examName).indexOf("作業") > -1;
-                            let unit = (isP6 && isHW) ? "題" : (eData.score === "尚未繳交" ? "" : "分");
+                            
+                            // Automatically infer unit
+                            let rawDistMax = 100;
+                            if (eData.dist && eData.dist.length > 0) rawDistMax = Math.max(...eData.dist);
+                            let unit = (isHW && rawDistMax <= 60) ? "題" : (eData.score === "尚未繳交" ? "" : "分");
                             
                             let threshold = 0;
                             if (eData.note && eData.note !== "無詳細備註") {
@@ -3113,7 +3120,8 @@
                             if (eData.dist && eData.dist.length > 0) {
                                 if (eData.dist.length !== 5) {
                                     const rawDist = eData.dist;
-                                    const minS = Math.min(...rawDist); const maxS = (isP6 && isHW) ? Math.max(...rawDist) : 100;
+                                    const minS = Math.min(...rawDist); const rawMax = Math.max(...rawDist);
+                                    const maxS = (isHW && rawMax < 90) ? rawMax : 100;
                                     let gap = (maxS - minS) || 1; let step = gap/5;
                                     const buckets = [0,0,0,0,0];
                                     rawDist.forEach(v => {
