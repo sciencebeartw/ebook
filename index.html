@@ -878,8 +878,8 @@
             width: 14px;
             height: 14px;
             border-radius: 50%;
-            background: #22c55e;
-            box-shadow: 0 0 0 3px rgba(34,197,94,0.2);
+            background: var(--primary-light);
+            box-shadow: 0 0 0 3px var(--primary-glow);
             z-index: 1;
         }
 
@@ -891,7 +891,7 @@
             top: 32px;
             bottom: -20px;
             width: 2px;
-            background: linear-gradient(to bottom, #22c55e, rgba(34,197,94,0.05));
+            background: linear-gradient(to bottom, var(--primary-light), transparent);
         }
 
         .post-card-wrapper:last-child::before {
@@ -899,7 +899,7 @@
         }
 
         .post-header {
-            background: #e8f5e9;
+            background: var(--primary-bg);
             padding: 12px 15px;
             color: var(--primary-dark);
             font-weight: bold;
@@ -1676,7 +1676,7 @@
             position: absolute;
             top: 10px;
             left: 10px;
-            background-color: #e8f5e9;
+            background-color: var(--primary-bg);
             color: var(--primary-dark);
             font-size: 1.05rem;
             padding: 2px 8px;
@@ -3641,7 +3641,10 @@ if (exam.dist) {
         var fillGrad = "#5b9bd5";
         var boxShad = "";
         if (isMyGroup) {
-            if (idx === 4) { fillGrad = "linear-gradient(135deg, #4ade80 0%, #22c55e 100%)"; boxShad = "box-shadow: 0 0 10px rgba(34,197,94,0.3);"; }
+            if (idx === 4) { 
+                fillGrad = "linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%)"; 
+                boxShad = "box-shadow: 0 0 10px var(--primary-glow);"; 
+            }
             else if (idx === 2 || idx === 3) { fillGrad = "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)"; boxShad = "box-shadow: 0 0 10px rgba(245,158,11,0.3);"; }
             else { fillGrad = "linear-gradient(135deg, #ef4444 0%, #dc3545 100%)"; boxShad = "box-shadow: 0 0 10px rgba(239,68,68,0.3);"; }
         }
@@ -3683,7 +3686,7 @@ if (exam.dist) {
                         }
                         
                         if (d && d.reason) {
-                            var statusColor = d.status === '待審核' ? '#f59e0b' : (d.status === '退回' ? '#ef4444' : '#10b981');
+                            var statusColor = d.status === '待審核' ? '#f59e0b' : (d.status === '退回' ? '#ef4444' : 'var(--primary)');
                             var statusIcon = d.status === '待審核' ? SVG.hourglass : (d.status === '退回' ? SVG.cross : SVG.check);
                             var rendered = `<div style="font-weight:bold; font-size:1.1rem; color:#431407; margin-bottom:4px;">${SVG.star}${d.reason} <span style="background:linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); color:white; padding:2px 8px; border-radius:12px; font-size:0.9rem;">+${d.count}棒</span></div><div style="font-weight:bold; color:${statusColor}; font-size:0.95rem; background:rgba(255,255,255,0.7); display:inline-block; padding:2px 8px; border-radius:4px; margin-top:4px;">${statusIcon} ${d.status}</div>`;
                             return `<div class="quote-box" style="background:#fef3c7; border-left:4px solid #f59e0b; border-radius:8px; padding:12px; margin:10px 0; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
@@ -3794,7 +3797,10 @@ dist.forEach((val, idx) => {
     var fillGrad = "#5b9bd5";
     var boxShad = "";
     if (isMyGroup) {
-        if (idx === 4) { fillGrad = "linear-gradient(135deg, #4ade80 0%, #22c55e 100%)"; boxShad = "box-shadow: 0 0 10px rgba(34,197,94,0.3);"; }
+        if (idx === 4) { 
+            fillGrad = "linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%)"; 
+            boxShad = "box-shadow: 0 0 10px var(--primary-glow);"; 
+        }
         else if (idx === 2 || idx === 3) { fillGrad = "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)"; boxShad = "box-shadow: 0 0 10px rgba(245,158,11,0.3);"; }
         else { fillGrad = "linear-gradient(135deg, #ef4444 0%, #dc3545 100%)"; boxShad = "box-shadow: 0 0 10px rgba(239,68,68,0.3);"; }
     }
@@ -3854,7 +3860,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     "<div style='font-weight:700; color:#1e293b; font-size:1rem;'>⭐ " + data.reason + " <span style='color:#d97706; font-weight:900;'>+" + data.count + "棒</span></div>" +
                     "<div style='font-size:0.85rem; color:#64748b; margin-top:2px;'>" + h.time.substring(5, 16) + " ｜ <span style='background:" + statusBg + "; color:" + statusColor + "; font-weight:700; padding:1px 8px; border-radius:10px;'>" + status + "</span></div>" +
                     (status === '待審核' ? "<div style='display:flex; gap:8px; margin-top:8px;'>" +
-                        "<button onclick=\"approveStickerApply('" + fbKey + "','" + className + "','" + studentName + "'," + data.count + ");\" style='flex:1; background:linear-gradient(135deg,#4ade80,#22c55e); color:white; border:none; border-radius:20px; padding:6px; font-weight:700; cursor:pointer;'>✓ 通過</button>" +
+                        "<button onclick=\"approveStickerApply('" + fbKey + "','" + className + "','" + studentName + "'," + data.count + ");\" style='flex:1; background:linear-gradient(135deg, var(--primary-light), var(--primary)); color:white; border:none; border-radius:20px; padding:6px; font-weight:700; cursor:pointer;'>✓ 通過</button>" +
                         "<button onclick=\"rejectStickerApply('" + fbKey + "','" + className + "','" + studentName + "');\" style='flex:1; background:#fee2e2; color:#dc2626; border:none; border-radius:20px; padding:6px; font-weight:700; cursor:pointer;'>✗ 退回</button>" +
                     "</div>" : '') +
                     "</div>";
@@ -3947,7 +3953,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     '<div style="font-size:0.85rem; color:#64748b; margin:4px 0;">' + item.time.substring(5, 16) + ' ｜ <b style="color:' + statusColor + '">' + item.status + '</b></div>' +
                     (item.status === '待審核' ?
                         '<div style="display:flex; gap:8px; margin-top:8px;">' +
-                        '<button onclick="approveStickerApply(\'' + item.fbKey + '\',\'' + item.cls + '\',\'' + item.stuName + '\',' + item.count + ')" style="flex:1; background:linear-gradient(135deg,#4ade80,#22c55e); color:white; border:none; border-radius:20px; padding:8px; font-weight:700; cursor:pointer; font-size:1rem;">✓ 通過</button>' +
+                        '<button onclick="approveStickerApply(\'' + item.fbKey + '\',\'' + item.cls + '\',\'' + item.stuName + '\',' + item.count + ')" style="flex:1; background:linear-gradient(135deg, var(--primary-light), var(--primary)); color:white; border:none; border-radius:20px; padding:8px; font-weight:700; cursor:pointer; font-size:1rem;">✓ 通過</button>' +
                         '<button onclick="rejectStickerApply(\'' + item.fbKey + '\',\'' + item.cls + '\',\'' + item.stuName + '\')" style="flex:1; background:#fee2e2; color:#dc2626; border:none; border-radius:20px; padding:8px; font-weight:700; cursor:pointer; font-size:1rem;">✗ 退回</button>' +
                         '</div>' : '') +
                     '</div>';
@@ -4188,8 +4194,11 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         }
 
         function getTeacherInfo(className) {
-            if (className.includes('阿喵')) return { name: '阿喵' };
-            return { name: '老師' };
+            if (!className) return { name: "喵", fullName: "阿喵老師" };
+            if (className.includes("小六資優數學") || className.includes("小六資優數")) return { name: "東", fullName: "小東老師" };
+            if (className.includes("數學超前班")) return { name: "翔", fullName: "李翔老師" };
+            if (BEAR_SUBJECT === '/math') return { name: "師", fullName: "數學老師" };
+            return { name: "喵", fullName: "阿喵老師" };
         }
 
         async function loadFbApplicants() {
@@ -4263,7 +4272,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             pendingList.forEach(function(item, idx) {
                 var isScore = (item.type.indexOf("補考") > -1);
                 var bg = isScore ? '#fef2f2' : '#f0fdf4';
-                var accent = isScore ? '#ef4444' : '#22c55e';
+                var accent = isScore ? '#ef4444' : 'var(--primary)';
                 if (!isScore && item.type === '作業上傳') { bg = '#f0f9ff'; accent = '#0ea5e9'; }
                 
                 var displayContent = item.content;
@@ -4317,7 +4326,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             google.script.run.withSuccessHandler(function(res) {
                 if(res && res.success) {
                     btn.innerText = "已回覆 ✓";
-                    btn.style.background = "#22c55e";
+                    btn.style.background = "var(--primary)";
                     input.value = "";
                 } else {
                     alert('回覆失敗，請重新整理重試');
