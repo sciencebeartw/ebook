@@ -2063,10 +2063,17 @@
     }
 
     function getTeacherInfo(className) {
-        if (!className) return { name: "喵", fullName: "阿喵老師" };
-        if (className.includes("小六資優數學") || className.includes("小六資優數")) return { name: "東", fullName: "小東老師" };
-        if (className.includes("數學超前班")) return { name: "翔", fullName: "李翔老師" };
-        if (BEAR_SUBJECT === '/math') return { name: "師", fullName: "數學老師" };
+        // First check subject
+        if (BEAR_SUBJECT === '/math') {
+            if (className && (className.includes("小六資優數學") || className.includes("小六資優數"))) {
+                return { name: "東", fullName: "小東老師" };
+            }
+            if (className && className.includes("數學超前班")) {
+                return { name: "翔", fullName: "李翔老師" };
+            }
+            return { name: "師", fullName: "數學老師" };
+        }
+        // Default to Science (Nature)
         return { name: "喵", fullName: "阿喵老師" };
     }
 
@@ -4193,13 +4200,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             document.getElementById('emergencyModal').style.display = 'none';
         }
 
-        function getTeacherInfo(className) {
-            if (!className) return { name: "喵", fullName: "阿喵老師" };
-            if (className.includes("小六資優數學") || className.includes("小六資優數")) return { name: "東", fullName: "小東老師" };
-            if (className.includes("數學超前班")) return { name: "翔", fullName: "李翔老師" };
-            if (BEAR_SUBJECT === '/math') return { name: "師", fullName: "數學老師" };
-            return { name: "喵", fullName: "阿喵老師" };
-        }
+
 
         async function loadFbApplicants() {
             var cls = document.getElementById('fbClassSelect') ? document.getElementById('fbClassSelect').value : '';
