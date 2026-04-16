@@ -2029,9 +2029,11 @@
     const qParams = new URLSearchParams(window.location.search);
     const BEAR_SUBJECT = qParams.get('subject') ? '/' + qParams.get('subject') : '/science';
 
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz3ZwBnTp6gcf5TKzJnHni6oat0_jxsnhGkfXAR-Fu_NI3ZVMu4WrDjssayDUtJrQU/exec";
-
-
+    const SCRIPT_URLS = {
+      '/science': "https://script.google.com/macros/s/AKfycbz3ZwBnTp6gcf5TKzJnHni6oat0_jxsnhGkfXAR-Fu_NI3ZVMu4WrDjssayDUtJrQU/exec",
+      '/math': "https://script.google.com/macros/s/AKfycbw9XG4LAibiDKWHRPkNaRmYs_kgm0z3HtYsFhQhtmxwt7JmE3mf9oD91ulFea6pBNsylQ/exec"
+    };
+    const SCRIPT_URL = SCRIPT_URLS[BEAR_SUBJECT] || SCRIPT_URLS['/science'];
     function doPostAction(action, data, onSuccess, onErr, adminPwd) {
       if(SCRIPT_URL.includes("請在此填入")) {
          alert("⚠️ 錯誤：尚未填入 GAS Web App 網址在 index.html 內！");
