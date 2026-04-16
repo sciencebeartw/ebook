@@ -212,6 +212,43 @@
             text-align: center;
         }
 
+        .subject-toggle-row {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0 25px;
+            width: 100%;
+            max-width: 320px;
+        }
+
+        .subject-btn {
+            flex: 1;
+            padding: 12px 0;
+            border: 2.5px solid #e2e8f0;
+            border-radius: 12px;
+            background: #ffffff;
+            color: #64748b;
+            font-weight: 800;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .subject-btn.active.sc {
+            border-color: #10b981;
+            color: #059669;
+            background: #ecfdf5;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+            transform: translateY(-2px);
+        }
+        
+        .subject-btn.active.ma {
+            border-color: #3b82f6;
+            color: #1d4ed8;
+            background: #eff6ff;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+            transform: translateY(-2px);
+        }
+
         /* 管理者介面 CSS */
         #admin-screen {
             display: none;
@@ -2459,7 +2496,38 @@
         <div id="login-screen">
             <img src="LOGO.png" class="logo-img logo-target" alt="山熊科學">
             <h2>數位聯絡簿</h2>
-            <div class="sub-title">小六資優自然<br>國中自然超前班</div>
+            <div class="sub-title" id="loginSubTitle">小六資優自然<br>國中自然超前班</div>
+            
+            <div class="subject-toggle-row">
+                <button class="subject-btn" id="btn-science" onclick="switchSubject('science')">🪴 自然科</button>
+                <button class="subject-btn" id="btn-math" onclick="switchSubject('math')">📐 數學科</button>
+            </div>
+
+            <script>
+                function switchSubject(subj) {
+                    window.location.search = '?subject=' + subj;
+                }
+
+                document.addEventListener("DOMContentLoaded", function() {
+                    const qP = new URLSearchParams(window.location.search);
+                    const subj = qP.get('subject') || 'science';
+                    const subTitleEl = document.getElementById('loginSubTitle');
+                    const btnSc = document.getElementById('btn-science');
+                    const btnMa = document.getElementById('btn-math');
+
+                    if (subj === 'math') {
+                        subTitleEl.innerHTML = "小六資優數學<br>國中數學超前班";
+                        btnMa.classList.add('active', 'ma');
+                        // Option to toggle theme colors could go here
+                        document.documentElement.style.setProperty('--primary', '#3b82f6');
+                        document.documentElement.style.setProperty('--bg', '#eff6ff');
+                    } else {
+                        subTitleEl.innerHTML = "小六資優自然<br>國中自然超前班";
+                        btnSc.classList.add('active', 'sc');
+                    }
+                });
+            </script>
+
             <div class="input-group"><input type="text" id="sName" placeholder="請輸入學生姓名 (或管理者帳號)"></div>
             <div class="input-group"><input type="password" id="sPass" placeholder="請輸入密碼 (或家長手機)"></div>
             <button class="login-btn" onclick="doLogin()">登入查看</button>
