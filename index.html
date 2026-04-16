@@ -538,16 +538,16 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            height: 75px;
+            height: 90px;
             flex-shrink: 0;
-            width: 75px;
+            width: 90px;
         }
 
         .header-logo-full {
             height: 100%;
             width: auto;
-            max-height: 75px;
-            max-width: 75px;
+            max-height: 90px;
+            max-width: 90px;
             object-fit: contain;
         }
 
@@ -561,7 +561,7 @@
         }
 
         .class-info-top {
-            font-size: 0.85rem;
+            font-size: 0.95rem;
             color: #64748b;
             font-weight: 700;
             margin-bottom: 2px;
@@ -578,10 +578,11 @@
         }
 
         .student-info {
-            font-size: 1.9rem;
+            font-size: 2.3rem;
             font-weight: 900;
             color: #064e3b;
-            line-height: 1.1;
+            line-height: 1;
+            margin-top: -2px;
             white-space: nowrap;
         }
 
@@ -612,7 +613,7 @@
         .bears-lab-title {
             font-family: 'Outfit', sans-serif;
             font-weight: 950;
-            font-size: 1.2rem;
+            font-size: 1.4rem;
             background: linear-gradient(135deg, #10b981 0%, #059669 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -621,21 +622,26 @@
 
         .header-btn-row {
             display: flex;
-            gap: 5px;
+            gap: 8px;
         }
 
         .header-icon-btn {
             text-decoration: none;
             background: #ffffff;
-            width: 28px;
-            height: 28px;
+            width: 36px;
+            height: 36px;
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 10px;
+            border-radius: 12px;
             transition: all 0.2s;
-            border: 1.2px solid #e2e8f0;
+            border: 1.5px solid #e2e8f0;
             box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+        
+        .header-icon-btn svg {
+            width: 20px;
+            height: 20px;
         }
 
         .refresh-btn { color: #0ea5e9; }
