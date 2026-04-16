@@ -6,113 +6,2381 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>山熊科學：電子聯絡簿系統 100% 全能操作對照手冊</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;900&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
+        /* ================= 基礎設定 ================= */
         :root {
-            --primary: #4CAF50; --blue: #3498db; --red: #e74c3c;
-            --orange: #f39c12; --bg-outer: #2c3e50; --apple-blue: #0071e3;
+            --primary: #4CAF50;
+            --bg: #f0fdf4;
+            --text: #333;
+            --line-green: #06C755;
         }
-        body { font-family: 'Noto Sans TC', sans-serif; background-color: var(--bg-outer); margin: 0; padding: 50px 0; display: flex; flex-direction: column; align-items: center; }
-        .controls { width: 1000px; background: white; padding: 25px; border-radius: 20px; margin-bottom: 40px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.4); }
-        .download-btn { background: linear-gradient(135deg, #0071e3, #3498db); color: white; border: none; padding: 18px 50px; font-size: 1.5rem; border-radius: 50px; cursor: pointer; font-weight: 900; }
-        
-        #poster-canvas { width: 1000px; background: #f8fafc; padding: 60px; border-radius: 40px; display: flex; flex-direction: column; gap: 70px; box-sizing: border-box; }
-        .feature-block { display: flex; gap: 50px; align-items: center; min-height: 480px; }
-        .feature-block.reverse { flex-direction: row-reverse; }
-        .phone-frame { width: 380px; background: white; border: 12px solid #2c3e50; border-radius: 40px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.15); flex-shrink: 0; position: relative; }
-        .info-panel { flex: 1; }
-        .info-panel h2 { font-size: 2.2rem; font-weight: 900; color: #1e293b; margin: 0 0 20px 0; }
-        .info-panel p { font-size: 1.35rem; color: #4b5563; line-height: 1.7; margin: 0; }
 
-        .step-num { background: #0071e3; color: white; width: 24px; height: 24px; border-radius: 50%; text-align: center; line-height: 24px; font-size: 14px; font-weight: bold; display: inline-block; margin-right: 8px; }
-        .share-icon { display: inline-block; width: 20px; height: 20px; vertical-align: -4px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23007AFF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8'/%3E%3Cpolyline points='16 6 12 2 8 6'/%3E%3Cline x1='12' y1='2' x2='12' y2='15'/%3E%3C/svg%3E"); background-size: contain; background-repeat: no-repeat; }
-        
-        .s-tag { display: block; border-radius: 20px; font-weight: 900; font-size: 1rem; width: fit-content; margin: 6px auto; padding: 6px 15px; }
-        .s-green { color: #27ae60; background: #eafaf1; border: 1px solid #27ae60; }
-        .s-yellow { color: #f39c12; background: #fef9e7; border: 1px solid #f39c12; }
-        .s-orange { color: #e67e22; background: #fdf2e9; border: 1px solid #e67e22; }
-        .s-red { color: #cc0000; background: #fadbd8; border: 1px solid #cc0000; }
-        
-        .blue-btn { background: var(--blue); color: white; padding: 14px; text-align: center; border-radius: 12px; font-weight: 900; margin: 8px 15px; box-shadow: 0 4px 10px rgba(52,152,219,0.2); }
-        .green-dash { border: 2px dashed var(--primary); background: #e9f7ef; border-radius: 15px; padding: 15px; margin: 10px 15px; text-align: center; }
-        .red-dash { border: 2px dashed var(--red); background: #fdf2f2; border-radius: 20px; padding: 15px; margin: 10px 15px; text-align: center; }
-        
-        .quote-box { background: #f1f3f5; border-left: 4px solid #ced4da; padding: 8px; margin-top: 5px; font-size: 0.85rem; color: #495057; text-align: left; }
-        .msg-history-item { background: white; border-radius: 10px; padding: 10px; margin-bottom: 10px; border-left: 5px solid #eee; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-        
-        /* 新版頁首卡片樣式 - 壓縮版 (字體放大版) */
-        .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-top: 35px; }
-        .summary-card { background: white; padding: 25px 20px; border-radius: 25px; border: 1px solid #f1f5f9; box-shadow: 0 10px 40px rgba(0,0,0,0.05); text-align: left; }
-        .summary-card h3 { font-size: 1.4rem; color: #1e293b; margin: 15px 0 10px 0; font-weight: 900; }
-        .summary-card p { font-size: 1.05rem; color: #64748b; line-height: 1.6; margin: 0; }
-        .icon-badge { width: 60px; height: 60px; background: #f8fafc; border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 30px; }
-        .h-box { display: inline-block; background: #e0f2fe; color: #0369a1; padding: 4px 12px; border-radius: 8px; font-weight: 900; }
-        .h-box.red { background: #fee2e2; color: #b91c1c; }
-        .h-box.green { background: #dcfce7; color: #15803d; }
+        /* ================= 啟動與引導樣式 ================= */
+        #splash-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #f5f5f7;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 20000;
+            transition: opacity 0.5s ease;
+        }
 
-        /* 來自 index.html 的真實樣式 */
-        .main-exam-range { font-size: 1.15rem; color: #666; margin-bottom: 12px; background: #f9f9f9; display: inline-block; padding: 5px 15px; border-radius: 20px; font-weight: bold; }
-        .exam-standard-box { margin-top: 12px; font-size: 1.2rem; color: #555; background-color: #fff9c4; border: 1px dashed #fbc02d; padding: 10px 15px; border-radius: 8px; display: inline-block; text-align: left; }
-        .btn-link { display: block; width: 100%; box-sizing: border-box; background: #3498db; color: white; padding: 10px 15px; border-radius: 8px; text-decoration: none; font-size: 1.1rem; font-weight: bold; margin: 8px 0; text-align: center; box-shadow: 0 3px 6px rgba(52, 152, 219, 0.2); }
-        .btn-link::before { content: "📎 "; }
-        .input-box { display: flex; gap: 8px; margin-top: 15px; padding: 10px; border-top: 1px solid #eee; background: white; }
-        .fb-input { flex: 1; padding: 10px 15px; border: 1px solid #ddd; border-radius: 25px; outline: none; font-size: 1.1rem; background: #fafafa; }
-        .fb-btn { background: #4CAF50; color: white; border: none; padding: 0 20px; border-radius: 25px; font-weight: bold; cursor: pointer; font-size: 1.1rem; }
-        .circular-line { width: 60px; height: 60px; border-radius: 50%; background-color: #06C755; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); display: flex; align-items: center; justify-content: center; color: white; font-weight: 900; font-size: 1.2rem; font-family: Arial, sans-serif; letter-spacing: 0.5px; text-decoration: none; }
-        
-        /* 懸浮彈窗重製 */
-        .modal-overlay { position: absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; padding:30px; box-sizing:border-box; z-index:100; }
-        .modal { background:white; border-radius:25px; width:85%; border:none; overflow:hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.3); }
+        .splash-logo {
+            width: 180px;
+            animation: breathe 2s infinite ease-in-out;
+        }
+
+        @keyframes breathe {
+
+            0%,
+            100% {
+                transform: scale(0.97);
+                opacity: 0.9;
+            }
+
+            50% {
+                transform: scale(1.03);
+                opacity: 1;
+            }
+        }
+
+        /* LINE/FB 偵測教學容器 (Ported from Booking System) */
+        .line-tutorial-container {
+            width: 220px;
+            height: 160px;
+            margin: 15px auto;
+            position: relative;
+            border: 2px solid #bdc3c7;
+            border-radius: 10px;
+            background: #ecf0f1;
+            overflow: hidden;
+            font-family: sans-serif;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .lt-footer {
+            height: 40px;
+            background: #1c1c1e;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 15px;
+        }
+
+        .lt-menu-btn {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-evenly;
+            align-items: center;
+        }
+
+        .lt-menu-dot {
+            width: 4px;
+            height: 4px;
+            background: white;
+            border-radius: 50%;
+        }
+
+        .lt-dropdown {
+            position: absolute;
+            bottom: 45px;
+            right: 10px;
+            background: #333;
+            box-shadow: 0 -3px 8px rgba(0, 0, 0, 0.25);
+            border-radius: 8px;
+            padding: 6px;
+            font-size: 11px;
+            color: white;
+            opacity: 0;
+            transform: scale(0.9);
+            transform-origin: bottom right;
+            animation: dropdownShow 4s infinite;
+        }
+
+        .lt-dropdown-item {
+            background: #444;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+
+        .lt-cursor {
+            width: 16px;
+            height: 16px;
+            background: rgba(52, 152, 219, 0.9);
+            border-radius: 50%;
+            position: absolute;
+            top: 70px;
+            left: 110px;
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9);
+            animation: cursorMove 4s infinite;
+            z-index: 10;
+        }
+
+        .lt-click-ripple {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 30px;
+            height: 30px;
+            border: 2px solid #3498db;
+            border-radius: 50%;
+            opacity: 0;
+            animation: rippleEffect 4s infinite;
+        }
+
+        @keyframes cursorMove {
+            0% {
+                top: 70px;
+                left: 110px;
+            }
+
+            15%,
+            25% {
+                top: 135px;
+                left: 192px;
+            }
+
+            35%,
+            45% {
+                top: 100px;
+                left: 135px;
+            }
+
+            100% {
+                top: 70px;
+                left: 110px;
+            }
+        }
+
+        @keyframes dropdownShow {
+
+            0%,
+            15%,
+            53%,
+            100% {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+
+            20%,
+            48% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @keyframes rippleEffect {
+
+            0%,
+            18%,
+            25%,
+            38%,
+            45%,
+            100% {
+                opacity: 0;
+            }
+
+            20% {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1.3);
+            }
+
+            40% {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1.3);
+            }
+        }
+
+        /* PWA 安裝教學專屬樣式 (iOS) */
+        .pwa-tutorial-ios {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            padding: 15px;
+        }
+
+        .pwa-step {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            width: 100%;
+            text-align: left;
+        }
+
+        .pwa-icon-box {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #eee;
+            border-radius: 10px;
+            flex-shrink: 0;
+        }
+
+        .pwa-icon-share {
+            width: 24px;
+            height: 24px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23007AFF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8'/%3E%3Cpolyline points='16 6 12 2 8 6'/%3E%3Cline x1='12' y1='2' x2='12' y2='15'/%3E%3C/svg%3E");
+            background-size: contain;
+        }
+
+        .pwa-icon-add {
+            width: 24px;
+            height: 24px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='2' ry='2'/%3E%3Cline x1='12' y1='8' x2='12' y2='16'/%3E%3Cline x1='8' y1='12' x2='16' y2='12'/%3E%3C/svg%3E");
+            background-size: contain;
+        }
+
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            padding: 0;
+            color: var(--text);
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .app-container {
+            max-width: 480px;
+            margin: 0 auto;
+            background: #f2f3f7;
+            min-height: 100vh;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.05);
+            position: relative;
+        }
+
+        /* 登入頁 */
+        #login-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+            background: white;
+        }
+
+        .logo-img {
+            max-width: 150px;
+            margin-bottom: 20px;
+        }
+
+        h2 {
+            margin: 10px 0 5px;
+            color: #444;
+            font-size: 1.8rem;
+            text-align: center;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+
+        .sub-title {
+            font-size: 1.1rem;
+            color: #888;
+            margin-bottom: 30px;
+            text-align: center;
+            line-height: 1.6;
+            font-weight: bold;
+        }
+
+        .input-group {
+            width: 100%;
+            margin-bottom: 15px;
+        }
+
+        input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #eee;
+            border-radius: 12px;
+            font-size: 16px;
+            box-sizing: border-box;
+            transition: 0.3s;
+            background: #fafafa;
+            text-align: center;
+        }
+
+        input:focus {
+            border-color: var(--primary);
+            outline: none;
+            background: white;
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 15px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(76, 175, 80, 0.3);
+        }
+
+        .error-msg {
+            color: #e74c3c;
+            margin-top: 15px;
+            font-weight: bold;
+            min-height: 24px;
+            text-align: center;
+        }
+
+        .forgot-pwd {
+            margin-top: 15px;
+            color: #aaa;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+
+        /* 管理者介面 CSS */
+        #admin-screen {
+            display: none;
+            padding: 20px;
+            background: #f2f3f7;
+            min-height: 100vh;
+        }
+
+        .admin-header {
+            font-size: 1.5rem;
+            font-weight: 900;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .admin-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .admin-card-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+
+        .admin-select {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #fafafa;
+            font-size: 16px;
+        }
+
+        .admin-btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            color: white;
+            margin-top: 5px;
+        }
+
+        .btn-blue {
+            background: #3498db;
+        }
+
+        .btn-green {
+            background: #27ae60;
+        }
+
+        .btn-gray {
+            background: #95a5a6;
+        }
+
+        .btn-red {
+            background: #c0392b;
+        }
+
+        .btn-orange {
+            background: #f39c12;
+        }
+
+        /* 上帝視角紅框 */
+        .admin-mode-border {
+            box-shadow: inset 0 0 0 6px rgba(192, 57, 43, 0.3);
+            min-height: 100vh;
+            position: relative;
+        }
+
+        .admin-mode-border::after {
+            content: "⚠️ 管理者預覽模式";
+            position: fixed;
+            top: 90px;
+            right: 10px;
+            background: rgba(192, 57, 43, 0.8);
+            color: white;
+            font-size: 0.8rem;
+            padding: 4px 10px;
+            border-radius: 20px;
+            z-index: 3000;
+            pointer-events: none;
+        }
+
+        .admin-exit-btn {
+            position: fixed;
+            bottom: 100px;
+            left: 20px;
+            background: #c0392b;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-weight: bold;
+            z-index: 3001;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            cursor: pointer;
+            display: none;
+        }
+
+        /* 編輯彈窗 Modal */
+        .editor-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 5000;
+            align-items: flex-end;
+            justify-content: center;
+        }
+
+        .editor-content {
+            background: white;
+            width: 100%;
+            max-width: 480px;
+            height: 85vh;
+            border-radius: 20px 20px 0 0;
+            display: flex;
+            flex-direction: column;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(100%);
+            }
+
+            to {
+                transform: translateY(0);
+            }
+        }
+
+        .editor-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .editor-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .editor-close {
+            font-size: 1.5rem;
+            color: #999;
+            cursor: pointer;
+        }
+
+        .editor-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .editor-label {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 4px;
+            display: block;
+            font-weight: bold;
+        }
+
+        .editor-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            box-sizing: border-box;
+            font-size: 16px;
+            background: #fafafa;
+        }
+
+        .editor-textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            box-sizing: border-box;
+            height: 100px;
+            font-family: inherit;
+            font-size: 16px;
+            resize: none;
+            background: #fafafa;
+        }
+
+        .editor-footer {
+            padding: 15px 20px;
+            border-top: 1px solid #eee;
+            display: flex;
+            gap: 10px;
+            background: white;
+        }
+
+        /* 連結小幫手 */
+        .link-helper-box {
+            background: #e3f2fd;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border: 1px solid #90caf9;
+        }
+
+        .link-helper-title {
+            font-size: 0.85rem;
+            font-weight: bold;
+            color: #1565c0;
+            margin-bottom: 8px;
+        }
+
+        .link-row {
+            display: flex;
+            gap: 6px;
+        }
+
+        .link-input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .link-btn {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        /* 老師手機版上傳區樣式 */
+        .teacher-upload-box {
+            background-color: #fff3e0;
+            border: 2px dashed #f39c12;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 15px;
+        }
+
+        .teacher-upload-title {
+            font-size: 0.9rem;
+            font-weight: bold;
+            color: #d35400;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        /* 歷史列表 */
+        #postHistoryArea {
+            margin-top: 10px;
+        }
+
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f9f9f9;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            border: 1px solid #eee;
+        }
+
+        .history-info {
+            font-size: 0.95rem;
+            color: #555;
+        }
+
+        .edit-btn-small {
+            background: #f39c12;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+
+        /* Header */
+        #main-screen {
+            display: none;
+            padding-bottom: 80px;
+        }
+
+        .header-bar {
+            background: #ffffff;
+            padding: 8px 10px;
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 3px solid #10b981;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+            min-height: 80px;
+            overflow: hidden;
+        }
+
+        .header-col-logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 60px;
+            flex-shrink: 0;
+            width: 60px;
+        }
+
+        .header-logo-full {
+            height: 100%;
+            width: auto;
+            max-height: 60px;
+            max-width: 60px;
+            object-fit: contain;
+        }
+
+        .header-col-info {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            height: 60px;
+            overflow: hidden;
+            padding-left: 0;
+        }
+
+        .class-info-top {
+            font-size: 0.75rem;
+            color: #64748b;
+            font-weight: 700;
+            margin-bottom: 2px;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            overflow: hidden;
+        }
+
+        .name-pill-row {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+
+        .student-info {
+            font-size: 1.6rem;
+            font-weight: 900;
+            color: #064e3b;
+            line-height: 1.1;
+            white-space: nowrap;
+        }
+
+        .sticker-badge-header {
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border: 1.5px solid #fbbf24;
+            border-radius: 20px;
+            padding: 2px 8px;
+            font-weight: 900;
+            font-size: 0.85rem;
+            color: #92400e;
+            white-space: nowrap;
+            box-shadow: 0 3px 8px rgba(251, 191, 36, 0.2);
+        }
+
+        .header-col-actions {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            justify-content: center;
+            height: 60px;
+            flex-shrink: 0;
+        }
+
+        .bears-lab-title {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 950;
+            font-size: 1.2rem;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 5px;
+        }
+
+        .header-btn-row {
+            display: flex;
+            gap: 5px;
+        }
+
+        .header-icon-btn {
+            text-decoration: none;
+            background: #ffffff;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            transition: all 0.2s;
+            border: 1.2px solid #e2e8f0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        .refresh-btn {
+            color: #0ea5e9;
+        }
+
+        .pwd-btn {
+            color: #f59e0b;
+        }
+
+        .logout-btn {
+            color: #ef4444;
+        }
+
+        .header-icon-btn:active {
+            transform: scale(0.9);
+            background: #f8fafc;
+        }
+
+        .float-line-container {
+            position: fixed;
+            bottom: 25px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            z-index: 2000;
+            align-items: center;
+        }
+
+        .line-btn {
+            width: 65px;
+            height: 65px;
+            border-radius: 50%;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            color: white;
+            font-family: Arial, sans-serif;
+            transition: transform 0.2s;
+            animation: bounce 2s ease-in-out infinite;
+        }
+
+        .line-btn:active {
+            transform: scale(0.9);
+            animation: none;
+        }
+
+        .line-btn span.small {
+            font-size: 10px;
+            font-weight: bold;
+            margin-bottom: 2px;
+            letter-spacing: 0px;
+        }
+
+        .line-btn span.large {
+            font-size: 18px;
+            font-weight: 900;
+            letter-spacing: 1px;
+        }
+
+        .btn-bear {
+            background-color: #06C755;
+        }
+
+        .back-top-btn {
+            width: 65px;
+            height: 65px;
+            border-radius: 50%;
+            background-color: #2563eb;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            z-index: 1999;
+            cursor: pointer;
+            transition: opacity 0.3s, transform 0.2s;
+            animation: bounce-delay 2s ease-in-out infinite;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            padding: 0;
+            border: none;
+        }
+
+        .back-top-btn:active {
+            transform: scale(0.9);
+        }
+
+        @keyframes bounce {
+
+            0%,
+            20%,
+            50%,
+            80%,
+            100% {
+                transform: translateY(0);
+            }
+
+            40% {
+                transform: translateY(-10px);
+            }
+
+            60% {
+                transform: translateY(-5px);
+            }
+        }
+
+        @keyframes bounce-delay {
+
+            0%,
+            20%,
+            50%,
+            80%,
+            100% {
+                transform: translateY(0);
+            }
+
+            40% {
+                transform: translateY(-8px);
+            }
+
+            60% {
+                transform: translateY(-4px);
+            }
+        }
+
+        /* Tabs */
+        .sticky-wrapper {
+            position: sticky;
+            top: 0;
+            z-index: 999;
+            background: white;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .tabs {
+            display: flex;
+            background: transparent;
+            margin: 15px 15px 5px 15px;
+            padding: 0;
+            gap: 10px;
+        }
+
+        .tab-item {
+            flex: 1;
+            text-align: center;
+            padding: 12px 0;
+            color: #64748b;
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 1.25rem;
+            background: rgba(255, 255, 255, 0.7);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+        }
+
+        .tab-item.active {
+            color: white;
+            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+            box-shadow: 0 4px 15px rgba(34, 197, 94, 0.3);
+            border: none;
+        }
+
+        /* 聯絡簿卡片 CSS */
+        .post-card {
+            background: white;
+            margin: 20px 15px;
+            border-radius: 16px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+        }
+
+        #tab-content-0 {
+            position: relative;
+        }
+
+        /* Timeline wrapper — pale green outer card */
+        .post-card-wrapper {
+            position: relative;
+            background: #f0fdf4;
+            border-radius: 20px;
+            margin: 20px 15px;
+            padding: 14px 12px 14px 34px;
+        }
+
+        /* Override the original margin on inner card since wrapper handles it */
+        .post-card-wrapper .post-card {
+            margin: 0 !important;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+        }
+
+        /* Dot */
+        .post-card-wrapper::after {
+            content: '';
+            position: absolute;
+            left: 10px;
+            top: 18px;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #22c55e;
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
+            z-index: 1;
+        }
+
+        /* Connecting vertical line */
+        .post-card-wrapper::before {
+            content: '';
+            position: absolute;
+            left: 16px;
+            top: 32px;
+            bottom: -20px;
+            width: 2px;
+            background: linear-gradient(to bottom, #22c55e, rgba(34, 197, 94, 0.05));
+        }
+
+        .post-card-wrapper:last-child::before {
+            display: none;
+        }
+
+        .post-header {
+            background: #e8f5e9;
+            padding: 12px 15px;
+            color: #2e7d32;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1.25rem;
+        }
+
+        .grade-section {
+            padding: 25px 20px;
+            border-bottom: 1px dashed #eee;
+            text-align: center;
+        }
+
+        .main-exam-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .main-exam-range {
+            font-size: 1.15rem;
+            color: #666;
+            margin-bottom: 15px;
+            background: #f9f9f9;
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+        }
+
+        .main-score {
+            font-size: 4.8rem;
+            font-weight: 700;
+            color: #333;
+            line-height: 1;
+            margin: 10px 0;
+            letter-spacing: -2px;
+
+            font-family: 'Outfit', sans-serif !important;
+        }
+
+        /* 缺考、尚未繳交 等文字型分數縮小 */
+        .main-score.text-grey-status {
+            font-size: 2.6rem !important;
+            color: #64748b !important;
+            font-family: 'Noto Sans TC', sans-serif !important;
+            letter-spacing: 0px !important;
+            font-weight: 700 !important;
+        }
+
+        .score-unit-big {
+            font-size: 1.6rem;
+            color: #999;
+            font-weight: normal;
+            margin-left: 5px;
+            vertical-align: middle;
+            letter-spacing: 0;
+        }
+
+        .score-sub {
+            font-size: 1.4rem;
+            color: #888;
+            margin-bottom: 20px;
+        }
+
+        .exam-standard-box {
+            margin: 16px auto;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #b45309;
+            background-color: #fffbeb;
+            border: 2px dashed #fbbf24;
+            padding: 10px 20px;
+            border-radius: 16px;
+            display: block;
+            text-align: center;
+            max-width: 90%;
+        }
+
+        .makeup-status-tag {
+            display: block;
+            font-weight: bold;
+            font-size: 1.1rem;
+            margin-top: 5px;
+            margin-bottom: 5px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            width: fit-content;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        #tab-content-1 .makeup-status-tag,
+        .grade-detail .makeup-status-tag {
+            font-size: 0.85rem !important;
+            padding: 3px 10px !important;
+            border-radius: 12px !important;
+        }
+
+        .status-warning {
+            color: #cc0000;
+            background: #ffebeb;
+            border: 1.5px solid #cc0000;
+        }
+
+        .status-green {
+            color: #27ae60;
+            background: #eafaf1;
+            border: 1px solid #27ae60;
+        }
+
+        .status-yellow {
+            color: #f39c12;
+            background: #fef9e7;
+            border: 1px solid #f39c12;
+        }
+
+        .status-orange {
+            color: #e67e22;
+            background: #fdf2e9;
+            border: 1px solid #e67e22;
+        }
+
+        .status-red {
+            color: #cc0000;
+            background: #fadbd8;
+            border: 1px solid #cc0000;
+        }
+
+        .home-exam-tag {
+            font-size: 0.95rem;
+            color: #888;
+            display: block;
+            margin-top: -5px;
+            margin-bottom: 10px;
+            font-weight: normal;
+        }
+
+        .reviewing-tag {
+            font-size: 0.95rem;
+            color: #3498db;
+            display: block;
+            margin-top: -5px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        .chart-container-post {
+            background: #fafafa;
+            padding: 15px;
+            border-radius: 12px;
+            margin-top: 15px;
+            text-align: left;
+        }
+
+        .chart-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+            font-size: 1.2rem;
+            height: 24px;
+        }
+
+        .chart-label {
+            width: 105px;
+            color: #888;
+            text-align: right;
+            margin-right: 10px;
+            font-family: monospace;
+            font-weight: bold;
+        }
+
+        .chart-bar-area {
+            flex-grow: 1;
+            background: #eee;
+            height: 100%;
+            border-radius: 4px;
+            overflow: hidden;
+            min-width: 50px;
+        }
+
+        .chart-bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        .chart-count {
+            width: 25px;
+            text-align: right;
+            color: #555;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+
+        .ref-hw-box {
+            margin-top: 20px;
+            text-align: left;
+            background: #fff3e0;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #f39c12;
+        }
+
+        .ref-hw-title {
+            font-weight: bold;
+            color: #d35400;
+            margin-bottom: 10px;
+            font-size: 1rem;
+        }
+
+        .ref-hw-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 1rem;
+            color: #444;
+            border-bottom: 1px dashed rgba(0, 0, 0, 0.1);
+            padding-bottom: 5px;
+        }
+
+        .hw-score-val {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #333;
+
+            font-family: 'Outfit', sans-serif !important;
+        }
+
+        .content-section {
+            padding: 25px 20px;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            color: var(--primary);
+            font-weight: 700;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            letter-spacing: 1px;
+        }
+
+        .section-title::before {
+            content: '';
+            width: 5px;
+            height: 20px;
+            background: var(--primary);
+            margin-right: 10px;
+            border-radius: 3px;
+        }
+
+        .info-block {
+            margin-bottom: 20px;
+        }
+
+        .info-label {
+            font-size: 1.25rem;
+            color: #2c3e50;
+            font-weight: 700;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .info-content {
+            font-size: 1.15rem;
+            color: #555;
+            line-height: 1.6;
+            padding-left: 5px;
+            word-wrap: break-word;
+        }
+
+        /* 老師發布的連結按鈕 (大膠囊) */
+        .btn-link {
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+            background: #3498db;
+            color: white;
+            padding: 12px 15px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 1.15rem;
+            font-weight: bold;
+            margin: 8px 0;
+            text-align: center;
+            box-shadow: 0 3px 6px rgba(52, 152, 219, 0.2);
+        }
+
+        /* 學生上傳的連結按鈕 (小標籤) */
+        .btn-small-tag {
+            display: inline-block;
+            background: #f0f0f0;
+            color: #555;
+            padding: 4px 10px;
+            border-radius: 15px;
+            text-decoration: none;
+            font-size: 1rem;
+            font-weight: bold;
+            border: 1px solid #ccc;
+            margin-left: 5px;
+            vertical-align: middle;
+        }
+
+        .btn-small-tag:hover {
+            background: #e0e0e0;
+        }
+
+        /* ★★★ v3.9.3 修正：強制讓公告與彈窗內文的連結變為小標籤樣式 (並加上圖示) ★★★ */
+        .bulletin-content .btn-link,
+        .emergency-body .btn-link {
+            display: inline-block;
+            width: auto;
+            background: #f0f0f0;
+            color: #555;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 1rem;
+            font-weight: bold;
+            text-align: left;
+            box-shadow: none;
+            border: 1px solid #ccc;
+            margin: 2px 5px 2px 0;
+        }
+
+        .bulletin-content .btn-link:hover,
+        .emergency-body .btn-link:hover {
+            background: #e0e0e0;
+        }
+
+        /* 自動加上迴紋針圖示 */
+        .bulletin-content .btn-link::before,
+        .emergency-body .btn-link::before {
+            content: "";
+        }
+
+        .score-report-section {
+            background: #fdf2f2;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 12px;
+            border: 2px dashed #e74c3c;
+        }
+
+        .feedback-section {
+            background: transparent;
+            padding: 20px 16px;
+            border-top: 1px solid rgba(0, 0, 0, 0.06);
+        }
+
+        .feedback-title {
+            font-size: 1.05rem;
+            color: #64748b;
+            font-weight: 700;
+            margin-bottom: 14px;
+        }
+
+        .history-msg {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 12px;
+            font-size: 1.25rem;
+        }
+
+        .history-msg-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+
+        .history-msg-avatar.avatar-student {
+            background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
+            color: #475569;
+        }
+
+        .history-msg-avatar.avatar-teacher {
+            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+            color: white;
+        }
+
+        .history-msg-body {
+            background: #f1f5f9;
+            border-radius: 4px 16px 16px 16px;
+            padding: 10px 14px;
+            flex: 1;
+        }
+
+        .history-msg-body.teacher-body {
+            background: #e8fdf1;
+            border-radius: 16px 4px 16px 16px;
+        }
+
+        .history-msg-time {
+            font-size: 0.9rem;
+            color: #94a3b8;
+            margin-top: 4px;
+            text-align: right;
+        }
+
+        .input-box {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .score-input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e74c3c;
+            border-radius: 25px;
+            outline: none;
+            font-size: 1.4rem;
+            text-align: center;
+            font-weight: bold;
+            color: #c0392b;
+        }
+
+        .score-btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 0 25px;
+            border-radius: 25px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1.25rem;
+        }
+
+        .fb-input {
+            flex: 1;
+            padding: 12px 18px;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 25px;
+            outline: none;
+            font-size: 1.25rem;
+            background: #f8fafc;
+            transition: border-color 0.2s;
+        }
+
+        .fb-input:focus {
+            border-color: #4ade80;
+        }
+
+        .fb-btn {
+            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+            color: white;
+            border: none;
+            padding: 0 22px;
+            border-radius: 25px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1.25rem;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+            transition: all 0.2s;
+        }
+
+        .fb-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(34, 197, 94, 0.4);
+        }
+
+        .quote-box {
+            background-color: #f1f3f5;
+            border-left: 4px solid #adb5bd;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            font-size: 0.95rem;
+            color: #555;
+        }
+
+        .quote-type {
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: #888;
+            margin-bottom: 3px;
+        }
+
+        /* 學生上傳區樣式 */
+        .student-upload-box {
+            background: #e8f5e9;
+            border: 2px dashed #4CAF50;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .upload-title {
+            font-weight: bold;
+            color: #2e7d32;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        /* ===== 棒卡申請區（橘色） ===== */
+        .sticker-apply-box {
+            background: #fff7ed;
+            border: 2px dashed #fb923c;
+            border-radius: 12px;
+            padding: 14px 15px;
+            margin-bottom: 18px;
+        }
+
+        .sticker-apply-title {
+            font-weight: bold;
+            color: #ea580c;
+            margin-bottom: 10px;
+            display: block;
+            font-size: 1.15rem;
+        }
+
+        .sticker-apply-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 6px;
+            flex-wrap: wrap;
+        }
+
+        .sticker-reason-select {
+            flex: 1;
+            min-width: 0;
+            padding: 8px 12px;
+            border: 1.5px solid #fed7aa;
+            border-radius: 20px;
+            font-size: 1.1rem;
+            outline: none;
+            background: white;
+            color: #431407;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23fb923c' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 30px;
+        }
+
+        .sticker-reason-custom {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1.5px solid #fed7aa;
+            border-radius: 20px;
+            font-size: 1.1rem;
+            outline: none;
+            background: white;
+            margin-top: 6px;
+            display: none;
+        }
+
+        .sticker-count-select {
+            width: 90px;
+            padding: 8px 10px;
+            border: 1.5px solid #fed7aa;
+            border-radius: 20px;
+            font-size: 1.1rem;
+            outline: none;
+            background: white;
+            text-align: center;
+            color: #431407;
+        }
+
+        .sticker-submit-btn {
+            background: linear-gradient(135deg, #fb923c 0%, #ea580c 100%);
+            color: white;
+            border: none;
+            padding: 8px 18px;
+            border-radius: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1.1rem;
+            white-space: nowrap;
+            box-shadow: 0 3px 10px rgba(234, 88, 12, 0.3);
+            transition: transform 0.15s;
+        }
+
+        .sticker-submit-btn:active {
+            transform: scale(0.96);
+        }
+
+        .sticker-hint {
+            font-size: 0.9rem;
+            color: #fb923c;
+            margin-top: 4px;
+        }
+
+        /* 棒卡申請氣泡樣式 */
+        .history-msg-body.sticker-body {
+            background: #fff7ed;
+            border: 1px solid #fed7aa;
+        }
+
+        .sticker-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            color: white;
+            font-weight: 800;
+            font-size: 1rem;
+            padding: 2px 10px;
+            border-radius: 20px;
+            margin-left: 6px;
+        }
+
+        .sticker-status {
+            font-size: 0.9rem;
+            color: #6b7280;
+            padding: 2px 8px;
+            background: #f3f4f6;
+            border-radius: 10px;
+            margin-top: 4px;
+            display: inline-block;
+        }
+
+        .sticker-status.approved {
+            background: #dcfce7;
+            color: #15803d;
+        }
+
+        .sticker-status.rejected {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+
+        .upload-btn-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+
+        .upload-btn-real {
+            border: 2px solid #4CAF50;
+            color: #4CAF50;
+            background-color: white;
+            padding: 8px 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .upload-btn-wrapper input[type=file] {
+            font-size: 100px;
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .upload-status {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: #666;
+            min-height: 20px;
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-box {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            width: 80%;
+            max-width: 350px;
+            text-align: center;
+        }
+
+        .modal-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+
+        .text-red {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+
+        .score-green {
+            color: #28a745;
+        }
+
+        .score-red {
+            color: #e74c3c;
+        }
+
+        .loader-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.8);
+            z-index: 2000;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        .loader-text {
+            margin-top: 10px;
+            color: #666;
+            font-weight: bold;
+        }
+
+        #loader {
+            display: none;
+            margin: 20px auto;
+        }
+
+        #loader-login {
+            display: none;
+            margin: 15px auto;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Tab 2 Style */
+        .score-card {
+            background: #fff;
+            border: 1px solid #f0f0f0;
+            border-top: 5px solid #4CAF50;
+            border-radius: 8px;
+            padding: 20px 16px;
+            margin-bottom: 15px;
+            position: relative;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .score-card:active {
+            background-color: #f9f9f9;
+            transform: scale(0.99);
+        }
+
+        .class-badge {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            font-size: 1.05rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+
+        .card-main {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 15px;
+        }
+
+        .exam-info {
+            display: flex;
+            flex-direction: column;
+            margin-top: 0px;
+        }
+
+        .exam-date {
+            font-size: 1.15rem;
+            color: #999;
+            margin-bottom: 5px;
+        }
+
+        .exam-name {
+            font-weight: 700;
+            color: #333;
+            font-size: 1.6rem;
+        }
+
+        .score-box {
+            text-align: right;
+        }
+
+        .score-val {
+            font-size: 3.2rem;
+            font-weight: 700;
+            line-height: 1;
+            color: #333;
+            letter-spacing: -1px;
+            padding: 5px 0px;
+            display: inline-block;
+
+            font-family: 'Outfit', sans-serif !important;
+        }
+
+        .score-val.score-green {
+            color: #28a745 !important;
+        }
+
+        .score-val.score-red {
+            color: #e74c3c !important;
+        }
+
+        .score-unit {
+            font-size: 1.2rem;
+            color: #aaa;
+            font-weight: normal;
+            margin-left: 2px;
+        }
+
+        .avg-score {
+            font-size: 1.2rem;
+            color: #888;
+            margin-top: 8px;
+        }
+
+        .score-missing {
+            font-size: 2.2rem;
+            color: #999;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+
+        .sub-note {
+            font-size: 1.1rem;
+            color: #999;
+            margin-top: 2px;
+        }
+
+        .expand-area {
+            display: none;
+        }
+
+        .score-card.active .expand-area {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+
+        .detail-box {
+            margin-top: 15px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #b45309;
+            background-color: #fffbeb;
+            border: 2px dashed #fbbf24;
+            padding: 10px 20px;
+            border-radius: 16px;
+            text-align: center;
+            line-height: 1.5;
+        }
+
+        .click-hint {
+            font-size: 1.05rem;
+            color: #ccc;
+            text-align: center;
+            margin-top: 5px;
+            opacity: 0.5;
+        }
+
+        .chart-wrapper {
+            margin-top: 15px;
+            padding: 10px;
+            background: #fafafa;
+            border-radius: 8px;
+        }
+
+        /* 公告系統樣式 */
+        .bulletin-card {
+            background: white;
+            margin: 20px 15px;
+            border-radius: 16px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+            border: 2px solid #ccc;
+        }
+
+        .bulletin-card.type-emergency {
+            border-color: #e74c3c;
+        }
+
+        .bulletin-card.type-schedule {
+            border-color: #3498db;
+        }
+
+        .bulletin-card.type-normal {
+            border-color: #f39c12;
+        }
+
+        .bulletin-header {
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #eee;
+            color: #333;
+        }
+
+        .bulletin-card.type-emergency .bulletin-header {
+            background: #fdecea;
+            color: #c0392b;
+        }
+
+        .bulletin-card.type-schedule .bulletin-header {
+            background: #eaf2f8;
+            color: #2980b9;
+        }
+
+        .bulletin-card.type-normal .bulletin-header {
+            background: #fef9e7;
+            color: #d35400;
+        }
+
+        .bulletin-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .bulletin-date {
+            font-size: 1.1rem;
+            opacity: 0.8;
+        }
+
+        .bulletin-tag {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            background: rgba(0, 0, 0, 0.1);
+            margin-right: 8px;
+        }
+
+        .bulletin-content {
+            padding: 20px;
+            font-size: 1.45rem;
+            color: #555;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+
+        .btn-capsule {
+            display: inline-block;
+            background: #3498db;
+            color: white;
+            padding: 10px 25px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-size: 1.25rem;
+            font-weight: bold;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(52, 152, 219, 0.3);
+            margin: 0 auto;
+        }
+
+        .btn-capsule:active {
+            transform: scale(0.95);
+        }
+
+        .btn-center-wrapper {
+            text-align: center;
+            padding-bottom: 20px;
+        }
+
+        /* 緊急彈窗樣式 - Modern */
+        .emergency-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.55);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+
+        .emergency-box {
+            background: white;
+            width: 100%;
+            max-width: 380px;
+            border-radius: 24px;
+            overflow: hidden;
+            border-top: 6px solid #ef4444;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
+            animation: popIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes popIn {
+            from {
+                transform: scale(0.8);
+                opacity: 0;
+            }
+
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .emergency-header {
+            background: white;
+            padding: 28px 20px 10px;
+            text-align: center;
+            color: #dc2626;
+            font-weight: 900;
+            font-size: 1.7rem;
+        }
+
+        .emergency-body {
+            padding: 16px 24px 24px;
+            font-size: 1.45rem;
+            line-height: 1.6;
+            color: #555;
+            text-align: center;
+            max-height: 55vh;
+            overflow-y: auto;
+        }
+
+        .emergency-footer {
+            padding: 0 20px 24px;
+            text-align: center;
+        }
+
+        .emergency-btn {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+            border: none;
+            padding: 16px 30px;
+            border-radius: 50px;
+            font-size: 1.35rem;
+            font-weight: 800;
+            cursor: pointer;
+            width: 100%;
+            box-shadow: 0 8px 20px rgba(239, 68, 68, 0.35);
+            transition: all 0.2s;
+            letter-spacing: 2px;
+        }
+
+        .emergency-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px rgba(239, 68, 68, 0.5);
+        }
+
+        /* V2 Vertical Bar Chart for index.html */
+        .v2-bar-chart-container {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-around;
+            height: 120px;
+            margin: 25px 10px 10px 10px;
+            padding-bottom: 25px;
+            border-bottom: 2px solid #e2e8f0;
+            position: relative;
+        }
+
+        .v2-bar-col {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            height: 100%;
+            width: 35px;
+            position: relative;
+        }
+
+        .v2-bar-fill {
+            width: 100%;
+            border-radius: 8px 8px 0 0;
+            position: relative;
+
+        }
+
+        @keyframes growBar {
+            0% {
+                height: 0%;
+            }
+
+            100% {
+                height: var(--target-height);
+            }
+        }
+
+
+        .v2-bar-fill::after {
+            content: attr(data-val);
+            position: absolute;
+            top: -25px;
+            width: 100%;
+            text-align: center;
+            font-size: 0.85rem;
+            font-weight: 900;
+            color: #064e3b;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .v2-bar-label {
+            position: absolute;
+            bottom: -25px;
+            font-size: 0.8rem;
+            font-weight: 800;
+            color: #64748b;
+            text-align: center;
+            font-family: 'Outfit', sans-serif;
+            width: 200%;
+        }
+
+
+
+
+        /* ===== Poster Layout Styles ===== */
+        body {
+            background-color: #2c3e50;
+            margin: 0;
+            padding: 50px 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .controls {
+            width: 1000px;
+            background: white;
+            padding: 25px;
+            border-radius: 20px;
+            margin-bottom: 40px;
+            text-align: center;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+        }
+
+        .download-btn {
+            background: linear-gradient(135deg, #0071e3, #3498db);
+            color: white;
+            border: none;
+            padding: 18px 50px;
+            font-size: 1.5rem;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: 900;
+        }
+
+        #poster-canvas {
+            width: 1000px;
+            background: #f8fafc;
+            padding: 60px;
+            border-radius: 40px;
+            display: flex;
+            flex-direction: column;
+            gap: 70px;
+            box-sizing: border-box;
+        }
+
+        .feature-block {
+            display: flex;
+            gap: 50px;
+            align-items: center;
+            min-height: 480px;
+        }
+
+        .feature-block.reverse {
+            flex-direction: row-reverse;
+        }
+
+        .phone-frame {
+            width: 380px;
+            background: var(--bg, #f0fdf4);
+            border: 12px solid #2c3e50;
+            border-radius: 40px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+            flex-shrink: 0;
+            position: relative;
+            /* force standard app font */
+            font-family: 'Noto Sans TC', sans-serif;
+        }
+
+        .phone-frame * {
+            box-sizing: border-box;
+        }
+
+        .info-panel {
+            flex: 1;
+        }
+
+        .info-panel h2 {
+            font-size: 2.2rem;
+            font-weight: 900;
+            color: #1e293b;
+            margin: 0 0 20px 0;
+        }
+
+        .info-panel p {
+            font-size: 1.35rem;
+            color: #4b5563;
+            line-height: 1.7;
+            margin: 0;
+        }
+
+        /* 1x4 功能概覽卡片 (壓縮版) */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-top: 35px;
+        }
+
+        .summary-card {
+            background: white;
+            padding: 25px 20px;
+            border-radius: 25px;
+            border: 1px solid #f1f5f9;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.05);
+            text-align: left;
+        }
+
+        .summary-card h3 {
+            font-size: 1.4rem;
+            color: #1e293b;
+            margin: 15px 0 10px 0;
+            font-weight: 900;
+        }
+
+        .summary-card p {
+            font-size: 1.05rem;
+            color: #64748b;
+            line-height: 1.6;
+            margin: 0;
+        }
+
+        .icon-badge {
+            width: 60px;
+            height: 60px;
+            background: #f8fafc;
+            border-radius: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+        }
+
+        .h-box {
+            display: inline-block;
+            background: #e0f2fe;
+            color: #0369a1;
+            padding: 4px 12px;
+            border-radius: 8px;
+            font-weight: 900;
+        }
+
+        .h-box.red {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+
+        .h-box.green {
+            background: #dcfce7;
+            color: #15803d;
+        }
+
+        .h-box.orange {
+            background: #ffedd5;
+            color: #ea580c;
+        }
+
+        /* mock header overrides */
+        .mock-header-bar {
+            background: #ffffff;
+            padding: 8px 10px;
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 3px solid #10b981;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+            min-height: 80px;
+            overflow: hidden;
+        }
+
+        /* timeline card overrides for display */
+        .mock-post-card-wrapper {
+            margin: 15px 15px;
+            /* hide the pseudo elements line */
+        }
     </style>
 </head>
 
 <body>
 
     <div class="controls">
-        <h2 style="margin:0 0 20px 0;">山熊科學：100% 數位系統功能全圖解 (全能究極完整手冊)</h2>
+        <h2 style="margin:0 0 20px 0;">山熊科學：100% 數位系統功能全圖解 (改版全新手冊)</h2>
         <div style="display: flex; gap: 15px; flex-wrap: wrap; justify-content: center;">
             <button id="btn-long" class="download-btn" onclick="takeScreenshot()">📸 下載 究極高清長圖</button>
-            <button id="btn-sections" class="download-btn" style="background: linear-gradient(135deg, #16a085, #1abc9c);" onclick="downloadInSections()">📂 分段下載 (推薦傳 LINE)</button>
-            <button id="btn-pdf" class="download-btn" style="background: linear-gradient(135deg, #c0392b, #e74c3c);" onclick="downloadPDF()">📄 下載 高清 PDF 版</button>
+            <button id="btn-sections" class="download-btn"
+                style="background: linear-gradient(135deg, #16a085, #1abc9c);" onclick="downloadInSections()">📂 分段下載
+                (推薦傳 LINE)</button>
+            <button id="btn-pdf" class="download-btn" style="background: linear-gradient(135deg, #c0392b, #e74c3c);"
+                onclick="downloadPDF()">📄 下載 高清 PDF 版</button>
         </div>
-        <p style="margin: 15px 0 0 0; font-size: 0.9rem; color: #666; font-weight: bold;">💡 小技巧：分段下載後依序傳到 LINE 群組，家長閱讀最輕鬆、文字最清楚！</p>
+        <p style="margin: 15px 0 0 0; font-size: 0.9rem; color: #666; font-weight: bold;">💡 小技巧：分段下載後依序傳到 LINE
+            群組，家長閱讀最輕鬆、文字最清楚！</p>
     </div>
 
     <div id="poster-canvas">
-        <div class="poster-header" style="text-align:center; padding-bottom:30px; background: white; border-radius: 40px; padding: 40px 60px; box-sizing: border-box; margin-bottom: 20px;">
-            <h1 style="font-size:3.8rem; margin:0; color:#1e293b; font-weight: 900; letter-spacing: -2px;">山熊科學數位聯絡簿</h1>
+        <div class="poster-header"
+            style="text-align:center; padding-bottom:30px; background: white; border-radius: 40px; padding: 40px 60px; box-sizing: border-box; margin-bottom: 20px;">
+            <h1 style="font-size:3.8rem; margin:0; color:#1e293b; font-weight: 900; letter-spacing: -2px;">山熊科學數位聯絡簿
+            </h1>
             <p style="font-size:1.5rem; color:#64748b; margin:10px 0 0 0;">全方位掌握學習狀況，溝通無障礙 🚀</p>
-            
-            <!-- 1x4 功能概覽卡片 (壓縮版) -->
+
             <div class="summary-grid">
                 <div class="summary-card">
                     <div class="icon-badge">🔒</div>
                     <h3>專屬防護</h3>
-                    <p>支援 <span class="h-box">「修改密碼」</span>，嚴密保護您的數位隱私！</p>
+                    <p>全新設計與 <span class="h-box">修改密碼</span>，數位隱私更升級！</p>
                 </div>
                 <div class="summary-card">
                     <div class="icon-badge">📊</div>
                     <h3>即時成績</h3>
-                    <p>展示 <span class="h-box red">4 種等級</span> 補考結果，回報更直覺。</p>
+                    <p>展示 <span class="h-box red">4 種等級</span> 補考動態圖，回報更直覺。</p>
                 </div>
                 <div class="summary-card">
-                    <div class="icon-badge">💬</div>
-                    <h3>雙向留言</h3>
-                    <p>點擊 <span class="h-box">「學生留言」</span>，與老師溝通不漏接。</p>
+                    <div class="icon-badge">🎁</div>
+                    <h3>回報棒卡</h3>
+                    <p>新增自動 <span class="h-box orange">棒卡申請</span>功能，成就解鎖不漏接！</p>
                 </div>
                 <div class="summary-card">
                     <div class="icon-badge">📤</div>
                     <h3>作業上傳</h3>
-                    <p>拍照上傳 <span class="h-box green">「作業/筆記」</span>，遠端解惑超順暢。</p>
+                    <p>拍照上傳 <span class="h-box green">作業/筆記</span>，並由老師雙向留言。</p>
                 </div>
             </div>
 
             <!-- LINE 求助導引欄 -->
-            <div style="margin-top: 30px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 20px; padding: 15px 25px; display: flex; align-items: center; justify-content: center; gap: 20px;">
+            <div
+                style="margin-top: 30px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 20px; padding: 15px 25px; display: flex; align-items: center; justify-content: center; gap: 20px;">
                 <span style="font-size: 1.1rem; font-weight: 900; color: #334155;">急迫疑問？點擊右下角</span>
-                <div style="background: #06C755; color: white; padding: 6px 20px; border-radius: 40px; font-weight: 900; display: flex; align-items: center; gap: 8px; font-size: 0.9rem;">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/4/41/LINE_logo.svg" style="width: 18px; filter: brightness(0) invert(1);"> LINE 官方
+                <div
+                    style="background: #06C755; color: white; padding: 6px 20px; border-radius: 40px; font-weight: 900; display: flex; align-items: center; gap: 8px; font-size: 0.9rem;">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/4/41/LINE_logo.svg"
+                        style="width: 18px; filter: brightness(0) invert(1);"> LINE 官方
                 </div>
                 <span style="font-size: 1rem; color: #64748b; font-weight: bold;">多位專業老師在線即時解答！</span>
             </div>
@@ -120,219 +2388,352 @@
 
         <!-- 1. 安裝指南 -->
         <div class="feature-block">
-            <div class="phone-frame" style="height: 550px; background: #f8f9fa; padding: 0; position: relative;">
-                
-                <!-- 模擬 LINE 阻擋畫面 (上半部) -->
-                <div style="padding: 20px; text-align: center;">
-                    <img src="https://www.sciencebear.com.tw/icon.png" style="width:70px; border-radius:15px; margin-bottom:5px; box-shadow:0 4px 10px rgba(0,0,0,0.1);">
-                    <div style="font-size:0.85rem; color:#666; margin-bottom:15px;">山熊科學數位聯絡簿</div>
-                    
-                    <div style="background: #fdf2f2; border: 1.5px solid #e74c3c; border-radius: 12px; padding: 15px; margin-bottom: 20px;">
-                        <div style="color: #c0392b; font-weight: 900; font-size: 1.1rem; margin-bottom: 8px;">🛑 請勿在 LINE 內開啟</div>
-                        <div style="color: #666; font-size: 0.9rem; line-height: 1.5;">Google 安全驗證<b>不支援 LINE 內建瀏覽器</b><br>登入將會失敗</div>
-                    </div>
-                    
-                    <div style="background: white; border-radius: 15px; padding: 20px 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
-                        <div style="color: #3498db; font-weight: 900; margin-bottom: 15px;">👉 請依下方指示操作</div>
-                        <div style="background: #2c3e50; border-radius: 10px; height: 60px; position: relative; margin-bottom: 15px;">
-                            <div style="position: absolute; right: 10px; top: 10px; color: white; display: flex; flex-direction: column; gap: 4px;">
-                                <div style="width: 4px; height: 4px; background: white; border-radius: 50%;"></div>
-                                <div style="width: 4px; height: 4px; background: white; border-radius: 50%;"></div>
-                                <div style="width: 4px; height: 4px; background: white; border-radius: 50%;"></div>
+            <div class="phone-frame" style="height: 550px; background: #f5f5f7;">
+                <!-- Replicated from line-tutorial-overlay -->
+                <div
+                    style="align-items: center; justify-content: center; flex-direction: column; padding: 24px; box-sizing: border-box; display: flex; height: 100%;">
+                    <div style="width:100%;">
+                        <div style="text-align:center; margin-bottom:18px;">
+                            <img src="https://www.sciencebear.com.tw/icon.png"
+                                style="width:70px; height:70px; border-radius:16px; box-shadow:0 4px 16px rgba(0,0,0,0.15);"
+                                alt="山熊科學">
+                            <div style="margin-top:8px; font-size:13px; color:#666;">山熊科學數位聯絡簿</div>
+                        </div>
+                        <div
+                            style="background:rgba(231,76,60,0.1); border:2px solid #e74c3c; border-radius:14px; padding:14px 16px; margin-bottom:16px; text-align:center;">
+                            <div style="color:#c0392b; font-weight:bold; font-size:16px; margin-bottom:5px;">🛑 請勿在 LINE
+                                內開啟</div>
+                            <div style="color:#555; font-size:13px; line-height:1.6;">Google 安全驗證<b>不支援 LINE
+                                    內建瀏覽器</b><br>登入將會失敗</div>
+                        </div>
+                        <div
+                            style="background:white; border-radius:16px; padding:18px; box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+                            <div
+                                style="font-weight:bold; color:#2980b9; font-size:14px; margin-bottom:14px; text-align:center;">
+                                👉 請依下方動畫指示操作</div>
+                            <div class="line-tutorial-container">
+                                <div class="lt-dropdown" style="opacity: 1; transform: scale(1); animation: none;">
+                                    <div class="lt-dropdown-item">在瀏覽器中開啟</div>
+                                </div>
+                                <div class="lt-footer">
+                                    <div class="lt-menu-btn">
+                                        <div class="lt-menu-dot"></div>
+                                        <div class="lt-menu-dot"></div>
+                                        <div class="lt-menu-dot"></div>
+                                    </div>
+                                </div>
+                                <div class="lt-cursor" style="left: 170px; top: 120px; animation: none;">
+                                    <div class="lt-click-ripple" style="opacity: 1;"></div>
+                                </div>
                             </div>
-                            <div style="background: #4b5563; color: white; font-size: 0.8rem; padding: 6px 12px; border-radius: 6px; position: absolute; right: 30px; top: -10px;">在預設瀏覽器中開啟</div>
+                            <div
+                                style="text-align:center; font-size:14px; color:#444; margin-top:14px; line-height:1.7;">
+                                點擊畫面<b>右下角的 [ ⋮ ]</b><br>選擇<b>「以 Safari 或 Chrome 開啟」</b>
+                            </div>
                         </div>
-                        <div style="color: #555; font-size: 0.9rem; font-weight: bold;">點擊畫面右下角/右上角的 [ ⋮ ]<br>選擇「以 Safari 或 Chrome 開啟」</div>
-                    </div>
-                </div>
-
-                <!-- 模擬安裝為桌面 App 覆蓋層 (下半部疊加) -->
-                <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 50%; background: rgba(0,0,0,0.4); display: flex; align-items: flex-end; z-index: 10;">
-                    <div style="background: white; width: 100%; border-radius: 20px 20px 0 0; padding: 20px; box-sizing: border-box; text-align: center;">
-                        <div style="width: 50px; height: 50px; border: 2px solid #3498db; color: #3498db; border-radius: 50%; font-size: 24px; font-weight: 900; line-height: 46px; margin: 0 auto 10px auto;">i</div>
-                        <h3 style="margin: 0 0 10px 0; font-size: 1.3rem; color: #333;">📱 安裝為桌面 App</h3>
-                        
-                        <div style="display: flex; align-items: center; gap: 10px; background: #f8f9fa; padding: 10px; border-radius: 10px; margin-bottom: 8px; text-align: left;">
-                            <div style="background: #e9ecef; width: 30px; height: 30px; border-radius: 8px; display: flex; justify-content: center; align-items: center; color: #007aff;"><span class="share-icon"></span></div>
-                            <div style="font-size: 0.85rem; color: #555;">1. 點擊瀏覽器下方的「分享」按鈕</div>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 10px; background: #f8f9fa; padding: 10px; border-radius: 10px; margin-bottom: 15px; text-align: left;">
-                            <div style="background: #e9ecef; width: 30px; height: 30px; border-radius: 8px; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 16px;">＋</div>
-                            <div style="font-size: 0.85rem; color: #555;">2. 向上捲動並點擊「加入主畫面」</div>
-                        </div>
-                        <div style="background: #4CAF50; color: white; padding: 10px; border-radius: 10px; font-weight: bold;">了解！開始使用</div>
                     </div>
                 </div>
             </div>
             <div class="info-panel">
-                <h2 style="color:var(--apple-blue);">📲 第一步：跳出 LINE，安裝桌面捷徑</h2>
-                <p>為避免 Google 登入卡住，請先依紅色指示<b>「跳轉至外部瀏覽器」</b>。<br>切換成功後，系統會跳出引導畫面，請依指示將網頁<b>「加入主畫面」</b>，以後就能像專屬 App 一樣在桌面隨點隨開，不再迷路！</p>
+                <h2 style="color:#0071e3;">📲 第一步：跳出 LINE，安裝桌面捷徑</h2>
+                <p>為避免 Google 登入卡住，系統會自動偵測 LINE 並跳出紅色指示<b>「跳轉至外部瀏覽器」</b>。<br>切換成功後，系統會引導您將網頁<b>「加入主畫面」</b>，以後就能像專屬 App
+                    一樣在桌面隨開即用，不怕每次都要重新登入了！</p>
             </div>
         </div>
 
         <!-- 2. 登入改密碼 -->
         <div class="feature-block reverse">
-            <div class="phone-frame" style="height: 520px; background: #fafafa; padding: 30px 25px; box-sizing: border-box; text-align: center; position: relative;">
-                <!-- 灰階 LOGO 與標題 -->
-                <img src="https://www.sciencebear.com.tw/icon.png" style="width: 90px; filter: grayscale(100%); opacity: 0.6; margin-bottom: 10px;">
-                <div style="font-size: 1.6rem; font-weight: 900; color: #444; margin-bottom: 5px;">數位聯絡簿</div>
-                <div style="font-size: 0.95rem; color: #888; font-weight: bold; margin-bottom: 25px;">小六資優自然<br>國中自然超前班</div>
-
-                <!-- 登入框 -->
-                <div style="display: flex; flex-direction: column; gap: 15px;">
-                    <div style="background: white; border: 1px solid #e0e0e0; padding: 12px; border-radius: 10px; color: #aaa; text-align: center; font-size: 0.95rem;">請輸入學生姓名 (預設帳號)</div>
-                    <div style="background: white; border: 1px solid #e0e0e0; padding: 12px; border-radius: 10px; color: #aaa; text-align: center; font-size: 0.95rem;">請輸入密碼 (家長手機)</div>
-                    <div style="background: #4CAF50; color: white; padding: 14px; border-radius: 10px; font-weight: 900; font-size: 1.1rem; margin-top: 5px; box-shadow: 0 4px 6px rgba(76, 175, 80, 0.2);">登入查看</div>
-                </div>
-                <div style="font-size: 0.75rem; color: #aaa; margin-top: 15px;">忘記密碼請洽山熊科學</div>
+            <div class="phone-frame" id="login-screen"
+                style="height: 520px; background: white; padding: 20px; justify-content: flex-start; position: relative; min-height: auto;">
+                <img src="https://www.sciencebear.com.tw/icon.png" class="logo-img" alt="山熊科學"
+                    style="margin-top: 30px;">
+                <h2>數位聯絡簿</h2>
+                <div class="sub-title" style="margin-bottom: 20px;">小六資優自然<br>國中自然超前班</div>
+                <div class="input-group"><input type="text" placeholder="請輸入學生姓名" style="pointer-events: none;"></div>
+                <div class="input-group"><input type="password" placeholder="請輸入密碼 (預設家長手機)"
+                        style="pointer-events: none;"></div>
+                <button class="login-btn">登入查看</button>
+                <div class="forgot-pwd">忘記密碼請洽山熊科學</div>
 
                 <!-- 模擬登入後的修改密碼提示疊加 -->
-                <div style="position: absolute; bottom: 30px; left: 0; width: 100%; display: flex; justify-content: center;">
-                    <div style="background: rgba(255,255,255,0.95); border: 1.5px solid #e0e0e0; padding: 15px; border-radius: 15px; width: 80%; box-shadow: 0 10px 20px rgba(0,0,0,0.1);">
-                        <div style="font-size: 0.85rem; color: #555; margin-bottom: 10px; font-weight: bold;">登入成功後，請點擊右上角：</div>
-                        <div style="display: inline-block; background: white; color: #777; border: 1px solid #ccc; padding: 4px 15px; border-radius: 20px; font-size: 0.85rem;">改密碼</div>
+                <div
+                    style="position: absolute; bottom: 30px; left: 0; width: 100%; display: flex; justify-content: center;">
+                    <div
+                        style="background: rgba(255,255,255,0.95); border: 2px solid #10b981; padding: 15px; border-radius: 15px; width: 85%; box-shadow: 0 10px 20px rgba(0,0,0,0.1); text-align: center;">
+                        <div style="font-size: 0.95rem; color: #064e3b; margin-bottom: 10px; font-weight: bold;">
+                            登入後，請點擊上方工具列：</div>
+                        <div class="header-icon-btn pwd-btn"
+                            style="display:inline-flex; width:36px; height:36px;"><svg width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='11' width='18' height='11' rx='2' ry='2'/><path d='M7 11V7a5 5 0 0 1 10 0v4'/></svg></div>
                     </div>
                 </div>
-
-                <!-- 綠色 LINE -->
-                <div style="position:absolute; bottom:20px; right:20px;" class="circular-line">LINE</div>
             </div>
             <div class="info-panel">
-                <h2 style="color:var(--primary);">🔑 預設登入與帳戶安全</h2>
-                <p>初次使用的預設帳密：<br>👤 **帳號**：學生姓名 (請輸入全名)<br>🔒 **密碼**：家長留下的手機號碼<br><br>為了保障孩子的資料安全，首次登入成功看到成績後，強烈建議您點擊右上角的<b>「改密碼」</b>按鈕，變更為您專屬的密碼。</p>
+                <h2 style="color:#10b981;"><svg width='1.1em' height='1.1em' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' style='vertical-align:-0.2em;margin-right:6px'><rect x='3' y='11' width='18' height='11' rx='2' ry='2'/><path d='M7 11V7a5 5 0 0 1 10 0v4'/></svg> 預設登入與帳戶安全</h2>
+                <p>初次使用的預設帳密：<br><svg width='1em' height='1em' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' style='vertical-align:-0.15em;margin-right:4px'><path d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'/><circle cx='12' cy='7' r='4'/></svg> <b>帳號</b>：學生姓名 (請輸入全名)<br><svg width='1em' height='1em' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' style='vertical-align:-0.15em;margin-right:4px'><rect x='3' y='11' width='18' height='11' rx='2' ry='2'/><path d='M7 11V7a5 5 0 0 1 10 0v4'/></svg>
+                    <b>密碼</b>：家長留下的手機號碼<br><br>為了保障孩子的資料安全，首次登入成功看到成績後，強烈建議您點擊右上角的<b>「<svg width='1em' height='1em' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' style='vertical-align:-0.15em;'><rect x='3' y='11' width='18' height='11' rx='2' ry='2'/><path d='M7 11V7a5 5 0 0 1 10 0v4'/></svg> (改密碼)」</b>按鈕，變更為您專屬的密碼。</p>
             </div>
         </div>
 
         <!-- 3. 緊急公告彈窗 -->
         <div class="feature-block">
-            <div class="phone-frame" style="height: 400px; position: relative;">
-                <div style="padding:15px; font-weight:900; color:#555;">林世衡</div>
-                <div class="modal-overlay">
-                    <div class="modal">
-                        <div style="background:#fdecea; padding:15px; color:#c0392b; font-weight:900; text-align:center; border-bottom:1px solid #f5b7b1;">⚠️ 緊急公告</div>
-                        <div style="padding:20px; text-align:center; font-size:1rem; color:#333; line-height:1.5;">這是一則重要公告，請家長讀完後點擊確認喔！</div>
-                        <div style="background:#e74c3c; color:white; padding:12px; margin:20px; text-align:center; border-radius:12px; font-weight:900;">我已閱讀</div>
+            <div class="phone-frame" style="height: 480px; position: relative; background: #f0fdf4;">
+                <div class="mock-header-bar">
+                    <div class="header-col-logo"><img src="https://www.sciencebear.com.tw/icon.png"
+                            class="header-logo-full"></div>
+                    <div class="header-col-info">
+                        <div class="class-info-top">國二自然超前班</div>
+                        <div class="name-pill-row"><span class="student-info">林阿熊</span></div>
+                    </div>
+                </div>
+
+                <div class="emergency-modal"
+                    style="display:flex; position:absolute; backdrop-filter: blur(2px); z-index: 10;">
+                    <div class="emergency-box" style="animation: none;">
+                        <div class="emergency-header"><svg width='1em' height='1em' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' style='vertical-align:-0.15em;margin-right:8px'><path d='M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z'/><line x1='12' y1='9' x2='12' y2='13'/><line x1='12' y1='17' x2='12.01' y2='17'/></svg> 緊急公告</div>
+                        <div class="emergency-body">因颱風來襲，今日資優自然課程停課一次，堂數順延！</div>
+                        <div class="emergency-footer">
+                            <button class="emergency-btn" style="font-family: inherit;">我已閱讀</button>
+                        </div>
                     </div>
                 </div>
             </div>
             <div class="info-panel">
-                <h2 style="color:var(--red);">🚨 重要公告：即時彈出提醒 (不漏看任何消息)</h2>
-                <p>當有停課、補課或任何影響上課時間地點的極重要訊息，系統會自動跳出<span style="font-weight:900; color:var(--red);">強制紅色彈窗</span>。家長點擊確認後才能進行其他動作，確保訊息絕對不漏看。</p>
+                <h2 style="color:#ef4444;">🚨 重要公告：即時彈出提醒</h2>
+                <p>當有停課、補課或任何影響上課時間地點的極重要訊息，系統會自動跳出<span
+                        style="font-weight:900; color:#ef4444;">強制紅色視窗</span>。家長點擊「我已閱讀」後才能進行其他動作，確保訊息絕對不漏接！</p>
             </div>
         </div>
 
         <!-- 4. 公告分頁列表 -->
         <div class="feature-block reverse">
-            <div class="phone-frame" style="height: 520px; background:#f2f3f7;">
-                <div style="background:white; padding:15px; border-bottom:1px solid #eee; display:flex; gap:12px;">
-                    <span style="color:#4CAF50; font-weight:900; border-bottom:3.5px solid #4CAF50;">數位聯絡簿</span>
-                    <span style="color:#999; font-weight:bold;">近期成績</span>
-                    <span style="color:#4CAF50; font-weight:900; border-bottom:3.5px solid #4CAF50;">重要公告</span>
+            <div class="phone-frame" style="height: 520px; background:#f2f3f7; padding-top: 10px; overflow-y: hidden;">
+                <div class="tabs">
+                    <div class="tab-item">聯絡簿</div>
+                    <div class="tab-item active" style="font-size: 1.1rem; padding: 10px 0;">公佈欄 &amp; 公告</div>
                 </div>
-                <div style="background:white; margin:10px; padding:15px; border-radius:12px; border-left:6px solid #f39c12; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-                    <span style="background:#f39c12; color:white; padding:3px 8px; border-radius:5px; font-size:0.7rem; font-weight:900; margin-right:5px;">一般</span> <b>本週理化小考重點整理</b>
-                    <p style="font-size: 0.8rem; color: #666; margin: 8px 0 0 0; line-height: 1.4;">本週重點為「電流與磁場的交互作用」，請複習講義第 15-20 頁...</p>
-                </div>
-                <div style="background:white; margin:10px; padding:15px; border-radius:12px; border-left:6px solid #3498db; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-                    <span style="background:#3498db; color:white; padding:3px 8px; border-radius:5px; font-size:0.7rem; font-weight:900; margin-right:5px;">課表</span> <b>上學期完整精美課表下載</b>
-                    <div class="btn-link" style="margin-top: 10px; font-size: 0.9rem;">2026_上學期課表.pdf</div>
-                </div>
-                <div style="background:white; margin:10px; padding:15px; border-radius:12px; border-left:6px solid #e74c3c; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-                    <span style="background:#e74c3c; color:white; padding:3px 8px; border-radius:5px; font-size:0.7rem; font-weight:900; margin-right:5px;">緊急</span> <b>補考教室調整地圖</b>
-                </div>
-            </div>
-            <div class="info-panel">
-                <h2 style="color:var(--orange);">📢 各類公告與永久性檔案</h2>
-                <p>在「重要公告」分頁，您可以一次查看老師發布的所有歷史消息。系統將資訊標註為<span style="color:#f39c12; font-weight:900;">一般公告</span>、<span style="color:#3498db; font-weight:900;">課表資料</span>與<span style="color:var(--red); font-weight:900;">緊急提醒</span>，確保所有紀錄隨時可查。</p>
-            </div>
-        </div>
-
-        <!-- 5. 補考回報與審核 (圖一) -->
-        <div class="feature-block">
-            <div class="phone-frame" style="height: 480px; text-align:center; padding-top:15px;">
-                <div style="font-weight:900; color:#555; font-size:1.4rem;">今日小考成績</div>
-                <div class="main-exam-range" style="margin-top: 10px;">範圍: 電流的磁效應</div>
-                <div style="font-size:4rem; font-weight:900; color:#333; line-height:1; margin-top:5px;">100 <span style="font-size:1.3rem; color:#999; font-weight:bold;">分</span></div>
-                <div style="color:var(--blue); font-weight:900; margin-top:5px; font-size:1.15rem;">(待審核)</div>
-                <div class="exam-standard-box">🎯 補考標準：未滿 85 分需補考</div>
-                
-                <div class="red-dash" style="margin-top:20px;">
-                    <div style="color:var(--red); font-weight:900; margin-bottom:12px; font-size:1.2rem;">📝 回報補考分數</div>
-                    <div style="display:flex; justify-content:center; gap:8px;">
-                        <div style="border:2.5px solid #e74c3c; border-radius:30px; font-weight:bold; color:var(--red); padding:10px; width:55%; font-size:1.4rem; background:white;">100</div>
-                        <div style="background:var(--red); color:white; padding:12px 25px; border-radius:30px; font-weight:900; font-size:1.1rem;">送出</div>
+                <div style="padding: 5px;">
+                    <div class="bulletin-card type-normal">
+                        <div class="bulletin-header"><span class="bulletin-title"><span
+                                    class="bulletin-tag type-normal">一般</span>山熊科學教室守則</span><span
+                                class="bulletin-date">09/21</span></div>
+                        <div class="bulletin-content">教室規章請嚴格遵守！</div>
+                    </div>
+                    <div class="bulletin-card type-schedule">
+                        <div class="bulletin-header"><span class="bulletin-title"><span
+                                    class="bulletin-tag type-schedule">課表</span>上學期課表下載</span><span
+                                class="bulletin-date">09/10</span></div>
+                        <div class="bulletin-content" style="padding-top: 10px;">
+                            <a class="btn-capsule">👉 下載 PDF 課表</a>
+                        </div>
                     </div>
                 </div>
             </div>
             <div class="info-panel">
-                <h2 style="color:var(--red);">🎯 在家補考：分數一鍵回報 (老師同步掌握進度)</h2>
-                <p>若孩子領回補考卷寫完並批改後，請點入聯絡簿專屬的<span style="font-weight:900; color:var(--red);">紅色虛線回報欄</span>輸入分數。回報後成績旁會顯示藍色的<span style="color:var(--blue); font-weight:900;">(待審核)</span>，讓老師在後台同步核對。</p>
+                <h2 style="color:#f59e0b;">📢 分類公佈欄與永久檔案</h2>
+                <p>切換至「公佈欄」分頁，可一次查看老師發布的所有歷史消息。系統將資訊分類為<span style="color:#d35400; font-weight:900;">一般公告</span>、<span
+                        style="color:#2980b9; font-weight:900;">課表資料</span>與<span
+                        style="color:#c0392b; font-weight:900;">緊急提醒</span>，確保所有紀錄點擊即可查閱、下載。</p>
             </div>
         </div>
 
-        <!-- 6. 補考分級狀態 (圖三) -->
-        <div class="feature-block reverse">
-            <div class="phone-frame" style="height: 520px; text-align:center; padding-top:20px;">
-                <div style="font-weight:900; color:#555; font-size:1.4rem;">今日小考成績</div>
-                <div class="main-exam-range" style="margin-top: 10px;">範圍: 電流的磁效應</div>
-                <div style="font-size:4rem; font-weight:900; color:var(--red); line-height:1; margin-top:5px;">50 <span style="font-size:1.3rem; color:#999; font-weight:bold;">分</span></div>
-                <div class="s-tag s-red" style="margin-top:10px; margin-bottom:10px;">⚠️ 未達標需補考</div>
-                <div class="exam-standard-box">🎯 補考標準：未滿 85 分需補考</div>
-                <hr style="border:0; border-top:1px solid #eee; margin:15px 0;">
-                <div style="font-weight:900; color:#666; margin-bottom:10px;">補考五大狀態 (根據20題錯數)</div>
-                <span class="s-tag s-green">👍 補考結果：觀念理解良好 (錯 0-3)</span>
-                <span class="s-tag s-yellow">😐 補考結果：觀念大致理解 (錯 4-6)</span>
-                <span class="s-tag s-orange">😐 補考結果：觀念不太理解 (錯 7-9)</span>
-                <span class="s-tag s-red">💪 補考結果：觀念必須加強 (錯 10+)</span>
-            </div>
-            <div class="info-panel">
-                <h2 style="color:var(--orange);">📉 複習進度：掌握孩子掌握程度</h2>
-                <p>當成績未達標準，分數下方會跳出<span style="color:var(--red); font-weight:900;">⚠️ 未達標警示標記</span>。補考後系統會依錯題數呈現顏色狀態，幫助家長一眼看見孩子補完考後是真的聽懂了，還是需要再加強。</p>
-            </div>
-        </div>
-
-        <!-- 7. 留言對話紀錄 (圖二) -->
+        <!-- 5. 補考回報與審核 -->
         <div class="feature-block">
-            <div class="phone-frame" style="height: 480px; padding:15px; box-sizing:border-box; background:#fafafa; position:relative;">
-                <div style="overflow-y:auto; height:calc(100% - 60px);">
-                    <div class="msg-history-item"><b>阿喵老師回覆:</b> 棒！<div style="color:#999; font-size:0.75rem; text-align:right;">(04/03 20:42)</div></div>
-                    <div class="msg-history-item"><b>家長/學生:</b> 超帥<div style="color:#999; font-size:0.75rem; text-align:right;">(04/03 20:56)</div></div>
-                    <div class="msg-history-item"><b>阿喵老師回覆:</b><div class="quote-box"><b>學生留言</b><br>超帥</div>超愛<div style="color:#999; font-size:0.75rem; text-align:right;">(04/03 20:57)</div></div>
-                    <div class="msg-history-item"><b>阿喵老師回覆:</b><div class="quote-box"><b>補考回報</b><br>100</div>厲害<div style="color:#999; font-size:0.75rem; text-align:right;">(04/03 21:00)</div></div>
+            <div class="phone-frame"
+                style="height: 540px; background: white; padding: 0 0 15px; overflow: hidden; border-radius: 40px; background: #f0fdf4;">
+                <div class="post-card mock-post-card-wrapper" style="border: 1px solid #e5e7eb;">
+                    <div class="post-header"><span>📅 09/21 (四) 聯絡簿</span></div>
+                    <div class="grade-section" style="border: none; padding-bottom: 0;">
+                        <span class="main-exam-title">今日小考成績</span>
+                        <span class="main-exam-range">範圍: 電流的磁效應</span>
+                        <div class="main-score" style="font-size: 5rem;">100<span class="score-unit-big">分</span></div>
+                        <span class="reviewing-tag">(待審核)</span>
+                        <span class="exam-standard-box" style="margin-top: 15px;"><svg width='1.3em' height='1.3em'
+                                viewBox='0 0 24 24' fill='none' stroke='#e11d48' stroke-width='2' stroke-linecap='round'
+                                style='vertical-align:-0.3em;margin-right:6px'>
+                                <circle cx='12' cy='12' r='10' />
+                                <circle cx='12' cy='12' r='6' />
+                                <circle cx='12' cy='12' r='2' fill='#e11d48' />
+                            </svg> 未達 85 分需補考</span>
+                    </div>
+                    <div class="score-report-section" style="margin: 15px 15px 25px;">
+                        <div
+                            style="font-weight: 900; color: #c0392b; margin-bottom: 10px; font-size: 1.15rem; text-align: center;">
+                            <svg width='1.2em' height='1.2em' viewBox='0 0 24 24' fill='none' stroke='currentColor'
+                                stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'
+                                style='vertical-align:-0.25em;margin-right:6px'>
+                                <path d='M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7' />
+                                <path d='M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z' />
+                            </svg> 新增/修改 本次補考分數
+                        </div>
+                        <div class="input-box" style="margin-top: 0;">
+                            <input type="number" class="score-input" value="100" style="pointer-events:none;">
+                            <button class="score-btn">送出</button>
+                        </div>
+                    </div>
                 </div>
-                <div class="input-box" style="position:absolute; bottom:0; left:0; width:100%; box-sizing:border-box; margin:0;">
-                    <input type="text" class="fb-input" placeholder="留言給老師...">
-                    <button class="fb-btn">送出</button>
-                </div>
-                <div style="position:absolute; bottom:75px; right:15px;" class="circular-line">LINE</div>
             </div>
             <div class="info-panel">
-                <h2 style="color:#27ae60;">💬 雙向對話留言板與 LINE 支援</h2>
-                <p>除了強大的「引用功能」可追蹤老師的回覆目標外，家長若遇到繁瑣問題或老師繁忙，可隨時轉跳至綠色的 <b>LINE 官方圖標</b>。山熊科學有多位老師組成團隊，隨時為大家服務！</p>
+                <h2 style="color:#e74c3c; white-space: nowrap;">🎯 在家補考：分數一鍵回報</h2>
+                <p>若孩子領回補考卷，寫完並批改後，請在成績單下方的<span
+                        style="font-weight:900; color:#e74c3c;">紅色虛線回報欄</span>輸入分數。回報後成績會顯示為<span
+                        style="color:#3498db; font-weight:900;">(待審核)</span>，讓老師在後台同步核對。</p>
             </div>
         </div>
 
-        <!-- 8. 檔案存取 (補充 下載/上傳) -->
+        <!-- 6. 補考分級狀態 -->
         <div class="feature-block reverse">
-            <div class="phone-frame" style="height: 500px; padding-top:10px;">
-                <div style="background:#e1f5fe; padding:10px; font-weight:bold; color:#0288d1; font-size:0.9rem;">🔵 今日考卷/教材下載區</div>
-                <div class="blue-btn">電能、用電安全.pdf</div>
-                <div class="blue-btn">電流的溫熱效應.pdf</div>
-                <div style="height:30px;"></div>
-                <div style="background:#e8f5e9; padding:10px; font-weight:bold; color:#2e7d32; font-size:0.9rem;">🟢 作業/理化筆記回傳區</div>
-                <div class="green-dash">
-                    <span style="font-weight:900; color:#2e7d32; font-size:1.1rem;">可一次拍照上傳多張照片</span><br>
-                    <div style="background:white; border:1.8px solid #2e7d32; padding:8px 20px; border-radius:8px; margin-top:12px; display:inline-block; font-weight:900; color:#2e7d32;">➕ 選擇檔案</div>
+            <div class="phone-frame"
+                style="height: 620px; background: white; text-align:center; padding-top:20px; border-radius: 40px;">
+                <span class="main-exam-range">範圍: 電流的磁效應</span>
+                <div class="main-score text-red" style="font-size:4.5rem; color: #e74c3c;">50<span
+                        class="score-unit-big">分</span></div>
+                <span class="makeup-status-tag status-warning" style="margin-bottom: 15px;"><svg width='1.1em' height='1.1em' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' style='vertical-align:-0.2em;margin-right:4px'><path d='M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z'/><line x1='12' y1='9' x2='12' y2='13'/><line x1='12' y1='17' x2='12.01' y2='17'/></svg> 未達標需補考</span>
+
+                <div class="v2-bar-chart-container" style="height: 80px; margin: 15px 20px;">
+                    <div class="v2-bar-col">
+                        <div class="v2-bar-fill" style="height: 30%; background: #4ade80;" data-val="1"></div>
+                        <div class="v2-bar-label">0~60</div>
+                    </div>
+                    <div class="v2-bar-col">
+                        <div class="v2-bar-fill" style="height: 100%; background: #fbbf24;" data-val="4"></div>
+                        <div class="v2-bar-label" style="opacity: 0;">60~70</div>
+                    </div>
+                    <div class="v2-bar-col">
+                        <div class="v2-bar-fill" style="height: 40%; background: #f87171;" data-val="2"></div>
+                        <div class="v2-bar-label" style="opacity: 0;">70~80</div>
+                    </div>
+                    <div class="v2-bar-col">
+                        <div class="v2-bar-fill" style="height: 20%; background: #38bdf8;" data-val="1"></div>
+                        <div class="v2-bar-label" style="opacity: 0;">80~90</div>
+                    </div>
+                    <div class="v2-bar-col">
+                        <div class="v2-bar-fill" style="height: 60%; background: #a78bfa;" data-val="3"></div>
+                        <div class="v2-bar-label">90+</div>
+                    </div>
+                </div>
+
+                <span class="exam-standard-box" style="margin: 20px auto 10px;"><svg width='1.3em' height='1.3em'
+                        viewBox='0 0 24 24' fill='none' stroke='#e11d48' stroke-width='2' stroke-linecap='round'
+                        style='vertical-align:-0.3em;margin-right:6px'>
+                        <circle cx='12' cy='12' r='10' />
+                        <circle cx='12' cy='12' r='6' />
+                        <circle cx='12' cy='12' r='2' fill='#e11d48' />
+                    </svg> 未滿 85 分需補考</span>
+                <hr style="border:0; border-top:1px solid #eee; margin:15px 0;">
+
+                <div style="font-weight:900; color:#64748b; margin-bottom:10px;">【補考五大狀態圖例】</div>
+                <div style="font-size: 0.95rem;">
+                    <span class="makeup-status-tag status-green"><svg width='1.1em' height='1.1em' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' style='vertical-align:-0.2em;margin-right:4px'><path d='M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3'/></svg> 補考結果：觀念理解良好</span>
+                    <span class="makeup-status-tag status-yellow"><svg width='1.1em' height='1.1em' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' style='vertical-align:-0.2em;margin-right:4px'><circle cx='12' cy='12' r='10'/><path d='M8 14s1.5 2 4 2 4-2 4-2'/><line x1='9' y1='9' x2='9.01' y2='9'/><line x1='15' y1='9' x2='15.01' y2='9'/></svg> 補考結果：觀念大致理解</span>
+                    <span class="makeup-status-tag status-orange"><svg width='1.1em' height='1.1em' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' style='vertical-align:-0.2em;margin-right:4px'><circle cx='12' cy='12' r='10'/><line x1='8' y1='15' x2='16' y2='15'/><line x1='9' y1='9' x2='9.01' y2='9'/><line x1='15' y1='9' x2='15.01' y2='9'/></svg> 補考結果：觀念不太理解</span>
+                    <span class="makeup-status-tag status-red"><svg width='1.1em' height='1.1em' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' style='vertical-align:-0.2em;margin-right:4px'><circle cx='12' cy='12' r='10'/><path d='M16 16s-1.5-2-4-2-4 2-4 2'/><line x1='9' y1='9' x2='9.01' y2='9'/><line x1='15' y1='9' x2='15.01' y2='9'/></svg> 補考結果：觀念必須加強</span>
                 </div>
             </div>
             <div class="info-panel">
-                <h2 style="color:var(--blue);">📄 雲端隨身包：下載教材、回傳筆記都方便</h2>
-                <p>🔹 <span style="font-weight:900; color:var(--blue);">教材下載</span>：點擊藍色按鈕，直接下載練習題或講義到手機，不用大海撈針找紀錄。<br>
-                🔸 <span style="font-weight:900; color:var(--primary);">筆記回傳</span>：若需回傳作業，在「綠色虛線區」直接拍照上傳。老師隨時批改，不擔心 LINE 訊息照片過期喔！</p>
+                <h2 style="color:#ea580c;">📉 班級統計圖與雙重顏色警示</h2>
+                <p>成績未達標會顯示<span style="color:#cc0000; font-weight:900;">⚠️
+                        補考警示</span>。成績會自動帶出全班的分散動態長條直方圖，若發生補考，系統還會根據補考錯題數呈現<span
+                        style="color:#27ae60; font-weight:900;">綠色</span>到<span
+                        style="color:#cc0000; font-weight:900;">紅色</span>的狀態，幫助家長秒懂孩子是真聽懂了，還是還需要再加強。</p>
             </div>
         </div>
 
-        <div style="text-align:center; color:#999; border-top:1px solid #ddd; padding-top:40px; padding-bottom:50px;">
+        <!-- 7. 棒卡申請區 -->
+        <div class="feature-block">
+            <div class="phone-frame"
+                style="height: 520px; background: white; padding: 20px; box-sizing: border-box; text-align: left; background: #f0fdf4;">
+                <div class="mock-header-bar" style="margin: -20px -20px 20px -20px; padding: 10px 20px;">
+                    <div class="header-col-info" style="padding: 0;">
+                        <span class="student-info" style="font-size: 1.4rem;">黃阿喵</span>
+                    </div>
+                    <div>
+                        <span class="sticker-badge-header" style="font-size: 1rem; padding: 4px 10px;"><svg width='1.2em' height='1.2em' viewBox='0 0 24 24' fill='#f59e0b' stroke='#f59e0b' stroke-width='1.5' style='vertical-align:-0.2em;margin-right:6px'><polygon points='12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2'/></svg> 棒卡數：x 3</span>
+                    </div>
+                </div>
+
+                <div class="post-card" style="box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);">
+                    <div class="feedback-section">
+                        <div class="sticker-apply-box">
+                            <span class="sticker-apply-title"><svg width='1em' height='1em' viewBox='0 0 24 24' fill='#f59e0b' stroke='#f59e0b' stroke-width='1.5' style='vertical-align:-0.15em;margin-right:3px'><polygon points='12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2'/></svg> 棒卡申請區</span>
+                            <div class="sticker-apply-row">
+                                <select class="sticker-reason-select">
+                                    <option>今日小考 100 分</option>
+                                </select>
+                                <select class="sticker-count-select">
+                                    <option>+20 張</option>
+                                </select>
+                            </div>
+                            <button class="sticker-submit-btn"
+                                style="width: 100%; margin-top: 10px; font-family: inherit;">送出申請表 🚀</button>
+                            <div class="sticker-hint">每日可申請一次，老師會盡快審核喔！</div>
+                        </div>
+
+                        <div class="history-msg">
+                            <div class="history-msg-avatar avatar-student">喵</div>
+                            <div class="history-msg-body sticker-body">
+                                <div><b>申請發放棒卡</b> <span class="sticker-badge">+20 張</span></div>
+                                <div style="font-size: 0.95rem; color: #ea580c; margin-top: 4px;">理由：今日小考 100 分</div>
+                                <div class="sticker-status approved"><svg width='1em' height='1em' viewBox='0 0 24 24' fill='none' style='vertical-align:-0.15em;margin-right:3px;border-radius:50%'><circle cx='12' cy='12' r='12' fill='#10b981'/><polyline points='6 12 10 16 18 8' stroke='white' stroke-width='2.5' fill='none' stroke-linecap='round'/></svg> 已核准發放</div>
+                                <div class="history-msg-time">09/21 18:30</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="info-panel">
+                <h2 style="color:#fb923c;">回報棒卡系統</h2>
+                <p><span
+                        style="font-weight:900; color:#ea580c;">「棒卡申請」</span>功能：孩子在班上完成特定目標（如：小考高分、課堂表现良好）後，可直接透過橘色的申請區送出請求，老師審核通過後點數直接加進上方棒卡帳戶，成就感滿滿！
+                </p>
+            </div>
+        </div>
+
+        <!-- 8. 留言與檔案區 -->
+        <div class="feature-block reverse">
+            <div class="phone-frame" style="height: 580px; background: white; display: flex; flex-direction: column;">
+                <div class="student-upload-box" style="margin: 15px; text-align: center;">
+                    <span class="upload-title"><svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' style='vertical-align:middle;margin-right:4px'><polyline points='16 16 12 12 8 16'/><line x1='12' y1='12' x2='12' y2='21'/><path d='M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3'/></svg> 學生作業上傳區</span>
+                    <div class="upload-btn-real" style="pointer-events: none;"><svg width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='3' stroke-linecap='round' style='vertical-align:middle;margin-right:3px'><line x1='12' y1='5' x2='12' y2='19'/><line x1='5' y1='12' x2='19' y2='12'/></svg> 選擇檔案 / 拍照</div>
+                    <div class="upload-status">可上傳多張照片</div>
+                </div>
+
+                <div class="feedback-section"
+                    style="flex: 1; overflow-y: hidden; display: flex; flex-direction: column; padding: 20px 15px;">
+                    <div style="flex: 1;">
+                        <div class="history-msg">
+                            <div class="history-msg-avatar avatar-teacher">喵</div>
+                            <div class="history-msg-body teacher-body">
+                                <div><a class="btn-small-tag">📎 P102-105.jpg</a></div>
+                                <div>表現得很棒！</div>
+                                <div class="history-msg-time">09/20 20:42</div>
+                            </div>
+                        </div>
+                        <div class="history-msg">
+                            <div class="history-msg-avatar avatar-student">熊</div>
+                            <div class="history-msg-body">
+                                <div class="quote-box">
+                                    <div class="quote-type">老師：喵</div>
+                                    表現得很棒！
+                                </div>
+                                <div>謝謝阿喵老師！</div>
+                                <div class="history-msg-time">09/20 20:56</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="input-box" style="margin-top: auto;">
+                        <input type="text" class="fb-input" placeholder="回覆或留言...">
+                        <button class="fb-btn">送出</button>
+                    </div>
+                </div>
+            </div>
+            <div class="info-panel">
+                <h2 style="color:#10b981;">💬 雙向對話留言板與檔案上傳</h2>
+                <p>除了強大的「引用功能」可自動綁定老師的對話內容外，也完美支援<b>「作業拍照上傳」</b>。<br>點擊綠色虛線區即可附上圖片，有不懂的立即發問，讓老師線上看圖解惑，再也不怕問題卡住！</p>
+            </div>
+        </div>
+
+        <div
+            style="text-align:center; color:#999; border-top:1px solid #ddd; padding-top:40px; padding-bottom:50px; font-weight: bold;">
             © 2026 山熊科學教育 Bear's Lab. All Rights Reserved.
         </div>
     </div>
@@ -348,12 +2749,12 @@
             updateBtn("btn-long", "⏳ 正在生成究極高清長圖...", true);
             try {
                 const canvas = await html2canvas(document.querySelector("#poster-canvas"), {
-                    scale: 3, // Increased scale for ultra-high quality
+                    scale: 3,
                     backgroundColor: "#f8fafc",
                     useCORS: true
                 });
                 const link = document.createElement('a');
-                link.download = '山熊科學-聯絡簿首登與全功能操作究極指南(高清版).png';
+                link.download = '山熊科學-電子聯絡簿操作手冊(全新長圖版).png';
                 link.href = canvas.toDataURL('image/png', 1.0);
                 link.click();
                 updateBtn("btn-long", "✅ 下載成功！ (可再次下載)", false);
@@ -369,19 +2770,18 @@
                 document.querySelector(".poster-header"),
                 ...document.querySelectorAll(".feature-block")
             ];
-            
+
             try {
                 for (let i = 0; i < blocks.length; i++) {
-                    // Create a temporary off-screen wrapper to add "bleeding" (padding)
                     const wrapper = document.createElement('div');
-                    wrapper.style.padding = '50px'; // Add 50px bleeding
-                    wrapper.style.background = '#f8fafc'; // Matches poster background
-                    wrapper.style.width = '1000px'; // Match poster width
+                    wrapper.style.padding = '50px';
+                    wrapper.style.background = '#f8fafc';
+                    wrapper.style.width = '1000px';
                     wrapper.style.boxSizing = 'border-box';
                     wrapper.style.position = 'absolute';
                     wrapper.style.top = '-9999px';
                     wrapper.style.left = '0';
-                    
+
                     const clone = blocks[i].cloneNode(true);
                     wrapper.appendChild(clone);
                     document.body.appendChild(wrapper);
@@ -391,16 +2791,16 @@
                         backgroundColor: "#f8fafc",
                         useCORS: true
                     });
-                    
+
                     document.body.removeChild(wrapper);
 
                     const link = document.createElement('a');
                     link.download = `山熊科學手冊_第${i + 1}部分.png`;
                     link.href = canvas.toDataURL('image/png', 1.0);
                     link.click();
-                    
-                    await new Promise(r => setTimeout(r, 600)); // Slightly longer delay for safety
-                    updateBtn("btn-sections", `⏳ 已下載 ${i+1}/${blocks.length}`, true);
+
+                    await new Promise(r => setTimeout(r, 600));
+                    updateBtn("btn-sections", `⏳ 已下載 ${i + 1}/${blocks.length}`, true);
                 }
                 updateBtn("btn-sections", "✅ 分段下載完成！", false);
             } catch (e) {
@@ -412,23 +2812,22 @@
         async function downloadPDF() {
             updateBtn("btn-pdf", "⏳ 正在生成多頁 PDF...", true);
             const { jsPDF } = window.jspdf;
-            
+
             try {
                 const blocks = [
                     document.querySelector(".poster-header"),
                     ...document.querySelectorAll(".feature-block")
                 ];
-                
-                // 建立一個標準 A4 大小的 PDF (橫式 Landscape)
+
                 const pdf = new jsPDF('l', 'mm', 'a4');
                 const pdfWidth = pdf.internal.pageSize.getWidth();
                 const pdfHeight = pdf.internal.pageSize.getHeight();
-                
+
                 for (let i = 0; i < blocks.length; i++) {
                     const wrapper = document.createElement('div');
-                    wrapper.style.padding = '30px'; 
-                    wrapper.style.background = '#f8fafc'; 
-                    wrapper.style.width = '1000px'; 
+                    wrapper.style.padding = '30px';
+                    wrapper.style.background = '#f8fafc';
+                    wrapper.style.width = '1000px';
                     wrapper.style.boxSizing = 'border-box';
                     wrapper.style.position = 'absolute';
                     wrapper.style.top = '-9999px';
@@ -436,9 +2835,8 @@
                     wrapper.style.display = 'flex';
                     wrapper.style.justifyContent = 'center';
                     wrapper.style.alignItems = 'center';
-                    // 設定高度為 700px (1000:700 = A4 橫式比例 1.414)
-                    wrapper.style.minHeight = '700px'; 
-                    
+                    wrapper.style.minHeight = '700px';
+
                     const clone = blocks[i].cloneNode(true);
                     wrapper.appendChild(clone);
                     document.body.appendChild(wrapper);
@@ -448,28 +2846,26 @@
                         backgroundColor: "#f8fafc",
                         useCORS: true
                     });
-                    
+
                     document.body.removeChild(wrapper);
 
                     const imgData = canvas.toDataURL('image/jpeg', 0.95);
                     const imgProps = pdf.getImageProperties(imgData);
-                    
-                    // 計算縮放以適應 A4 寬度
+
                     const ratio = pdfWidth / imgProps.width;
                     const finalHeight = imgProps.height * ratio;
-                    
-                    // 確保圖像置中 (Y 軸偏移量)
+
                     const yOffset = (pdfHeight - finalHeight) > 0 ? (pdfHeight - finalHeight) / 2 : 0;
 
                     if (i > 0) {
                         pdf.addPage();
                     }
                     pdf.addImage(imgData, 'JPEG', 0, yOffset, pdfWidth, finalHeight);
-                    
-                    updateBtn("btn-pdf", `⏳ 正在生成第 ${i+1}/${blocks.length} 頁...`, true);
+
+                    updateBtn("btn-pdf", `⏳ 正在生成第 ${i + 1}/${blocks.length} 頁...`, true);
                 }
-                
-                pdf.save("山熊科學-聯絡簿操作究極指南.pdf");
+
+                pdf.save("山熊科學-電子聯絡簿操作手冊.pdf");
                 updateBtn("btn-pdf", "✅ PDF 下載成功！", false);
             } catch (e) {
                 console.error(e);
