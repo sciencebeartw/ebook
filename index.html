@@ -118,7 +118,7 @@
         }
 
         .app-container {
-            max-width: 480px;
+            max-width: 800px;
             margin: 0 auto;
             background: #f2f3f7;
             min-height: 100vh;
@@ -538,16 +538,16 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            height: 60px;
+            height: 75px;
             flex-shrink: 0;
-            width: 60px;
+            width: 75px;
         }
 
         .header-logo-full {
             height: 100%;
             width: auto;
-            max-height: 60px;
-            max-width: 60px;
+            max-height: 75px;
+            max-width: 75px;
             object-fit: contain;
         }
 
@@ -561,7 +561,7 @@
         }
 
         .class-info-top {
-            font-size: 0.75rem;
+            font-size: 0.85rem;
             color: #64748b;
             font-weight: 700;
             margin-bottom: 2px;
@@ -578,7 +578,7 @@
         }
 
         .student-info {
-            font-size: 1.6rem;
+            font-size: 1.9rem;
             font-weight: 900;
             color: #064e3b;
             line-height: 1.1;
@@ -1983,6 +1983,8 @@
   <script>
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
+    const qParams = new URLSearchParams(window.location.search);
+    const BEAR_SUBJECT = qParams.get('subject') ? '/' + qParams.get('subject') : '/science';
 
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz3ZwBnTp6gcf5TKzJnHni6oat0_jxsnhGkfXAR-Fu_NI3ZVMu4WrDjssayDUtJrQU/exec";
 
@@ -2022,7 +2024,7 @@
                 }
             }
 
-            const snapS = await db.ref('/students').once('value');
+            const snapS = await db.ref(BEAR_SUBJECT + '/students').once('value');
             const allStudents = snapS.val() || {};
             
             let foundClass = "";
@@ -2066,7 +2068,7 @@
             const safeC = safeKey(result.className);
 
             // Fetch Grades
-            const snapG = await db.ref(`/grades/${safeC}/${foundUserKey}/exams`).once('value');
+            const snapG = await db.ref(`${BEAR_SUBJECT}/grades/${safeC}/${foundUserKey}/exams`).once('value');
             const examsObj = snapG.val() || {};
             let fullGradeList = [];
             for (let col in examsObj) {
@@ -2135,7 +2137,7 @@
             result.grades = fullGradeList.sort((a, b) => a.colIndex - b.colIndex);
 
             // Fetch Posts
-            const snapP = await db.ref(`/dailyPosts/${safeC}`).once('value');
+            const snapP = await db.ref(`${BEAR_SUBJECT}/dailyPosts/${safeC}`).once('value');
             const postsObj = snapP.val() || {};
             let classPosts = [];
             let now = new Date();
@@ -2169,7 +2171,7 @@
             result.dailyPost = classPosts;
 
             // Fetch Bulletins
-            const snapB = await db.ref(`/bulletins/${safeC}`).once('value');
+            const snapB = await db.ref(`${BEAR_SUBJECT}/bulletins/${safeC}`).once('value');
             const bullObj = snapB.val() || {};
             let bulls = [];
             for (let id in bullObj) {
@@ -2181,7 +2183,7 @@
             result.bulletins = bulls.reverse(); // Reverse to roughly match desc order
 
             // Fetch Feedbacks
-            const snapF = await db.ref(`/feedbacks/${safeC}/${foundUserKey}`).once('value');
+            const snapF = await db.ref(`${BEAR_SUBJECT}/feedbacks/${safeC}/${foundUserKey}`).once('value');
             const fbsObj = snapF.val() || {};
             for (let fbid in fbsObj) {
                 const fb = fbsObj[fbid];
@@ -2205,14 +2207,14 @@
         },
         getAllClassNames: async function() {
            try { 
-               const snap = await db.ref('/students').once('value');
+               const snap = await db.ref(BEAR_SUBJECT + '/students').once('value');
                const alls = snap.val() || {};
                if(onSuccess) onSuccess(Object.keys(alls));
            } catch(e) { if(onErr) onErr(e); }
         },
         getStudentList: async function(cls) {
            try {
-               const snap = await db.ref(`/students/${safeKey(cls)}`).once('value');
+               const snap = await db.ref(`${BEAR_SUBJECT}/students/${safeKey(cls)}`).once('value');
                const val = snap.val() || {};
                let namesObjArr = []; 
                for(let k in val) if(val[k].name) namesObjArr.push(val[k]);
@@ -2223,7 +2225,7 @@
         },
         getPostHistory: async function(cls) {
            try {
-               const snap = await db.ref(`/dailyPosts/${safeKey(cls)}`).once('value');
+               const snap = await db.ref(`${BEAR_SUBJECT}/dailyPosts/${safeKey(cls)}`).once('value');
                const obj = snap.val() || {};
                let arr = [];
                for(let k in obj) { let p = obj[k]; p.rowIndex = k; arr.push(p); }
@@ -2233,7 +2235,7 @@
         },
         getBulletins: async function(cls) {
            try {
-               const snap = await db.ref(`/bulletins/${safeKey(cls)}`).once('value');
+               const snap = await db.ref(`${BEAR_SUBJECT}/bulletins/${safeKey(cls)}`).once('value');
                const obj = snap.val() || {};
                let arr = [];
                for(let k in obj) { let b = obj[k]; b.rowIndex = k; arr.push(b); }
@@ -2975,12 +2977,12 @@
                     const safeN = result.studentName.replace(/[.#$[\]]/g, '-');
 
                     // 1. 棒卡數監聽
-                    db.ref('/students/' + safeC + '/' + safeN + '/stickers').on('value', function(snap) {
+                    db.ref(BEAR_SUBJECT + '/students/' + safeC + '/' + safeN + '/stickers').on('value', function(snap) {
                         document.getElementById('headStickerCount').innerText = snap.val() || 0;
                     });
 
                     // 2. 留言回報監聽 (包含審核狀態與老師回覆)
-                    db.ref('/feedbacks/' + safeC + '/' + safeN).on('value', function(snap) {
+                    db.ref(BEAR_SUBJECT + '/feedbacks/' + safeC + '/' + safeN).on('value', function(snap) {
                         const fbsObj = snap.val() || {};
                         let newFbs = [];
                         for (let fbid in fbsObj) {
@@ -2993,7 +2995,7 @@
                     });
 
                     // 3. 重要公告監聽 (班級 + 全校)
-                    db.ref('/bulletins').on('value', function(snap) {
+                    db.ref(BEAR_SUBJECT + '/bulletins').on('value', function(snap) {
                         const allBulls = snap.val() || {};
                         let bulls = [];
                         for (let cls in allBulls) {
@@ -3010,7 +3012,7 @@
                     });
 
                     // 4. 成績資料監聽 (近期成績更新)
-                    db.ref('/grades/' + safeC + '/' + (result.foundUserKey || '') + '/exams').on('value', function(snap) {
+                    db.ref(BEAR_SUBJECT + '/grades/' + safeC + '/' + (result.foundUserKey || '') + '/exams').on('value', function(snap) {
                         if (!snap.exists()) return;
                         const examsObj = snap.val() || {};
                         let fullGradeList = [];
@@ -3069,7 +3071,7 @@
                     });
 
                     // 5. 聯絡簿內容監聽
-                    db.ref('/dailyPosts/' + safeC).on('value', function(snap) {
+                    db.ref(BEAR_SUBJECT + '/dailyPosts/' + safeC).on('value', function(snap) {
                         const postsObj = snap.val() || {};
                         let classPosts = [];
                         let now = new Date();
@@ -3760,7 +3762,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         async function loadStickerApplicants() {
             var cls = document.getElementById('stickerClassSelect') ? document.getElementById('stickerClassSelect').value : '';
             if (!cls) return;
-            var snap = await db.ref('/students/' + safeKey(cls)).once('value');
+            var snap = await db.ref(BEAR_SUBJECT + '/students/' + safeKey(cls)).once('value');
             var kids = snap.val() || {};
             var sel = document.getElementById('stickerStudentSelect');
             sel.innerHTML = '<option value="" disabled selected>請選擇學生</option>';
@@ -3785,12 +3787,12 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var stuName = stuSel ? stuSel.value : '';
             if (!cls || !stuName) { alert('請先選擇班級和學生'); return; }
             var safeC = safeKey(cls);
-            var snapS = await db.ref('/students/' + safeC).once('value');
+            var snapS = await db.ref(BEAR_SUBJECT + '/students/' + safeC).once('value');
             var kids = snapS.val() || {};
             var pendingList = [];
 
             if (stuName === 'all') {
-                var snapF = await db.ref('/feedbacks/' + safeC).once('value');
+                var snapF = await db.ref(BEAR_SUBJECT + '/feedbacks/' + safeC).once('value');
                 var allFbs = snapF.val() || {};
                 
                 for (var sKey in allFbs) {
@@ -3813,7 +3815,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 var stuKey = '';
                 for (var k in kids) { if (kids[k] && kids[k].name === stuName) { stuKey = k; break; } }
                 if (!stuKey) { alert('找不到學生'); return; }
-                var snapF = await db.ref('/feedbacks/' + safeC + '/' + stuKey).once('value');
+                var snapF = await db.ref(BEAR_SUBJECT + '/feedbacks/' + safeC + '/' + stuKey).once('value');
                 var fbs = snapF.val() || {};
 
                 for (var fid in fbs) {
@@ -3852,19 +3854,19 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             if (!confirm('確認通過 +' + count + ' 棒？')) return;
             const safeC = safeKey(className);
             // Find student key
-            const snapS = await db.ref('/students/' + safeC).once('value');
+            const snapS = await db.ref(BEAR_SUBJECT + '/students/' + safeC).once('value');
             const kids = snapS.val() || {};
             let stuKey = '';
             for (let k in kids) { if (kids[k].name === studentName) { stuKey = k; break; } }
             if (!stuKey) { alert('找不到學生'); return; }
             // Update sticker count
-            const currentRef = db.ref('/students/' + safeC + '/' + stuKey + '/stickers');
+            const currentRef = db.ref(BEAR_SUBJECT + '/students/' + safeC + '/' + stuKey + '/stickers');
             const snap = await currentRef.once('value');
             const current = parseInt(snap.val()) || 0;
             await currentRef.set(current + parseInt(count));
             // Update feedback status
             if (fbKey) {
-                const fbRef = db.ref('/feedbacks/' + safeC + '/' + stuKey + '/' + fbKey + '/content');
+                const fbRef = db.ref(BEAR_SUBJECT + '/feedbacks/' + safeC + '/' + stuKey + '/' + fbKey + '/content');
                 const contenSnap = await fbRef.once('value');
                 try {
                     var d = JSON.parse(contenSnap.val()); d.status = '通過';
@@ -3878,13 +3880,13 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         async function rejectStickerApply(fbKey, className, studentName) {
             if (!confirm('確認退回申請？')) return;
             const safeC = safeKey(className);
-            const snapS = await db.ref('/students/' + safeC).once('value');
+            const snapS = await db.ref(BEAR_SUBJECT + '/students/' + safeC).once('value');
             const kids = snapS.val() || {};
             let stuKey = '';
             for (let k in kids) { if (kids[k].name === studentName) { stuKey = k; break; } }
             if (!stuKey) return;
             if (fbKey) {
-                const fbRef = db.ref('/feedbacks/' + safeC + '/' + stuKey + '/' + fbKey + '/content');
+                const fbRef = db.ref(BEAR_SUBJECT + '/feedbacks/' + safeC + '/' + stuKey + '/' + fbKey + '/content');
                 const contenSnap = await fbRef.once('value');
                 try {
                     var d = JSON.parse(contenSnap.val()); d.status = '退回';
@@ -4084,7 +4086,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         async function loadFbApplicants() {
             var cls = document.getElementById('fbClassSelect') ? document.getElementById('fbClassSelect').value : '';
             if (!cls) return;
-            var snap = await db.ref('/students/' + safeKey(cls)).once('value');
+            var snap = await db.ref(BEAR_SUBJECT + '/students/' + safeKey(cls)).once('value');
             var kids = snap.val() || {};
             var sel = document.getElementById('fbStudentSelect');
             sel.innerHTML = '<option value="" disabled selected>請選擇學生</option>';
@@ -4109,12 +4111,12 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var stuName = stuSel ? stuSel.value : '';
             if (!cls || !stuName) { alert('請先選擇班級和學生'); return; }
             var safeC = safeKey(cls);
-            var snapS = await db.ref('/students/' + safeC).once('value');
+            var snapS = await db.ref(BEAR_SUBJECT + '/students/' + safeC).once('value');
             var kids = snapS.val() || {};
             var pendingList = [];
 
             if (stuName === 'all') {
-                var snapF = await db.ref('/feedbacks/' + safeC).once('value');
+                var snapF = await db.ref(BEAR_SUBJECT + '/feedbacks/' + safeC).once('value');
                 var allFbs = snapF.val() || {};
                 for (var sKey in allFbs) {
                     var fbs = allFbs[sKey];
@@ -4132,7 +4134,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 var stuKey = '';
                 for (var k in kids) { if (kids[k] && kids[k].name === stuName) { stuKey = k; break; } }
                 if (!stuKey) return;
-                var snapF = await db.ref('/feedbacks/' + safeC + '/' + stuKey).once('value');
+                var snapF = await db.ref(BEAR_SUBJECT + '/feedbacks/' + safeC + '/' + stuKey).once('value');
                 var fbs = snapF.val() || {};
                 for (var fid in fbs) {
                     var fb = fbs[fid];
