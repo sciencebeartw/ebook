@@ -2058,15 +2058,25 @@
         .replace(/\s+/g, '_');
     }
 
+    function getTeacherInfo(className) {
+        if (!className) return { name: "喵", fullName: "阿喵老師" };
+        if (className.includes("小六資優數學")) return { name: "東", fullName: "東老師" };
+        if (className.includes("數學超前班")) return { name: "翔", fullName: "翔老師" };
+        // Default to Science Teacher
+        if (BEAR_SUBJECT === '/math') return { name: "山熊", fullName: "數學老師" };
+        return { name: "喵", fullName: "阿喵老師" };
+    }
+
     async function executeFirebaseRead(studentName, password, bypassPwd, targetClass) {
         let result = { found: false, className: "", studentName: "", dailyPost: [], grades: [], feedbackHistory: [], bulletins: [], stickers: 0 };
         
         try {
-            // Admin shortcut (避免明文寫在程式碼中)
+            // Admin shortcut
             if (studentName.toLowerCase() === "admin") {
-                // 為了避免 Firebase rules 權限阻擋，我們直接使用混淆過的密碼來防呆 (bWlhbw== 解碼為舊預設)
                 if (btoa(password) === "bWlhbw==") {
-                    return { found: true, isAdmin: true, studentName: "阿喵老師", className: "管理者模式" };
+                    let adminT = getTeacherInfo(targetClass || "").fullName;
+                    if (!targetClass && BEAR_SUBJECT === '/math') adminT = "數學老師";
+                    return { found: true, isAdmin: true, studentName: adminT, className: "管理者模式" };
                 }
             }
 
@@ -3695,7 +3705,8 @@ if (exam.dist) {
                         var bodyClass = isTeacher ? "teacher-body" : "";
                         var sName = (gData && gData.studentName) ? gData.studentName : "學";
                         var sChar = sName.length >= 2 ? sName.charAt(sName.length - 2) : sName.charAt(0);
-                        var tName = (gData && gData.className) ? "喵" : "師";
+                        var classInfo = getTeacherInfo(gData && gData.className ? gData.className : "");
+                        var tName = classInfo.name;
                         var avatarChar = isTeacher ? tName : sChar;
                         if (h.type === "棒卡申請") {
                             var stickerData = {};
@@ -4169,6 +4180,11 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             document.getElementById('emergencyModal').style.display = 'none';
         }
 
+        function getTeacherInfo(className) {
+            if (className.includes('阿喵')) return { name: '阿喵' };
+            return { name: '老師' };
+        }
+
         async function loadFbApplicants() {
             var cls = document.getElementById('fbClassSelect') ? document.getElementById('fbClassSelect').value : '';
             if (!cls) return;
@@ -4251,6 +4267,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 });
                 displayContent = displayContent.replace(/\[附件\](https?:\/\/[^\s<]+)/g, "<br><a href='$1' target='_blank' style='display:inline-block; margin-top:5px; padding:5px 10px; background:#e0f2fe; color:#0284c7; border-radius:5px; text-decoration:none; font-weight:bold; font-size:0.9rem;'>📄 點此檢視附件</a>");
 
+                let tInfo = getTeacherInfo(item.cls);
                 html += '<div style="background:' + bg + '; border-radius:12px; border-left:5px solid ' + accent + '; padding:12px; margin-bottom:10px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">' +
                     '<div style="font-size:0.85rem; color:#64748b; margin-bottom:4px; display:flex; justify-content:space-between;">' +
                     '<span>📅 ' + item.date + '</span><span>' + item.time.substring(5, 16) + '</span></div>' +
@@ -4258,7 +4275,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     '<div style="margin-bottom:6px;"><span style="display:inline-block; background:#e2e8f0; padding:3px 10px; border-radius:12px; font-size:0.8rem; font-weight:bold; color:#475569;" id="fb-type-'+idx+'">' + item.type + '</span></div>' +
                     '<div style="font-size:1rem; color:#334155; word-break:break-all; line-height:1.4; margin-bottom:10px;" id="fb-content-'+idx+'">' + displayContent + '</div>' +
                     '<div style="display:flex; gap:6px;">' +
-                    '<input type="text" id="fb-reply-'+idx+'" placeholder="輸入阿喵回覆..." style="flex:1; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.95rem;">' +
+                    '<input type="text" id="fb-reply-'+idx+'" placeholder="輸入' + tInfo.name + '老師回覆..." style="flex:1; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.95rem;">' +
                     '<button onclick="sendAdminReply('+idx+', \'' + item.safeC + '\', \'' + item.stuKey + '\', \'' + item.date + '\', \'' + item.cls + '\', \'' + item.stuName + '\')" style="background:#3b82f6; color:white; border:none; border-radius:6px; padding:8px 14px; font-weight:700; cursor:pointer;">立即回覆</button>' +
                     '</div>' +
                 '</div>';
@@ -4281,11 +4298,12 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             if (originalContent.length > 50) originalContent = originalContent.substring(0, 50) + "...";
             var finalContent = "[quote:" + originalType + "]" + originalContent + "[/quote]\n" + content;
 
+            let tInfo = getTeacherInfo(clsName);
             var form = {
                 className: clsName,
                 studentName: stuName,
                 targetDate: targetDate,
-                type: "阿喵老師回覆",
+                type: tInfo.fullName + "回覆",
                 content: finalContent
             };
 
