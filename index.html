@@ -1210,6 +1210,28 @@
             background: #e0e0e0;
         }
 
+        .btn-important-tag {
+            display: inline-block;
+            background: linear-gradient(135deg, #FF8008, #FFC837);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 15px;
+            text-decoration: none;
+            font-size: 1rem;
+            font-weight: bold;
+            border: none;
+            margin-left: 5px;
+            vertical-align: middle;
+            box-shadow: 0 2px 5px rgba(255, 128, 8, 0.4);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .btn-important-tag:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(255, 128, 8, 0.6);
+            color: white;
+        }
+
         /* ★★★ v3.9.3 修正：強制讓公告與彈窗內文的連結變為小標籤樣式 (並加上圖示) ★★★ */
         .bulletin-content .btn-link,
         .emergency-body .btn-link {
@@ -2871,7 +2893,9 @@
             text = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
             var withBr = text.replace(/\n/g, '<br>');
             return withBr.replace(/\[(.*?)\](http[s]?:\/\/[^\s]+)/g, function (match, name, url) {
-                if (name.indexOf("附件") > -1 || name.indexOf("作業") > -1) {
+                if (name.indexOf("作業") > -1 || name.indexOf("上傳") > -1) {
+                    return `<a href="${url}" target="_blank" class="btn-important-tag">${SVG.upload}${name}</a>`;
+                } else if (name.indexOf("附件") > -1) {
                     return `<a href="${url}" target="_blank" class="btn-small-tag">${SVG.clip}${name}</a>`;
                 } else {
                     return `<a href="${url}" target="_blank" class="btn-link">${name}</a>`;
@@ -3744,7 +3768,9 @@ if (exam.dist) {
                     // 老師發布的連結 -> 藍色大膠囊
                     // 學生上傳的連結 -> 灰色小標籤 (透過 class="btn-small-tag" 區分)
                     return withBr.replace(/\[(.*?)\](http[s]?:\/\/[^\s]+)/g, function (match, name, url) {
-                        if (name.indexOf("附件") > -1 || name.indexOf("作業") > -1) {
+                        if (name.indexOf("作業") > -1 || name.indexOf("上傳") > -1) {
+                            return `<a href="${url}" target="_blank" class="btn-important-tag">${SVG.upload}${name}</a>`;
+                        } else if (name.indexOf("附件") > -1) {
                             return `<a href="${url}" target="_blank" class="btn-small-tag">${SVG.clip}${name}</a>`;
                         } else {
                             return `<a href="${url}" target="_blank" class="btn-link">${name}</a>`;
