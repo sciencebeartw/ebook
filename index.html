@@ -2979,7 +2979,14 @@
             if (fileInput.files.length === 0) { alert('請先選擇檔案！'); return; }
             var file = fileInput.files[0];
             if (file.size > 10 * 1024 * 1024) { alert('❌ 檔案太大！請限制在 10MB 以內。'); return; }
-            if (!currentFocusInput) { alert('請先點選您想要插入連結的格子'); return; }
+
+            // ★ v4.0 智慧目標：依照類型自動決定要填入的欄位
+            var targetInput = currentFocusInput;
+            if (typeSelect.value === '小考') targetInput = document.getElementById('postQuiz');
+            else if (typeSelect.value === '補考') targetInput = document.getElementById('postMakeup');
+            else if (typeSelect.value === '補充') targetInput = document.getElementById('postNote');
+
+            if (!targetInput) { alert('請先點選您想要插入連結的格子'); return; }
 
             statusDiv.innerText = '⏳ 上傳中...';
             var fileName = renameInput.value || file.name;
@@ -2991,7 +2998,8 @@
             uploadToFirebase(file, path,
                 function(res) {
                     statusDiv.innerText = '✅ 上傳成功！';
-                    currentFocusInput.value += '\n[' + fileName + ']' + res.url;
+                    var linkText = '[' + fileName + ']' + res.url;
+                    targetInput.value = targetInput.value ? (targetInput.value + '\n' + linkText) : linkText;
                     fileInput.value = ''; renameInput.value = '';
                 },
                 function(err) { statusDiv.innerText = '❌ 上傳錯誤：' + (err.message || err.toString()); }
