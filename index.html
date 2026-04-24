@@ -3075,6 +3075,11 @@
             document.getElementById('full-loader').style.display = 'none';
             gData = result;
             if (pass !== "admin_view") gPass = pass; // ★ 防止神主模式覆蓋真正的密碼
+
+            // ★ v4.0 登入記錄：fire-and-forget，不阻塞 UI
+            if (pass !== "admin_view" && !result.isAdmin) {
+                doPostAction('logAccess', { className: result.className, studentName: result.studentName }, null, null, '');
+            }
             document.getElementById('login-screen').style.display = 'none';
             document.getElementById('admin-screen').style.display = 'none';
             document.getElementById('main-screen').style.display = 'block';
