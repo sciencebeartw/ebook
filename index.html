@@ -2741,11 +2741,15 @@
                     </div>
 
                     <div class="link-helper-box">
-                        <div class="link-helper-title">🔗 連結小幫手</div>
+                        <div class="link-helper-title">🔗 連結小幫手 (先貼上網址，再選功能)</div>
                         <div class="link-row">
                             <input type="text" id="linkName" class="link-input" placeholder="按鈕名稱">
                             <input type="text" id="linkUrl" class="link-input" style="flex:2;" placeholder="網址">
-                            <button type="button" class="link-btn" onclick="insertLink()">插入</button>
+                            <button type="button" class="link-btn" onclick="insertLink()">插入當前游標</button>
+                        </div>
+                        <div style="display:flex; gap:5px; margin-top:5px;">
+                            <button type="button" class="link-btn" style="background:#e67e22; flex:1;" onclick="quickFillPost('小考')">📝 填入小考欄</button>
+                            <button type="button" class="link-btn" style="background:#e67e22; flex:1;" onclick="quickFillPost('補考')">💊 填入補考欄</button>
                         </div>
                     </div>
 
@@ -3496,6 +3500,20 @@
                     alert("❌ 系統連線錯誤：" + err);
                 })
                 .saveDailyPost(formData, gPass);
+        }
+
+        function quickFillPost(type) {
+            var url = document.getElementById('linkUrl').value;
+            var name = document.getElementById('linkName').value;
+            if (!url) { alert("請先貼上網址！"); return; }
+            var btnStr = "[" + (name || (type + "連結")) + "]" + url;
+            if (type === '小考') {
+                var old = document.getElementById('postQuiz').value;
+                document.getElementById('postQuiz').value = old ? (old + "\n" + btnStr) : btnStr;
+            } else {
+                var old = document.getElementById('postMakeup').value;
+                document.getElementById('postMakeup').value = old ? (old + "\n" + btnStr) : btnStr;
+            }
         }
 
         function submitBulletin() {
