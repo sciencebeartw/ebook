@@ -2763,7 +2763,7 @@
                                 onfocus="setFocus(this)">
                         </div>
                     </div>
-                    <div class="editor-label">下次範圍</div>
+                    <div class="editor-label">下次小考範圍</div>
                     <input type="text" id="postRange" class="editor-input" onfocus="setFocus(this)">
                     <div class="editor-label">備註/補充資料</div>
                     <textarea id="postNote" class="editor-textarea" style="height:60px;"
@@ -3458,8 +3458,10 @@
             var btn = event.target;
             var originalText = btn.innerText;
             var idx = currentEditingPost ? currentEditingPost.rowIndex : null;
+            var id = currentEditingPost ? currentEditingPost.id : null;
             var formData = {
                 rowIndex: idx,
+                id: id,
                 reserveTime: document.getElementById('postReserveTime').value,
                 date: document.getElementById('postDate').value,
                 className: document.getElementById('modalClassName').value,
