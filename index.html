@@ -4002,50 +4002,78 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             listDiv.innerHTML = html;
         }
         async function approveStickerApply(fbKey, className, studentName, count) {
+            // 找出該筆申請的時間戳記 (由 feedbackHistory 中尋找)
+            let fbItem = gData.feedbackHistory.find(h => h.fbKey === fbKey);
+            if (!fbItem) { alert('找不到申請紀錄資料'); return; }
+
             if (!confirm('確認通過 +' + count + ' 棒？')) return;
-            const safeC = safeKey(className);
-            // Find student key
-            const snapS = await db.ref(BEAR_SUBJECT + '/students/' + safeC).once('value');
-            const kids = snapS.val() || {};
-            let stuKey = '';
-            for (let k in kids) { if (kids[k].name === studentName) { stuKey = k; break; } }
-            if (!stuKey) { alert('找不到學生'); return; }
-            // Update sticker count
-            const currentRef = db.ref(BEAR_SUBJECT + '/students/' + safeC + '/' + stuKey + '/stickers');
-            const snap = await currentRef.once('value');
-            const current = parseInt(snap.val()) || 0;
-            await currentRef.set(current + parseInt(count));
-            // Update feedback status
-            if (fbKey) {
-                const fbRef = db.ref(BEAR_SUBJECT + '/feedbacks/' + safeC + '/' + stuKey + '/' + fbKey + '/content');
-                const contenSnap = await fbRef.once('value');
-                try {
-                    var d = JSON.parse(contenSnap.val()); d.status = '通過';
-                    await fbRef.set(JSON.stringify(d));
-                } catch(e) {}
-            }
-            alert('已通過！棒卡 +' + count + '，目前共 ' + (current + parseInt(count)) + ' 棒');
-            if (typeof loadStickerReviews === 'function') loadStickerReviews();
+            
+            // 顯示處理中狀態 (若按鈕存在)
+            const btn = event.target;
+            const originalText = btn.innerText;
+            btn.disabled = true;
+            btn.innerText = "處理中...";
+
+            // 呼叫 GAS 後端，確保試算表同步更新
+            google.script.run.withSuccessHandler(function(res) {
+                btn.disabled = false;
+                btn.innerText = originalText;
+                if (res.success) {
+                    alert('✅ 已通過！棒卡 +' + count);
+                    // 本地更新 gData (若有需要即時反映在介面上)
+                    if (gData.studentName === studentName) {
+                        gData.stickers = (parseInt(gData.stickers) || 0) + parseInt(count);
+                    }
+                    if (typeof loadStickerReviews === 'function') loadStickerReviews();
+                } else {
+                    alert('❌ 失敗：' + res.msg);
+                }
+            }).withFailureHandler(function(err) {
+                btn.disabled = false;
+                btn.innerText = originalText;
+                alert('❌ 系統連線錯誤：' + err);
+            }).approveStickerGas(
+                gData.password, // 使用登入時的管理者密碼
+                fbItem.time, 
+                className, 
+                studentName, 
+                count, 
+                '通過'
+            );
         }
 
         async function rejectStickerApply(fbKey, className, studentName) {
-            if (!confirm('確認退回申請？')) return;
-            const safeC = safeKey(className);
-            const snapS = await db.ref(BEAR_SUBJECT + '/students/' + safeC).once('value');
-            const kids = snapS.val() || {};
-            let stuKey = '';
-            for (let k in kids) { if (kids[k].name === studentName) { stuKey = k; break; } }
-            if (!stuKey) return;
-            if (fbKey) {
-                const fbRef = db.ref(BEAR_SUBJECT + '/feedbacks/' + safeC + '/' + stuKey + '/' + fbKey + '/content');
-                const contenSnap = await fbRef.once('value');
-                try {
-                    var d = JSON.parse(contenSnap.val()); d.status = '退回';
-                    await fbRef.set(JSON.stringify(d));
-                } catch(e) {}
-            }
-            alert('已退回申請');
-            if (typeof loadStickerReviews === 'function') loadStickerReviews();
+            let fbItem = gData.feedbackHistory.find(h => h.fbKey === fbKey);
+            if (!fbItem) { alert('找不到申請紀錄資料'); return; }
+
+            if (!confirm('確認退回此申請？')) return;
+
+            const btn = event.target;
+            const originalText = btn.innerText;
+            btn.disabled = true;
+            btn.innerText = "處理中...";
+
+            google.script.run.withSuccessHandler(function(res) {
+                btn.disabled = false;
+                btn.innerText = originalText;
+                if (res.success) {
+                    alert('已退回申請');
+                    if (typeof loadStickerReviews === 'function') loadStickerReviews();
+                } else {
+                    alert('❌ 失敗：' + res.msg);
+                }
+            }).withFailureHandler(function(err) {
+                btn.disabled = false;
+                btn.innerText = originalText;
+                alert('❌ 系統連線錯誤：' + err);
+            }).approveStickerGas(
+                gData.password, 
+                fbItem.time, 
+                className, 
+                studentName, 
+                0, 
+                '退回'
+            );
         }
         function onStickerReasonChange(safeId) {
             var sel = document.getElementById('sticker-reason-' + safeId);
@@ -4164,7 +4192,13 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 .withSuccessHandler(function (res) { 
                     btn.disabled = false;
                     btn.innerText = originalText;
-                    if (res.success) { alert("✅ 修改成功！"); closePwdModal(); } 
+                    if (res.success) { 
+                        alert("✅ 修改成功！下次登入請使用新密碼。"); 
+                        closePwdModal(); 
+                        // 清空欄位
+                        document.getElementById('oldP').value = "";
+                        document.getElementById('newP').value = "";
+                    } 
                     else { alert("❌ " + res.msg); } 
                 })
                 .withFailureHandler(function(err) {
