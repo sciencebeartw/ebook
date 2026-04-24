@@ -3548,7 +3548,7 @@
                     btn.disabled = false;
                     btn.innerText = originalText;
                     if (res.success) {
-                        alert("✅ 公告發布成功！\n(Firebase 資料同步通常需要 1~3 秒才會生效)"); 
+                        alert("✅ 公告發布成功！\n模式: " + res.mode + "\n試算表: " + (res.debugSheet || "未知") + "\n(Firebase 資料同步通常需要 1~3 秒才會生效)"); 
                         closeBulletinModal(); 
                         onBulletinClassChange();
                     } else { 
