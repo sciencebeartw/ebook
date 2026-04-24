@@ -1179,7 +1179,7 @@
             display: block;
             width: 100%;
             box-sizing: border-box;
-            background: #3498db;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
             color: white;
             padding: 12px 15px;
             border-radius: 8px;
@@ -1188,7 +1188,14 @@
             font-weight: bold;
             margin: 8px 0;
             text-align: center;
-            box-shadow: 0 3px 6px rgba(52, 152, 219, 0.2);
+            box-shadow: 0 3px 6px rgba(59, 130, 246, 0.3);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .btn-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 12px rgba(59, 130, 246, 0.5);
+            color: white;
         }
 
         /* 學生上傳的連結按鈕 (小標籤) */
@@ -1211,24 +1218,26 @@
         }
 
         .btn-important-tag {
-            display: inline-block;
-            background: linear-gradient(135deg, #FF8008, #FFC837);
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+            background: linear-gradient(135deg, #a855f7 0%, #6366f1 100%);
             color: white;
-            padding: 4px 12px;
-            border-radius: 15px;
+            padding: 12px 15px;
+            border-radius: 8px;
             text-decoration: none;
-            font-size: 1rem;
+            font-size: 1.15rem;
             font-weight: bold;
             border: none;
-            margin-left: 5px;
-            vertical-align: middle;
-            box-shadow: 0 2px 5px rgba(255, 128, 8, 0.4);
+            margin: 8px 0;
+            text-align: center;
+            box-shadow: 0 3px 6px rgba(168, 85, 247, 0.3);
             transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
 
         .btn-important-tag:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(255, 128, 8, 0.6);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 12px rgba(168, 85, 247, 0.5);
             color: white;
         }
 
