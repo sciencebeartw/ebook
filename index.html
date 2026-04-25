@@ -1520,9 +1520,9 @@
             border: none;
             padding: 8px 18px;
             border-radius: 20px;
+            font-size: 1.1rem;
             font-weight: bold;
             cursor: pointer;
-            font-size: 1.1rem;
             white-space: nowrap;
             box-shadow: 0 3px 10px rgba(234,88,12,0.3);
             transition: transform 0.15s;
@@ -2682,7 +2682,10 @@
                         <option value="退回">已退回</option>
                     </select>
                 </div>
-                <button class="admin-btn btn-blue" onclick="loadStickerReviews()">載入棒卡申請</button>
+                <div style="display:flex; gap:8px;">
+                    <button class="admin-btn btn-blue" onclick="loadStickerReviews()" style="flex:1;">載入棒卡申請</button>
+                    <button id="btnApproveAllStickers" class="admin-btn btn-orange" onclick="approveAllStickers()" style="display:none; flex:1; background:linear-gradient(135deg, #a855f7, #6366f1); border:none; color:white;">一鍵通過</button>
+                </div>
                 <div id="stickerReviewList" style="margin-top:12px; max-height:400px; overflow-y:auto;"></div>
             </div>
 
@@ -2906,6 +2909,13 @@
     </div>
 
     <script>
+        window.swalAlert = function(title, text, icon) {
+            return Swal.fire({ title: title, text: text, icon: icon || 'info', confirmButtonText: '確定', confirmButtonColor: '#3b82f6' });
+        };
+        window.swalConfirm = function(title, text) {
+            return Swal.fire({ title: title, text: text, icon: 'warning', showCancelButton: true, confirmButtonColor: '#a855f7', cancelButtonColor: '#d1d5db', confirmButtonText: '確定', cancelButtonText: '取消' }).then(function(res) { return res.isConfirmed; });
+        };
+
         // ★★★ 全域工具函式：解析連結 (v3.9.2) ★★★
         function parseBtn(text) {
             if (!text) return "";
@@ -3632,7 +3642,7 @@
             window.scrollTo(0, 0);
         }
 
-        function getDisplayLogic(exam, feedbackHistory) { var rawScore = (exam.score || "").toString(); var sheetNum = exam.scoreNum; var myColor = (exam.cellColor || "").toLowerCase(); var result = { mainScore: "", mainClass: "", statusHtml: "", effectiveNum: null, showReviewing: false, needsReport: false }; if (sheetNum !== null && !isNaN(sheetNum)) { result.effectiveNum = sheetNum; result.mainScore = sheetNum; if (exam.myBucket === 4) result.mainClass = " score-green"; else if (exam.myBucket <= 1 && exam.myBucket >= 0) result.mainClass = " score-red"; if (rawScore.indexOf("假") > -1) result.statusHtml += "<div class='home-exam-tag'>(請假回報)</div>"; } else { result.needsReport = true; var overrideNum = getFeedbackOverrideNum(exam, feedbackHistory); if (overrideNum !== null) { result.effectiveNum = overrideNum; result.mainScore = overrideNum; result.showReviewing = true; } else { var isHw = (exam.exam && exam.exam.indexOf("作業") > -1) || (exam.date && exam.date.indexOf("作業") > -1); if (rawScore.indexOf("尚未繳交") > -1) { result.mainScore = "尚未繳交"; result.mainClass = " text-grey-status"; } else { result.mainScore = isHw ? "缺繳" : "缺考"; result.mainClass = " text-grey-status"; } } } if (result.showReviewing) result.statusHtml += "<div class='reviewing-tag'>(待審核)</div>"; if (myColor) { if (myColor === "#00ff00") result.statusHtml += "<div class='makeup-status-tag status-green'>" + SVG.thumbsUp + "補考結果：觀念理解良好</div>"; else if (myColor === "#ffff00") result.statusHtml += "<div class='makeup-status-tag status-yellow'>" + SVG.smile + "補考結果：觀念大致理解</div>"; else if (myColor === "#ff9900") result.statusHtml += "<div class='makeup-status-tag status-orange'>" + SVG.meh + "補考結果：觀念不太理解</div>"; else if (myColor === "#ff0000") result.statusHtml += "<div class='makeup-status-tag status-red'>" + SVG.frown + "補考結果：觀念必須加強</div>"; } if (result.statusHtml.indexOf("補考結果") === -1) { if (result.effectiveNum !== null && exam.makeupThreshold > 0) { if (result.effectiveNum < exam.makeupThreshold) result.statusHtml += "<div class='makeup-status-tag status-warning'>" + SVG.alert + "未達標需補考</div>"; } } return result; }
+        function getDisplayLogic(exam, feedbackHistory) { var rawScore = (exam.score || "").toString(); var sheetNum = exam.scoreNum; var myColor = (exam.cellColor || "").toLowerCase(); var result = { mainScore: "", mainClass: "", statusHtml: "", effectiveNum: null, showReviewing: false, needsReport: false }; if (sheetNum !== null && !isNaN(sheetNum)) { result.effectiveNum = sheetNum; result.mainScore = sheetNum; if (exam.myBucket === 4) result.mainClass = " score-green"; else if (exam.myBucket <= 1 && exam.myBucket >= 0) result.mainClass = " score-red"; if (rawScore.indexOf("假") > -1) result.statusHtml += "<div class='home-exam-tag'>(請假回報)</div>"; } else { result.needsReport = true; var overrideNum = getFeedbackOverrideNum(exam, feedbackHistory); if (overrideNum !== null) { result.effectiveNum = overrideNum; result.mainScore = overrideNum; result.showReviewing = true; } else { var isHw = (exam.exam && exam.exam.indexOf("作業") > -1) || (exam.date && exam.date.indexOf("作業") > -1) || rawScore.indexOf("未交") > -1 || rawScore.indexOf("缺交") > -1 || rawScore.indexOf("缺繳") > -1; if (rawScore.indexOf("尚未繳交") > -1) { result.mainScore = "尚未繳交"; result.mainClass = " text-grey-status"; } else { result.mainScore = isHw ? "缺繳" : "缺考"; result.mainClass = " text-grey-status"; } } } if (result.showReviewing) result.statusHtml += "<div class='reviewing-tag'>(待審核)</div>"; if (myColor) { if (myColor === "#00ff00") result.statusHtml += "<div class='makeup-status-tag status-green'>" + SVG.thumbsUp + "補考結果：觀念理解良好</div>"; else if (myColor === "#ffff00") result.statusHtml += "<div class='makeup-status-tag status-yellow'>" + SVG.smile + "補考結果：觀念大致理解</div>"; else if (myColor === "#ff9900") result.statusHtml += "<div class='makeup-status-tag status-orange'>" + SVG.meh + "補考結果：觀念不太理解</div>"; else if (myColor === "#ff0000") result.statusHtml += "<div class='makeup-status-tag status-red'>" + SVG.frown + "補考結果：觀念必須加強</div>"; } if (result.statusHtml.indexOf("補考結果") === -1) { if (result.effectiveNum !== null && exam.makeupThreshold > 0) { if (result.effectiveNum < exam.makeupThreshold) result.statusHtml += "<div class='makeup-status-tag status-warning'>" + SVG.alert + "未達標需補考</div>"; } } return result; }
         function getFeedbackOverrideNum(exam, feedbackHistory) { if (!feedbackHistory || feedbackHistory.length === 0) return null; var rawScore = (exam.score || "").toString(); var hasNum = (exam.scoreNum !== null && !isNaN(exam.scoreNum)); if (exam.isMissing || (rawScore.indexOf("假") > -1 && !hasNum)) { for (var k = feedbackHistory.length - 1; k >= 0; k--) { var fb = feedbackHistory[k]; if (fb.type === "補考回報") { var fbDatePart = fb.targetDate.substring(5).replace('-', '/'); var fbDatePart2 = fb.targetDate.substring(5).replace('-', '/').replace(/^0/, '').replace(/\/0/, '/'); if (exam.date.indexOf(fbDatePart) > -1 || exam.date.indexOf(fbDatePart2) > -1 || exam.date == fbDatePart2) { var match = fb.content.match(/(\d+(\.\d+)?)/); if (match) return parseFloat(match[0]); } } } } return null; }
 
         // ★★★ v3.9 新增：學生上傳佇列處理 ★★★
@@ -4030,6 +4040,13 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 }
             }
 
+            window.currentPendingStickers = pendingList;
+            var btnApproveAll = document.getElementById('btnApproveAllStickers');
+            if (btnApproveAll) {
+                var hasPending = pendingList.some(function(item) { return item.status === '待審核'; });
+                btnApproveAll.style.display = hasPending ? 'block' : 'none';
+            }
+
             var listDiv = document.getElementById('stickerReviewList');
             if (pendingList.length === 0) { listDiv.innerHTML = '<div style="color:#999; padding:10px;">無棒卡申請記錄</div>'; return; }
             var html = '';
@@ -4048,6 +4065,46 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             });
             listDiv.innerHTML = html;
         }
+
+        async function approveAllStickers() {
+            if (!window.currentPendingStickers || window.currentPendingStickers.length === 0) return;
+            var listToApprove = window.currentPendingStickers.filter(function(item) { return item.status === '待審核'; });
+            if (listToApprove.length === 0) return;
+
+            var clsSel = document.getElementById('stickerClassSelect');
+            var cls = clsSel ? clsSel.value : '';
+            if (!cls) return;
+
+            var confirmResult = await swalConfirm('一鍵批次審核', '確定要「一鍵通過」這 ' + listToApprove.length + ' 筆待審核申請嗎？');
+            if (!confirmResult) return;
+
+            var btn = document.getElementById('btnApproveAllStickers');
+            var originalText = btn.innerText;
+            btn.disabled = true;
+            btn.innerText = "處理中...";
+            
+            swalAlert('處理中...', '系統正在批次更新資料與 Firebase，請稍候。', 'info');
+
+            google.script.run.withSuccessHandler(function(res) {
+                btn.disabled = false;
+                btn.innerText = originalText;
+                if (res && res.success) {
+                    swalAlert('✅ 一鍵通過完成！', '共成功處理了 ' + res.count + ' 筆申請。', 'success');
+                    if (typeof loadStickerReviews === 'function') loadStickerReviews();
+                } else {
+                    swalAlert('❌ 失敗', res ? res.msg : '未知錯誤', 'error');
+                }
+            }).withFailureHandler(function(err) {
+                btn.disabled = false;
+                btn.innerText = originalText;
+                swalAlert('❌ 系統連線錯誤', err.toString(), 'error');
+            }).approveAllStickersGas(
+                gPass, 
+                cls, 
+                JSON.stringify(listToApprove)
+            );
+        }
+
         async function approveStickerApply(btn, fbKey, className, studentName, count, time) {
             if (!confirm('確認通過 +' + count + ' 棒？')) return;
             

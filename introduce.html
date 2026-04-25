@@ -2350,6 +2350,22 @@
             </h1>
             <p style="font-size:1.5rem; color:#64748b; margin:10px 0 0 0;">全方位掌握學習狀況，溝通無障礙 🚀</p>
 
+            <!-- 適用班別徽章欄 -->
+            <div style="margin-top: 25px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;">
+                <div style="background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 8px 20px; border-radius: 50px; font-weight: 900; font-size: 1.05rem; box-shadow: 0 4px 12px rgba(16,185,129,0.3);">
+                    🔬 小六資優自然
+                </div>
+                <div style="background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; padding: 8px 20px; border-radius: 50px; font-weight: 900; font-size: 1.05rem; box-shadow: 0 4px 12px rgba(59,130,246,0.3);">
+                    🔢 小六資優數學
+                </div>
+                <div style="background: linear-gradient(135deg, #6366f1, #4f46e5); color: white; padding: 8px 20px; border-radius: 50px; font-weight: 900; font-size: 1.05rem; box-shadow: 0 4px 12px rgba(99,102,241,0.3);">
+                    🌿 自然超前班
+                </div>
+                <div style="background: linear-gradient(135deg, #f59e0b, #d97706); color: white; padding: 8px 20px; border-radius: 50px; font-weight: 900; font-size: 1.05rem; box-shadow: 0 4px 12px rgba(245,158,11,0.3);">
+                    📐 數學超前班
+                </div>
+            </div>
+
             <div class="summary-grid">
                 <div class="summary-card">
                     <div class="icon-badge">🔒</div>
@@ -2380,6 +2396,7 @@
                 <div
                     style="background: #06C755; color: white; padding: 6px 20px; border-radius: 40px; font-weight: 900; display: flex; align-items: center; gap: 8px; font-size: 0.9rem;">
                     <img src="https://upload.wikimedia.org/wikipedia/commons/4/41/LINE_logo.svg"
+                        crossorigin="anonymous"
                         style="width: 18px; filter: brightness(0) invert(1);"> LINE 官方
                 </div>
                 <span style="font-size: 1rem; color: #64748b; font-weight: bold;">多位專業老師在線即時解答！</span>
@@ -2395,6 +2412,7 @@
                     <div style="width:100%;">
                         <div style="text-align:center; margin-bottom:18px;">
                             <img src="https://www.sciencebear.com.tw/icon.png"
+                                crossorigin="anonymous"
                                 style="width:70px; height:70px; border-radius:16px; box-shadow:0 4px 16px rgba(0,0,0,0.15);"
                                 alt="山熊科學">
                             <div style="margin-top:8px; font-size:13px; color:#666;">山熊科學數位聯絡簿</div>
@@ -2435,42 +2453,42 @@
                 </div>
             </div>
             <div class="info-panel">
-                <h2 style="color:#0071e3;">📲 第一步：跳出 LINE，安裝桌面捷徑</h2>
+                <h2 style="color:#0071e3;">📲 第一步：跳出 LINE<br>安裝桌面捷徑</h2>
                 <p>為避免 Google 登入卡住，系統會自動偵測 LINE 並跳出紅色指示<b>「跳轉至外部瀏覽器」</b>。<br>切換成功後，系統會引導您將網頁<b>「加入主畫面」</b>，以後就能像專屬 App
                     一樣在桌面隨開即用，不怕每次都要重新登入了！</p>
             </div>
         </div>
 
-        <!-- 2. 登入改密碼 -->
+        <!-- 2. 登入與科目選擇 -->
         <div class="feature-block reverse">
-            <div class="phone-frame" id="login-screen"
-                style="height: 520px; background: white; padding: 20px; justify-content: flex-start; position: relative; min-height: auto;">
+            <div class="phone-frame" id="login-screen-mock"
+                style="height: 580px; background: white; padding: 20px; justify-content: flex-start; position: relative; min-height: auto; border-radius: 40px; border: 8px solid #334155; display: flex; flex-direction: column; align-items: center; box-shadow: 0 20px 50px rgba(0,0,0,0.15);">
                 <img src="https://www.sciencebear.com.tw/icon.png" class="logo-img" alt="山熊科學"
-                    style="margin-top: 30px;">
-                <h2>數位聯絡簿</h2>
-                <div class="sub-title" style="margin-bottom: 20px;">小六資優自然<br>國中自然超前班</div>
-                <div class="input-group"><input type="text" placeholder="請輸入學生姓名" style="pointer-events: none;"></div>
-                <div class="input-group"><input type="password" placeholder="請輸入密碼 (預設家長手機)"
-                        style="pointer-events: none;"></div>
-                <button class="login-btn">登入查看</button>
-                <div class="forgot-pwd">忘記密碼請洽山熊科學</div>
+                    crossorigin="anonymous"
+                    style="margin-top: 30px; max-width: 120px; display: block;">
+                <h2 style="font-size: 1.6rem; margin-top: 10px;">數位聯絡簿</h2>
+                
+                <!-- 模擬真實：科目切換開關 -->
+                <div class="subject-toggle-row" style="margin: 20px 0 15px; display: flex; gap: 10px; width: 100%;">
+                    <div class="subject-btn" style="flex: 1; text-align: center; padding: 12px 0; border: 2.5px solid #10b981; border-radius: 12px; background: #ecfdf5; color: #059669; font-weight: 800; font-size: 1rem; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);">🪴 自然科</div>
+                    <div class="subject-btn" style="flex: 1; text-align: center; padding: 12px 0; border: 2.5px solid #e2e8f0; border-radius: 12px; background: #ffffff; color: #64748b; font-weight: 800; font-size: 1rem;">📐 數學科</div>
+                </div>
 
-                <!-- 模擬登入後的修改密碼提示疊加 -->
-                <div
-                    style="position: absolute; bottom: 30px; left: 0; width: 100%; display: flex; justify-content: center;">
-                    <div
-                        style="background: rgba(255,255,255,0.95); border: 2px solid #10b981; padding: 15px; border-radius: 15px; width: 85%; box-shadow: 0 10px 20px rgba(0,0,0,0.1); text-align: center;">
-                        <div style="font-size: 0.95rem; color: #064e3b; margin-bottom: 10px; font-weight: bold;">
-                            登入後，請點擊上方工具列：</div>
-                        <div class="header-icon-btn pwd-btn"
-                            style="display:inline-flex; width:36px; height:36px;"><svg width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='11' width='18' height='11' rx='2' ry='2'/><path d='M7 11V7a5 5 0 0 1 10 0v4'/></svg></div>
-                    </div>
+                <div class="sub-title" style="margin-bottom: 20px; color: #059669; font-weight: 900; text-align: center;">小六資優自然 ✦ 自然超前班</div>
+                
+                <div class="input-group" style="width: 100%; margin-bottom: 12px;"><input type="text" placeholder="請輸入學生姓名" style="pointer-events: none; width: 100%; padding: 12px; border: 2px solid #eee; border-radius: 12px; text-align: center;"></div>
+                <div class="input-group" style="width: 100%; margin-bottom: 15px;"><input type="password" placeholder="請輸入密碼 (預設手機)" style="pointer-events: none; width: 100%; padding: 12px; border: 2px solid #eee; border-radius: 12px; text-align: center;"></div>
+                <button class="login-btn" style="width: 100%; padding: 14px; background: #10b981; color: white; border: none; border-radius: 12px; font-size: 1.1rem; font-weight: bold; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);">登入查看自然科</button>
+                
+                <div style="margin-top: 25px; border-top: 1px dashed #ddd; padding-top: 15px; width: 100%; text-align: center;">
+                    <span style="font-size: 0.85rem; color: #666;">💡 切換至「數學科」時，界面將同步轉為<span style="color:#3b82f6; font-weight:bold;">藍色主題</span></span>
                 </div>
             </div>
             <div class="info-panel">
-                <h2 style="color:#10b981;"><svg width='1.1em' height='1.1em' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' style='vertical-align:-0.2em;margin-right:6px'><rect x='3' y='11' width='18' height='11' rx='2' ry='2'/><path d='M7 11V7a5 5 0 0 1 10 0v4'/></svg> 預設登入與帳戶安全</h2>
-                <p>初次使用的預設帳密：<br><svg width='1em' height='1em' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' style='vertical-align:-0.15em;margin-right:4px'><path d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'/><circle cx='12' cy='7' r='4'/></svg> <b>帳號</b>：學生姓名 (請輸入全名)<br><svg width='1em' height='1em' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' style='vertical-align:-0.15em;margin-right:4px'><rect x='3' y='11' width='18' height='11' rx='2' ry='2'/><path d='M7 11V7a5 5 0 0 1 10 0v4'/></svg>
-                    <b>密碼</b>：家長留下的手機號碼<br><br>為了保障孩子的資料安全，首次登入成功看到成績後，強烈建議您點擊右上角的<b>「<svg width='1em' height='1em' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' style='vertical-align:-0.15em;'><rect x='3' y='11' width='18' height='11' rx='2' ry='2'/><path d='M7 11V7a5 5 0 0 1 10 0v4'/></svg> (改密碼)」</b>按鈕，變更為您專屬的密碼。</p>
+                <h2 style="color:#059669;">🔑 登入前：請先選擇科目</h2>
+                <p>山熊科學系統採用「導向式登入」設計：<br><br>
+                1. <b>學員類別切換</b>：登入前，請依照孩子當日就讀的類別，先點擊頂端的 <b><span style="color:#10b981;">「🪴 自然科」</span></b> 或 <b><span style="color:#3b82f6;">「📐 數學科」</span></b>。<br><br>
+                2. <b>輸入姓名登入</b>：輸入學生姓名與手機號碼後即可進入。若孩子同時就讀兩科，只需切換科目按鈕即可分別登入管理。</p>
             </div>
         </div>
 
@@ -2479,6 +2497,7 @@
             <div class="phone-frame" style="height: 480px; position: relative; background: #f0fdf4;">
                 <div class="mock-header-bar">
                     <div class="header-col-logo"><img src="https://www.sciencebear.com.tw/icon.png"
+                            crossorigin="anonymous"
                             class="header-logo-full"></div>
                     <div class="header-col-info">
                         <div class="class-info-top">國二自然超前班</div>
@@ -2498,7 +2517,7 @@
                 </div>
             </div>
             <div class="info-panel">
-                <h2 style="color:#ef4444;">🚨 重要公告：即時彈出提醒</h2>
+                <h2 style="color:#ef4444;">🚨 重要公告<br>即時彈出提醒</h2>
                 <p>當有停課、補課或任何影響上課時間地點的極重要訊息，系統會自動跳出<span
                         style="font-weight:900; color:#ef4444;">強制紅色視窗</span>。家長點擊「我已閱讀」後才能進行其他動作，確保訊息絕對不漏接！</p>
             </div>
@@ -2529,7 +2548,7 @@
                 </div>
             </div>
             <div class="info-panel">
-                <h2 style="color:#f59e0b;">📢 分類公佈欄與永久檔案</h2>
+                <h2 style="color:#f59e0b;">📢 分類公佈欄<br>與永久檔案下載</h2>
                 <p>切換至「公佈欄」分頁，可一次查看老師發布的所有歷史消息。系統將資訊分類為<span style="color:#d35400; font-weight:900;">一般公告</span>、<span
                         style="color:#2980b9; font-weight:900;">課表資料</span>與<span
                         style="color:#c0392b; font-weight:900;">緊急提醒</span>，確保所有紀錄點擊即可查閱、下載。</p>
@@ -2573,7 +2592,7 @@
                 </div>
             </div>
             <div class="info-panel">
-                <h2 style="color:#e74c3c; white-space: nowrap;">🎯 在家補考：分數一鍵回報</h2>
+                <h2 style="color:#e74c3c; white-space: nowrap;">🎯 在家補考<br>分數一鍵回報</h2>
                 <p>若孩子領回補考卷，寫完並批改後，請在成績單下方的<span
                         style="font-weight:900; color:#e74c3c;">紅色虛線回報欄</span>輸入分數。回報後成績會顯示為<span
                         style="color:#3498db; font-weight:900;">(待審核)</span>，讓老師在後台同步核對。</p>
@@ -2630,7 +2649,7 @@
                 </div>
             </div>
             <div class="info-panel">
-                <h2 style="color:#ea580c;">📉 班級統計圖與雙重顏色警示</h2>
+                <h2 style="color:#ea580c;">📉 班級統計圖<br>與雙重顏色警示</h2>
                 <p>成績未達標會顯示<span style="color:#cc0000; font-weight:900;">⚠️
                         補考警示</span>。成績會自動帶出全班的分散動態長條直方圖，若發生補考，系統還會根據補考錯題數呈現<span
                         style="color:#27ae60; font-weight:900;">綠色</span>到<span
@@ -2647,7 +2666,7 @@
                         <span class="student-info" style="font-size: 1.4rem;">黃阿喵</span>
                     </div>
                     <div>
-                        <span class="sticker-badge-header" style="font-size: 1rem; padding: 4px 10px;"><svg width='1.2em' height='1.2em' viewBox='0 0 24 24' fill='#f59e0b' stroke='#f59e0b' stroke-width='1.5' style='vertical-align:-0.2em;margin-right:6px'><polygon points='12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2'/></svg> 棒卡數：x 3</span>
+                        <span class="sticker-badge-header" style="font-size: 1rem; padding: 4px 10px;"><svg width='1.2em' height='1.2em' viewBox='0 0 24 24' fill='#f59e0b' stroke='#f59e0b' stroke-width='1.5' style='vertical-align:-0.2em;margin-right:6px'><polygon points='12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2'/></svg> 棒卡數：200 棒</span>
                     </div>
                 </div>
 
@@ -2660,7 +2679,7 @@
                                     <option>今日小考 100 分</option>
                                 </select>
                                 <select class="sticker-count-select">
-                                    <option>+20 張</option>
+                                    <option>+20 棒</option>
                                 </select>
                             </div>
                             <button class="sticker-submit-btn"
@@ -2671,7 +2690,7 @@
                         <div class="history-msg">
                             <div class="history-msg-avatar avatar-student">喵</div>
                             <div class="history-msg-body sticker-body">
-                                <div><b>申請發放棒卡</b> <span class="sticker-badge">+20 張</span></div>
+                                <div><b>申請發放棒卡</b> <span class="sticker-badge">+20 棒</span></div>
                                 <div style="font-size: 0.95rem; color: #ea580c; margin-top: 4px;">理由：今日小考 100 分</div>
                                 <div class="sticker-status approved"><svg width='1em' height='1em' viewBox='0 0 24 24' fill='none' style='vertical-align:-0.15em;margin-right:3px;border-radius:50%'><circle cx='12' cy='12' r='12' fill='#10b981'/><polyline points='6 12 10 16 18 8' stroke='white' stroke-width='2.5' fill='none' stroke-linecap='round'/></svg> 已核准發放</div>
                                 <div class="history-msg-time">09/21 18:30</div>
@@ -2681,7 +2700,7 @@
                 </div>
             </div>
             <div class="info-panel">
-                <h2 style="color:#fb923c;">回報棒卡系統</h2>
+                <h2 style="color:#fb923c;">🚀 回報棒卡系統<br>獎勵即時入帳</h2>
                 <p><span
                         style="font-weight:900; color:#ea580c;">「棒卡申請」</span>功能：孩子在班上完成特定目標（如：小考高分、課堂表现良好）後，可直接透過橘色的申請區送出請求，老師審核通過後點數直接加進上方棒卡帳戶，成就感滿滿！
                 </p>
@@ -2727,7 +2746,7 @@
                 </div>
             </div>
             <div class="info-panel">
-                <h2 style="color:#10b981;">💬 雙向對話留言板與檔案上傳</h2>
+                <h2 style="color:#10b981;">💬 雙向對話留言板<br>與檔案拍照上傳</h2>
                 <p>除了強大的「引用功能」可自動綁定老師的對話內容外，也完美支援<b>「作業拍照上傳」</b>。<br>點擊綠色虛線區即可附上圖片，有不懂的立即發問，讓老師線上看圖解惑，再也不怕問題卡住！</p>
             </div>
         </div>
@@ -2811,6 +2830,14 @@
 
         async function downloadPDF() {
             updateBtn("btn-pdf", "⏳ 正在生成多頁 PDF...", true);
+
+            // 防衛性檢查：確認 jsPDF 是否已成功載入
+            if (!window.jspdf || !window.jspdf.jsPDF) {
+                alert("⚠️ PDF 函式庫尚未載入！\n\n請確認：\n1. 網路連線正常（需連外網下載 CDN）\n2. 重新整理頁面後再試");
+                updateBtn("btn-pdf", "❌ 函式庫未載入，請重整頁面", false);
+                return;
+            }
+
             const { jsPDF } = window.jspdf;
 
             try {
@@ -2824,6 +2851,8 @@
                 const pdfHeight = pdf.internal.pageSize.getHeight();
 
                 for (let i = 0; i < blocks.length; i++) {
+                    updateBtn("btn-pdf", `⏳ 正在生成第 ${i + 1}/${blocks.length} 頁...`, true);
+
                     const wrapper = document.createElement('div');
                     wrapper.style.padding = '30px';
                     wrapper.style.background = '#f8fafc';
@@ -2844,12 +2873,13 @@
                     const canvas = await html2canvas(wrapper, {
                         scale: 2,
                         backgroundColor: "#f8fafc",
-                        useCORS: true
+                        useCORS: true,
+                        imageTimeout: 5000
                     });
 
                     document.body.removeChild(wrapper);
 
-                    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                    const imgData = canvas.toDataURL('image/jpeg', 0.92);
                     const imgProps = pdf.getImageProperties(imgData);
 
                     const ratio = pdfWidth / imgProps.width;
@@ -2861,15 +2891,14 @@
                         pdf.addPage();
                     }
                     pdf.addImage(imgData, 'JPEG', 0, yOffset, pdfWidth, finalHeight);
-
-                    updateBtn("btn-pdf", `⏳ 正在生成第 ${i + 1}/${blocks.length} 頁...`, true);
                 }
 
                 pdf.save("山熊科學-電子聯絡簿操作手冊.pdf");
                 updateBtn("btn-pdf", "✅ PDF 下載成功！", false);
             } catch (e) {
-                console.error(e);
-                updateBtn("btn-pdf", "❌ PDF 下載失敗", false);
+                console.error("PDF 生成錯誤：", e);
+                updateBtn("btn-pdf", `❌ PDF 下載失敗：${e.message || '未知錯誤'}`, false);
+                alert(`PDF 生成失敗！\n\n錯誤訊息：${e.message}\n\n請截圖此訊息並回報給開發者。`);
             }
         }
     </script>
