@@ -19,10 +19,34 @@ service firebase.storage {
       allow write: if true;
     }
 
-    // ★ 新增：老師/學生在 ebook-app 上傳的附件（考卷、筆記、作業等）
+    // ★ 老師/學生在 ebook-app 上傳的附件（考卷、筆記、作業等）
     match /uploads/{allPaths=**} {
       allow read: if true;
       allow write: if true;
+    }
+
+    // ★ 開放成績單目錄，允許未登入的使用者上傳 (GAS WebApp 專用)
+    match /report_cards/{allPaths=**} {
+      allow read: if true;
+      allow create, update: if request.resource.contentType.matches('image/.*')
+                            && request.resource.size < 15 * 1024 * 1024;
+      allow delete: if false; // 禁止前端刪除
+    }
+
+    // 其他根目錄的所有檔案 (白名單防護)
+    match /{allPaths=**} {
+      // 允許所有人讀取圖片 (這樣前台才看得到橫幅與封面)
+      allow read: if true;
+
+      // 允許建立與更新：檢查圖片格式、大小限制放寬至 10MB (避免 AI 大圖被擋)、並嚴格檢查白名單
+      allow create, update: if request.resource.contentType.matches('image/.*')
+                   && request.resource.size < 15 * 1024 * 1024
+                   && request.auth != null
+                   && request.auth.token.email.matches('^(neatnelsonhuang|kuohsu33|foxgiddens|gk322923|hamasaki0710|bearslab3m|yehyaya1125|wade020788|4415wayne|qsc93344|anna00332|sciencebearhigh|owencheng11078|yoyo89227|hwangshaotarng|chiaoi4477|bear6667360)@gmail[.]com$');
+                   
+      // 允許刪除：只需要檢查是否登入且在白名單內
+      allow delete: if request.auth != null
+                   && request.auth.token.email.matches('^(neatnelsonhuang|kuohsu33|foxgiddens|gk322923|hamasaki0710|bearslab3m|yehyaya1125|wade020788|4415wayne|qsc93344|anna00332|sciencebearhigh|owencheng11078|yoyo89227|hwangshaotarng|chiaoi4477|bear6667360)@gmail[.]com$');
     }
   }
 }
