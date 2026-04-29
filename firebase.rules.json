@@ -1,5 +1,8 @@
 {
   "rules": {
+    ".read": "auth != null",
+    ".write": "auth != null",
+
     "admins": {
       ".read": true,
       ".write": true
