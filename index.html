@@ -3170,6 +3170,10 @@
                         gData.feedbackHistory = newFbs;
                         // 重新渲染聯絡簿區塊，確保狀態即時更新
                         renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
+                        // 同步重新渲染近期分數區塊，讓待審核狀態即時顯示在成績卡片上
+                        if (gData.grades) {
+                            renderOldGradeCards(gData.grades);
+                        }
                     });
 
                     // 3. 重要公告監聽 (班級 + 全校)
