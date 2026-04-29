@@ -4087,9 +4087,10 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             btn.disabled = true;
             btn.innerText = "處理中...";
             
-            swalLoading('處理中...', '系統正在批次更新資料與 Firebase，請稍候。');
+            Swal.fire({ title: '處理中...', text: '系統正在批次更新資料與 Firebase，請稍候。', icon: 'info', allowOutsideClick: false, showConfirmButton: false, didOpen: function() { Swal.showLoading(); } });
 
             google.script.run.withSuccessHandler(function(res) {
+                Swal.close();
                 btn.disabled = false;
                 btn.innerText = originalText;
                 if (res && res.success) {
@@ -4099,6 +4100,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     swalAlert('❌ 失敗', res ? res.msg : '未知錯誤', 'error');
                 }
             }).withFailureHandler(function(err) {
+                Swal.close();
                 btn.disabled = false;
                 btn.innerText = originalText;
                 swalAlert('❌ 系統連線錯誤', err.toString(), 'error');
