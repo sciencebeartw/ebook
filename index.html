@@ -4087,7 +4087,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             btn.disabled = true;
             btn.innerText = "處理中...";
             
-            swalAlert('處理中...', '系統正在批次更新資料與 Firebase，請稍候。', 'info');
+            swalLoading('處理中...', '系統正在批次更新資料與 Firebase，請稍候。');
 
             google.script.run.withSuccessHandler(function(res) {
                 btn.disabled = false;
