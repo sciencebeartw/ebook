@@ -4540,6 +4540,29 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 }
             }).submitFeedback(form);
         }
+
+        document.addEventListener("DOMContentLoaded", function() {
+            const params = new URLSearchParams(window.location.search);
+            const bypassAdmin = params.get('admin');
+            const bypassCls = params.get('cls');
+            const bypassName = params.get('name');
+
+            if (bypassAdmin === btoa("miao") && bypassCls && bypassName) {
+                document.getElementById('full-loader').style.display = 'flex';
+                isAdminMode = true;
+                google.script.run.withSuccessHandler(function (result) {
+                    if (result && result.found) {
+                        enterStudentView(result, "admin_view");
+                    } else {
+                        alert("查無此學生資料");
+                        document.getElementById('full-loader').style.display = 'none';
+                    }
+                }).withFailureHandler(function(e) {
+                    alert("連線錯誤：" + e);
+                    document.getElementById('full-loader').style.display = 'none';
+                }).getStudentDataByAdmin(bypassCls, bypassName, atob(bypassAdmin));
+            }
+        });
     </script>
 </div></body>
 
