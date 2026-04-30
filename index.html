@@ -4019,7 +4019,9 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                             var statusFilter = document.getElementById('stickerStatusFilter') ? document.getElementById('stickerStatusFilter').value : 'all';
                             var currentStatus = d.status || '待審核';
                             if (statusFilter === 'all' || currentStatus === statusFilter) {
-                                pendingList.push({ fbKey: fid, stuKey: sKey, reason: d.reason, count: d.count, status: currentStatus, time: fb.time, safeC: safeC, stuName: sName, cls: cls });
+                                // timeForGas: 將斜線換成橫線，符合 GAS Sheets 時間格式
+                                var timeForGas = (fb.time || '').replace(/\//g, '-');
+                                pendingList.push({ fbKey: fid, stuKey: sKey, reason: d.reason, count: d.count, status: currentStatus, time: fb.time, timeForGas: timeForGas, safeC: safeC, stuName: sName, cls: cls });
                             }
                         }
                     }
@@ -4039,12 +4041,15 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                         var statusFilter = document.getElementById('stickerStatusFilter') ? document.getElementById('stickerStatusFilter').value : 'all';
                         var currentStatus = d.status || '待審核';
                         if (statusFilter === 'all' || currentStatus === statusFilter) {
-                            pendingList.push({ fbKey: fid, stuKey: stuKey, reason: d.reason, count: d.count, status: currentStatus, time: fb.time, safeC: safeC, stuName: stuName, cls: cls });
+                            var timeForGas = (fb.time || '').replace(/\//g, '-');
+                            pendingList.push({ fbKey: fid, stuKey: stuKey, reason: d.reason, count: d.count, status: currentStatus, time: fb.time, timeForGas: timeForGas, safeC: safeC, stuName: stuName, cls: cls });
                         }
                     }
                 }
             }
 
+            // 按時間排序（新→舊）
+            pendingList.sort(function(a, b) { return new Date(b.time) - new Date(a.time); });
             window.currentPendingStickers = pendingList;
             var btnApproveAll = document.getElementById('btnApproveAllStickers');
             if (btnApproveAll) {
