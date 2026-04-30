@@ -4118,30 +4118,35 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         }
 
         async function approveStickerApply(btn, fbKey, className, studentName, count, time) {
-            if (!confirm('確認通過 +' + count + ' 棒？')) return;
+            var confirmResult = await swalConfirm('通過審核', '確認通過 +' + count + ' 棒？');
+            if (!confirmResult) return;
             
             const originalText = btn.innerText;
             btn.disabled = true;
             btn.innerText = "處理中...";
+            
+            Swal.fire({ title: '處理中...', text: '正在更新資料至伺服器...', icon: 'info', allowOutsideClick: false, showConfirmButton: false, didOpen: function() { Swal.showLoading(); } });
 
             // 呼叫 GAS 後端，確保試算表同步更新
             google.script.run.withSuccessHandler(function(res) {
+                Swal.close();
                 btn.disabled = false;
                 btn.innerText = originalText;
                 if (res.success) {
-                    alert('✅ 已通過！棒卡 +' + count);
+                    swalAlert('✅ 已通過！', '棒卡 +' + count, 'success');
                     // 本地更新 gData (若有需要即時反映在介面上)
                     if (typeof gData !== 'undefined' && gData && gData.studentName === studentName) {
                         gData.stickers = (parseInt(gData.stickers) || 0) + parseInt(count);
                     }
                     if (typeof loadStickerReviews === 'function') loadStickerReviews();
                 } else {
-                    alert('❌ 失敗：' + res.msg);
+                    swalAlert('❌ 失敗', res.msg, 'error');
                 }
             }).withFailureHandler(function(err) {
+                Swal.close();
                 btn.disabled = false;
                 btn.innerText = originalText;
-                alert('❌ 系統連線錯誤：' + err);
+                swalAlert('❌ 系統連線錯誤', err.toString(), 'error');
             }).approveStickerGas(
                 gPass, // 使用登入時的管理者密碼
                 time, 
@@ -4153,25 +4158,30 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         }
 
         async function rejectStickerApply(btn, fbKey, className, studentName, time) {
-            if (!confirm('確認退回此申請？')) return;
+            var confirmResult = await swalConfirm('退回申請', '確認退回此申請？');
+            if (!confirmResult) return;
 
             const originalText = btn.innerText;
             btn.disabled = true;
             btn.innerText = "處理中...";
+            
+            Swal.fire({ title: '處理中...', text: '正在更新資料至伺服器...', icon: 'info', allowOutsideClick: false, showConfirmButton: false, didOpen: function() { Swal.showLoading(); } });
 
             google.script.run.withSuccessHandler(function(res) {
+                Swal.close();
                 btn.disabled = false;
                 btn.innerText = originalText;
                 if (res.success) {
-                    alert('已退回申請');
+                    swalAlert('✅ 退回成功', '已退回該筆申請', 'success');
                     if (typeof loadStickerReviews === 'function') loadStickerReviews();
                 } else {
-                    alert('❌ 失敗：' + res.msg);
+                    swalAlert('❌ 失敗', res.msg, 'error');
                 }
             }).withFailureHandler(function(err) {
+                Swal.close();
                 btn.disabled = false;
                 btn.innerText = originalText;
-                alert('❌ 系統連線錯誤：' + err);
+                swalAlert('❌ 系統連線錯誤', err.toString(), 'error');
             }).approveStickerGas(
                 gPass, 
                 time, 
