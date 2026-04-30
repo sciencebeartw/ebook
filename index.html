@@ -2659,10 +2659,14 @@
                     <select id="fbStudentSelect" class="admin-select" style="flex:1;">
                         <option value="" disabled selected>請選擇學生</option>
                     </select>
+                    <select id="fbTypeSelect" class="admin-select" style="flex:1;">
+                        <option value="全部">全部類型 (不含棒卡)</option>
+                        <option value="學生留言">一般留言與作業</option>
+                        <option value="補考">補考回報</option>
+                    </select>
                 </div>
                 <div style="display:flex; gap:8px;">
-                    <button class="admin-btn btn-blue" onclick="loadAdminFeedbacks('學生留言')" style="flex:1;">載入相關留言</button>
-                    <button class="admin-btn btn-orange" onclick="loadAdminFeedbacks('補考')" style="flex:1;">載入補考回報</button>
+                    <button class="admin-btn btn-blue" onclick="loadAdminFeedbacks()" style="flex:1;">載入查詢結果</button>
                 </div>
                 <div id="adminFeedbackList" style="margin-top:12px; max-height:400px; overflow-y:auto;"></div>
             </div>
@@ -4407,11 +4411,15 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }
         }
 
-        async function loadAdminFeedbacks(filterType) {
+        async function loadAdminFeedbacks() {
             var clsSel = document.getElementById('fbClassSelect');
             var stuSel = document.getElementById('fbStudentSelect');
+            var typeSel = document.getElementById('fbTypeSelect');
+            
             var cls = clsSel ? clsSel.value : '';
             var stuName = stuSel ? stuSel.value : '';
+            var filterType = typeSel ? typeSel.value : '全部';
+            
             if (!cls || !stuName) { alert('請先選擇班級和學生'); return; }
             var safeC = safeKey(cls);
             var snapS = await db.ref(BEAR_SUBJECT + '/students/' + safeC).once('value');
@@ -4426,10 +4434,16 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     var sName = kids[sKey] ? kids[sKey].name : '未知';
                     for (var fid in fbs) {
                         var fb = fbs[fid];
-                        if (filterType === '補考' && fb.type && fb.type.indexOf('補考') > -1) {
-                            pendingList.push({ fbKey: fid, stuKey: sKey, type: fb.type, content: fb.content, time: fb.time, date: fb.targetDate || fb.time.substring(0,10).replace(/-/g,'/'), cls: cls, stuName: sName, safeC: safeC });
-                        } else if (filterType === '學生留言' && (!fb.type || fb.type.indexOf('棒卡') === -1) && (!fb.type || fb.type.indexOf('補考') === -1)) {
-                            pendingList.push({ fbKey: fid, stuKey: sKey, type: fb.type || '學生留言', content: fb.content, time: fb.time, date: fb.targetDate || fb.time.substring(0,10).replace(/-/g,'/'), cls: cls, stuName: sName, safeC: safeC });
+                        var fType = fb.type || '學生留言';
+                        if (fType.indexOf('棒卡') > -1) continue; // 棒卡不在此區顯示
+                        
+                        var match = false;
+                        if (filterType === '全部') match = true;
+                        else if (filterType === '補考' && fType.indexOf('補考') > -1) match = true;
+                        else if (filterType === '學生留言' && fType.indexOf('補考') === -1) match = true;
+                        
+                        if (match) {
+                            pendingList.push({ fbKey: fid, stuKey: sKey, type: fType, content: fb.content, time: fb.time, date: fb.targetDate || fb.time.substring(0,10).replace(/-/g,'/'), cls: cls, stuName: sName, safeC: safeC });
                         }
                     }
                 }
@@ -4441,10 +4455,16 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 var fbs = snapF.val() || {};
                 for (var fid in fbs) {
                     var fb = fbs[fid];
-                    if (filterType === '補考' && fb.type && fb.type.indexOf('補考') > -1) {
-                        pendingList.push({ fbKey: fid, stuKey: stuKey, type: fb.type, content: fb.content, time: fb.time, date: fb.targetDate || fb.time.substring(0,10).replace(/-/g,'/'), cls: cls, stuName: stuName, safeC: safeC });
-                    } else if (filterType === '學生留言' && (!fb.type || fb.type.indexOf('棒卡') === -1) && (!fb.type || fb.type.indexOf('補考') === -1)) {
-                        pendingList.push({ fbKey: fid, stuKey: stuKey, type: fb.type || '學生留言', content: fb.content, time: fb.time, date: fb.targetDate || fb.time.substring(0,10).replace(/-/g,'/'), cls: cls, stuName: stuName, safeC: safeC });
+                    var fType = fb.type || '學生留言';
+                    if (fType.indexOf('棒卡') > -1) continue;
+                    
+                    var match = false;
+                    if (filterType === '全部') match = true;
+                    else if (filterType === '補考' && fType.indexOf('補考') > -1) match = true;
+                    else if (filterType === '學生留言' && fType.indexOf('補考') === -1) match = true;
+                    
+                    if (match) {
+                        pendingList.push({ fbKey: fid, stuKey: stuKey, type: fType, content: fb.content, time: fb.time, date: fb.targetDate || fb.time.substring(0,10).replace(/-/g,'/'), cls: cls, stuName: stuName, safeC: safeC });
                     }
                 }
             }
@@ -4460,7 +4480,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 var accent = isScore ? '#ef4444' : 'var(--primary)';
                 if (!isScore && item.type === '作業上傳') { bg = '#f0f9ff'; accent = '#0ea5e9'; }
                 
-                var displayContent = item.content;
+                var displayContent = (item.content !== undefined && item.content !== null) ? item.content.toString() : "";
                 if (displayContent.startsWith("'")) displayContent = displayContent.substring(1);
                 
                 displayContent = displayContent.replace(/\[quote:([^\]]+)\](.*?)\[\/quote\]/gi, function(match, qtype, qContent) {
