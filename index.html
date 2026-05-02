@@ -1536,6 +1536,93 @@
             margin-top: 4px;
         }
 
+        /* ===== 我會改進區（紅色） ===== */
+        .penalty-apply-box {
+            background: #fef2f2;
+            border: 2px dashed #ef4444;
+            border-radius: 12px;
+            padding: 14px 15px;
+            margin-bottom: 18px;
+        }
+
+        .penalty-apply-title {
+            font-weight: bold;
+            color: #dc2626;
+            margin-bottom: 10px;
+            display: block;
+            font-size: 1.15rem;
+        }
+
+        .penalty-reason-select {
+            flex: 1;
+            min-width: 0;
+            padding: 8px 12px;
+            border: 1.5px solid #fca5a5;
+            border-radius: 20px;
+            font-size: 1.1rem;
+            outline: none;
+            background: white;
+            color: #7f1d1d;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23ef4444' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 30px;
+        }
+
+        .penalty-count-select {
+            width: 90px;
+            padding: 8px 10px;
+            border: 1.5px solid #fca5a5;
+            border-radius: 20px;
+            font-size: 1.1rem;
+            outline: none;
+            background: white;
+            text-align: center;
+            color: #7f1d1d;
+        }
+
+        .penalty-submit-btn {
+            background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+            color: white;
+            border: none;
+            padding: 8px 18px;
+            border-radius: 20px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            white-space: nowrap;
+            box-shadow: 0 3px 10px rgba(239,68,68,0.3);
+            transition: transform 0.15s;
+        }
+
+        .penalty-submit-btn:active { transform: scale(0.96); }
+
+        .penalty-hint {
+            font-size: 0.9rem;
+            color: #ef4444;
+            margin-top: 4px;
+        }
+
+        /* 扣卡申報氣泡樣式 */
+        .history-msg-body.penalty-body {
+            background: #fef2f2;
+            border: 1px solid #fca5a5;
+        }
+
+        .penalty-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+            color: white;
+            font-weight: 800;
+            font-size: 1rem;
+            padding: 2px 8px;
+            border-radius: 12px;
+            margin-left: 6px;
+            box-shadow: 0 2px 6px rgba(239,68,68,0.3);
+        }
+
         /* 棒卡申請氣泡樣式 */
         .history-msg-body.sticker-body {
             background: #fff7ed;
@@ -3830,7 +3917,14 @@ if (exam.dist) {
                             try { stickerData = JSON.parse(h.content); } catch(e) { stickerData = { reason: h.content, count: '?', status: "待審核" }; }
                             var statusLabel = stickerData.status || "待審核";
                             var statusClass = (statusLabel === "通過") ? "approved" : (statusLabel === "退回" ? "rejected" : "");
-                            historyHtml += "<div class='history-msg'><div class='history-msg-avatar avatar-student'>" + avatarChar + "</div><div class='history-msg-body sticker-body'><span>" + SVG.star + stickerData.reason + "</span><span class='sticker-badge'>+" + stickerData.count + "棒</span><br><span class='sticker-status " + statusClass + "'>" + (statusLabel === "通過" ? SVG.check : (statusLabel === "退回" ? SVG.cross : SVG.hourglass)) + statusLabel + "</span><div class='history-msg-time'>" + h.time.substring(5, 16) + "</div></div></div>";
+                            
+                            var isPenalty = parseInt(stickerData.count) < 0;
+                            var bodyCls = isPenalty ? "penalty-body" : "sticker-body";
+                            var badgeCls = isPenalty ? "penalty-badge" : "sticker-badge";
+                            var prefix = isPenalty ? "" : "+";
+                            var icon = isPenalty ? "🚨 " : SVG.star;
+                            
+                            historyHtml += "<div class='history-msg'><div class='history-msg-avatar avatar-student'>" + avatarChar + "</div><div class='history-msg-body " + bodyCls + "'><span>" + icon + stickerData.reason + "</span><span class='" + badgeCls + "'>" + prefix + stickerData.count + "棒</span><br><span class='sticker-status " + statusClass + "'>" + (statusLabel === "通過" ? SVG.check : (statusLabel === "退回" ? SVG.cross : SVG.hourglass)) + statusLabel + "</span><div class='history-msg-time'>" + h.time.substring(5, 16) + "</div></div></div>";
                         } else {
                             historyHtml += "<div class='history-msg'><div class='history-msg-avatar " + avatarClass + "'>" + avatarChar + "</div><div class='history-msg-body " + bodyClass + "'>" + parseBtn(h.content) + "<div class='history-msg-time'>" + h.time.substring(5, 16) + "</div></div></div>";
                         } }}); var inputPlaceholder = "留言給老師..."; var safeDateId = post.date.replace(/\//g, '-');
@@ -3865,6 +3959,26 @@ if (exam.dist) {
             </div>
             <input type="text" class="sticker-reason-custom" id="sticker-custom-${safeDateId}" placeholder="請輸入得棒名目...">
             <div class="sticker-hint">申請後由老師審核，通過後計入總棒數 ${SVG.star}</div>
+        </div>
+        <div class="penalty-apply-box">
+            <span class="penalty-apply-title">🚨 我會改進</span>
+            <div class="sticker-apply-row">
+                <select class="penalty-reason-select" id="penalty-reason-${safeDateId}" onchange="onPenaltyReasonChange('${safeDateId}')">
+                    <option value="__placeholder__" disabled selected>請選擇改進事項</option>
+                    <option value="聯絡簿未簽名">⚠️ 聯絡簿未簽名</option>
+                    <option value="作業未完成">⚠️ 作業未完成</option>
+                    <option value="__custom__">✍️ 自行填寫...</option>
+                </select>
+                <select class="penalty-count-select" id="penalty-count-${safeDateId}" onchange="onPenaltyCountChange('${safeDateId}')">
+                    <option value="-5">-5棒</option>
+                    <option value="-10">-10棒</option>
+                    <option value="__custom__">自訂...</option>
+                </select>
+                <input type="number" class="sticker-count-custom" id="penalty-count-custom-${safeDateId}" placeholder="扣棒" max="-1" style="display:none; width:65px; padding:8px; border:1.5px solid #fca5a5; border-radius:20px; outline:none; color: #dc2626;">
+                <button class="penalty-submit-btn" onclick="submitPenaltyApply('${safeDateId}', '${post.date}')">送出反省</button>
+            </div>
+            <input type="text" class="sticker-reason-custom" id="penalty-custom-${safeDateId}" placeholder="請輸入改進事項..." style="border-color: #fca5a5; color: #7f1d1d;">
+            <div class="penalty-hint">送出後由老師審核，並自總棒數中扣除。勇敢負責是成長的第一步！</div>
         </div>
     `;
 
@@ -3960,11 +4074,18 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 var data = {};
                 try { data = JSON.parse(h.content); } catch(e) { data = { reason: h.content, count: '?', status: '待審核' }; }
                 var status = data.status || '待審核';
+                var isPenalty = parseInt(data.count) < 0;
+                
                 var statusColor = status === '通過' ? '#15803d' : (status === '退回' ? '#dc2626' : '#92400e');
                 var statusBg = status === '通過' ? '#dcfce7' : (status === '退回' ? '#fee2e2' : '#fef3c7');
+                var icon = isPenalty ? "🚨" : "⭐";
+                var prefix = isPenalty ? "" : "+";
+                var countColor = isPenalty ? "#dc2626" : "#d97706";
+                var itemBg = isPenalty ? (status === '待審核' ? '#fef2f2' : statusBg) : statusBg;
+
                 var fbKey = h.fbKey || '';
-                html += "<div style='background:" + statusBg + "; border-radius:12px; padding:10px 12px; margin-bottom:10px;'>" +
-                    "<div style='font-weight:700; color:#1e293b; font-size:1rem;'>⭐ " + data.reason + " <span style='color:#d97706; font-weight:900;'>+" + data.count + "棒</span></div>" +
+                html += "<div style='background:" + itemBg + "; border-radius:12px; padding:10px 12px; margin-bottom:10px; border:" + (isPenalty ? "1px dashed #fca5a5" : "none") + ";'>" +
+                    "<div style='font-weight:700; color:#1e293b; font-size:1rem;'>" + icon + " " + data.reason + " <span style='color:" + countColor + "; font-weight:900;'>" + prefix + data.count + "棒</span></div>" +
                     "<div style='font-size:0.85rem; color:#64748b; margin-top:2px;'>" + h.time.substring(5, 16) + " ｜ <span style='background:" + statusBg + "; color:" + statusColor + "; font-weight:700; padding:1px 8px; border-radius:10px;'>" + status + "</span></div>" +
                     (status === '待審核' ? "<div style='display:flex; gap:8px; margin-top:8px;'>" +
                         "<button onclick=\"approveStickerApply(this, '" + fbKey + "','" + className + "','" + studentName + "'," + data.count + ",'" + h.time + "');\" style='flex:1; background:linear-gradient(135deg, var(--primary-light), var(--primary)); color:white; border:none; border-radius:20px; padding:6px; font-weight:700; cursor:pointer;'>✓ 通過</button>" +
@@ -4065,10 +4186,16 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             if (pendingList.length === 0) { listDiv.innerHTML = '<div style="color:#999; padding:10px;">無棒卡申請記錄</div>'; return; }
             var html = '';
             pendingList.forEach(function(item) {
+                var isPenalty = parseInt(item.count) < 0;
                 var statusBg = item.status === '通過' ? '#dcfce7' : (item.status === '退回' ? '#fee2e2' : '#fef9c3');
                 var statusColor = item.status === '通過' ? '#15803d' : (item.status === '退回' ? '#dc2626' : '#92400e');
-                html += '<div style="background:' + statusBg + '; border-radius:12px; padding:12px; margin-bottom:10px;">' +
-                    '<div style="font-weight:700; font-size:1.05rem;"><span style="color:#2563eb;">[' + item.stuName + ']</span> ⭐ ' + item.reason + ' <span style="color:#d97706;">+' + item.count + '棒</span></div>' +
+                var icon = isPenalty ? "🚨" : "⭐";
+                var prefix = isPenalty ? "" : "+";
+                var countColor = isPenalty ? "#dc2626" : "#d97706";
+                var itemBg = isPenalty ? (item.status === '待審核' ? '#fef2f2' : statusBg) : statusBg;
+
+                html += '<div style="background:' + itemBg + '; border-radius:12px; padding:12px; margin-bottom:10px; border:' + (isPenalty ? '1px dashed #fca5a5' : 'none') + ';">' +
+                    '<div style="font-weight:700; font-size:1.05rem;"><span style="color:#2563eb;">[' + item.stuName + ']</span> ' + icon + ' ' + item.reason + ' <span style="color:' + countColor + ';">' + prefix + item.count + '棒</span></div>' +
                     '<div style="font-size:0.85rem; color:#64748b; margin:4px 0;">' + item.time.substring(5, 16) + ' ｜ <b style="color:' + statusColor + '">' + item.status + '</b></div>' +
                     (item.status === '待審核' ?
                         '<div style="display:flex; gap:8px; margin-top:8px;">' +
@@ -4251,6 +4378,63 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }).withFailureHandler(function(e) {
                 alert('棒卡申請送出失敗: ' + e.message);
                 if (submitBtn) { submitBtn.innerText = "送出申請"; submitBtn.disabled = false; }
+            }).submitFeedback(form);
+        }
+
+        function onPenaltyReasonChange(safeId) {
+            var sel = document.getElementById('penalty-reason-' + safeId);
+            var custom = document.getElementById('penalty-custom-' + safeId);
+            if (sel && custom) {
+                custom.style.display = (sel.value === '__custom__') ? 'block' : 'none';
+            }
+        }
+        function onPenaltyCountChange(safeId) {
+            var sel = document.getElementById('penalty-count-' + safeId);
+            var custom = document.getElementById('penalty-count-custom-' + safeId);
+            if (sel && custom) {
+                custom.style.display = (sel.value === '__custom__') ? 'block' : 'none';
+            }
+        }
+
+        function submitPenaltyApply(safeId, realDate) {
+            var submitBtn = document.querySelector('#penalty-reason-' + safeId).parentElement.querySelector('.penalty-submit-btn');
+
+            var selEl = document.getElementById('penalty-reason-' + safeId);
+            var customEl = document.getElementById('penalty-custom-' + safeId);
+            var countSelEl = document.getElementById('penalty-count-' + safeId);
+            var countCustomEl = document.getElementById('penalty-count-custom-' + safeId);
+            
+            var reason = selEl ? selEl.value : '';
+            if (reason === '__custom__') reason = customEl ? customEl.value.trim() : '';
+            if (reason === '__placeholder__' || reason === '') {
+                alert("請選擇或填寫改進事項！");
+                return;
+            }
+
+            var count = countSelEl ? countSelEl.value : '';
+            if (count === '__custom__') count = countCustomEl ? countCustomEl.value.trim() : '';
+            if (count === '') {
+                alert("請填寫或選擇扣除棒數！");
+                return;
+            }
+            if (parseInt(count) > 0) count = "-" + count; // Ensure it's negative
+            
+            if (!confirm("確定要送出此改進申報？送出後將於審核通過扣除棒數。")) return;
+            
+            if(submitBtn) { submitBtn.innerText = "傳送中..."; submitBtn.disabled = true; }
+
+            var content = JSON.stringify({ reason: reason, count: count, status: "待審核" });
+            // 送出型態一樣使用 '棒卡申請' 以相容後台邏輯，但 count 為負數
+            var form = { className: gData.className, studentName: gData.studentName, targetDate: realDate, type: '棒卡申請', content: content };
+            
+            google.script.run.withSuccessHandler(function(res) {
+                if (selEl) { selEl.selectedIndex = 0; }
+                if (customEl) { customEl.value = ''; customEl.style.display = 'none'; }
+                if(submitBtn) { submitBtn.innerText = "送出反省"; submitBtn.disabled = false; }
+                alert("改進申報已送出！勇敢面對是成長的開始。");
+            }).withFailureHandler(function(e) {
+                alert('申報送出失敗: ' + (e.message || e));
+                if(submitBtn) { submitBtn.innerText = "送出反省"; submitBtn.disabled = false; }
             }).submitFeedback(form);
         }
 
