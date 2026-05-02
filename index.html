@@ -2927,7 +2927,7 @@
             // 先對 HTML 特殊字元做跳脫 防範 XSS
             text = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
             var withBr = text.replace(/\n/g, '<br>');
-            return withBr.replace(/\[(.*?)\](http[s]?:\/\/[^\s]+)/g, function (match, name, url) {
+            return withBr.replace(/\[(.*?)\](http[s]?:\/\/[^\s<]+)/g, function (match, name, url) {
                 if (name.indexOf("作業") > -1 || name.indexOf("上傳") > -1) {
                     return `<a href="${url}" target="_blank" class="btn-important-tag">${SVG.upload}${name}</a>`;
                 } else if (name.indexOf("附件") > -1) {
@@ -3806,7 +3806,7 @@ if (exam.dist) {
                     });
                     // 老師發布的連結 -> 藍色大膠囊
                     // 學生上傳的連結 -> 灰色小標籤 (透過 class="btn-small-tag" 區分)
-                    return withBr.replace(/\[(.*?)\](http[s]?:\/\/[^\s]+)/g, function (match, name, url) {
+                    return withBr.replace(/\[(.*?)\](http[s]?:\/\/[^\s<]+)/g, function (match, name, url) {
                         if (name.indexOf("作業") > -1 || name.indexOf("上傳") > -1) {
                             return `<a href="${url}" target="_blank" class="btn-important-tag">${SVG.upload}${name}</a>`;
                         } else if (name.indexOf("附件") > -1) {

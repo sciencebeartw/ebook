@@ -10,7 +10,7 @@ function renderDailyPosts(posts, history) {
                 withBr = withBr.replace(/\[quote:([^\]]+)\](.*?)\[\/quote\]/g, function(match, type, qContent) {
                     return `<div class="quote-box"><div class="quote-type">${type}</div><div class="quote-content">${qContent}</div></div>`;
                 });
-                return withBr.replace(/\[(.*?)\](http[s]?:\/\/[^\s]+)/g, function (match, name, url) {
+                return withBr.replace(/\[(.*?)\](http[s]?:\/\/[^\s<]+)/g, function (match, name, url) {
                     if (name.indexOf("附件") > -1 || name.indexOf("作業") > -1) {
                         return `<a href="${url}" target="_blank" class="btn-small-tag">📎 ${name}</a>`;
                     } else {
