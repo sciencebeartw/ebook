@@ -4646,6 +4646,12 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 container.innerHTML = "<div style='text-align:center; padding:30px; color:#999;'>目前沒有公告</div>";
                 return;
             }
+
+            // ★ 排序邏輯：由新到舊 ★
+            list.sort(function(a, b) {
+                return new Date(b.time.replace(/\//g, '-')) - new Date(a.time.replace(/\//g, '-'));
+            });
+
             var html = "";
             list.forEach(function (b) {
                 var cardClass = "bulletin-card";
