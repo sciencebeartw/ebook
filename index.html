@@ -4749,27 +4749,35 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var container = document.getElementById('sticky-notice-container');
             if (!container) return;
             
-            // 1. 優先尋找專門標記為「跑馬燈」的公告
-            var sticky = list.find(function(b) { return b.type === '跑馬燈'; });
-            
-            // 2. 如果沒有，則尋找最新的「一般」公告作為替代（可根據需求調整）
+            if (!list || list.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+
+            // 1. 確保名單是最新在前的（雖然 renderBulletins 已經排過，這裡再確認一次更安全）
+            var sortedList = [...list].sort(function(a, b) { return b.time.localeCompare(a.time); });
+
+            // 2. 依照優先權找公告：跑馬燈 > 一般
+            var sticky = sortedList.find(function(b) { return b.type === '跑馬燈'; });
             if (!sticky) {
-                var regulars = list.filter(function(b) { 
+                sticky = sortedList.find(function(b) { 
                     return b.type === '一般' && b.title && b.title.trim() !== ''; 
                 });
-                if (regulars.length > 0) sticky = regulars[0];
             }
             
-            // 3. 安全檢查：如果還是沒找到，或者內容真的是空的，直接消失
-            if (!sticky || !sticky.title || sticky.title.trim() === '') {
+            // 3. 安全檢查：如果沒符合條件的（例如全都是課表或緊急），直接消失
+            if (!sticky || !sticky.title) {
                 container.innerHTML = '';
                 return;
             }
             
-            var stickyId = 'sticky_' + (sticky.id || sticky.time);
+            var stickyId = 'sticky_' + (sticky.id || sticky.time.replace(/[: /]/g, '_'));
             if (localStorage.getItem(stickyId) === 'dismissed') { container.innerHTML = ''; return; }
             
-            var displayContent = `${sticky.title}：${sticky.content}`;
+            // 4. 內容處理：如果沒內容就只顯示標題，避免出現多餘的冒號
+            var cleanTitle = sticky.title.trim();
+            var cleanContent = (sticky.content && sticky.content.trim() !== '') ? sticky.content.trim().replace(/\n/g, ' ') : '';
+            var displayContent = cleanContent ? (cleanTitle + '：' + cleanContent) : cleanTitle;
             
             container.innerHTML = `
                 <div class="sticky-notice-banner" id="active-sticky-banner" onclick="switchTab(2)">
@@ -4783,19 +4791,19 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     <div class="sticky-notice-close" onclick="event.stopPropagation(); dismissStickyNotice('${stickyId}')">✕</div>
                 </div>
             `;
+            
+            // 啟動捲動檢測
             setTimeout(function() {
                 var banner = document.getElementById('active-sticky-banner');
                 if (!banner) return;
                 var wrapper = banner.querySelector('.sticky-notice-text-wrapper');
                 var singleText = banner.querySelector('.sticky-notice-text');
-                // 如果內容超過容器寬度，啟動跑馬燈
-                if (singleText.offsetWidth > banner.offsetWidth - 100) {
+                if (singleText && singleText.offsetWidth > (banner.offsetWidth - 120)) {
                     banner.classList.add('marquee-mode');
-                } else {
-                    // 如果沒超過，就不用顯示兩份文字
-                    wrapper.lastElementChild.remove();
+                } else if (wrapper && wrapper.lastElementChild) {
+                    wrapper.lastElementChild.style.display = 'none';
                 }
-            }, 200);
+            }, 300);
         }
 
         function dismissStickyNotice(id) {
