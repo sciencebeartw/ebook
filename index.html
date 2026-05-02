@@ -4330,7 +4330,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }
 
             // 按時間排序（新→舊）
-            pendingList.sort(function(a, b) { return new Date(b.time) - new Date(a.time); });
+            pendingList.sort(function(a, b) { return b.time.localeCompare(a.time); });
             window.currentPendingStickers = pendingList;
             var btnApproveAll = document.getElementById('btnApproveAllStickers');
             if (btnApproveAll) {
@@ -4898,7 +4898,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 }
             }
 
-            pendingList.sort(function(a,b) { return new Date(b.time) - new Date(a.time); });
+            pendingList.sort(function(a,b) { return b.time.localeCompare(a.time); });
 
             var listDiv = document.getElementById('adminFeedbackList');
             if (pendingList.length === 0) { listDiv.innerHTML = '<div style="color:#999; padding:10px;">目前沒有相關記錄。</div>'; return; }
