@@ -4739,9 +4739,24 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         function renderStickyNotice(list) {
             var container = document.getElementById('sticky-notice-container');
             if (!container) return;
-            var regulars = list.filter(function(b) { return b.type !== '緊急' && b.type !== '課表'; });
-            if (regulars.length === 0) { container.innerHTML = ''; return; }
-            var sticky = regulars[0];
+            
+            // 1. 優先尋找專門標記為「跑馬燈」的公告
+            var sticky = list.find(function(b) { return b.type === '跑馬燈'; });
+            
+            // 2. 如果沒有，則尋找最新的「一般」公告作為替代（可根據需求調整）
+            if (!sticky) {
+                var regulars = list.filter(function(b) { 
+                    return b.type === '一般' && b.title && b.title.trim() !== ''; 
+                });
+                if (regulars.length > 0) sticky = regulars[0];
+            }
+            
+            // 3. 安全檢查：如果還是沒找到，或者內容真的是空的，直接消失
+            if (!sticky || !sticky.title || sticky.title.trim() === '') {
+                container.innerHTML = '';
+                return;
+            }
+            
             var stickyId = 'sticky_' + (sticky.id || sticky.time);
             if (localStorage.getItem(stickyId) === 'dismissed') { container.innerHTML = ''; return; }
             
