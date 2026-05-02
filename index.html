@@ -3064,6 +3064,7 @@
                     <div class="editor-label">類型</div>
                     <select id="bulletinType" class="editor-input">
                         <option value="一般">📢 一般公告</option>
+                        <option value="跑馬燈">💡 跑馬燈 (置頂橫幅)</option>
                         <option value="緊急">🔴 緊急通知 (會跳彈窗)</option>
                         <option value="課表">📅 課表/永久連結</option>
                     </select>
@@ -3590,6 +3591,10 @@
             document.getElementById('postHistoryList').innerHTML = '載入中...';
             google.script.run.withSuccessHandler(function (posts) {
                 if (posts.length === 0) { document.getElementById('postHistoryList').innerHTML = '<div style="color:#999;">尚無資料</div>'; return; }
+                
+                // 排序：最新日期在上方
+                posts.sort(function(a, b) { return b.date.localeCompare(a.date); });
+
                 var html = '';
                 posts.forEach(function (p) {
                     var safeJson = encodeURIComponent(JSON.stringify(p));
@@ -3607,10 +3612,14 @@
             document.getElementById('bulletinHistoryList').innerHTML = '載入中...';
             google.script.run.withSuccessHandler(function (list) {
                 if (list.length === 0) { document.getElementById('bulletinHistoryList').innerHTML = '<div style="color:#999;">尚無公告</div>'; return; }
+
+                // 排序：最新發布在上方
+                list.sort(function(a, b) { return b.time.localeCompare(a.time); });
+
                 var html = '';
                 list.forEach(function (b) {
                     var safeJson = encodeURIComponent(JSON.stringify(b));
-                    var typeIcon = b.type === '緊急' ? '🔴' : (b.type === '課表' ? '📅' : '📢');
+                    var typeIcon = b.type === '緊急' ? '🔴' : (b.type === '課表' ? '📅' : (b.type === '跑馬燈' ? '💡' : '📢'));
                     html += '<div class="history-item"><div class="history-info">' + typeIcon + ' ' + b.title + ' <br><small>' + b.time + '</small></div><button class="edit-btn-small" onclick="openBulletinModal(\'' + safeJson + '\')">✏️ 修改</button></div>';
                 });
                 document.getElementById('bulletinHistoryList').innerHTML = html;
