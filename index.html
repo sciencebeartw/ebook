@@ -1010,7 +1010,7 @@
             z-index: 1;
         }
 
-        /* Connecting vertical line */
+        /* Connecting vertical line - Gradient Fade Out */
         .post-card-wrapper::before {
             content: '';
             position: absolute;
@@ -1018,12 +1018,12 @@
             top: 32px;
             bottom: -20px;
             width: 2.5px;
-            background: var(--primary);
-            opacity: 0.35;
+            background: linear-gradient(to bottom, var(--primary) 0%, transparent 100%);
+            opacity: 0.45;
         }
 
+        /* 最後一則維持同樣的漸層感即可 */
         .post-card-wrapper:last-child::before {
-            /* 最後一則不完全隱藏，而是縮短長度，保持視覺美感 */
             bottom: 40px;
         }
 
