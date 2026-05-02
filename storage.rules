@@ -19,6 +19,13 @@ service firebase.storage {
       allow write: if true;
     }
 
+    // ★ 通訊中心圖片：MessageCenter.html 前端直傳，無須登入 (GAS WebApp 環境無法取得 Auth)
+    match /notification_images/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.resource.contentType.matches('image/.*')
+                   && request.resource.size < 10 * 1024 * 1024; // 限制 10MB
+    }
+
     // ★ 老師/學生在 ebook-app 上傳的附件（考卷、筆記、作業等）
     match /uploads/{allPaths=**} {
       allow read: if true;
