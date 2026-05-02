@@ -4647,9 +4647,9 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 return;
             }
 
-            // ★ 排序邏輯：由新到舊 ★
+            // ★ 排序邏輯：由新到舊 (使用字串直接比對最穩定) ★
             list.sort(function(a, b) {
-                return new Date(b.time.replace(/\//g, '-')) - new Date(a.time.replace(/\//g, '-'));
+                return b.time.localeCompare(a.time);
             });
 
             var html = "";
