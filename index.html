@@ -2877,9 +2877,10 @@
                         <option value="" disabled selected>請選擇學生</option>
                     </select>
                     <select id="fbTypeSelect" class="admin-select" style="flex:1;">
+                        <option value="待處理" selected>🚨 補考 (待處理)</option>
                         <option value="全部">全部類型 (不含棒卡)</option>
                         <option value="學生留言">一般留言與作業</option>
-                        <option value="補考">補考回報</option>
+                        <option value="補考">所有補考回報</option>
                     </select>
                 </div>
                 <div style="display:flex; gap:8px;">
@@ -4955,8 +4956,10 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             if (!cls || !stuName) { alert('請先選擇班級和學生'); return; }
             var safeC = safeKey(cls);
             var snapS = await db.ref(BEAR_SUBJECT + '/students/' + safeC).once('value');
+            var snapG = await db.ref(BEAR_SUBJECT + '/grades/' + safeC).once('value');
             var kids = snapS.val() || {};
-            var pendingList = [];
+            var classGrades = snapG.val() || {};
+            var rawList = [];
 
             if (stuName === 'all') {
                 var snapF = await db.ref(BEAR_SUBJECT + '/feedbacks/' + safeC).once('value');
@@ -4967,16 +4970,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     for (var fid in fbs) {
                         var fb = fbs[fid];
                         var fType = fb.type || '學生留言';
-                        if (fType.indexOf('棒卡') > -1) continue; // 棒卡不在此區顯示
-                        
-                        var match = false;
-                        if (filterType === '全部') match = true;
-                        else if (filterType === '補考' && fType.indexOf('補考') > -1) match = true;
-                        else if (filterType === '學生留言' && fType.indexOf('補考') === -1) match = true;
-                        
-                        if (match) {
-                            pendingList.push({ fbKey: fid, stuKey: sKey, type: fType, content: fb.content, time: fb.time, date: fb.targetDate || fb.time.substring(0,10).replace(/-/g,'/'), cls: cls, stuName: sName, safeC: safeC });
-                        }
+                        if (fType.indexOf('棒卡') > -1) continue; 
+                        rawList.push({ fbKey: fid, stuKey: sKey, type: fType, content: fb.content, time: fb.time, date: fb.targetDate || fb.time.substring(0,10).replace(/-/g,'/'), cls: cls, stuName: sName, safeC: safeC });
                     }
                 }
             } else {
@@ -4989,17 +4984,86 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     var fb = fbs[fid];
                     var fType = fb.type || '學生留言';
                     if (fType.indexOf('棒卡') > -1) continue;
-                    
-                    var match = false;
-                    if (filterType === '全部') match = true;
-                    else if (filterType === '補考' && fType.indexOf('補考') > -1) match = true;
-                    else if (filterType === '學生留言' && fType.indexOf('補考') === -1) match = true;
-                    
-                    if (match) {
-                        pendingList.push({ fbKey: fid, stuKey: stuKey, type: fType, content: fb.content, time: fb.time, date: fb.targetDate || fb.time.substring(0,10).replace(/-/g,'/'), cls: cls, stuName: stuName, safeC: safeC });
-                    }
+                    rawList.push({ fbKey: fid, stuKey: stuKey, type: fType, content: fb.content, time: fb.time, date: fb.targetDate || fb.time.substring(0,10).replace(/-/g,'/'), cls: cls, stuName: stuName, safeC: safeC });
                 }
             }
+
+            // --- 智慧狀態判定引擎：最新覆蓋法則 ---
+            var groups = {};
+            rawList.forEach(function(item) {
+                if (item.type.indexOf('補考') > -1) {
+                    var key = item.stuKey + '_' + item.date;
+                    if (!groups[key]) groups[key] = [];
+                    groups[key].push(item);
+                }
+            });
+            for (var k in groups) {
+                groups[k].sort(function(a,b) { return b.time.localeCompare(a.time); });
+                groups[k].forEach(function(item, i) {
+                    item.isLatestMakeup = (i === 0);
+                });
+            }
+            
+            // 尋找大表成績
+            function getSheetScoreForDate(stuK, targetDateStr) {
+                if (!classGrades[stuK] || !classGrades[stuK].exams) return null;
+                var exams = classGrades[stuK].exams;
+                var parts = targetDateStr.replace(/-/g, "/").split("/");
+                if (parts.length < 2) return null;
+                var m = parseInt(parts[parts.length-2], 10).toString();
+                var d = parseInt(parts[parts.length-1], 10).toString();
+                var possibleDates = [m + "/" + d, (m.length===1?"0"+m:m) + "/" + (d.length===1?"0"+d:d)];
+                for (var colKey in exams) {
+                    var ex = exams[colKey];
+                    var title = (ex.examName || "") + " " + (ex.date || "");
+                    if (title.indexOf("作業") > -1) continue;
+                    if (title.indexOf("小考") > -1 || title.indexOf("複習考") > -1 || title.indexOf("期中考") > -1 || title.indexOf("大考") > -1) {
+                        if (possibleDates.some(function(pd) { return title.indexOf(pd) > -1; })) return (ex.score || "").toString();
+                    }
+                }
+                return null;
+            }
+
+            var pendingList = [];
+            rawList.forEach(function(item) {
+                var matchFilter = false;
+                var isMakeup = item.type.indexOf('補考') > -1;
+                item.statusFlag = "";
+                item.sheetScore = "";
+                
+                if (isMakeup) {
+                    if (!item.isLatestMakeup) {
+                        item.statusFlag = "🌚 已作廢";
+                    } else {
+                        var sScore = getSheetScoreForDate(item.stuKey, item.date);
+                        item.sheetScore = sScore;
+                        var rMatch = item.content.match(/(\d+(\.\d+)?)/);
+                        var rScore = rMatch ? rMatch[0] : "";
+                        
+                        if (!sScore || sScore.indexOf("假") === -1) {
+                            item.statusFlag = "🔴 未回填";
+                        } else {
+                            var sMatch = sScore.match(/(\d+(\.\d+)?)/);
+                            var sNum = sMatch ? sMatch[0] : "";
+                            if (sNum === rScore && rScore !== "") {
+                                item.statusFlag = "✅ 已回填";
+                            } else {
+                                item.statusFlag = "⚠️ 需更新 (異動)";
+                            }
+                        }
+                    }
+                    
+                    if (filterType === '待處理') {
+                        if (item.statusFlag === "🔴 未回填" || item.statusFlag === "⚠️ 需更新 (異動)") matchFilter = true;
+                    } else if (filterType === '全部' || filterType === '補考') {
+                        matchFilter = true;
+                    }
+                } else {
+                    if (filterType === '全部' || filterType === '學生留言') matchFilter = true;
+                }
+                
+                if (matchFilter) pendingList.push(item);
+            });
 
             pendingList.sort(function(a,b) { return b.time.localeCompare(a.time); });
 
@@ -5010,6 +5074,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 var isScore = (item.type.indexOf("補考") > -1);
                 var bg = isScore ? '#fef2f2' : '#f0fdf4';
                 var accent = isScore ? '#ef4444' : 'var(--primary)';
+                if (isScore && item.statusFlag === "✅ 已回填") { bg = '#f8fafc'; accent = '#94a3b8'; }
                 if (!isScore && item.type === '作業上傳') { bg = '#f0f9ff'; accent = '#0ea5e9'; }
                 
                 var displayContent = (item.content !== undefined && item.content !== null) ? item.content.toString() : "";
@@ -5020,17 +5085,29 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 });
                 displayContent = displayContent.replace(/\[附件\](https?:\/\/[^\s<]+)/g, "<br><a href='$1' target='_blank' style='display:inline-block; margin-top:5px; padding:5px 10px; background:#e0f2fe; color:#0284c7; border-radius:5px; text-decoration:none; font-weight:bold; font-size:0.9rem;'>📄 點此檢視附件</a>");
 
+                var statusTagHtml = '';
+                if (isScore) {
+                    var flagColor = item.statusFlag.indexOf('未回填') > -1 ? '#ef4444' : (item.statusFlag.indexOf('需更新') > -1 ? '#f59e0b' : '#64748b');
+                    var sheetInfo = item.sheetScore ? "大表: " + item.sheetScore : "大表: 空白";
+                    statusTagHtml = '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">' +
+                                    '<span style="display:inline-block; background:#e2e8f0; padding:3px 10px; border-radius:12px; font-size:0.8rem; font-weight:bold; color:#475569;" id="fb-type-'+idx+'">' + item.type + '</span>' +
+                                    '<span style="font-size:0.85rem; font-weight:bold; color:' + flagColor + ';">' + item.statusFlag + ' <span style="font-size:0.75rem; color:#94a3b8;">[' + sheetInfo + ']</span></span>' +
+                                    '</div>';
+                } else {
+                    statusTagHtml = '<div style="margin-bottom:6px;"><span style="display:inline-block; background:#e2e8f0; padding:3px 10px; border-radius:12px; font-size:0.8rem; font-weight:bold; color:#475569;" id="fb-type-'+idx+'">' + item.type + '</span></div>';
+                }
+
                 let tInfo = getTeacherInfo(item.cls);
                 html += '<div style="background:' + bg + '; border-radius:12px; border-left:5px solid ' + accent + '; padding:12px; margin-bottom:10px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">' +
                     '<div style="font-size:0.85rem; color:#64748b; margin-bottom:4px; display:flex; justify-content:space-between;">' +
                     '<span>📅 ' + item.date + '</span><span>' + item.time.substring(5, 16) + '</span></div>' +
                     '<div style="font-weight:700; font-size:1.1rem; color:#1e293b; margin-bottom:4px;"><span style="color:#2563eb;">[' + item.stuName + ']</span></div>' +
-                    '<div style="margin-bottom:6px;"><span style="display:inline-block; background:#e2e8f0; padding:3px 10px; border-radius:12px; font-size:0.8rem; font-weight:bold; color:#475569;" id="fb-type-'+idx+'">' + item.type + '</span></div>' +
+                    statusTagHtml +
                     '<div style="font-size:1rem; color:#334155; word-break:break-all; line-height:1.4; margin-bottom:10px;" id="fb-content-'+idx+'">' + displayContent + '</div>' +
                     '<div style="display:flex; gap:6px;">' +
                     '<input type="text" id="fb-reply-'+idx+'" placeholder="輸入' + tInfo.name + '老師回覆..." style="flex:1; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.95rem;">' +
-                    '<button onclick="sendAdminReply('+idx+', \'' + item.safeC + '\', \'' + item.stuKey + '\', \'' + item.date + '\', \'' + item.cls + '\', \'' + item.stuName + '\')" style="background:#3b82f6; color:white; border:none; border-radius:6px; padding:8px 14px; font-weight:700; cursor:pointer; flex-shrink:0;">回覆</button>' +
-                    (isScore ? '<button onclick="autoWriteScore('+idx+', \'' + item.cls + '\', \'' + item.stuName + '\', \'' + item.date + '\')" style="background:#10b981; color:white; border:none; border-radius:6px; padding:8px 14px; font-weight:700; cursor:pointer; flex-shrink:0;">📝 自動填入</button>' : '') +
+                    '<button onclick="sendAdminReply('+idx+', \'' + item.safeC + '\', \'' + item.stuKey + '\', \'' + item.date + '\', \'' + item.cls + '\', \'' + item.stuName + '\')" style="background:#3b82f6; color:white; border:none; border-radius:6px; padding:8px 14px; font-weight:700; cursor:pointer; flex-shrink:0;">立即回覆</button>' +
+                    (isScore && item.statusFlag !== "✅ 已回填" && item.statusFlag !== "🌚 已作廢" ? '<button id="btn-score-'+idx+'" onclick="autoWriteScore('+idx+', \'' + item.cls + '\', \'' + item.stuName + '\', \'' + item.date + '\')" style="background:#10b981; color:white; border:none; border-radius:6px; padding:8px 14px; font-weight:700; cursor:pointer; flex-shrink:0;">📝 自動填入</button>' : '') +
                     '</div>' +
                 '</div>';
             });
