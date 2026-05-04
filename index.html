@@ -2283,6 +2283,7 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-functions.js"></script>
   <script src="firebase-config.js"></script>
 
   <!-- Webhook API & Firebase Polyfill (Replace google.script.run) -->
@@ -2907,6 +2908,25 @@
                     <button id="btnApproveAllStickers" class="admin-btn btn-orange" onclick="approveAllStickers()" style="display:none; flex:1; background:linear-gradient(135deg, #a855f7, #6366f1); border:none; color:white;">一鍵通過</button>
                 </div>
                 <div id="stickerReviewList" style="margin-top:12px; max-height:400px; overflow-y:auto;"></div>
+            </div>
+
+            <div class="admin-card">
+                <div class="admin-card-title">📈 教務自動化 (作業催繳)</div>
+                <div style="margin-bottom:10px; color:#64748b; font-size:0.9rem;">
+                    自動掃描全校未交作業名單，支援一鍵推播 LINE 催繳通知。
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <button id="btnFetchMissingHW" class="admin-btn btn-blue" onclick="loadMissingHomework()" style="flex:1;">🔍 開始全校掃描</button>
+                    <button id="btnSendMissingHW" class="admin-btn btn-green" onclick="sendMissingHomeworkNotify()" style="display:none; flex:1;">🚀 批次發送催繳</button>
+                </div>
+                <!-- 預設訊息設定 -->
+                <div id="missingHWMessageArea" style="display:none; margin-top:15px; background:#f8fafc; padding:10px; border-radius:8px; border:1px solid #e2e8f0;">
+                    <div style="font-weight:bold; font-size:0.9rem; margin-bottom:5px; color:#334155;">自訂催繳前言 (家長會看到此段＋未交清單)：</div>
+                    <textarea id="missingHWMessageText" class="editor-textarea" style="height:60px; font-size:0.9rem;">家長您好，這裡是山熊科學。
+目前系統偵測到 {學生姓名} 尚有未完成的作業，提醒您協助留意：</textarea>
+                </div>
+                <!-- 名單列表 -->
+                <div id="missingHomeworkList" style="margin-top:12px; max-height:400px; overflow-y:auto;"></div>
             </div>
 
             <button class="admin-btn btn-gray" onclick="doLogout()" style="margin-top:20px;">登出管理者</button>
@@ -4935,7 +4955,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     '<div style="font-size:1rem; color:#334155; word-break:break-all; line-height:1.4; margin-bottom:10px;" id="fb-content-'+idx+'">' + displayContent + '</div>' +
                     '<div style="display:flex; gap:6px;">' +
                     '<input type="text" id="fb-reply-'+idx+'" placeholder="輸入' + tInfo.name + '老師回覆..." style="flex:1; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.95rem;">' +
-                    '<button onclick="sendAdminReply('+idx+', \'' + item.safeC + '\', \'' + item.stuKey + '\', \'' + item.date + '\', \'' + item.cls + '\', \'' + item.stuName + '\')" style="background:#3b82f6; color:white; border:none; border-radius:6px; padding:8px 14px; font-weight:700; cursor:pointer;">立即回覆</button>' +
+                    '<button onclick="sendAdminReply('+idx+', \'' + item.safeC + '\', \'' + item.stuKey + '\', \'' + item.date + '\', \'' + item.cls + '\', \'' + item.stuName + '\')" style="background:#3b82f6; color:white; border:none; border-radius:6px; padding:8px 14px; font-weight:700; cursor:pointer; flex-shrink:0;">回覆</button>' +
+                    (isScore ? '<button onclick="autoWriteScore('+idx+', \'' + item.cls + '\', \'' + item.stuName + '\', \'' + item.date + '\')" style="background:#10b981; color:white; border:none; border-radius:6px; padding:8px 14px; font-weight:700; cursor:pointer; flex-shrink:0;">📝 自動填入</button>' : '') +
                     '</div>' +
                 '</div>';
             });
@@ -4979,6 +5000,258 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }).submitFeedback(form);
         }
 
+        window.autoWriteScore = async function(idx, clsName, stuName, targetDate) {
+            var originalContent = document.getElementById('fb-content-' + idx).innerText;
+            // 嘗試從留言中萃取數字
+            var match = originalContent.match(/(\d+(\.\d+)?)/);
+            var extractedScore = "";
+            if (match) {
+                extractedScore = match[0] + "假"; // 自動補上"假"
+            }
+            
+            const { value: finalScore } = await Swal.fire({
+                title: '寫入成績確認',
+                html: '即將寫入 <b>' + stuName + '</b> 在 <b>' + targetDate + '</b> 的小考/複習考欄位。<br><br>系統已萃取出分數，您可以修改要寫入的值：',
+                input: 'text',
+                inputValue: extractedScore,
+                showCancelButton: true,
+                confirmButtonText: '📝 確定寫入 (單格覆寫)',
+                cancelButtonText: '取消',
+                inputValidator: (value) => {
+                    if (!value) {
+                        return '請輸入成績！'
+                    }
+                }
+            });
+            
+            if (finalScore) {
+                Swal.fire({ title: '寫入中...', text: '正在精準寫入試算表單格，保護其他公式...', icon: 'info', allowOutsideClick: false, showConfirmButton: false, didOpen: function() { Swal.showLoading(); } });
+
+                google.script.run.withSuccessHandler(function(res) {
+                    Swal.close();
+                    if (res && res.success) {
+                        swalAlert('✅ 寫入成功！', res.msg, 'success');
+                        // 可以將按鈕反白表示已寫入
+                        var btnWrapper = document.getElementById('fb-reply-' + idx).parentElement;
+                        if(btnWrapper && btnWrapper.lastElementChild) {
+                            btnWrapper.lastElementChild.innerText = "已寫入 ✓";
+                            btnWrapper.lastElementChild.style.background = "#64748b";
+                        }
+                    } else {
+                        swalAlert('❌ 寫入失敗', res ? res.msg : '未知錯誤', 'error');
+                    }
+                }).withFailureHandler(function(err) {
+                    Swal.close();
+                    swalAlert('❌ 系統連線錯誤', err.toString(), 'error');
+                }).writeScoreGas(gPass, clsName, stuName, targetDate, finalScore);
+            }
+        };
+
+        // ==========================================
+        // 教務自動化：作業催繳
+        // ==========================================
+        window.currentMissingHWList = [];
+        
+        async function loadMissingHomework() {
+            var btn = document.getElementById('btnFetchMissingHW');
+            var listDiv = document.getElementById('missingHomeworkList');
+            var sendBtn = document.getElementById('btnSendMissingHW');
+            var msgArea = document.getElementById('missingHWMessageArea');
+            
+            btn.disabled = true;
+            btn.innerText = "🔍 正在全校掃描中...";
+            listDiv.innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;">掃描各班級作業中，請稍候... (約需 5-15 秒)</div>';
+            sendBtn.style.display = 'none';
+            msgArea.style.display = 'none';
+            
+            Swal.fire({ title: '掃描中...', text: '正在跨表比對全校未交作業...', icon: 'info', allowOutsideClick: false, showConfirmButton: false, didOpen: function() { Swal.showLoading(); } });
+
+            google.script.run.withSuccessHandler(function(res) {
+                Swal.close();
+                btn.disabled = false;
+                btn.innerText = "🔍 重新全校掃描";
+                
+                if (res && res.success) {
+                    window.currentMissingHWList = res.data || [];
+                    renderMissingHomeworkList();
+                } else {
+                    swalAlert('❌ 掃描失敗', res ? res.msg : '未知錯誤', 'error');
+                    listDiv.innerHTML = '<div style="color:red; padding:10px;">掃描失敗</div>';
+                }
+            }).withFailureHandler(function(err) {
+                Swal.close();
+                btn.disabled = false;
+                btn.innerText = "🔍 重新全校掃描";
+                swalAlert('❌ 系統連線錯誤', err.toString(), 'error');
+                listDiv.innerHTML = '<div style="color:red; padding:10px;">連線錯誤</div>';
+            }).getMissingHomeworkList(gPass);
+        }
+
+        function renderMissingHomeworkList() {
+            var listDiv = document.getElementById('missingHomeworkList');
+            var sendBtn = document.getElementById('btnSendMissingHW');
+            var msgArea = document.getElementById('missingHWMessageArea');
+            
+            if (!window.currentMissingHWList || window.currentMissingHWList.length === 0) {
+                listDiv.innerHTML = '<div style="text-align:center; padding:20px; color:#10b981; font-weight:bold;">🎉 太棒了！全校目前沒有任何未交作業。</div>';
+                sendBtn.style.display = 'none';
+                msgArea.style.display = 'none';
+                return;
+            }
+            
+            // 將名單依照 家長電話(safePhone) 分組，因為同一個學生可能會有多個未交作業
+            var grouped = {};
+            window.currentMissingHWList.forEach(function(item) {
+                // 清理可能潛藏的空白字元
+                var phoneKey = (item.phone || "").toString().replace(/\s+/g, '');
+                var nameKey = item.name.toString().trim();
+                // 採用 手機+姓名 當唯一識別，避免同家長不同小孩混淆
+                var key = phoneKey + "_" + nameKey;
+                
+                if (!grouped[key]) {
+                    grouped[key] = {
+                        name: nameKey,
+                        phone: phoneKey, // Firebase SafeKey 格式，需確保是合法的
+                        sheet: item.sheet,
+                        hws: []
+                    };
+                }
+                grouped[key].hws.push(item);
+            });
+            
+            window.groupedMissingHW = grouped; // 供發送時使用
+            
+            var html = '<div style="margin-bottom:10px; font-weight:bold; color:#ef4444;">共 ' + Object.keys(grouped).length + ' 位學生有未交紀錄：</div>';
+            html += '<label style="display:flex; align-items:center; cursor:pointer; margin-bottom:10px; font-weight:bold;"><input type="checkbox" id="missingHWSelectAll" checked onchange="toggleMissingHWSelectAll()" style="transform:scale(1.2); margin-right:10px;">全選/取消全選</label>';
+            
+            for (var key in grouped) {
+                var stu = grouped[key];
+                html += '<div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:12px; margin-bottom:8px; display:flex; align-items:flex-start;">';
+                html += '<input type="checkbox" class="missing-hw-chk" value="' + key + '" checked style="transform:scale(1.2); margin-right:12px; margin-top:4px;">';
+                html += '<div style="flex:1;">';
+                html += '<div style="font-weight:bold; color:#3b82f6; font-size:1.05rem;">' + stu.name + ' <span style="font-size:0.8rem; color:#64748b; background:#f1f5f9; padding:2px 6px; border-radius:10px;">' + stu.sheet + '</span></div>';
+                
+                html += '<ul style="margin:5px 0 0 0; padding-left:20px; color:#475569; font-size:0.9rem;">';
+                stu.hws.forEach(function(hw) {
+                    var statusColor = hw.reason.indexOf("未交") > -1 ? "#ef4444" : "#d97706";
+                    html += '<li>' + hw.hwName + ' <span style="color:' + statusColor + '">[' + hw.reason + ']</span></li>';
+                });
+                html += '</ul>';
+                
+                html += '</div></div>';
+            }
+            
+            listDiv.innerHTML = html;
+            sendBtn.style.display = 'block';
+            msgArea.style.display = 'block';
+        }
+
+        window.toggleMissingHWSelectAll = function() {
+            var isChecked = document.getElementById('missingHWSelectAll').checked;
+            document.querySelectorAll('.missing-hw-chk').forEach(function(chk) {
+                chk.checked = isChecked;
+            });
+        };
+
+        window.sendMissingHomeworkNotify = async function() {
+            var chks = document.querySelectorAll('.missing-hw-chk:checked');
+            if (chks.length === 0) {
+                swalAlert("⚠️ 請至少勾選一位學生");
+                return;
+            }
+            
+            var msgText = document.getElementById('missingHWMessageText').value.trim();
+            if (!msgText) {
+                swalAlert("⚠️ 催繳前言不可為空");
+                return;
+            }
+            
+            var confirmResult = await swalConfirm('🚀 批次發送催繳', '確定要將催繳通知發送給這 ' + chks.length + ' 位學生的家長嗎？');
+            if (!confirmResult) return;
+            
+            var btn = document.getElementById('btnSendMissingHW');
+            var originalText = btn.innerText;
+            btn.disabled = true;
+            btn.innerText = "⏳ 發送中...";
+            
+            Swal.fire({ title: '發送中...', text: '正在透過 Cloud Functions 派發訊息，請勿關閉視窗', icon: 'info', allowOutsideClick: false, showConfirmButton: false, didOpen: function() { Swal.showLoading(); } });
+
+            try {
+                // 初始化 booking cloud functions (發送端)
+                if (!window.bookingFunctions) {
+                    const bookingConfig = { apiKey: "AIzaSyBEXgKhWRhUAFvzMad-D3QMtnGaS0Za1fA", projectId: "sciencebear-booking" };
+                    const existingApp = firebase.apps.find(app => app.name === 'booking');
+                    window.bookingApp = existingApp || firebase.initializeApp(bookingConfig, "booking");
+                    window.bookingFunctions = window.bookingApp.functions('us-central1');
+                }
+                
+                const sendLineNotify = window.bookingFunctions.httpsCallable('sendLineNotify');
+                var successCount = 0;
+                var failCount = 0;
+                var failNames = [];
+                
+                for (var i = 0; i < chks.length; i++) {
+                    var safeKey = chks[i].value;
+                    var stuData = window.groupedMissingHW[safeKey];
+                    if (!stuData) continue;
+                    
+                    var shortName = stuData.name.length >= 3 ? stuData.name.slice(-2) : stuData.name;
+                    var customPrefix = msgText
+                        .replace(/{學生全名}/g, stuData.name)
+                        .replace(/{學生名字}/g, shortName)
+                        .replace(/{學生姓名}/g, stuData.name);
+                        
+                    // 組合未交清單文字
+                    var hwListText = stuData.hws.map(function(hw) {
+                        return "🔸 " + hw.hwName + " (" + hw.reason + ")";
+                    }).join("\n");
+                    
+                    var finalMessage = customPrefix + "\n\n" + hwListText;
+                    
+                    btn.innerText = "⏳ 發送中 (" + (i+1) + "/" + chks.length + ")";
+                    
+                    try {
+                        const response = await sendLineNotify({
+                            studentName: stuData.name,
+                            phone: stuData.phone,
+                            textMessages: [finalMessage], 
+                            imageUrls: [],
+                            customToken: 'jAroU7Z3wjOq2r95naibGSC2Vo+kfUkPFY43Wyn/QdVs2A+AtRf08GoaOi1cla8Z2tGuE1Ju19RYYXp1eGrkx4zW5ll/IOsm324mH7haqZHdNYrrFhm1IuLkpiSv9TJFSNTQjdSbReP5SAmpeXolkgdB04t89/1O/w1cDnyilFU='
+                        });
+                        
+                        if (response.data && response.data.success) {
+                            successCount++;
+                        } else {
+                            failCount++;
+                            failNames.push(stuData.name);
+                        }
+                    } catch(e) {
+                        failCount++;
+                        failNames.push(stuData.name + " (" + e.message + ")");
+                    }
+                    
+                    await new Promise(r => setTimeout(r, 600)); // 限速防護
+                }
+                
+                Swal.close();
+                btn.disabled = false;
+                btn.innerText = originalText;
+                
+                if (failCount > 0) {
+                    swalAlert("⚠️ 發送完畢", "成功: " + successCount + " 人\n失敗: " + failCount + " 人\n\n❌ 失敗名單:\n" + failNames.join("\n"));
+                } else {
+                    swalAlert("✅ 全部發送成功！", "共成功通知了 " + successCount + " 位家長。", "success");
+                }
+                
+            } catch(globalErr) {
+                Swal.close();
+                btn.disabled = false;
+                btn.innerText = originalText;
+                console.error(globalErr);
+                swalAlert("❌ 發送過程發生錯誤", globalErr.toString(), "error");
+            }
+        }
+        
         document.addEventListener("DOMContentLoaded", function() {
             const params = new URLSearchParams(window.location.search);
             const bypassAdmin = params.get('admin');
