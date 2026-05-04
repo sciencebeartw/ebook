@@ -3929,6 +3929,11 @@
 
         function getFeedbackOverrideNum(exam, feedbackHistory) {
             if (!feedbackHistory || feedbackHistory.length === 0) return null;
+            
+            var rawScore = (exam.score || "").toString();
+            var isHw = (exam.exam && exam.exam.indexOf("作業") > -1) || (exam.date && exam.date.indexOf("作業") > -1) || rawScore.indexOf("未交") > -1 || rawScore.indexOf("缺交") > -1 || rawScore.indexOf("缺繳") > -1;
+            if (isHw) return null; // 排除作業，作業不會有補考回報分數
+
             for (var k = feedbackHistory.length - 1; k >= 0; k--) {
                 var fb = feedbackHistory[k];
                 if (fb.type === "補考回報") {
