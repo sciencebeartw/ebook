@@ -2913,10 +2913,15 @@
             <div class="admin-card">
                 <div class="admin-card-title">📈 教務自動化 (作業催繳)</div>
                 <div style="margin-bottom:10px; color:#64748b; font-size:0.9rem;">
-                    自動掃描全校未交作業名單，支援一鍵推播 LINE 催繳通知。
+                    自動掃描未交作業名單，支援一鍵推播 LINE 催繳通知。
+                </div>
+                <div style="display:flex; gap:8px; margin-bottom:8px;">
+                    <select id="missingHWClassSelect" style="flex:1; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:1rem; background:#fff;">
+                        <option value="all">全校掃描 (需較長時間)</option>
+                    </select>
                 </div>
                 <div style="display:flex; gap:8px;">
-                    <button id="btnFetchMissingHW" class="admin-btn btn-blue" onclick="loadMissingHomework()" style="flex:1;">🔍 開始全校掃描</button>
+                    <button id="btnFetchMissingHW" class="admin-btn btn-blue" onclick="loadMissingHomework()" style="flex:1;">🔍 開始掃描</button>
                     <button id="btnSendMissingHW" class="admin-btn btn-green" onclick="sendMissingHomeworkNotify()" style="display:none; flex:1;">🚀 批次發送催繳</button>
                 </div>
                 <!-- 預設訊息設定 -->
@@ -3576,6 +3581,11 @@
                 document.getElementById('bulletinTargetClass').innerHTML = opts;
                 if (document.getElementById('stickerClassSelect')) document.getElementById('stickerClassSelect').innerHTML = opts;
                 if (document.getElementById('fbClassSelect')) document.getElementById('fbClassSelect').innerHTML = opts;
+                if (document.getElementById('missingHWClassSelect')) {
+                    var hwOpts = '<option value="all">全校掃描 (需較長時間)</option>';
+                    names.forEach(function (n) { hwOpts += '<option value="' + n + '">' + n + '</option>'; });
+                    document.getElementById('missingHWClassSelect').innerHTML = hwOpts;
+                }
             }).getAllClassNames();
         }
         function loadStudentList() {
