@@ -2927,8 +2927,8 @@
                 <!-- 預設訊息設定 -->
                 <div id="missingHWMessageArea" style="display:none; margin-top:15px; background:#f8fafc; padding:10px; border-radius:8px; border:1px solid #e2e8f0;">
                     <div style="font-weight:bold; font-size:0.9rem; margin-bottom:5px; color:#334155;">自訂催繳前言 (家長會看到此段＋未交清單)：</div>
-                    <textarea id="missingHWMessageText" class="editor-textarea" style="height:60px; font-size:0.9rem;">家長您好，這裡是山熊科學。
-目前系統偵測到 {學生姓名} 尚有未完成的作業，提醒您協助留意：</textarea>
+                    <textarea id="missingHWMessageText" class="editor-textarea" style="height:60px; font-size:0.9rem;">阿喵老師溫馨小提醒：
+目前系統偵測到 {學生姓名} 尚未完成作業繳交上傳並訂正，提醒您協助留意：</textarea>
                 </div>
                 <!-- 名單列表 -->
                 <div id="missingHomeworkList" style="margin-top:12px; max-height:400px; overflow-y:auto;"></div>
@@ -5291,11 +5291,11 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     var stuData = window.groupedMissingHW[safeKey];
                     if (!stuData) continue;
                     
-                    var shortName = stuData.name.length >= 3 ? stuData.name.slice(-2) : stuData.name;
+                    var shortName = stuData.name.length > 2 ? stuData.name.substring(1) : stuData.name;
                     var customPrefix = msgText
                         .replace(/{學生全名}/g, stuData.name)
                         .replace(/{學生名字}/g, shortName)
-                        .replace(/{學生姓名}/g, stuData.name);
+                        .replace(/{學生姓名}/g, shortName); // 依照老師需求，{學生姓名} 也預設為去除姓氏的名字
                         
                     // 組合未交清單文字
                     var hwListText = stuData.hws.map(function(hw) {
