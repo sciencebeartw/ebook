@@ -2605,7 +2605,8 @@
         deleteBulletin: function(idx, pwd) { doPostAction("deleteBulletin", {rowIndex: idx}, onSuccess, onErr, pwd); },
         changeUserPassword: function(u, oldP, newP) { doPostAction("changeUserPassword", {studentName: u, oldPass: oldP, newPass: newP}, onSuccess, onErr); },
         approveStickerGas: function(pwd, timeStr, className, studentName, count, actionStr) { doPostAction("approveStickerGas", {timeStr: timeStr, className: className, studentName: studentName, count: count, actionStr: actionStr}, onSuccess, onErr, pwd); },
-        approveAllStickersGas: function(pwd, cls, jsonList) { doPostAction("approveAllStickersGas", {className: cls, pendingList: jsonList}, onSuccess, onErr, pwd); }
+        approveAllStickersGas: function(pwd, cls, jsonList) { doPostAction("approveAllStickersGas", {className: cls, pendingList: jsonList}, onSuccess, onErr, pwd); },
+        writeScoreGas: function(adminPassword, className, studentName, targetDateStr, scoreValue) { doPostAction("writeScoreGas", {className: className, studentName: studentName, targetDateStr: targetDateStr, scoreValue: scoreValue}, onSuccess, onErr, adminPassword); }
       };
     }
 
