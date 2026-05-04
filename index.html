@@ -5067,34 +5067,104 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var listDiv = document.getElementById('missingHomeworkList');
             var sendBtn = document.getElementById('btnSendMissingHW');
             var msgArea = document.getElementById('missingHWMessageArea');
+            var targetClass = document.getElementById('missingHWClassSelect').value;
             
             btn.disabled = true;
-            btn.innerText = "🔍 正在全校掃描中...";
-            listDiv.innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;">掃描各班級作業中，請稍候... (約需 5-15 秒)</div>';
+            btn.innerText = "🔍 正在極速掃描...";
+            listDiv.innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;">極速快取比對中，請稍候...</div>';
             sendBtn.style.display = 'none';
             msgArea.style.display = 'none';
             
-            Swal.fire({ title: '掃描中...', text: '正在跨表比對全校未交作業...', icon: 'info', allowOutsideClick: false, showConfirmButton: false, didOpen: function() { Swal.showLoading(); } });
+            var targetText = targetClass === "all" ? "全校" : targetClass;
+            Swal.fire({ title: '極速掃描中...', text: '正在自 Firebase 讀取 ' + targetText + ' 作業狀態...', icon: 'info', allowOutsideClick: false, showConfirmButton: false, didOpen: function() { Swal.showLoading(); } });
 
-            google.script.run.withSuccessHandler(function(res) {
+            try {
+                var missingList = [];
+                // 1. 讀取 Firebase 快取資料
+                const db = firebase.database();
+                var stuSnap = await db.ref(BEAR_SUBJECT + '/students').once('value');
+                var grdSnap = await db.ref(BEAR_SUBJECT + '/grades').once('value');
+                var allStudents = stuSnap.val() || {};
+                var allGrades = grdSnap.val() || {};
+
+                // 2. 處理每一個班級
+                var classNames = targetClass === "all" ? Object.keys(allGrades) : [targetClass];
+                classNames.forEach(function(cls) {
+                    if (cls.startsWith('_') || cls.indexOf('總名單') > -1 || cls.indexOf('核對') > -1) return;
+                    
+                    var clsStudents = allStudents[cls] || {};
+                    var clsGrades = allGrades[cls] || {};
+                    
+                    // 抓取這個班上隨便一個學生的考卷清單來做「結構解析」
+                    var anyStuKey = Object.keys(clsGrades)[0];
+                    if (!anyStuKey || !clsGrades[anyStuKey].exams) return;
+                    var examsObj = clsGrades[anyStuKey].exams;
+                    
+                    // 依照 col_ 的數字排序，確保我們找的「最近兩次」真的是最新的欄位
+                    var colKeys = Object.keys(examsObj).sort(function(a, b) {
+                        return parseInt(a.split('_')[1]) - parseInt(b.split('_')[1]);
+                    });
+                    
+                    // 找出所有標題含「作業」的欄位
+                    var homeworkCols = [];
+                    colKeys.forEach(function(colKey) {
+                        var ex = examsObj[colKey];
+                        var nameStr = (ex.date || "") + " " + (ex.examName || "");
+                        if (nameStr.indexOf("作業") > -1) {
+                            homeworkCols.push({ id: colKey, title: nameStr.trim() });
+                        }
+                    });
+                    
+                    // 嚴格規定：只催繳最近「2次」作業
+                    if (homeworkCols.length > 2) {
+                        homeworkCols = homeworkCols.slice(-2);
+                    }
+                    
+                    // 針對班上每個學生比對成績
+                    Object.keys(clsStudents).forEach(function(stuKey) {
+                        var stuInfo = clsStudents[stuKey];
+                        var stuGrades = (clsGrades[stuKey] && clsGrades[stuKey].exams) ? clsGrades[stuKey].exams : {};
+                        
+                        homeworkCols.forEach(function(hw) {
+                            var scoreInfo = stuGrades[hw.id];
+                            var rawScore = scoreInfo ? (scoreInfo.score || "").toString().trim() : "";
+                            
+                            var isMissing = false;
+                            var reason = "";
+                            if (rawScore === "" || rawScore === "#N/A") {
+                                isMissing = true;
+                                reason = "未交";
+                            } else if (rawScore.indexOf("缺") > -1 || rawScore.indexOf("未") > -1) {
+                                isMissing = true;
+                                reason = rawScore; // 可能是「缺交」或「尚未繳交」
+                            }
+                            
+                            if (isMissing) {
+                                missingList.push({
+                                    sheet: cls,
+                                    name: stuInfo.name,
+                                    phone: stuInfo.phone || stuInfo.password, // 使用新的電話欄位，未同步前先以密碼墊檔
+                                    hwName: hw.title,
+                                    reason: reason
+                                });
+                            }
+                        });
+                    });
+                });
+
                 Swal.close();
                 btn.disabled = false;
-                btn.innerText = "🔍 重新全校掃描";
+                btn.innerText = "🔍 重新掃描";
+                window.currentMissingHWList = missingList;
+                renderMissingHomeworkList();
                 
-                if (res && res.success) {
-                    window.currentMissingHWList = res.data || [];
-                    renderMissingHomeworkList();
-                } else {
-                    swalAlert('❌ 掃描失敗', res ? res.msg : '未知錯誤', 'error');
-                    listDiv.innerHTML = '<div style="color:red; padding:10px;">掃描失敗</div>';
-                }
-            }).withFailureHandler(function(err) {
+            } catch (err) {
                 Swal.close();
                 btn.disabled = false;
-                btn.innerText = "🔍 重新全校掃描";
-                swalAlert('❌ 系統連線錯誤', err.toString(), 'error');
-                listDiv.innerHTML = '<div style="color:red; padding:10px;">連線錯誤</div>';
-            }).getMissingHomeworkList(gPass);
+                btn.innerText = "🔍 重新掃描";
+                swalAlert('❌ 系統錯誤', err.toString(), 'error');
+                listDiv.innerHTML = '<div style="color:red; padding:10px;">系統連線錯誤</div>';
+            }
         }
 
         function renderMissingHomeworkList() {
