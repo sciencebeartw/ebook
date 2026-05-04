@@ -5115,9 +5115,9 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                         }
                     });
                     
-                    // 嚴格規定：只催繳最近「2次」作業
+                    // 嚴格規定：只催繳最近「2次」作業 (越靠左邊、數字越小的是最新的)
                     if (homeworkCols.length > 2) {
-                        homeworkCols = homeworkCols.slice(-2);
+                        homeworkCols = homeworkCols.slice(0, 2);
                     }
                     
                     // 針對班上每個學生比對成績
