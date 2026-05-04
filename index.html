@@ -5212,7 +5212,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             
             var keys = Object.keys(grouped);
             var html = '<div style="margin-bottom:10px; font-weight:bold; color:#ef4444;">共 ' + keys.length + ' 位學生有未交紀錄：</div>';
-            html += '<label style="display:flex; align-items:center; cursor:pointer; margin-bottom:10px; font-weight:bold; padding:8px; background:#f1f5f9; border-radius:6px;"><input type="checkbox" id="missingHWSelectAll" checked onchange="toggleMissingHWSelectAll()" style="transform:scale(1.2); margin-right:10px;">全選/取消全選</label>';
+            html += '<label style="display:block; cursor:pointer; margin-bottom:10px; font-weight:bold; padding:8px; background:#f1f5f9; border-radius:6px;"><input type="checkbox" id="missingHWSelectAll" checked onchange="toggleMissingHWSelectAll()" style="transform:scale(1.2); margin-right:10px; vertical-align:middle;">全選/取消全選</label>';
             
             var generatedCount = 0;
             keys.forEach(function(key) {
@@ -5222,9 +5222,11 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 var safeName = escapeHtml(stu.name);
                 var safeSheet = escapeHtml(stu.sheet);
                 
-                html += '<div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:12px; margin-bottom:8px; display:flex; align-items:flex-start;">';
-                html += '<input type="checkbox" class="missing-hw-chk" value="' + safeKey + '" checked style="transform:scale(1.2); margin-right:12px; margin-top:4px;">';
-                html += '<div style="flex:1; min-width:0;">';
+                html += '<div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:12px; margin-bottom:8px; display:block;">';
+                html += '<div style="display:inline-block; vertical-align:top; margin-right:12px; padding-top:2px;">';
+                html += '<input type="checkbox" class="missing-hw-chk" value="' + safeKey + '" checked style="transform:scale(1.2);">';
+                html += '</div>';
+                html += '<div style="display:inline-block; vertical-align:top; width:calc(100% - 40px);">';
                 html += '<div style="font-weight:bold; color:#3b82f6; font-size:1.05rem; word-break:break-all;">' + safeName + ' <span style="font-size:0.8rem; color:#64748b; background:#f1f5f9; padding:2px 6px; border-radius:10px;">' + safeSheet + '</span></div>';
                 
                 html += '<ul style="margin:5px 0 0 0; padding-left:20px; color:#475569; font-size:0.9rem;">';
@@ -5238,12 +5240,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             });
             
             // 診斷：把原始字串印出來看看是不是產生了什麼奇怪的東西
-            html += '<div style="margin-top:20px; color:red; font-weight:bold;">[工程師診斷] 這是背後產生的真實字串：</div>';
-            html += '<div style="font-size:12px; background:#eee; padding:10px; margin-bottom:10px;">';
-            html += 'Keys Length: ' + keys.length + '<br>';
-            html += 'Generated Count: ' + generatedCount + '<br>';
-            html += '</div>';
-            html += '<textarea style="width:100%; height:200px; font-family:monospace; font-size:12px;">' + escapeHtml(JSON.stringify(grouped, null, 2)) + '</textarea>';
+            html += '<div style="margin-top:20px; color:red; font-weight:bold;">[工程師診斷] 排版已修正為傳統 Inline-Block</div>';
             
             listDiv.innerHTML = html;
             sendBtn.style.display = 'block';
