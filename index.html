@@ -5167,13 +5167,22 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }
         }
 
+        function escapeHtml(unsafe) {
+            return (unsafe || "").toString()
+                 .replace(/&/g, "&amp;")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;")
+                 .replace(/"/g, "&quot;")
+                 .replace(/'/g, "&#039;");
+        }
+
         function renderMissingHomeworkList() {
             var listDiv = document.getElementById('missingHomeworkList');
             var sendBtn = document.getElementById('btnSendMissingHW');
             var msgArea = document.getElementById('missingHWMessageArea');
             
             if (!window.currentMissingHWList || window.currentMissingHWList.length === 0) {
-                listDiv.innerHTML = '<div style="text-align:center; padding:20px; color:#10b981; font-weight:bold;">🎉 太棒了！全校目前沒有任何未交作業。</div>';
+                listDiv.innerHTML = '<div style="text-align:center; padding:20px; color:#10b981; font-weight:bold;">🎉 太棒了！該班級目前沒有任何未交作業。</div>';
                 sendBtn.style.display = 'none';
                 msgArea.style.display = 'none';
                 return;
@@ -5201,25 +5210,30 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             
             window.groupedMissingHW = grouped; // 供發送時使用
             
-            var html = '<div style="margin-bottom:10px; font-weight:bold; color:#ef4444;">共 ' + Object.keys(grouped).length + ' 位學生有未交紀錄：</div>';
-            html += '<label style="display:flex; align-items:center; cursor:pointer; margin-bottom:10px; font-weight:bold;"><input type="checkbox" id="missingHWSelectAll" checked onchange="toggleMissingHWSelectAll()" style="transform:scale(1.2); margin-right:10px;">全選/取消全選</label>';
+            var keys = Object.keys(grouped);
+            var html = '<div style="margin-bottom:10px; font-weight:bold; color:#ef4444;">共 ' + keys.length + ' 位學生有未交紀錄：</div>';
+            html += '<label style="display:flex; align-items:center; cursor:pointer; margin-bottom:10px; font-weight:bold; padding:8px; background:#f1f5f9; border-radius:6px;"><input type="checkbox" id="missingHWSelectAll" checked onchange="toggleMissingHWSelectAll()" style="transform:scale(1.2); margin-right:10px;">全選/取消全選</label>';
             
-            for (var key in grouped) {
+            keys.forEach(function(key) {
                 var stu = grouped[key];
+                var safeKey = escapeHtml(key);
+                var safeName = escapeHtml(stu.name);
+                var safeSheet = escapeHtml(stu.sheet);
+                
                 html += '<div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:12px; margin-bottom:8px; display:flex; align-items:flex-start;">';
-                html += '<input type="checkbox" class="missing-hw-chk" value="' + key + '" checked style="transform:scale(1.2); margin-right:12px; margin-top:4px;">';
-                html += '<div style="flex:1;">';
-                html += '<div style="font-weight:bold; color:#3b82f6; font-size:1.05rem;">' + stu.name + ' <span style="font-size:0.8rem; color:#64748b; background:#f1f5f9; padding:2px 6px; border-radius:10px;">' + stu.sheet + '</span></div>';
+                html += '<input type="checkbox" class="missing-hw-chk" value="' + safeKey + '" checked style="transform:scale(1.2); margin-right:12px; margin-top:4px;">';
+                html += '<div style="flex:1; min-width:0;">';
+                html += '<div style="font-weight:bold; color:#3b82f6; font-size:1.05rem; word-break:break-all;">' + safeName + ' <span style="font-size:0.8rem; color:#64748b; background:#f1f5f9; padding:2px 6px; border-radius:10px;">' + safeSheet + '</span></div>';
                 
                 html += '<ul style="margin:5px 0 0 0; padding-left:20px; color:#475569; font-size:0.9rem;">';
                 stu.hws.forEach(function(hw) {
                     var statusColor = hw.reason.indexOf("未交") > -1 ? "#ef4444" : "#d97706";
-                    html += '<li>' + hw.hwName + ' <span style="color:' + statusColor + '">[' + hw.reason + ']</span></li>';
+                    html += '<li style="word-break:break-all;">' + escapeHtml(hw.hwName) + ' <span style="color:' + statusColor + '">[' + escapeHtml(hw.reason) + ']</span></li>';
                 });
                 html += '</ul>';
                 
                 html += '</div></div>';
-            }
+            });
             
             listDiv.innerHTML = html;
             sendBtn.style.display = 'block';
