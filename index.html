@@ -2517,6 +2517,11 @@
                 const fb = fbsObj[fbid];
                 result.feedbackHistory.push({ time: fb.time, targetDate: fb.targetDate, type: fb.type, content: fb.content, fbKey: fbid });
             }
+            result.feedbackHistory.sort(function(a, b) {
+                var tA = new Date(a.time).getTime() || 0;
+                var tB = new Date(b.time).getTime() || 0;
+                return tA - tB;
+            });
 
             return result;
         } catch(e) {
@@ -3426,6 +3431,11 @@
                             const fb = fbsObj[fbid];
                             newFbs.push({ time: fb.time, targetDate: fb.targetDate, type: fb.type, content: fb.content, fbKey: fbid });
                         }
+                        newFbs.sort(function(a, b) {
+                            var tA = new Date(a.time).getTime() || 0;
+                            var tB = new Date(b.time).getTime() || 0;
+                            return tA - tB;
+                        });
                         gData.feedbackHistory = newFbs;
                         // 重新渲染聯絡簿區塊，確保狀態即時更新
                         renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
