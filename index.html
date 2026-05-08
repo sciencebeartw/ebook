@@ -287,6 +287,115 @@
             padding-bottom: 10px;
         }
 
+        .makeup-panel-note {
+            color: #64748b;
+            font-size: 0.92rem;
+            line-height: 1.5;
+            margin: -4px 0 12px;
+        }
+
+        .makeup-exam-meta {
+            background: #f8fafc;
+            color: #475569;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            margin: 8px 0 12px;
+        }
+
+        .makeup-student-card {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-left: 6px solid #cbd5e1;
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 10px;
+            box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+        }
+
+        .makeup-student-card.is-saving {
+            opacity: 0.78;
+        }
+
+        .makeup-student-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .makeup-student-name {
+            font-size: 1.08rem;
+            font-weight: 900;
+            color: #1e293b;
+        }
+
+        .makeup-score-line {
+            font-size: 0.9rem;
+            color: #64748b;
+            margin-top: 3px;
+        }
+
+        .makeup-status-pill {
+            flex-shrink: 0;
+            font-size: 0.82rem;
+            font-weight: 800;
+            color: #475569;
+            background: #f1f5f9;
+            border-radius: 999px;
+            padding: 4px 9px;
+            text-align: center;
+        }
+
+        .makeup-color-row {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 7px;
+        }
+
+        .makeup-color-btn {
+            border: none;
+            border-radius: 10px;
+            color: white;
+            padding: 10px 4px;
+            font-size: 1rem;
+            font-weight: 900;
+            cursor: pointer;
+            min-height: 54px;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+        }
+
+        .makeup-color-btn span {
+            display: block;
+            font-size: 0.72rem;
+            font-weight: 700;
+            margin-top: 2px;
+            line-height: 1.2;
+        }
+
+        .makeup-color-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .makeup-green { background: #16a34a; }
+        .makeup-yellow { background: #eab308; color: #422006; }
+        .makeup-orange { background: #f97316; }
+        .makeup-red { background: #dc2626; }
+
+        .makeup-inline-status {
+            font-size: 0.86rem;
+            color: #64748b;
+            min-height: 20px;
+            margin-top: 8px;
+        }
+
+        .makeup-inline-status.ok { color: #16a34a; font-weight: 800; }
+        .makeup-inline-status.error { color: #dc2626; font-weight: 800; }
+
         .admin-select {
             width: 100%;
             padding: 12px;
@@ -2612,7 +2721,8 @@
         changeUserPassword: function(u, oldP, newP) { doPostAction("changeUserPassword", {studentName: u, oldPass: oldP, newPass: newP}, onSuccess, onErr); },
         approveStickerGas: function(pwd, timeStr, className, studentName, count, actionStr) { doPostAction("approveStickerGas", {timeStr: timeStr, className: className, studentName: studentName, count: count, actionStr: actionStr}, onSuccess, onErr, pwd); },
         approveAllStickersGas: function(pwd, cls, jsonList) { doPostAction("approveAllStickersGas", {className: cls, pendingList: jsonList}, onSuccess, onErr, pwd); },
-        writeScoreGas: function(adminPassword, className, studentName, targetDateStr, scoreValue) { doPostAction("writeScoreGas", {className: className, studentName: studentName, targetDateStr: targetDateStr, scoreValue: scoreValue}, onSuccess, onErr, adminPassword); }
+        writeScoreGas: function(adminPassword, className, studentName, targetDateStr, scoreValue) { doPostAction("writeScoreGas", {className: className, studentName: studentName, targetDateStr: targetDateStr, scoreValue: scoreValue}, onSuccess, onErr, adminPassword); },
+        writeMakeupResultColorGas: function(adminPassword, className, studentName, examColIndex, colorHex) { doPostAction("writeMakeupResultColorGas", {className: className, studentName: studentName, examColIndex: examColIndex, colorHex: colorHex}, onSuccess, onErr, adminPassword); }
       };
     }
 
@@ -2893,6 +3003,19 @@
                     <button class="admin-btn btn-blue" onclick="loadAdminFeedbacks()" style="flex:1;">載入查詢結果</button>
                 </div>
                 <div id="adminFeedbackList" style="margin-top:12px; max-height:400px; overflow-y:auto;"></div>
+            </div>
+
+            <div class="admin-card">
+                <div class="admin-card-title">🎨 補考結果登記</div>
+                <div class="makeup-panel-note">選班級與小考後，點學生卡片上的顏色即可登記結果。成功不會跳彈窗，方便現場連續操作。</div>
+                <select id="makeupClassSelect" class="admin-select" onchange="loadMakeupExams()">
+                    <option value="" disabled selected>請選擇班級</option>
+                </select>
+                <select id="makeupExamSelect" class="admin-select" onchange="renderMakeupStudentList()" disabled>
+                    <option value="" disabled selected>請先選擇班級</option>
+                </select>
+                <div id="makeupExamMeta" class="makeup-exam-meta" style="display:none;"></div>
+                <div id="makeupResultList" style="margin-top:12px; max-height:430px; overflow-y:auto;"></div>
             </div>
 
             <div class="admin-card">
@@ -3617,6 +3740,7 @@
                 document.getElementById('bulletinTargetClass').innerHTML = opts;
                 if (document.getElementById('stickerClassSelect')) document.getElementById('stickerClassSelect').innerHTML = opts;
                 if (document.getElementById('fbClassSelect')) document.getElementById('fbClassSelect').innerHTML = opts;
+                if (document.getElementById('makeupClassSelect')) document.getElementById('makeupClassSelect').innerHTML = opts;
                 if (document.getElementById('missingHWClassSelect')) {
                     var hwOpts = '<option value="all">全校掃描 (需較長時間)</option>';
                     names.forEach(function (n) { hwOpts += '<option value="' + n + '">' + n + '</option>'; });
@@ -4963,6 +5087,231 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         }
 
 
+
+        var currentMakeupExamData = null;
+        var MAKEUP_RESULT_COLORS = [
+            { hex: "#00ff00", key: "green", label: "綠", text: "理解良好" },
+            { hex: "#ffff00", key: "yellow", label: "黃", text: "大致理解" },
+            { hex: "#ff9900", key: "orange", label: "橘", text: "不太理解" },
+            { hex: "#ff0000", key: "red", label: "紅", text: "必須加強" }
+        ];
+
+        function escapeAdminHtml(str) {
+            return (str === undefined || str === null ? "" : str.toString())
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+
+        function escapeInlineJs(str) {
+            return (str === undefined || str === null ? "" : str.toString())
+                .replace(/\\/g, "\\\\")
+                .replace(/'/g, "\\'")
+                .replace(/\n/g, " ");
+        }
+
+        function parseScoreNumber(raw) {
+            var match = (raw || "").toString().match(/(\d+(\.\d+)?)/);
+            return match ? parseFloat(match[0]) : null;
+        }
+
+        function parseMakeupThreshold(note) {
+            var match = (note || "").toString().match(/(\d+)/);
+            return match ? parseInt(match[0], 10) : 0;
+        }
+
+        function isMakeupExamTitle(title) {
+            if (!title || title.indexOf("作業") > -1) return false;
+            return ["小考", "複習", "期中", "大考", "隨堂", "鑑定"].some(function(keyword) {
+                return title.indexOf(keyword) > -1;
+            });
+        }
+
+        function getMakeupColorInfo(colorHex) {
+            var c = (colorHex || "").toString().toLowerCase();
+            return MAKEUP_RESULT_COLORS.find(function(item) { return item.hex === c; }) || null;
+        }
+
+        function isMakeupCandidateScore(rawScore, threshold) {
+            var raw = (rawScore || "").toString();
+            var scoreNum = parseScoreNumber(raw);
+            if (raw === "" || raw === "#N/A") return true;
+            if (raw.indexOf("假") > -1 || raw.indexOf("缺") > -1 || raw.indexOf("未") > -1) return true;
+            return threshold > 0 && scoreNum !== null && scoreNum < threshold;
+        }
+
+        async function loadMakeupExams() {
+            var cls = document.getElementById('makeupClassSelect') ? document.getElementById('makeupClassSelect').value : '';
+            var examSelect = document.getElementById('makeupExamSelect');
+            var listDiv = document.getElementById('makeupResultList');
+            var metaDiv = document.getElementById('makeupExamMeta');
+            if (!cls || !examSelect || !listDiv) return;
+
+            examSelect.disabled = true;
+            examSelect.innerHTML = '<option value="" selected>載入小考中...</option>';
+            listDiv.innerHTML = '<div style="color:#94a3b8; padding:12px;">正在讀取班級成績...</div>';
+            if (metaDiv) metaDiv.style.display = 'none';
+
+            try {
+                var safeC = safeKey(cls);
+                var snapS = await db.ref(BEAR_SUBJECT + '/students/' + safeC).once('value');
+                var snapG = await db.ref(BEAR_SUBJECT + '/grades/' + safeC).once('value');
+                var studentsObj = snapS.val() || {};
+                var gradesObj = snapG.val() || {};
+                var examMap = {};
+
+                Object.keys(gradesObj).forEach(function(stuKey) {
+                    var exams = gradesObj[stuKey] && gradesObj[stuKey].exams ? gradesObj[stuKey].exams : {};
+                    Object.keys(exams).forEach(function(colKey) {
+                        var exam = exams[colKey] || {};
+                        var colIndex = parseInt(colKey.replace('col_', ''), 10);
+                        if (isNaN(colIndex)) return;
+                        var title = ((exam.date || "") + " " + (exam.examName || "")).trim();
+                        if (!isMakeupExamTitle(title)) return;
+                        if (!examMap[colIndex]) {
+                            examMap[colIndex] = {
+                                colIndex: colIndex,
+                                title: title || ("考試欄位 " + colIndex),
+                                note: exam.note || "",
+                                average: exam.average || "-"
+                            };
+                        }
+                    });
+                });
+
+                var exams = Object.keys(examMap).map(function(k) { return examMap[k]; }).sort(function(a, b) {
+                    return a.colIndex - b.colIndex;
+                });
+
+                currentMakeupExamData = {
+                    className: cls,
+                    students: studentsObj,
+                    grades: gradesObj,
+                    exams: exams
+                };
+
+                if (exams.length === 0) {
+                    examSelect.innerHTML = '<option value="" selected>找不到小考/複習/鑑定欄位</option>';
+                    listDiv.innerHTML = '<div style="color:#999; padding:10px;">這個班級目前沒有可登記的考試欄位。</div>';
+                    return;
+                }
+
+                var opts = '<option value="" disabled selected>請選擇小考/鑑定考</option>';
+                exams.forEach(function(exam) {
+                    var threshold = parseMakeupThreshold(exam.note);
+                    var suffix = threshold > 0 ? ("｜標準 " + threshold) : "";
+                    opts += '<option value="' + exam.colIndex + '">' + escapeAdminHtml(exam.title + suffix) + '</option>';
+                });
+                examSelect.innerHTML = opts;
+                examSelect.disabled = false;
+                listDiv.innerHTML = '<div style="color:#94a3b8; padding:12px;">請選擇要登記的考試。</div>';
+            } catch (e) {
+                console.error(e);
+                examSelect.innerHTML = '<option value="" selected>讀取失敗</option>';
+                listDiv.innerHTML = '<div style="color:#dc2626; padding:10px;">讀取失敗：' + escapeAdminHtml(e.message || e.toString()) + '</div>';
+            }
+        }
+
+        function renderMakeupStudentList() {
+            var examSelect = document.getElementById('makeupExamSelect');
+            var listDiv = document.getElementById('makeupResultList');
+            var metaDiv = document.getElementById('makeupExamMeta');
+            if (!examSelect || !listDiv || !currentMakeupExamData) return;
+
+            var colIndex = parseInt(examSelect.value, 10);
+            var selectedExam = currentMakeupExamData.exams.find(function(exam) { return exam.colIndex === colIndex; });
+            if (!selectedExam) return;
+
+            var threshold = parseMakeupThreshold(selectedExam.note);
+            if (metaDiv) {
+                metaDiv.style.display = 'block';
+                metaDiv.innerHTML = '<b>' + escapeAdminHtml(selectedExam.title) + '</b><br>補考標準：' + (threshold > 0 ? threshold : '未設定') + '｜班平均：' + escapeAdminHtml(selectedExam.average || '-');
+            }
+
+            var orderedStudents = Object.keys(currentMakeupExamData.students).map(function(stuKey) {
+                var stu = currentMakeupExamData.students[stuKey] || {};
+                return { key: stuKey, name: stu.name || "", rowIndex: stu.rowIndex || 9999 };
+            }).filter(function(stu) {
+                return !!stu.name;
+            }).sort(function(a, b) {
+                return (a.rowIndex || 9999) - (b.rowIndex || 9999);
+            });
+
+            var rows = [];
+            orderedStudents.forEach(function(stu) {
+                var stuGrades = currentMakeupExamData.grades[stu.key] && currentMakeupExamData.grades[stu.key].exams ? currentMakeupExamData.grades[stu.key].exams : {};
+                var exam = stuGrades['col_' + colIndex];
+                if (!exam) return;
+                var colorInfo = getMakeupColorInfo(exam.cellColor);
+                if (!colorInfo && !isMakeupCandidateScore(exam.score, threshold)) return;
+                rows.push({
+                    name: stu.name,
+                    score: exam.score || "",
+                    cellColor: exam.cellColor || "",
+                    colorInfo: colorInfo
+                });
+            });
+
+            if (rows.length === 0) {
+                listDiv.innerHTML = '<div style="color:#999; padding:10px;">目前沒有未達標準、缺考/請假，或已登記結果的學生。</div>';
+                return;
+            }
+
+            var html = '';
+            rows.forEach(function(row, idx) {
+                var colorInfo = row.colorInfo;
+                var borderColor = colorInfo ? colorInfo.hex : '#cbd5e1';
+                var statusText = colorInfo ? ('已登記：' + colorInfo.label + '｜' + colorInfo.text) : '尚未登記';
+                var scoreText = row.score ? row.score : '空白';
+                html += '<div class="makeup-student-card" id="makeup-card-' + idx + '" style="border-left-color:' + borderColor + ';">' +
+                    '<div class="makeup-student-head">' +
+                    '<div><div class="makeup-student-name">' + escapeAdminHtml(row.name) + '</div>' +
+                    '<div class="makeup-score-line">原始成績：' + escapeAdminHtml(scoreText) + '</div></div>' +
+                    '<div class="makeup-status-pill" id="makeup-pill-' + idx + '">' + escapeAdminHtml(statusText) + '</div>' +
+                    '</div>' +
+                    '<div class="makeup-color-row">';
+                MAKEUP_RESULT_COLORS.forEach(function(color) {
+                    html += '<button class="makeup-color-btn makeup-' + color.key + '" onclick="setMakeupResultColor(this, ' + idx + ', \'' + escapeInlineJs(currentMakeupExamData.className) + '\', \'' + escapeInlineJs(row.name) + '\', ' + colIndex + ', \'' + color.hex + '\')">' +
+                        color.label + '<span>' + color.text + '</span></button>';
+                });
+                html += '</div><div class="makeup-inline-status" id="makeup-status-' + idx + '"></div></div>';
+            });
+            listDiv.innerHTML = html;
+        }
+
+        function setMakeupResultColor(btn, idx, clsName, stuName, examColIndex, colorHex) {
+            var card = document.getElementById('makeup-card-' + idx);
+            var status = document.getElementById('makeup-status-' + idx);
+            var pill = document.getElementById('makeup-pill-' + idx);
+            if (!card || !status || card.classList.contains('is-saving')) return;
+
+            var colorInfo = getMakeupColorInfo(colorHex);
+            card.classList.add('is-saving');
+            status.className = 'makeup-inline-status';
+            status.innerText = '登記中...';
+            card.querySelectorAll('.makeup-color-btn').forEach(function(button) { button.disabled = true; });
+
+            google.script.run.withSuccessHandler(function(res) {
+                card.classList.remove('is-saving');
+                card.querySelectorAll('.makeup-color-btn').forEach(function(button) { button.disabled = false; });
+                if (res && res.success) {
+                    card.style.borderLeftColor = colorHex;
+                    if (pill && colorInfo) pill.innerText = '已登記：' + colorInfo.label + '｜' + colorInfo.text;
+                    status.className = 'makeup-inline-status ok';
+                    status.innerText = '已登記，正在等待雲端同步顯示。';
+                } else {
+                    status.className = 'makeup-inline-status error';
+                    status.innerText = '登記失敗：' + (res && res.msg ? res.msg : '未知錯誤');
+                }
+            }).withFailureHandler(function(err) {
+                card.classList.remove('is-saving');
+                card.querySelectorAll('.makeup-color-btn').forEach(function(button) { button.disabled = false; });
+                status.className = 'makeup-inline-status error';
+                status.innerText = '連線失敗：' + (err && err.message ? err.message : err.toString());
+            }).writeMakeupResultColorGas(gPass, clsName, stuName, examColIndex, colorHex);
+        }
 
         async function loadFbApplicants() {
             var cls = document.getElementById('fbClassSelect') ? document.getElementById('fbClassSelect').value : '';
