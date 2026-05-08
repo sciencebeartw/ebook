@@ -2382,6 +2382,7 @@
                        result.found = true;
                        result.className = c;
                        result.studentName = kid.name;
+                       result.foundUserKey = k;
                        break;
                    }
                 }
@@ -3226,6 +3227,26 @@
 
         var gData = null, gPass = "", isAdminMode = false, currentEditingPost = null, currentFocusInput = null;
         var currentEditingBulletin = null;
+        var activeRealtimeListeners = [];
+
+        // ★★★ 即時監聽生命週期管理 ★★★
+        function clearRealtimeListeners() {
+            activeRealtimeListeners.forEach(function(item) {
+                try {
+                    item.ref.off('value', item.handler);
+                } catch(e) {
+                    console.warn('解除即時監聽失敗：', e);
+                }
+            });
+            activeRealtimeListeners = [];
+        }
+
+        function watchRealtimeValue(path, handler) {
+            var ref = db.ref(path);
+            ref.on('value', handler);
+            activeRealtimeListeners.push({ ref: ref, handler: handler });
+            return ref;
+        }
 
 
         document.addEventListener("DOMContentLoaded", function () {
@@ -3396,6 +3417,7 @@
 
         function enterStudentView(result, pass) {
             document.getElementById('full-loader').style.display = 'none';
+            clearRealtimeListeners();
             gData = result;
             if (pass !== "admin_view") gPass = pass; // ★ 防止神主模式覆蓋真正的密碼
 
@@ -3416,15 +3438,16 @@
             try {
                 if (typeof db !== 'undefined') {
                     const safeC = result.className.replace(/[.#$[\]]/g, '-');
-                    const safeN = result.studentName.replace(/[.#$[\]]/g, '-');
+                    const studentKey = result.foundUserKey || result.studentName.replace(/[.#$[\]]/g, '-');
+                    result.foundUserKey = studentKey;
 
                     // 1. 棒卡數監聽
-                    db.ref(BEAR_SUBJECT + '/students/' + safeC + '/' + safeN + '/stickers').on('value', function(snap) {
+                    watchRealtimeValue(BEAR_SUBJECT + '/students/' + safeC + '/' + studentKey + '/stickers', function(snap) {
                         document.getElementById('headStickerCount').innerText = snap.val() || 0;
                     });
 
                     // 2. 留言回報監聽 (包含審核狀態與老師回覆)
-                    db.ref(BEAR_SUBJECT + '/feedbacks/' + safeC + '/' + safeN).on('value', function(snap) {
+                    watchRealtimeValue(BEAR_SUBJECT + '/feedbacks/' + safeC + '/' + studentKey, function(snap) {
                         const fbsObj = snap.val() || {};
                         let newFbs = [];
                         for (let fbid in fbsObj) {
@@ -3446,7 +3469,7 @@
                     });
 
                     // 3. 重要公告監聽 (班級 + 全校)
-                    db.ref(BEAR_SUBJECT + '/bulletins').on('value', function(snap) {
+                    watchRealtimeValue(BEAR_SUBJECT + '/bulletins', function(snap) {
                         const allBulls = snap.val() || {};
                         let bulls = [];
                         for (let cls in allBulls) {
@@ -3463,7 +3486,7 @@
                     });
 
                     // 4. 成績資料監聽 (近期成績更新)
-                    db.ref(BEAR_SUBJECT + '/grades/' + safeC + '/' + (result.foundUserKey || '') + '/exams').on('value', function(snap) {
+                    watchRealtimeValue(BEAR_SUBJECT + '/grades/' + safeC + '/' + studentKey + '/exams', function(snap) {
                         if (!snap.exists()) return;
                         const examsObj = snap.val() || {};
                         let fullGradeList = [];
@@ -3527,7 +3550,7 @@
                     });
 
                     // 5. 聯絡簿內容監聽
-                    db.ref(BEAR_SUBJECT + '/dailyPosts/' + safeC).on('value', function(snap) {
+                    watchRealtimeValue(BEAR_SUBJECT + '/dailyPosts/' + safeC, function(snap) {
                         const postsObj = snap.val() || {};
                         let classPosts = [];
                         let now = new Date();
@@ -3584,6 +3607,7 @@
         }
 
         function showAdminDashboard() {
+            clearRealtimeListeners();
             document.getElementById('login-screen').style.display = 'none'; document.getElementById('main-screen').style.display = 'none'; document.getElementById('admin-screen').style.display = 'block';
             google.script.run.withSuccessHandler(function (names) {
                 var opts = '<option value="" disabled selected>請選擇班級</option>';
@@ -3618,6 +3642,7 @@
             google.script.run.withSuccessHandler(function (result) { enterStudentView(result, "admin_view"); }).getStudentDataByAdmin(cls, name, gPass);
         }
         function exitGodMode() {
+            clearRealtimeListeners();
             document.getElementById('full-loader').style.display = 'none';
             isAdminMode = false;
             document.getElementById('appContainer').classList.remove('admin-mode-border');
@@ -3905,6 +3930,7 @@
         }
 
         function doLogout() {
+            clearRealtimeListeners();
             if (isAdminMode) exitGodMode();
             gData = null; gPass = "";
             document.getElementById('sName').value = ""; document.getElementById('sPass').value = ""; document.getElementById('loginMsg').innerText = "";
