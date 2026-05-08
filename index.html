@@ -3042,9 +3042,9 @@
             </div>
 
             <div class="admin-card">
-                <div class="admin-card-title">📈 教務自動化 (作業催繳)</div>
+                <div class="admin-card-title">📈 教務自動化 (課務提醒)</div>
                 <div style="margin-bottom:10px; color:#64748b; font-size:0.9rem;">
-                    自動掃描未交作業名單，支援一鍵推播 LINE 催繳通知。
+                    自動掃描未交作業與請假未補考名單，支援一鍵推播 LINE 提醒。
                 </div>
                 <div style="display:flex; gap:8px; margin-bottom:8px;">
                     <select id="missingHWClassSelect" style="flex:1; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:1rem; background:#fff;">
@@ -3053,13 +3053,13 @@
                 </div>
                 <div style="display:flex; gap:8px;">
                     <button id="btnFetchMissingHW" class="admin-btn btn-blue" onclick="loadMissingHomework()" style="flex:1;">🔍 開始掃描</button>
-                    <button id="btnSendMissingHW" class="admin-btn btn-green" onclick="sendMissingHomeworkNotify()" style="display:none; flex:1;">🚀 批次發送催繳</button>
+                    <button id="btnSendMissingHW" class="admin-btn btn-green" onclick="sendMissingHomeworkNotify()" style="display:none; flex:1;">🚀 批次發送提醒</button>
                 </div>
                 <!-- 預設訊息設定 -->
                 <div id="missingHWMessageArea" style="display:none; margin-top:15px; background:#f8fafc; padding:10px; border-radius:8px; border:1px solid #e2e8f0;">
-                    <div style="font-weight:bold; font-size:0.9rem; margin-bottom:5px; color:#334155;">自訂催繳前言 (家長會看到此段＋未交清單)：</div>
+                    <div style="font-weight:bold; font-size:0.9rem; margin-bottom:5px; color:#334155;">自訂提醒前言 (家長會看到此段＋待確認清單)：</div>
                     <textarea id="missingHWMessageText" class="editor-textarea" style="height:60px; font-size:0.9rem;">阿喵老師溫馨小提醒：
-目前尚未看到{學生姓名}完成作業繳交上傳並訂正，提醒您協助留意：</textarea>
+目前有幾項課務紀錄需要協助確認，提醒您協助留意：</textarea>
                 </div>
                 <!-- 名單列表 -->
                 <div id="missingHomeworkList" style="margin-top:12px; max-height:400px; overflow-y:auto;"></div>
@@ -5592,7 +5592,14 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         // 教務自動化：作業催繳
         // ==========================================
         window.currentMissingHWList = [];
-        
+
+        function isMakeupReminderExamTitle(title) {
+            if (!title || title.indexOf("作業") > -1) return false;
+            return ["小考", "複習", "鑑定"].some(function(keyword) {
+                return title.indexOf(keyword) > -1;
+            });
+        }
+
         async function loadMissingHomework() {
             var btn = document.getElementById('btnFetchMissingHW');
             var listDiv = document.getElementById('missingHomeworkList');
@@ -5607,7 +5614,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             msgArea.style.display = 'none';
             
             var targetText = targetClass === "all" ? "全校" : targetClass;
-            Swal.fire({ title: '極速掃描中...', text: '正在自 Firebase 讀取 ' + targetText + ' 作業狀態...', icon: 'info', allowOutsideClick: false, showConfirmButton: false, didOpen: function() { Swal.showLoading(); } });
+            Swal.fire({ title: '極速掃描中...', text: '正在自 Firebase 讀取 ' + targetText + ' 課務狀態...', icon: 'info', allowOutsideClick: false, showConfirmButton: false, didOpen: function() { Swal.showLoading(); } });
 
             try {
                 var missingList = [];
@@ -5636,13 +5643,16 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                         return parseInt(a.split('_')[1]) - parseInt(b.split('_')[1]);
                     });
                     
-                    // 找出所有標題含「作業」的欄位
+                    // 找出所有標題含「作業」的欄位，以及小考/複習/鑑定欄位
                     var homeworkCols = [];
+                    var makeupExamCols = [];
                     colKeys.forEach(function(colKey) {
                         var ex = examsObj[colKey];
                         var nameStr = (ex.date || "") + " " + (ex.examName || "");
                         if (nameStr.indexOf("作業") > -1) {
                             homeworkCols.push({ id: colKey, title: nameStr.trim() });
+                        } else if (isMakeupReminderExamTitle(nameStr)) {
+                            makeupExamCols.push({ id: colKey, title: nameStr.trim() });
                         }
                     });
                     
@@ -5672,11 +5682,27 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                             
                             if (isMissing) {
                                 missingList.push({
+                                    type: "homework",
                                     sheet: cls,
                                     name: stuInfo.name,
                                     phone: stuInfo.phone || stuInfo.password, // 使用新的電話欄位，未同步前先以密碼墊檔
                                     hwName: hw.title,
                                     reason: reason
+                                });
+                            }
+                        });
+
+                        makeupExamCols.forEach(function(exam) {
+                            var scoreInfo = stuGrades[exam.id];
+                            var rawScore = scoreInfo ? (scoreInfo.score || "").toString().trim() : "";
+                            if (rawScore === "假") {
+                                missingList.push({
+                                    type: "makeup",
+                                    sheet: cls,
+                                    name: stuInfo.name,
+                                    phone: stuInfo.phone || stuInfo.password,
+                                    hwName: exam.title,
+                                    reason: "請假未補考"
                                 });
                             }
                         });
@@ -5713,7 +5739,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var msgArea = document.getElementById('missingHWMessageArea');
             
             if (!window.currentMissingHWList || window.currentMissingHWList.length === 0) {
-                listDiv.innerHTML = '<div style="text-align:center; padding:20px; color:#10b981; font-weight:bold;">🎉 太棒了！該班級目前沒有任何未交作業。</div>';
+                listDiv.innerHTML = '<div style="text-align:center; padding:20px; color:#10b981; font-weight:bold;">🎉 太棒了！該班級目前沒有任何待提醒項目。</div>';
                 sendBtn.style.display = 'none';
                 msgArea.style.display = 'none';
                 return;
@@ -5742,7 +5768,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             window.groupedMissingHW = grouped; // 供發送時使用
             
             var keys = Object.keys(grouped);
-            var html = '<div style="margin-bottom:10px; font-weight:bold; color:#ef4444;">共 ' + keys.length + ' 位學生有未交紀錄：</div>';
+            var html = '<div style="margin-bottom:10px; font-weight:bold; color:#ef4444;">共 ' + keys.length + ' 位學生有待提醒項目：</div>';
             html += '<label style="display:block; cursor:pointer; margin-bottom:10px; font-weight:bold; padding:8px; background:#f1f5f9; border-radius:6px;"><input type="checkbox" id="missingHWSelectAll" checked onchange="toggleMissingHWSelectAll()" style="width:18px; height:18px; margin-right:10px; vertical-align:middle;">全選/取消全選</label>';
             
             keys.forEach(function(key) {
@@ -5760,8 +5786,10 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 
                 html += '<ul style="margin:5px 0 0 0; padding-left:20px; color:#475569; font-size:0.9rem;">';
                 stu.hws.forEach(function(hw) {
-                    var statusColor = hw.reason.indexOf("未交") > -1 ? "#ef4444" : "#d97706";
-                    html += '<li style="word-break:break-all;">' + escapeHtml(hw.hwName) + ' <span style="color:' + statusColor + '">[' + escapeHtml(hw.reason) + ']</span></li>';
+                    var isMakeupItem = hw.type === "makeup";
+                    var statusColor = isMakeupItem ? "#d97706" : (hw.reason.indexOf("未交") > -1 ? "#ef4444" : "#d97706");
+                    var label = isMakeupItem ? "請假未補考" : "作業未交";
+                    html += '<li style="word-break:break-all;"><span style="font-weight:bold; color:' + statusColor + ';">' + label + '：</span>' + escapeHtml(hw.hwName) + ' <span style="color:' + statusColor + '">[' + escapeHtml(hw.reason) + ']</span></li>';
                 });
                 html += '</ul>';
                 
@@ -5789,11 +5817,11 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             
             var msgText = document.getElementById('missingHWMessageText').value.trim();
             if (!msgText) {
-                swalAlert("⚠️ 催繳前言不可為空");
+                swalAlert("⚠️ 提醒前言不可為空");
                 return;
             }
             
-            var confirmResult = await swalConfirm('🚀 批次發送催繳', '確定要將催繳通知發送給這 ' + chks.length + ' 位學生的家長嗎？');
+            var confirmResult = await swalConfirm('🚀 批次發送提醒', '確定要將課務提醒發送給這 ' + chks.length + ' 位學生的家長嗎？');
             if (!confirmResult) return;
             
             var btn = document.getElementById('btnSendMissingHW');
@@ -5828,9 +5856,10 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                         .replace(/{學生名字}/g, shortName)
                         .replace(/{學生姓名}/g, shortName); // 依照老師需求，{學生姓名} 也預設為去除姓氏的名字
                         
-                    // 組合未交清單文字
+                    // 組合作業未交與請假未補考清單文字
                     var hwListText = stuData.hws.map(function(hw) {
-                        return "🔸 " + hw.hwName + " (" + hw.reason + ")";
+                        var label = hw.type === "makeup" ? "請假未補考" : "作業未交";
+                        return "🔸 " + label + "：" + hw.hwName + " (" + hw.reason + ")";
                     }).join("\n");
                     
                     var finalMessage = customPrefix + "\n\n" + hwListText;
