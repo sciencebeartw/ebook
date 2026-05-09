@@ -3014,6 +3014,7 @@
                 <select id="makeupExamSelect" class="admin-select" onchange="renderMakeupStudentList()" disabled>
                     <option value="" disabled selected>請先選擇班級</option>
                 </select>
+                <button id="btnRefreshMakeupList" class="admin-btn btn-blue" onclick="refreshMakeupCurrentList()" style="display:none;">🔄 重新整理目前名單</button>
                 <div id="makeupExamMeta" class="makeup-exam-meta" style="display:none;"></div>
                 <div id="makeupResultList" style="margin-top:12px; max-height:430px; overflow-y:auto;"></div>
             </div>
@@ -3127,8 +3128,7 @@
                 </div>
                 <div class="editor-body">
                     <div class="editor-label">班級</div>
-                    <input type="text" id="modalClassName" class="editor-input" readonly
-                        style="background:#eee; color:#555;">
+                    <select id="modalClassName" class="editor-input"></select>
 
                     <div class="editor-label" style="color:#e67e22;">⏰ 預約發布時間 (選填，留空則立即發布)</div>
                     <input type="datetime-local" id="postReserveTime" class="editor-input">
@@ -3348,7 +3348,7 @@
             arrowDown: "<svg width='1.1em' height='1.1em' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' style='vertical-align:middle;'><line x1='12' y1='5' x2='12' y2='19'/><polyline points='19 12 12 19 5 12'/></svg>",
         };
 
-        var gData = null, gPass = "", isAdminMode = false, currentEditingPost = null, currentFocusInput = null;
+        var gData = null, gPass = "", isAdminMode = false, currentEditingPost = null, currentPostMode = "create", currentFocusInput = null;
         var currentEditingBulletin = null;
         var activeRealtimeListeners = [];
 
@@ -3733,6 +3733,7 @@
             clearRealtimeListeners();
             document.getElementById('login-screen').style.display = 'none'; document.getElementById('main-screen').style.display = 'none'; document.getElementById('admin-screen').style.display = 'block';
             google.script.run.withSuccessHandler(function (names) {
+                window.adminClassNames = names || [];
                 var opts = '<option value="" disabled selected>請選擇班級</option>';
                 names.forEach(function (n) { opts += '<option value="' + n + '">' + n + '</option>'; });
                 document.getElementById('adminClassSelect').innerHTML = opts;
@@ -3790,10 +3791,37 @@
                 var html = '';
                 posts.forEach(function (p) {
                     var safeJson = encodeURIComponent(JSON.stringify(p));
-                    html += '<div class="history-item"><div class="history-info">📅 ' + p.date + ' <br><small>' + p.title + '</small></div><button class="edit-btn-small" onclick="openPostModal(\'' + safeJson + '\')">✏️ 修改</button></div>';
+                    html += '<div class="history-item"><div class="history-info">📅 ' + p.date + ' <br><small>' + p.title + '</small></div><div style="display:flex; gap:6px; flex-shrink:0;"><button class="edit-btn-small" onclick="openPostModal(\'' + safeJson + '\')">✏️ 修改</button><button class="edit-btn-small" style="background:#6366f1;" onclick="openPostModal(\'' + safeJson + '\', \'copy\')">📋 複製</button></div></div>';
                 });
                 document.getElementById('postHistoryList').innerHTML = html;
             }).getPostHistory(cls);
+        }
+
+        function populatePostModalClassSelect(selectedClass, disabled) {
+            var sel = document.getElementById('modalClassName');
+            var names = window.adminClassNames || [];
+            var opts = '';
+            if (names.length === 0 && selectedClass) names = [selectedClass];
+            names.forEach(function(name) {
+                opts += '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + '</option>';
+            });
+            sel.innerHTML = opts;
+            sel.value = selectedClass || '';
+            sel.disabled = !!disabled;
+            sel.style.background = disabled ? '#eee' : '#fff';
+            sel.style.color = disabled ? '#555' : '#111827';
+        }
+
+        function toDatetimeLocalValue(value) {
+            var raw = (value || '').toString().trim();
+            if (!raw) return '';
+            var match = raw.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/);
+            if (!match) return raw.indexOf(' ') > -1 ? raw.replace(' ', 'T') : raw;
+            return match[1] + '-' + match[2].padStart(2, '0') + '-' + match[3].padStart(2, '0') + 'T' + (match[4] || '00').padStart(2, '0') + ':' + (match[5] || '00');
+        }
+
+        function toSheetDatetimeValue(value) {
+            return (value || '').toString().trim().replace('T', ' ');
         }
 
         function onBulletinClassChange() {
@@ -3818,17 +3846,19 @@
             }).getBulletins(cls);
         }
 
-        function openPostModal(jsonStr) {
+        function openPostModal(jsonStr, mode) {
             var cls = document.getElementById('postTargetClass').value;
             if (!cls) return;
-            document.getElementById('modalClassName').value = cls;
             currentFocusInput = null;
 
             if (jsonStr) {
                 var p = JSON.parse(decodeURIComponent(jsonStr));
-                currentEditingPost = p;
-                document.getElementById('modalTitle').innerText = "編輯聯絡簿";
-                document.getElementById('btnDeletePost').style.display = 'block';
+                var isCopy = mode === 'copy';
+                currentEditingPost = isCopy ? null : p;
+                currentPostMode = isCopy ? "copy" : "edit";
+                populatePostModalClassSelect(cls, !isCopy);
+                document.getElementById('modalTitle').innerText = isCopy ? "複製聯絡簿" : "編輯聯絡簿";
+                document.getElementById('btnDeletePost').style.display = isCopy ? 'none' : 'block';
                 document.getElementById('postDate').value = p.date.replace(/\//g, '-');
                 document.getElementById('postTitle').value = p.title;
                 document.getElementById('postProgress').value = p.progress;
@@ -3838,9 +3868,11 @@
                 document.getElementById('postQuiz').value = p.quiz;
                 document.getElementById('postRange').value = p.range;
                 document.getElementById('postNote').value = p.note;
-                document.getElementById('postReserveTime').value = p.reserveTime || "";
+                document.getElementById('postReserveTime').value = toDatetimeLocalValue(p.reserveTime);
             } else {
                 currentEditingPost = null;
+                currentPostMode = "create";
+                populatePostModalClassSelect(cls, false);
                 document.getElementById('modalTitle').innerText = "新增聯絡簿";
                 document.getElementById('btnDeletePost').style.display = 'none';
                 var today = new Date(); var m = String(today.getMonth() + 1).padStart(2, '0'); var d = String(today.getDate()).padStart(2, '0');
@@ -3857,7 +3889,11 @@
             }
             document.getElementById('editorModal').style.display = 'flex';
         }
-        function closePostModal() { document.getElementById('editorModal').style.display = 'none'; }
+        function closePostModal() {
+            document.getElementById('editorModal').style.display = 'none';
+            currentEditingPost = null;
+            currentPostMode = "create";
+        }
 
         function openBulletinModal(jsonStr) {
             var cls = document.getElementById('bulletinTargetClass').value;
@@ -3947,12 +3983,14 @@
         function submitPost() {
             var btn = event.target;
             var originalText = btn.innerText;
-            var idx = currentEditingPost ? currentEditingPost.rowIndex : null;
-            var id = currentEditingPost ? currentEditingPost.id : null;
+            var isEditingPost = currentEditingPost && currentPostMode === "edit";
+            var idx = isEditingPost ? currentEditingPost.rowIndex : null;
+            var id = isEditingPost ? currentEditingPost.id : null;
             var formData = {
                 rowIndex: idx,
                 id: id,
-                reserveTime: document.getElementById('postReserveTime').value,
+                forceCreate: currentPostMode === "copy",
+                reserveTime: toSheetDatetimeValue(document.getElementById('postReserveTime').value),
                 date: document.getElementById('postDate').value,
                 className: document.getElementById('modalClassName').value,
                 title: document.getElementById('postTitle').value,
@@ -3965,6 +4003,7 @@
                 note: document.getElementById('postNote').value
             };
             if (!formData.date) { alert("日期為必填！"); return; }
+            if (!formData.className) { alert("班級為必填！"); return; }
             
             // Disable button to prevent double submission
             btn.disabled = true;
@@ -3977,9 +4016,10 @@
                     btn.disabled = false;
                     btn.innerText = originalText;
                     if (res.success) {
-                        var action = res.mode === 'update' ? "修改成功！" : "發布成功！";
+                        var action = currentPostMode === "copy" ? "複製發布成功！" : (res.mode === 'update' ? "修改成功！" : "發布成功！");
                         alert("✅ " + action + "\n(Firebase 資料同步通常需要 1~3 秒才會生效)"); 
                         closePostModal(); 
+                        document.getElementById('postTargetClass').value = formData.className;
                         onClassChange(); 
                     } else { 
                         alert("❌ 失敗：" + res.msg); 
@@ -5153,6 +5193,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             examSelect.innerHTML = '<option value="" selected>載入小考中...</option>';
             listDiv.innerHTML = '<div style="color:#94a3b8; padding:12px;">正在讀取班級成績...</div>';
             if (metaDiv) metaDiv.style.display = 'none';
+            var refreshBtn = document.getElementById('btnRefreshMakeupList');
+            if (refreshBtn) refreshBtn.style.display = 'none';
 
             try {
                 var safeC = safeKey(cls);
@@ -5206,11 +5248,37 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 });
                 examSelect.innerHTML = opts;
                 examSelect.disabled = false;
+                if (refreshBtn) refreshBtn.style.display = 'block';
                 listDiv.innerHTML = '<div style="color:#94a3b8; padding:12px;">請選擇要登記的考試。</div>';
             } catch (e) {
                 console.error(e);
                 examSelect.innerHTML = '<option value="" selected>讀取失敗</option>';
                 listDiv.innerHTML = '<div style="color:#dc2626; padding:10px;">讀取失敗：' + escapeAdminHtml(e.message || e.toString()) + '</div>';
+            }
+        }
+
+        async function refreshMakeupCurrentList() {
+            var classSelect = document.getElementById('makeupClassSelect');
+            var examSelect = document.getElementById('makeupExamSelect');
+            if (!classSelect || !classSelect.value) {
+                alert('請先選擇班級');
+                return;
+            }
+            var selectedCol = examSelect ? examSelect.value : '';
+            var btn = document.getElementById('btnRefreshMakeupList');
+            var originalText = btn ? btn.innerText : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerText = '重新整理中...';
+            }
+            await loadMakeupExams();
+            if (selectedCol && examSelect && Array.from(examSelect.options).some(function(opt) { return opt.value === selectedCol; })) {
+                examSelect.value = selectedCol;
+                renderMakeupStudentList();
+            }
+            if (btn) {
+                btn.disabled = false;
+                btn.innerText = originalText || '🔄 重新整理目前名單';
             }
         }
 
