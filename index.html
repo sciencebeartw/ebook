@@ -5178,8 +5178,17 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var raw = (rawScore || "").toString();
             var scoreNum = parseScoreNumber(raw);
             if (raw === "" || raw === "#N/A") return true;
+
+            // 數字優先：只要能解析出數字，直接依數字判斷是否達標
+            if (threshold > 0 && scoreNum !== null) {
+                if (scoreNum >= threshold) return false; // 已達標，排除（如「90假」且標準85）
+                return true; // 未達標，列入（如「60假」且標準85）
+            }
+
+            // 沒有數字才看關鍵字（如純粹的「假」「缺」「未」）
             if (raw.indexOf("假") > -1 || raw.indexOf("缺") > -1 || raw.indexOf("未") > -1) return true;
-            return threshold > 0 && scoreNum !== null && scoreNum < threshold;
+
+            return false;
         }
 
         async function loadMakeupExams() {
