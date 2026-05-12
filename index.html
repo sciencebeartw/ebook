@@ -5909,15 +5909,6 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             Swal.fire({ title: '發送中...', text: '正在透過 Cloud Functions 派發訊息，請勿關閉視窗', icon: 'info', allowOutsideClick: false, showConfirmButton: false, didOpen: function() { Swal.showLoading(); } });
 
             try {
-                // 初始化 booking cloud functions (發送端)
-                if (!window.bookingFunctions) {
-                    const bookingConfig = { apiKey: "AIzaSyBEXgKhWRhUAFvzMad-D3QMtnGaS0Za1fA", projectId: "sciencebear-booking" };
-                    const existingApp = firebase.apps.find(app => app.name === 'booking');
-                    window.bookingApp = existingApp || firebase.initializeApp(bookingConfig, "booking");
-                    window.bookingFunctions = window.bookingApp.functions('us-central1');
-                }
-                
-                const sendLineNotify = window.bookingFunctions.httpsCallable('sendLineNotify');
                 var successCount = 0;
                 var failCount = 0;
                 var failNames = [];
@@ -5944,19 +5935,21 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     btn.innerText = "⏳ 發送中 (" + (i+1) + "/" + chks.length + ")";
                     
                     try {
-                        const response = await sendLineNotify({
-                            studentName: stuData.name,
-                            phone: stuData.phone,
-                            textMessages: [finalMessage], 
-                            imageUrls: [],
-                            customToken: 'jAroU7Z3wjOq2r95naibGSC2Vo+kfUkPFY43Wyn/QdVs2A+AtRf08GoaOi1cla8Z2tGuE1Ju19RYYXp1eGrkx4zW5ll/IOsm324mH7haqZHdNYrrFhm1IuLkpiSv9TJFSNTQjdSbReP5SAmpeXolkgdB04t89/1O/w1cDnyilFU='
+                        const responseData = await new Promise(function(resolve, reject) {
+                            doPostAction('sendMissingHomeworkLine', {
+                                studentName: stuData.name,
+                                phone: stuData.phone,
+                                textMessages: [finalMessage],
+                                imageUrls: []
+                            }, resolve, reject, gPass);
                         });
                         
-                        if (response.data && response.data.success) {
+                        if (responseData && responseData.success) {
                             successCount++;
                         } else {
                             failCount++;
-                            failNames.push(stuData.name);
+                            var reason = responseData && responseData.msg ? responseData.msg : '後端回傳失敗';
+                            failNames.push(stuData.name + " (" + reason + ")");
                         }
                     } catch(e) {
                         failCount++;
