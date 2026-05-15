@@ -3079,6 +3079,21 @@
                         <option value="all">全校掃描 (需較長時間)</option>
                     </select>
                 </div>
+                <div style="display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap;">
+                    <select id="missingHWRangeMode" onchange="toggleMissingHWDateRange()" style="flex:1; min-width:180px; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:1rem; background:#fff;">
+                        <option value="latest2" selected>最近 2 次作業</option>
+                        <option value="rolling14">最近 2 週作業</option>
+                        <option value="latest1">最近 1 次作業</option>
+                        <option value="latest4">最近 4 次作業</option>
+                        <option value="all">全部作業</option>
+                        <option value="date">指定日期區間</option>
+                    </select>
+                </div>
+                <div id="missingHWDateRangeFields" style="display:none; gap:8px; margin-bottom:8px; align-items:center; flex-wrap:wrap;">
+                    <input type="date" id="missingHWStartDate" style="flex:1; min-width:150px; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:1rem;">
+                    <span style="color:#64748b; font-weight:bold;">到</span>
+                    <input type="date" id="missingHWEndDate" style="flex:1; min-width:150px; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:1rem;">
+                </div>
                 <div style="display:flex; gap:8px;">
                     <button id="btnFetchMissingHW" class="admin-btn btn-blue" onclick="loadMissingHomework()" style="flex:1;">🔍 開始掃描</button>
                     <button id="btnSendMissingHW" class="admin-btn btn-green" onclick="sendMissingHomeworkNotify()" style="display:none; flex:1;">🚀 批次發送提醒</button>
@@ -5741,11 +5756,158 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         // 教務自動化：作業催繳
         // ==========================================
         window.currentMissingHWList = [];
+        window.currentMissingHWRangeLabel = '最近 2 次作業';
 
         function isMakeupReminderExamTitle(title) {
             if (!title || title.indexOf("作業") > -1) return false;
             return ["小考", "複習", "鑑定"].some(function(keyword) {
                 return title.indexOf(keyword) > -1;
+            });
+        }
+
+        window.toggleMissingHWDateRange = function() {
+            var modeEl = document.getElementById('missingHWRangeMode');
+            var rangeFields = document.getElementById('missingHWDateRangeFields');
+            if (!modeEl || !rangeFields) return;
+            rangeFields.style.display = modeEl.value === 'date' ? 'flex' : 'none';
+        };
+
+        function parseMissingHWDateInput(value) {
+            if (!value) return null;
+            var parts = value.split('-');
+            if (parts.length !== 3) return null;
+            var year = parseInt(parts[0], 10);
+            var month = parseInt(parts[1], 10);
+            var day = parseInt(parts[2], 10);
+            var date = new Date(year, month - 1, day);
+            if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
+            return date;
+        }
+
+        function formatMissingHWDate(date) {
+            return date.getFullYear() + '/' + (date.getMonth() + 1) + '/' + date.getDate();
+        }
+
+        function getMissingHWRangeConfig() {
+            var modeEl = document.getElementById('missingHWRangeMode');
+            var mode = modeEl ? modeEl.value : 'latest2';
+            var latestMap = {
+                latest1: { limit: 1, label: '最近 1 次作業' },
+                latest2: { limit: 2, label: '最近 2 次作業' },
+                latest4: { limit: 4, label: '最近 4 次作業' }
+            };
+
+            if (latestMap[mode]) {
+                return { mode: 'latest', limit: latestMap[mode].limit, label: latestMap[mode].label };
+            }
+            if (mode === 'all') {
+                return { mode: 'all', label: '全部作業' };
+            }
+            if (mode === 'rolling14') {
+                var today = new Date();
+                var endToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                var startRolling = new Date(endToday.getFullYear(), endToday.getMonth(), endToday.getDate() - 13);
+                return {
+                    mode: 'date',
+                    startDate: startRolling,
+                    endDate: endToday,
+                    fallbackYear: endToday.getFullYear(),
+                    label: '最近 2 週作業'
+                };
+            }
+
+            var startEl = document.getElementById('missingHWStartDate');
+            var endEl = document.getElementById('missingHWEndDate');
+            var startDate = parseMissingHWDateInput(startEl ? startEl.value : '');
+            var endDate = parseMissingHWDateInput(endEl ? endEl.value : '');
+            if (!startDate && !endDate) {
+                return { mode: 'date', invalid: true, message: '請至少選擇開始日期或結束日期。' };
+            }
+            if (startDate && endDate && startDate.getTime() > endDate.getTime()) {
+                return { mode: 'date', invalid: true, message: '開始日期不能晚於結束日期。' };
+            }
+
+            var fallbackYear = (startDate || endDate || new Date()).getFullYear();
+            var label = '';
+            if (startDate && endDate) {
+                label = formatMissingHWDate(startDate) + ' 到 ' + formatMissingHWDate(endDate);
+            } else if (startDate) {
+                label = formatMissingHWDate(startDate) + ' 以後';
+            } else {
+                label = formatMissingHWDate(endDate) + ' 以前';
+            }
+            return { mode: 'date', startDate: startDate, endDate: endDate, fallbackYear: fallbackYear, label: label };
+        }
+
+        function parseHomeworkDateValue(hw, fallbackYear) {
+            var text = ((hw.rawDate || '') + ' ' + (hw.title || '')).trim();
+            var fullMatch = text.match(/(\d{4})[\/.-](\d{1,2})[\/.-](\d{1,2})/);
+            var year;
+            var month;
+            var day;
+            if (fullMatch) {
+                year = parseInt(fullMatch[1], 10);
+                month = parseInt(fullMatch[2], 10);
+                day = parseInt(fullMatch[3], 10);
+            } else {
+                var shortMatch = text.match(/(^|[^\d])(\d{1,2})[\/.-](\d{1,2})(?!\d)/);
+                if (!shortMatch) return null;
+                year = fallbackYear || new Date().getFullYear();
+                month = parseInt(shortMatch[2], 10);
+                day = parseInt(shortMatch[3], 10);
+            }
+
+            var date = new Date(year, month - 1, day);
+            if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
+            return date;
+        }
+
+        function getHomeworkDateCandidates(hw, rangeConfig) {
+            var text = ((hw.rawDate || '') + ' ' + (hw.title || '')).trim();
+            var fullMatch = text.match(/(\d{4})[\/.-](\d{1,2})[\/.-](\d{1,2})/);
+            if (fullMatch) {
+                var fullDate = parseHomeworkDateValue(hw, rangeConfig.fallbackYear);
+                return fullDate ? [fullDate] : [];
+            }
+
+            var shortMatch = text.match(/(^|[^\d])(\d{1,2})[\/.-](\d{1,2})(?!\d)/);
+            if (!shortMatch) return [];
+
+            var month = parseInt(shortMatch[2], 10);
+            var day = parseInt(shortMatch[3], 10);
+            var yearSeeds = [
+                rangeConfig.startDate ? rangeConfig.startDate.getFullYear() : null,
+                rangeConfig.endDate ? rangeConfig.endDate.getFullYear() : null,
+                rangeConfig.fallbackYear,
+                new Date().getFullYear()
+            ];
+            var seenYears = {};
+            return yearSeeds.reduce(function(dates, year) {
+                if (!year || seenYears[year]) return dates;
+                seenYears[year] = true;
+                var date = new Date(year, month - 1, day);
+                if (date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day) {
+                    dates.push(date);
+                }
+                return dates;
+            }, []);
+        }
+
+        function filterHomeworkColsByRange(homeworkCols, rangeConfig) {
+            if (!rangeConfig || rangeConfig.mode === 'latest') {
+                var limit = rangeConfig && rangeConfig.limit ? rangeConfig.limit : 2;
+                return homeworkCols.slice(0, limit);
+            }
+            if (rangeConfig.mode === 'all') return homeworkCols;
+            if (rangeConfig.mode !== 'date') return homeworkCols.slice(0, 2);
+
+            return homeworkCols.filter(function(hw) {
+                var dateCandidates = getHomeworkDateCandidates(hw, rangeConfig);
+                return dateCandidates.some(function(hwDate) {
+                    if (rangeConfig.startDate && hwDate.getTime() < rangeConfig.startDate.getTime()) return false;
+                    if (rangeConfig.endDate && hwDate.getTime() > rangeConfig.endDate.getTime()) return false;
+                    return true;
+                });
             });
         }
 
@@ -5755,6 +5917,11 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var sendBtn = document.getElementById('btnSendMissingHW');
             var msgArea = document.getElementById('missingHWMessageArea');
             var targetClass = document.getElementById('missingHWClassSelect').value;
+            var rangeConfig = getMissingHWRangeConfig();
+            if (rangeConfig.invalid) {
+                swalAlert('⚠️ 日期範圍未完成', rangeConfig.message, 'warning');
+                return;
+            }
             
             btn.disabled = true;
             btn.innerText = "🔍 正在極速掃描...";
@@ -5763,7 +5930,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             msgArea.style.display = 'none';
             
             var targetText = targetClass === "all" ? "全校" : targetClass;
-            Swal.fire({ title: '極速掃描中...', text: '正在自 Firebase 讀取 ' + targetText + ' 課務狀態...', icon: 'info', allowOutsideClick: false, showConfirmButton: false, didOpen: function() { Swal.showLoading(); } });
+            Swal.fire({ title: '極速掃描中...', text: '正在自 Firebase 讀取 ' + targetText + ' 課務狀態（作業範圍：' + rangeConfig.label + '）...', icon: 'info', allowOutsideClick: false, showConfirmButton: false, didOpen: function() { Swal.showLoading(); } });
 
             try {
                 var missingList = [];
@@ -5799,16 +5966,14 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                         var ex = examsObj[colKey];
                         var nameStr = (ex.date || "") + " " + (ex.examName || "");
                         if (nameStr.indexOf("作業") > -1) {
-                            homeworkCols.push({ id: colKey, title: nameStr.trim() });
+                            homeworkCols.push({ id: colKey, title: nameStr.trim(), rawDate: ex.date || "" });
                         } else if (isMakeupReminderExamTitle(nameStr)) {
                             makeupExamCols.push({ id: colKey, title: nameStr.trim() });
                         }
                     });
                     
-                    // 嚴格規定：只催繳最近「2次」作業 (越靠左邊、數字越小的是最新的)
-                    if (homeworkCols.length > 2) {
-                        homeworkCols = homeworkCols.slice(0, 2);
-                    }
+                    // 越靠左邊、數字越小的是最新欄位；依老師選擇的範圍決定要催繳哪些作業。
+                    homeworkCols = filterHomeworkColsByRange(homeworkCols, rangeConfig);
                     
                     // 針對班上每個學生比對成績
                     Object.keys(clsStudents).forEach(function(stuKey) {
@@ -5862,6 +6027,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 btn.disabled = false;
                 btn.innerText = "🔍 重新掃描";
                 window.currentMissingHWList = missingList;
+                window.currentMissingHWRangeLabel = rangeConfig.label;
                 renderMissingHomeworkList();
                 
             } catch (err) {
@@ -5886,9 +6052,10 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var listDiv = document.getElementById('missingHomeworkList');
             var sendBtn = document.getElementById('btnSendMissingHW');
             var msgArea = document.getElementById('missingHWMessageArea');
+            var rangeLabel = window.currentMissingHWRangeLabel || '最近 2 次作業';
             
             if (!window.currentMissingHWList || window.currentMissingHWList.length === 0) {
-                listDiv.innerHTML = '<div style="text-align:center; padding:20px; color:#10b981; font-weight:bold;">🎉 太棒了！該班級目前沒有任何待提醒項目。</div>';
+                listDiv.innerHTML = '<div style="text-align:center; padding:20px; color:#10b981; font-weight:bold;">🎉 太棒了！該班級目前沒有任何待提醒項目。<br><span style="font-size:0.85rem; color:#64748b;">作業範圍：' + escapeHtml(rangeLabel) + '</span></div>';
                 sendBtn.style.display = 'none';
                 msgArea.style.display = 'none';
                 return;
@@ -5917,7 +6084,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             window.groupedMissingHW = grouped; // 供發送時使用
             
             var keys = Object.keys(grouped);
-            var html = '<div style="margin-bottom:10px; font-weight:bold; color:#ef4444;">共 ' + keys.length + ' 位學生有待提醒項目：</div>';
+            var html = '<div style="margin-bottom:10px; font-weight:bold; color:#ef4444;">共 ' + keys.length + ' 位學生有待提醒項目：<span style="font-size:0.85rem; color:#64748b; font-weight:normal;">（作業範圍：' + escapeHtml(rangeLabel) + '）</span></div>';
             html += '<label style="display:block; cursor:pointer; margin-bottom:10px; font-weight:bold; padding:8px; background:#f1f5f9; border-radius:6px;"><input type="checkbox" id="missingHWSelectAll" checked onchange="toggleMissingHWSelectAll()" style="width:18px; height:18px; margin-right:10px; vertical-align:middle;">全選/取消全選</label>';
             
             keys.forEach(function(key) {
