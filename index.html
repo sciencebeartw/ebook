@@ -5877,16 +5877,16 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 var kids = snap.val() || {};
                 var list = [];
                 for (var k in kids) {
-                    if (kids[k].name) list.push(kids[k].name);
+                    if (kids[k].name) list.push({ key: k, name: kids[k].name });
                 }
-                list.sort(function(a, b) { return a.localeCompare(b, 'zh-Hant'); });
+                list.sort(function(a, b) { return a.name.localeCompare(b.name, 'zh-Hant'); });
                 if (list.length === 0) {
                     stuSel.innerHTML = '<option value="" disabled selected>這個班級沒有學生</option>';
                     return;
                 }
                 var opts = '<option value="" disabled selected>請選擇學生</option>';
-                list.forEach(function(name) {
-                    opts += '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + '</option>';
+                list.forEach(function(stu) {
+                    opts += '<option value="' + escapeHtml(stu.key) + '" data-name="' + escapeHtml(stu.name) + '">' + escapeHtml(stu.name) + '</option>';
                 });
                 stuSel.innerHTML = opts;
                 stuSel.disabled = false;
@@ -5935,16 +5935,49 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }
         }
 
-        function sendDirectStudentMessage(btn) {
+        function formatFeedbackTimestamp(date) {
+            var d = date || new Date();
+            function pad(n) { return n.toString().padStart(2, '0'); }
+            return d.getFullYear() + '/' + pad(d.getMonth() + 1) + '/' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+        }
+
+        function getDirectMessageSelectedStudent() {
+            var stuSel = document.getElementById('directMsgStudentSelect');
+            if (!stuSel || !stuSel.value) return { key: '', name: '' };
+            var opt = stuSel.selectedOptions && stuSel.selectedOptions[0];
+            return {
+                key: stuSel.value,
+                name: opt ? (opt.getAttribute('data-name') || opt.textContent || '').trim() : ''
+            };
+        }
+
+        async function writeFeedbackDirectToFirebase(cls, stuKey, form) {
+            var payload = {
+                time: formatFeedbackTimestamp(new Date()),
+                targetDate: form.targetDate,
+                type: form.type,
+                content: form.content,
+                source: 'dashboard_direct',
+                createdAt: firebase.database.ServerValue.TIMESTAMP,
+                createdBy: 'ebook_admin'
+            };
+            var ref = db.ref(BEAR_SUBJECT + '/feedbacks/' + safeKey(cls) + '/' + stuKey).push();
+            await ref.set(payload);
+            return ref.key;
+        }
+
+        async function sendDirectStudentMessage(btn) {
             var cls = document.getElementById('directMsgClassSelect').value;
-            var stuName = document.getElementById('directMsgStudentSelect').value;
+            var selectedStudent = getDirectMessageSelectedStudent();
+            var stuKey = selectedStudent.key;
+            var stuName = selectedStudent.name;
             var targetDate = document.getElementById('directMsgDateSelect').value;
             var textarea = document.getElementById('directMsgContent');
             var status = document.getElementById('directMsgStatus');
             var content = textarea.value.trim();
 
             if (!cls) { swalAlert('請先選擇班級', '', 'warning'); return; }
-            if (!stuName) { swalAlert('請先選擇學生', '', 'warning'); return; }
+            if (!stuKey || !stuName) { swalAlert('請先選擇學生', '', 'warning'); return; }
             if (!targetDate) { swalAlert('請先選擇聯絡簿日期', '學生端只會在指定日期的聯絡簿下方顯示留言。', 'warning'); return; }
             if (!content) { swalAlert('請輸入留言內容', '', 'warning'); return; }
             if (btn.disabled) return;
@@ -5962,41 +5995,34 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var form = {
                 className: cls,
                 studentName: stuName,
+                studentKey: stuKey,
                 targetDate: targetDate,
                 type: tInfo.fullName + '留言',
                 content: content
             };
 
-            google.script.run
-                .withSuccessHandler(function(res) {
-                    btn.disabled = false;
-                    btn.innerText = originalText;
-                    if (res && res.success) {
-                        textarea.value = '';
-                        if (status) {
-                            status.style.display = 'block';
-                            status.style.color = '#16a34a';
-                            status.innerText = '已送出。學生端通常 1 到 3 秒後會在 ' + targetDate + ' 的留言區看到。';
-                        }
-                        if (document.getElementById('fbClassSelect').value === cls && document.getElementById('fbStudentSelect').value === stuName) {
-                            loadAdminFeedbacks();
-                        }
-                    } else if (status) {
-                        status.style.display = 'block';
-                        status.style.color = '#dc2626';
-                        status.innerText = '送出失敗：' + ((res && res.msg) ? res.msg : '請重新整理後再試一次');
-                    }
-                })
-                .withFailureHandler(function(err) {
-                    btn.disabled = false;
-                    btn.innerText = originalText;
-                    if (status) {
-                        status.style.display = 'block';
-                        status.style.color = '#dc2626';
-                        status.innerText = '系統連線錯誤：' + (err && err.message ? err.message : err);
-                    }
-                })
-                .submitFeedback(form);
+            try {
+                await writeFeedbackDirectToFirebase(cls, stuKey, form);
+                btn.disabled = false;
+                btn.innerText = originalText;
+                textarea.value = '';
+                if (status) {
+                    status.style.display = 'block';
+                    status.style.color = '#16a34a';
+                    status.innerText = '已送出。學生端通常 1 到 3 秒後會在 ' + targetDate + ' 的留言區看到。';
+                }
+                if (document.getElementById('fbClassSelect').value === cls && document.getElementById('fbStudentSelect').value === stuName) {
+                    loadAdminFeedbacks();
+                }
+            } catch (err) {
+                btn.disabled = false;
+                btn.innerText = originalText;
+                if (status) {
+                    status.style.display = 'block';
+                    status.style.color = '#dc2626';
+                    status.innerText = '送出失敗：Firebase 寫入失敗，學生端尚未收到。' + (err && err.message ? ' ' + err.message : '');
+                }
+            }
         }
 
         async function loadFbApplicants() {
@@ -6193,7 +6219,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         async function sendAdminReply(idx, safeC, stuKey, targetDate, clsName, stuName) {
             var input = document.getElementById('fb-reply-' + idx);
             var content = input.value.trim();
-            if(!content) { alert('請輸入回覆內容'); return; }
+            if(!content) { swalAlert('請輸入回覆內容', '', 'warning'); return; }
             var btn = input.nextElementSibling;
             if (btn.disabled) return;
             btn.innerText = "傳送中...";
@@ -6214,17 +6240,16 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 content: finalContent
             };
 
-            google.script.run.withSuccessHandler(function(res) {
-                if(res && res.success) {
-                    btn.innerText = "已回覆 ✓";
-                    btn.style.background = "var(--primary)";
-                    input.value = "";
-                } else {
-                    alert('回覆失敗，請重新整理重試');
-                    btn.innerText = "立即回覆";
-                    btn.disabled = false;
-                }
-            }).submitFeedback(form);
+            try {
+                await writeFeedbackDirectToFirebase(clsName, stuKey, form);
+                btn.innerText = "已回覆 ✓";
+                btn.style.background = "var(--primary)";
+                input.value = "";
+            } catch (err) {
+                swalAlert('回覆失敗', 'Firebase 寫入失敗，學生端尚未收到。' + (err && err.message ? ' ' + err.message : ''), 'error');
+                btn.innerText = "立即回覆";
+                btn.disabled = false;
+            }
         }
 
         window.autoWriteScore = async function(idx, clsName, stuName, targetDate) {
