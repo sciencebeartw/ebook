@@ -651,6 +651,13 @@
             border-radius: 8px;
             padding: 12px;
             margin-bottom: 15px;
+            transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .teacher-upload-box.is-dragover {
+            background-color: #fff7ed;
+            border-color: #e67e22;
+            box-shadow: 0 0 0 4px rgba(243, 156, 18, 0.18);
         }
 
         .teacher-upload-title {
@@ -659,6 +666,12 @@
             color: #d35400;
             margin-bottom: 8px;
             display: block;
+        }
+
+        .teacher-upload-drop-hint {
+            color: #9a3412;
+            font-size: 0.82rem;
+            margin-bottom: 8px;
         }
 
         /* 歷史列表 */
@@ -3011,6 +3024,27 @@
             </div>
 
             <div class="admin-card">
+                <div class="admin-card-title">✉️ 直接留言給學生</div>
+                <div style="margin-bottom:10px; color:#64748b; font-size:0.9rem;">
+                    留言會出現在選定日期的聯絡簿下方，和學生留言同一串對話中。
+                </div>
+                <div style="margin-bottom:10px; display:flex; gap:8px; flex-wrap:wrap;">
+                    <select id="directMsgClassSelect" class="admin-select" onchange="onDirectMessageClassChange()" style="flex:1;">
+                        <option value="" disabled selected>請選擇班級</option>
+                    </select>
+                    <select id="directMsgStudentSelect" class="admin-select" onchange="onDirectMessageStudentChange()" disabled style="flex:1;">
+                        <option value="" disabled selected>請先選擇班級</option>
+                    </select>
+                    <select id="directMsgDateSelect" class="admin-select" disabled style="flex:1;">
+                        <option value="" disabled selected>請先選擇班級</option>
+                    </select>
+                </div>
+                <textarea id="directMsgContent" class="editor-textarea" style="height:72px; margin-bottom:8px;" placeholder="輸入要給學生看的留言..."></textarea>
+                <button id="btnSendDirectMessage" class="admin-btn btn-green" onclick="sendDirectStudentMessage(this)">送出留言</button>
+                <div id="directMsgStatus" style="display:none; margin-top:10px; font-size:0.9rem;"></div>
+            </div>
+
+            <div class="admin-card">
                 <div class="admin-card-title">💬 學生留言與補考審核</div>
                 <div style="margin-bottom:10px; display:flex; gap:8px; flex-wrap:wrap;">
                     <select id="fbClassSelect" class="admin-select" onchange="loadFbApplicants()" style="flex:1;">
@@ -3188,8 +3222,9 @@
                         onfocus="setFocus(this)"></textarea>
 
                     <!-- ★★★ v3.9 新增：老師手機版上傳區 ★★★ -->
-                    <div class="teacher-upload-box">
+                    <div class="teacher-upload-box" ondragenter="handleTeacherUploadDrag(event)" ondragover="handleTeacherUploadDrag(event)" ondragleave="handleTeacherUploadDragLeave(event)" ondrop="handleTeacherUploadDrop(event)">
                         <span class="teacher-upload-title">📤 檔案上傳工具 (自動插入連結)</span>
+                        <div class="teacher-upload-drop-hint">可選檔後上傳，也可先選類型，再把考卷檔直接拖進這個區塊。</div>
                         <div style="display:flex; gap:5px; margin-bottom:5px;">
                             <select id="teacherUploadType" class="editor-input" style="flex:1; margin-bottom:0;">
                                 <option value="小考">小考卷</option>
@@ -3443,12 +3478,44 @@
             document.getElementById('linkUrl').value = "";
         }
 
+        var pendingTeacherUploadFile = null;
+
+        function setPendingTeacherUploadFile(file) {
+            pendingTeacherUploadFile = file || null;
+            var renameInput = document.getElementById('teacherRenameInput');
+            if (pendingTeacherUploadFile && renameInput) renameInput.value = pendingTeacherUploadFile.name;
+        }
+
         // ★★★ v3.9 新增：老師手機版上傳邏輯 (聯絡簿) ★★★
         function handleTeacherFileSelect() {
             var fileInput = document.getElementById('teacherFileInput');
             if (fileInput.files.length > 0) {
-                document.getElementById('teacherRenameInput').value = fileInput.files[0].name;
+                setPendingTeacherUploadFile(fileInput.files[0]);
             }
+        }
+
+        function handleTeacherUploadDrag(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (event.currentTarget) event.currentTarget.classList.add('is-dragover');
+        }
+
+        function handleTeacherUploadDragLeave(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (event.currentTarget && !event.currentTarget.contains(event.relatedTarget)) {
+                event.currentTarget.classList.remove('is-dragover');
+            }
+        }
+
+        function handleTeacherUploadDrop(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (event.currentTarget) event.currentTarget.classList.remove('is-dragover');
+            var files = event.dataTransfer && event.dataTransfer.files;
+            if (!files || files.length === 0) return;
+            setPendingTeacherUploadFile(files[0]);
+            teacherUploadFile();
         }
         // ★★★ 共用：直接上傳到 Firebase Storage（不走 GAS）★★★
         // v3.9 改版：全面捨棄 FileReader(Base64) 避免手機記憶體不足導致大圖損毀
@@ -3485,8 +3552,8 @@
             var typeSelect = document.getElementById('teacherUploadType');
             var statusDiv = document.getElementById('teacherUploadStatus');
 
-            if (fileInput.files.length === 0) { alert('請先選擇檔案！'); return; }
-            var file = fileInput.files[0];
+            var file = pendingTeacherUploadFile || (fileInput.files && fileInput.files[0]);
+            if (!file) { alert('請先選擇檔案，或把檔案拖進上傳區！'); return; }
             if (file.size > 10 * 1024 * 1024) { alert('❌ 檔案太大！請限制在 10MB 以內。'); return; }
 
             // ★ v4.0 智慧目標：依照類型自動決定要填入的欄位
@@ -3510,6 +3577,7 @@
                     var linkText = '[' + fileName + ']' + res.url;
                     targetInput.value = targetInput.value ? (targetInput.value + '\n' + linkText) : linkText;
                     fileInput.value = ''; renameInput.value = '';
+                    pendingTeacherUploadFile = null;
                 },
                 function(err) { statusDiv.innerText = '❌ 上傳錯誤：' + (err.message || err.toString()); }
             );
@@ -3783,6 +3851,7 @@
                 document.getElementById('bulletinTargetClass').innerHTML = opts;
                 if (document.getElementById('stickerClassSelect')) document.getElementById('stickerClassSelect').innerHTML = opts;
                 if (document.getElementById('fbClassSelect')) document.getElementById('fbClassSelect').innerHTML = opts;
+                if (document.getElementById('directMsgClassSelect')) document.getElementById('directMsgClassSelect').innerHTML = opts;
                 if (document.getElementById('makeupClassSelect')) document.getElementById('makeupClassSelect').innerHTML = opts;
                 if (document.getElementById('missingHWClassSelect')) {
                     var hwOpts = '<option value="all">全校掃描 (需較長時間)</option>';
@@ -5475,6 +5544,151 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 status.className = 'makeup-inline-status error';
                 status.innerText = '連線失敗：' + (err && err.message ? err.message : err.toString());
             }).writeMakeupResultColorGas(gPass, clsName, stuName, examColIndex, colorHex);
+        }
+
+        async function onDirectMessageClassChange() {
+            await Promise.all([
+                loadDirectMessageStudents(),
+                loadDirectMessagePostDates()
+            ]);
+        }
+
+        function onDirectMessageStudentChange() {
+            var status = document.getElementById('directMsgStatus');
+            if (status) status.style.display = 'none';
+        }
+
+        async function loadDirectMessageStudents() {
+            var cls = document.getElementById('directMsgClassSelect') ? document.getElementById('directMsgClassSelect').value : '';
+            var stuSel = document.getElementById('directMsgStudentSelect');
+            if (!cls || !stuSel) return;
+            stuSel.innerHTML = '<option value="" disabled selected>載入中...</option>';
+            stuSel.disabled = true;
+            try {
+                var snap = await db.ref(BEAR_SUBJECT + '/students/' + safeKey(cls)).once('value');
+                var kids = snap.val() || {};
+                var list = [];
+                for (var k in kids) {
+                    if (kids[k].name) list.push(kids[k].name);
+                }
+                list.sort(function(a, b) { return a.localeCompare(b, 'zh-Hant'); });
+                if (list.length === 0) {
+                    stuSel.innerHTML = '<option value="" disabled selected>這個班級沒有學生</option>';
+                    return;
+                }
+                var opts = '<option value="" disabled selected>請選擇學生</option>';
+                list.forEach(function(name) {
+                    opts += '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + '</option>';
+                });
+                stuSel.innerHTML = opts;
+                stuSel.disabled = false;
+            } catch (err) {
+                console.error('讀取直接留言學生失敗:', err);
+                stuSel.innerHTML = '<option value="" disabled selected>學生讀取失敗</option>';
+            }
+        }
+
+        async function loadDirectMessagePostDates() {
+            var cls = document.getElementById('directMsgClassSelect') ? document.getElementById('directMsgClassSelect').value : '';
+            var dateSel = document.getElementById('directMsgDateSelect');
+            if (!cls || !dateSel) return;
+            dateSel.innerHTML = '<option value="" disabled selected>載入中...</option>';
+            dateSel.disabled = true;
+            try {
+                var snap = await db.ref(BEAR_SUBJECT + '/dailyPosts/' + safeKey(cls)).once('value');
+                var postsObj = snap.val() || {};
+                var now = new Date();
+                var posts = Object.keys(postsObj).map(function(key) {
+                    var post = postsObj[key] || {};
+                    return {
+                        date: (post.date || '').toString(),
+                        title: (post.title || '').toString(),
+                        reserveTime: (post.reserveTime || '').toString()
+                    };
+                }).filter(function(post) {
+                    if (post.reserveTime.trim() && new Date(post.reserveTime) > now) return false;
+                    return !!post.date;
+                });
+                posts.sort(function(a, b) { return b.date.localeCompare(a.date); });
+                if (posts.length === 0) {
+                    dateSel.innerHTML = '<option value="" disabled selected>這個班級還沒有聯絡簿</option>';
+                    return;
+                }
+                var opts = '<option value="" disabled selected>請選擇顯示在哪天</option>';
+                posts.slice(0, 30).forEach(function(post) {
+                    var label = post.date + (post.title ? ' ' + post.title : '');
+                    opts += '<option value="' + escapeHtml(post.date) + '">' + escapeHtml(label) + '</option>';
+                });
+                dateSel.innerHTML = opts;
+                dateSel.disabled = false;
+            } catch (err) {
+                console.error('讀取直接留言聯絡簿日期失敗:', err);
+                dateSel.innerHTML = '<option value="" disabled selected>聯絡簿讀取失敗</option>';
+            }
+        }
+
+        function sendDirectStudentMessage(btn) {
+            var cls = document.getElementById('directMsgClassSelect').value;
+            var stuName = document.getElementById('directMsgStudentSelect').value;
+            var targetDate = document.getElementById('directMsgDateSelect').value;
+            var textarea = document.getElementById('directMsgContent');
+            var status = document.getElementById('directMsgStatus');
+            var content = textarea.value.trim();
+
+            if (!cls) { swalAlert('請先選擇班級', '', 'warning'); return; }
+            if (!stuName) { swalAlert('請先選擇學生', '', 'warning'); return; }
+            if (!targetDate) { swalAlert('請先選擇聯絡簿日期', '學生端只會在指定日期的聯絡簿下方顯示留言。', 'warning'); return; }
+            if (!content) { swalAlert('請輸入留言內容', '', 'warning'); return; }
+            if (btn.disabled) return;
+
+            var originalText = btn.innerText;
+            btn.disabled = true;
+            btn.innerText = '送出中...';
+            if (status) {
+                status.style.display = 'block';
+                status.style.color = '#64748b';
+                status.innerText = '正在寫入留言...';
+            }
+
+            var tInfo = getTeacherInfo(cls);
+            var form = {
+                className: cls,
+                studentName: stuName,
+                targetDate: targetDate,
+                type: tInfo.fullName + '留言',
+                content: content
+            };
+
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                    if (res && res.success) {
+                        textarea.value = '';
+                        if (status) {
+                            status.style.display = 'block';
+                            status.style.color = '#16a34a';
+                            status.innerText = '已送出。學生端通常 1 到 3 秒後會在 ' + targetDate + ' 的留言區看到。';
+                        }
+                        if (document.getElementById('fbClassSelect').value === cls && document.getElementById('fbStudentSelect').value === stuName) {
+                            loadAdminFeedbacks();
+                        }
+                    } else if (status) {
+                        status.style.display = 'block';
+                        status.style.color = '#dc2626';
+                        status.innerText = '送出失敗：' + ((res && res.msg) ? res.msg : '請重新整理後再試一次');
+                    }
+                })
+                .withFailureHandler(function(err) {
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                    if (status) {
+                        status.style.display = 'block';
+                        status.style.color = '#dc2626';
+                        status.innerText = '系統連線錯誤：' + (err && err.message ? err.message : err);
+                    }
+                })
+                .submitFeedback(form);
         }
 
         async function loadFbApplicants() {
