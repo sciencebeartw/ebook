@@ -1715,6 +1715,13 @@
             padding: 15px;
             margin-bottom: 20px;
             text-align: center;
+            transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .student-upload-box.is-dragover {
+            background: #ecfdf5;
+            border-color: #10b981;
+            box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.16);
         }
 
         .upload-title {
@@ -3310,8 +3317,9 @@
                         onfocus="setFocus(this)"></textarea>
 
                     <!-- ★★★ v3.9 新增：公告上傳區 (智慧填入) ★★★ -->
-                    <div class="teacher-upload-box">
+                    <div class="teacher-upload-box" ondragenter="handleBulletinUploadDrag(event)" ondragover="handleBulletinUploadDrag(event)" ondragleave="handleBulletinUploadDragLeave(event)" ondrop="handleBulletinUploadDrop(event)">
                         <span class="teacher-upload-title">📤 公告附件上傳 (優先填按鈕)</span>
+                        <div class="teacher-upload-drop-hint">可選檔後上傳，也可以把公告附件直接拖進這個區塊。</div>
                         <div style="display:flex; gap:5px; margin-bottom:5px;">
                             <select id="bulletinUploadType" class="editor-input" style="flex:1; margin-bottom:0;">
                                 <option value="公告">公告附件</option>
@@ -3583,12 +3591,44 @@
             );
         }
 
+        var pendingBulletinUploadFile = null;
+
+        function setPendingBulletinUploadFile(file) {
+            pendingBulletinUploadFile = file || null;
+            var renameInput = document.getElementById('bulletinRenameInput');
+            if (pendingBulletinUploadFile && renameInput) renameInput.value = pendingBulletinUploadFile.name;
+        }
+
         // ★★★ v3.9 新增：老師手機版上傳邏輯 (公告 - 智慧填入) ★★★
         function handleBulletinFileSelect() {
             var fileInput = document.getElementById('bulletinFileInput');
             if (fileInput.files.length > 0) {
-                document.getElementById('bulletinRenameInput').value = fileInput.files[0].name;
+                setPendingBulletinUploadFile(fileInput.files[0]);
             }
+        }
+
+        function handleBulletinUploadDrag(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (event.currentTarget) event.currentTarget.classList.add('is-dragover');
+        }
+
+        function handleBulletinUploadDragLeave(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (event.currentTarget && !event.currentTarget.contains(event.relatedTarget)) {
+                event.currentTarget.classList.remove('is-dragover');
+            }
+        }
+
+        function handleBulletinUploadDrop(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (event.currentTarget) event.currentTarget.classList.remove('is-dragover');
+            var files = event.dataTransfer && event.dataTransfer.files;
+            if (!files || files.length === 0) return;
+            setPendingBulletinUploadFile(files[0]);
+            bulletinUploadFile();
         }
 
         // ★★★ v3.9 老師公告附件上傳 → Firebase Storage ★★★
@@ -3601,8 +3641,8 @@
             var btnUrlInput = document.getElementById('bulletinBtnUrl');
             var contentInput = document.getElementById('bulletinContent');
 
-            if (fileInput.files.length === 0) { alert('請先選擇檔案！'); return; }
-            var file = fileInput.files[0];
+            var file = pendingBulletinUploadFile || (fileInput.files && fileInput.files[0]);
+            if (!file) { alert('請先選擇檔案，或把檔案拖進上傳區！'); return; }
             if (file.size > 10 * 1024 * 1024) { alert('❌ 檔案太大！請限制在 10MB 以內。'); return; }
 
             statusDiv.innerText = '⏳ 上傳中...';
@@ -3624,6 +3664,7 @@
                         statusDiv.innerText += ' (已插入內文)';
                     }
                     fileInput.value = ''; renameInput.value = '';
+                    pendingBulletinUploadFile = null;
                 },
                 function(err) { statusDiv.innerText = '❌ 上傳錯誤：' + (err.message || err.toString()); }
             );
@@ -4316,15 +4357,44 @@
 
         function handleStudentUpload(input, dateStr) {
             if (input.files.length === 0) return;
-            if (input.files.length > 5) {
+            startStudentUpload(Array.from(input.files), dateStr, input);
+        }
+
+        function startStudentUpload(files, dateStr, inputToClear) {
+            if (!files || files.length === 0) return;
+            if (files.length > 5) {
                 alert("一次最多只能上傳 5 個檔案！");
-                input.value = "";
+                if (inputToClear) inputToClear.value = "";
                 return;
             }
 
             currentUploadDate = dateStr;
-            uploadQueue = Array.from(input.files);
+            uploadQueue = files;
             processUploadQueue(dateStr);
+        }
+
+        function handleStudentUploadDrag(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (event.currentTarget) event.currentTarget.classList.add('is-dragover');
+            if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+        }
+
+        function handleStudentUploadDragLeave(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (event.currentTarget && !event.currentTarget.contains(event.relatedTarget)) {
+                event.currentTarget.classList.remove('is-dragover');
+            }
+        }
+
+        function handleStudentUploadDrop(event, dateStr) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (event.currentTarget) event.currentTarget.classList.remove('is-dragover');
+            var files = event.dataTransfer && event.dataTransfer.files;
+            if (!files || files.length === 0) return;
+            startStudentUpload(Array.from(files), dateStr, null);
         }
 
         // ★★★ v3.9 學生作業上傳佇列 → Firebase Storage ★★★
@@ -4498,8 +4568,9 @@ if (exam.dist) {
                         } }}); var inputPlaceholder = "留言給老師..."; var safeDateId = post.date.replace(/\//g, '-');
 
                 var uploadHtml = `
-        <div class="student-upload-box">
+        <div class="student-upload-box" ondragenter="handleStudentUploadDrag(event)" ondragover="handleStudentUploadDrag(event)" ondragleave="handleStudentUploadDragLeave(event)" ondrop="handleStudentUploadDrop(event, '${post.date}')">
             <span class="upload-title"><svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' style='vertical-align:middle;margin-right:4px'><polyline points='16 16 12 12 8 16'/><line x1='12' y1='12' x2='12' y2='21'/><path d='M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3'/></svg>作業/筆記上傳區</span>
+            <div style="font-size:0.82rem; color:#64748b; font-weight:bold; margin-bottom:8px;">可多選檔案，也可以直接拖曳檔案到這個區塊。</div>
             <div class="upload-btn-wrapper">
                 <button class="upload-btn-real"><svg width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='3' stroke-linecap='round' style='vertical-align:middle;margin-right:3px'><line x1='12' y1='5' x2='12' y2='19'/><line x1='5' y1='12' x2='19' y2='12'/></svg> 選擇檔案 (可多選)</button>
                 <input type="file" multiple onchange="handleStudentUpload(this, '${post.date}')">
