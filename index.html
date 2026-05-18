@@ -48,7 +48,7 @@
 
         .splash-logo {
             width: 180px;
-            animation: breathe 2s infinite ease-in-out;
+            animation: breathe 1.4s infinite ease-in-out;
         }
 
         @keyframes breathe {
@@ -176,7 +176,8 @@
         }
         .pwa-toolbar-share {
             background: #ffffff;
-            animation: pwaSharePulse 4.2s infinite;
+            opacity: 0;
+            animation: pwaShareButtonShow 6.4s infinite;
         }
         .pwa-toolbar-share .pwa-icon-share {
             width: 18px;
@@ -188,6 +189,41 @@
             border-radius: 50%;
             background: rgba(255,255,255,0.88);
             box-shadow: 8px 0 rgba(255,255,255,0.88), -8px 0 rgba(255,255,255,0.88);
+        }
+        .pwa-toolbar-more {
+            animation: pwaMoreButtonPulse 6.4s infinite;
+        }
+        .pwa-browser-menu {
+            position: absolute;
+            right: 20px;
+            bottom: 48px;
+            width: 136px;
+            padding: 8px;
+            border-radius: 16px;
+            background: rgba(52,52,56,0.96);
+            color: white;
+            box-shadow: 0 12px 26px rgba(15,23,42,0.22);
+            opacity: 0;
+            transform: translateY(10px) scale(0.96);
+            transform-origin: bottom right;
+            animation: pwaBrowserMenuShow 6.4s infinite;
+        }
+        .pwa-browser-item {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 8px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 900;
+        }
+        .pwa-browser-item.share {
+            animation: pwaShareRowPulse 6.4s infinite;
+        }
+        .pwa-browser-item .pwa-icon-share {
+            width: 16px;
+            height: 16px;
+            filter: brightness(1.6);
         }
         .pwa-share-card {
             position: absolute;
@@ -202,7 +238,7 @@
             opacity: 0;
             transform: translateY(12px) scale(0.96);
             transform-origin: bottom center;
-            animation: pwaShareCardShow 5.6s infinite;
+            animation: pwaShareCardShow 6.4s infinite;
         }
         .pwa-share-title {
             display: flex;
@@ -247,7 +283,7 @@
             font-weight: 950;
         }
         .pwa-more-action .pwa-action-circle {
-            animation: pwaMorePulse 5.6s infinite;
+            animation: pwaViewMorePulse 6.4s infinite;
         }
         .pwa-action-list {
             position: absolute;
@@ -262,7 +298,7 @@
             opacity: 0;
             transform: translateY(12px) scale(0.96);
             transform-origin: bottom center;
-            animation: pwaActionListShow 5.6s infinite;
+            animation: pwaActionListShow 6.4s infinite;
         }
         .pwa-sheet-item {
             display: flex;
@@ -290,7 +326,7 @@
             height: 34px;
             border-radius: 11px;
             border: 2px solid rgba(76,175,80,0);
-            animation: pwaAddPulse 5.6s infinite;
+            animation: pwaAddPulse 6.4s infinite;
             pointer-events: none;
         }
         .pwa-cursor {
@@ -301,7 +337,7 @@
             background: rgba(59,130,246,0.94);
             box-shadow: 0 0 0 3px rgba(255,255,255,0.92);
             z-index: 3;
-            animation: pwaCursorMove 5.6s infinite;
+            animation: pwaCursorMove 6.4s infinite;
         }
         .pwa-cursor::after {
             content: '';
@@ -310,45 +346,59 @@
             border: 2px solid rgba(59,130,246,0.65);
             border-radius: 50%;
             opacity: 0;
-            animation: pwaCursorRipple 5.6s infinite;
+            animation: pwaCursorRipple 6.4s infinite;
         }
         @keyframes pwaCursorMove {
             0%, 100% { left: 108px; top: 50px; transform: scale(1); }
-            12% { left: 109px; top: 135px; transform: scale(1); }
-            16% { left: 109px; top: 135px; transform: scale(0.82); }
-            21% { left: 109px; top: 135px; transform: scale(1); }
-            39% { left: 190px; top: 92px; transform: scale(1); }
-            43% { left: 190px; top: 92px; transform: scale(0.82); }
-            48% { left: 190px; top: 92px; transform: scale(1); }
-            69% { left: 80px; top: 92px; transform: scale(1); }
-            73% { left: 80px; top: 92px; transform: scale(0.82); }
-            78% { left: 80px; top: 92px; transform: scale(1); }
-            90% { left: 108px; top: 50px; transform: scale(1); }
+            10% { left: 189px; top: 135px; transform: scale(1); }
+            14% { left: 189px; top: 135px; transform: scale(0.82); }
+            18% { left: 189px; top: 135px; transform: scale(1); }
+            31% { left: 72px; top: 84px; transform: scale(1); }
+            35% { left: 72px; top: 84px; transform: scale(0.82); }
+            39% { left: 72px; top: 84px; transform: scale(1); }
+            55% { left: 190px; top: 92px; transform: scale(1); }
+            59% { left: 190px; top: 92px; transform: scale(0.82); }
+            63% { left: 190px; top: 92px; transform: scale(1); }
+            80% { left: 80px; top: 92px; transform: scale(1); }
+            84% { left: 80px; top: 92px; transform: scale(0.82); }
+            88% { left: 80px; top: 92px; transform: scale(1); }
         }
         @keyframes pwaCursorRipple {
-            0%, 14%, 23%, 41%, 50%, 71%, 80%, 100% { opacity: 0; transform: scale(0.55); }
-            16%, 43%, 73% { opacity: 1; transform: scale(1.15); }
-            21%, 48%, 78% { opacity: 0; transform: scale(1.55); }
+            0%, 12%, 20%, 33%, 41%, 57%, 65%, 82%, 90%, 100% { opacity: 0; transform: scale(0.55); }
+            14%, 35%, 59%, 84% { opacity: 1; transform: scale(1.15); }
+            18%, 39%, 63%, 88% { opacity: 0; transform: scale(1.55); }
         }
-        @keyframes pwaSharePulse {
-            0%, 12%, 28%, 100% { box-shadow: none; transform: scale(1); }
-            18%, 24% { box-shadow: 0 0 0 5px rgba(0,122,255,0.2); transform: scale(1.08); }
+        @keyframes pwaMoreButtonPulse {
+            0%, 8%, 20%, 100% { box-shadow: none; transform: scale(1); }
+            12%, 17% { box-shadow: 0 0 0 5px rgba(255,255,255,0.18); transform: scale(1.08); }
+        }
+        @keyframes pwaBrowserMenuShow {
+            0%, 17%, 42%, 100% { opacity: 0; transform: translateY(10px) scale(0.96); }
+            22%, 38% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes pwaShareRowPulse {
+            0%, 26%, 40%, 100% { background: transparent; box-shadow: none; }
+            31%, 36% { background: rgba(76,175,80,0.22); box-shadow: 0 0 0 2px rgba(76,175,80,0.32); }
+        }
+        @keyframes pwaShareButtonShow {
+            0%, 39%, 100% { opacity: 0; }
+            42%, 52% { opacity: 1; }
         }
         @keyframes pwaShareCardShow {
-            0%, 18%, 54%, 100% { opacity: 0; transform: translateY(12px) scale(0.96); }
-            24%, 49% { opacity: 1; transform: translateY(0) scale(1); }
+            0%, 38%, 66%, 100% { opacity: 0; transform: translateY(12px) scale(0.96); }
+            44%, 62% { opacity: 1; transform: translateY(0) scale(1); }
         }
         @keyframes pwaActionListShow {
-            0%, 49%, 86%, 100% { opacity: 0; transform: translateY(12px) scale(0.96); }
-            56%, 82% { opacity: 1; transform: translateY(0) scale(1); }
+            0%, 62%, 94%, 100% { opacity: 0; transform: translateY(12px) scale(0.96); }
+            69%, 90% { opacity: 1; transform: translateY(0) scale(1); }
         }
-        @keyframes pwaMorePulse {
-            0%, 35%, 52%, 100% { box-shadow: none; transform: scale(1); }
-            42%, 48% { box-shadow: 0 0 0 5px rgba(255,255,255,0.14); transform: scale(1.08); }
+        @keyframes pwaViewMorePulse {
+            0%, 50%, 64%, 100% { box-shadow: none; transform: scale(1); }
+            55%, 60% { box-shadow: 0 0 0 5px rgba(255,255,255,0.14); transform: scale(1.08); }
         }
         @keyframes pwaAddPulse {
-            0%, 66%, 82%, 100% { border-color: rgba(76,175,80,0); box-shadow: none; }
-            72%, 78% { border-color: rgba(76,175,80,0.78); box-shadow: 0 0 0 4px rgba(76,175,80,0.14); }
+            0%, 77%, 92%, 100% { border-color: rgba(76,175,80,0); box-shadow: none; }
+            82%, 88% { border-color: rgba(76,175,80,0.78); box-shadow: 0 0 0 4px rgba(76,175,80,0.14); }
         }
 
         body {
@@ -3108,7 +3158,7 @@
                 function startDetection() {
                     // 【情境 1】桌面 App 模式（PWA Standalone）→ 短暫呼吸後直接進入
                     if (isStandalone) {
-                        setTimeout(window.showApp, 400);
+                        setTimeout(window.showApp, 200);
                         return;
                     }
 
@@ -3125,7 +3175,7 @@
                     // 【情境 3】一般手機瀏覽器（Safari/Chrome）→ 顯示 PWA 安裝引導，只有一個按鈕
                     if (isiOS || isAndroid) {
                         var pwaBtn = isiOS
-                            ? '<div class="pwa-install-guide"><div style="font-weight:bold; color:#2980b9; font-size:14px; text-align:center;">👉 請依下方動畫指示操作</div><div class="pwa-install-animation" aria-hidden="true"><div class="pwa-mini-page"><div class="pwa-mini-logo"></div></div><div class="pwa-share-card"><div class="pwa-share-title"><img src="icon.png" alt=""><span>山熊科學數位聯絡簿</span></div><div class="pwa-share-actions"><div class="pwa-share-action"><div class="pwa-action-circle">□</div><span>拷貝</span></div><div class="pwa-share-action"><div class="pwa-action-circle">□</div><span>加入書籤</span></div><div class="pwa-share-action pwa-more-action"><div class="pwa-action-circle">⌃</div><span>檢視較多</span></div></div></div><div class="pwa-action-list"><div class="pwa-sheet-item"><div class="pwa-icon-add"></div><span>加入主畫面</span></div></div><div class="pwa-toolbar"><div class="pwa-toolbar-icon"></div><div class="pwa-toolbar-icon pwa-toolbar-share"><div class="pwa-icon-share"></div></div><div class="pwa-toolbar-icon"><div class="pwa-toolbar-dot"></div></div></div><div class="pwa-cursor"></div></div><div class="pwa-tutorial-ios"><div class="pwa-step"><div class="pwa-icon-box"><div class="pwa-icon-share"></div></div><div>1. 點擊瀏覽器下方的<b>「分享」</b>按鈕</div></div><div class="pwa-step"><div class="pwa-icon-box">⌃</div><div>2. 點擊<b>「檢視較多」</b>，或把選單往上拉</div></div><div class="pwa-step"><div class="pwa-icon-box"><div class="pwa-icon-add"></div></div><div>3. 點擊<b>「加入主畫面」</b></div></div></div></div>'
+                            ? '<div class="pwa-install-guide"><div style="font-weight:bold; color:#2980b9; font-size:14px; text-align:center;">👉 請依下方動畫指示操作</div><div class="pwa-install-animation" aria-hidden="true"><div class="pwa-mini-page"><div class="pwa-mini-logo"></div></div><div class="pwa-browser-menu"><div class="pwa-browser-item share"><div class="pwa-icon-share"></div><span>分享</span></div><div class="pwa-browser-item"><span>加入「書籤」</span></div></div><div class="pwa-share-card"><div class="pwa-share-title"><img src="icon.png" alt=""><span>山熊科學數位聯絡簿</span></div><div class="pwa-share-actions"><div class="pwa-share-action"><div class="pwa-action-circle">□</div><span>拷貝</span></div><div class="pwa-share-action"><div class="pwa-action-circle">□</div><span>加入書籤</span></div><div class="pwa-share-action pwa-more-action"><div class="pwa-action-circle">⌃</div><span>檢視較多</span></div></div></div><div class="pwa-action-list"><div class="pwa-sheet-item"><div class="pwa-icon-add"></div><span>加入主畫面</span></div></div><div class="pwa-toolbar"><div class="pwa-toolbar-icon"></div><div class="pwa-toolbar-icon pwa-toolbar-share"><div class="pwa-icon-share"></div></div><div class="pwa-toolbar-icon pwa-toolbar-more"><div class="pwa-toolbar-dot"></div></div></div><div class="pwa-cursor"></div></div><div class="pwa-tutorial-ios"><div class="pwa-step"><div class="pwa-icon-box">•••</div><div>1. 點擊右下角<b>「三個點點」</b></div></div><div class="pwa-step"><div class="pwa-icon-box"><div class="pwa-icon-share"></div></div><div>2. 點擊<b>「分享」</b></div></div><div class="pwa-step"><div class="pwa-icon-box">⌃</div><div>3. 點擊<b>「檢視較多」</b>，或把選單往上拉</div></div><div class="pwa-step"><div class="pwa-icon-box"><div class="pwa-icon-add"></div></div><div>4. 點擊<b>「加入主畫面」</b></div></div></div></div>'
                             : '<div style="padding:10px;text-align:left;"><p>1. 點擊右上角的<b>「⋮」選單</b></p><p>2. 選擇<b>「安裝應用程式」</b>或<b>「將網頁加入主畫面」</b></p></div>';
 
                         setTimeout(function() {
@@ -3141,12 +3191,12 @@
                             } else {
                                 window.showApp();
                             }
-                        }, 500);
+                        }, 150);
                         return;
                     }
 
                     // 【情境 4】電腦版 → 直接進入
-                    setTimeout(window.showApp, 300);
+                    setTimeout(window.showApp, 150);
                 }
 
                 if (document.readyState === 'loading') {
@@ -3155,14 +3205,14 @@
                     startDetection();
                 }
 
-                // 保險：8秒後若非 LINE/FB/IG 且仍卡著，強制進入
+                // 保險：5秒後若非 LINE/FB/IG 且仍卡著，強制進入
                 setTimeout(function() {
                     var splash = document.getElementById('splash-screen');
                     if (splash && splash.style.display !== 'none' && !isLine && !isFB && !isIG) {
-                        console.warn('[ebook-app] Emergency entry after 8s');
+                        console.warn('[ebook-app] Emergency entry after 5s');
                         window.showApp();
                     }
-                }, 8000);
+                }, 5000);
             })();
         </script>
 
