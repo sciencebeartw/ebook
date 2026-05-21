@@ -1978,6 +1978,47 @@
             box-shadow: 0 6px 16px var(--primary-glow);
         }
 
+        .admin-reply-box {
+            margin-top: 10px;
+            padding: 10px;
+            border: 1px solid #bfdbfe;
+            border-radius: 12px;
+            background: #eff6ff;
+        }
+
+        .admin-reply-title {
+            font-size: 0.85rem;
+            font-weight: 900;
+            color: #1d4ed8;
+            margin-bottom: 8px;
+        }
+
+        .admin-reply-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .admin-reply-row input {
+            flex: 1;
+            min-width: 0;
+            padding: 9px 12px;
+            border: 1px solid #93c5fd;
+            border-radius: 999px;
+            outline: none;
+            font-size: 1rem;
+        }
+
+        .admin-reply-row button {
+            border: none;
+            border-radius: 999px;
+            padding: 0 14px;
+            background: #2563eb;
+            color: white;
+            font-weight: 900;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
         .quote-box {
             background-color: #f1f3f5;
             border-left: 4px solid #adb5bd;
@@ -4731,6 +4772,7 @@
         }
 
         function renderDailyPosts(posts, history) {
+            window.adminModeReplyContext = {};
             var container = document.getElementById('tab-content-0'); if (!posts || posts.length === 0) { container.innerHTML = "<div style='text-align:center; padding:30px; color:#999;'>目前沒有聯絡簿資料</div>"; return; } var html = ""; posts.forEach(function (post) {
                 var gradeHtml = ""; var exam = post.examData.main; var others = post.examData.others; var scoreReportHtml = ""; if (exam) {
                     var logic = getDisplayLogic(exam, history); var unitDisplay = ""; if (!isNaN(parseFloat(logic.mainScore))) unitDisplay = "<span class='score-unit-big'>" + (exam.unit || "分") + "</span>"; var scoreDisplay = "<span class='" + logic.mainClass + "'>" + logic.mainScore + "</span>" + unitDisplay; var standardHtml = ""; var isHomeworkExam = (exam.exam && exam.exam.indexOf("作業") > -1) || (exam.date && exam.date.indexOf("作業") > -1); if (exam.note && exam.note !== "" && !isHomeworkExam) { standardHtml = "<div class='exam-standard-box'>" + SVG.target + " 補考標準：" + exam.note + "</div>"; } if (logic.needsReport) { var safeDate = post.date.replace(/\//g, '-'); scoreReportHtml = "<div class='score-report-section'><div style='font-weight:bold; color:#c0392b; margin-bottom:10px; font-size:1.35rem;'>" + SVG.edit + "回報補考分數</div><div class='input-box'><input type='number' class='score-input' id='score-in-" + safeDate + "' placeholder='輸入分數'><button class='score-btn' onclick=\"submitScoreReport('" + safeDate + "', '" + post.date + "')\">送出</button></div></div>"; } var chartHtml = "";
@@ -4852,7 +4894,18 @@ if (exam.dist) {
                             
                             historyHtml += "<div class='history-msg'><div class='history-msg-avatar avatar-student'>" + avatarChar + "</div><div class='history-msg-body " + bodyCls + "'><span>" + icon + stickerData.reason + "</span><span class='" + badgeCls + "'>" + prefix + stickerData.count + "棒</span><br><span class='sticker-status " + statusClass + "'>" + (statusLabel === "通過" ? SVG.check : (statusLabel === "退回" ? SVG.cross : SVG.hourglass)) + statusLabel + "</span><div class='history-msg-time'>" + h.time.substring(5, 16) + "</div></div></div>";
                         } else {
-                            historyHtml += "<div class='history-msg'><div class='history-msg-avatar " + avatarClass + "'>" + avatarChar + "</div><div class='history-msg-body " + bodyClass + "'>" + parseBtn(h.content) + "<div class='history-msg-time'>" + h.time.substring(5, 16) + "</div></div></div>";
+                            var adminReplyHtml = "";
+                            if (isAdminMode && !isTeacher) {
+                                var contextKey = makeDomSafeId(post.date + "_" + (h.fbKey || h.time || Math.random().toString(36).slice(2)));
+                                window.adminModeReplyContext[contextKey] = {
+                                    fbKey: h.fbKey || "",
+                                    targetDate: post.date,
+                                    type: displayType,
+                                    content: h.content || ""
+                                };
+                                adminReplyHtml = buildAdminReplyBox(contextKey);
+                            }
+                            historyHtml += "<div class='history-msg'><div class='history-msg-avatar " + avatarClass + "'>" + avatarChar + "</div><div class='history-msg-body " + bodyClass + "'>" + parseBtn(h.content) + "<div class='history-msg-time'>" + h.time.substring(5, 16) + "</div>" + adminReplyHtml + "</div></div>";
                         } }}); var inputPlaceholder = "留言給老師..."; var safeDateId = post.date.replace(/\//g, '-');
 
                 var uploadHtml = `
@@ -5621,6 +5674,68 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 .replace(/\\/g, "\\\\")
                 .replace(/'/g, "\\'")
                 .replace(/\n/g, " ");
+        }
+
+        function makeDomSafeId(str) {
+            return (str === undefined || str === null ? "" : str.toString()).replace(/[^a-zA-Z0-9_-]/g, "_");
+        }
+
+        function buildAdminReplyBox(contextKey) {
+            return "<div class='admin-reply-box'>" +
+                "<div class='admin-reply-title'>老師回覆</div>" +
+                "<div class='admin-reply-row'>" +
+                "<input type='text' id='admin-reply-input-" + contextKey + "' placeholder='以老師身分回覆這則留言'>" +
+                "<button type='button' onclick=\"sendAdminModeReply('" + contextKey + "')\">回覆</button>" +
+                "</div></div>";
+        }
+
+        async function sendAdminModeReply(contextKey) {
+            if (!isAdminMode) return;
+            var context = window.adminModeReplyContext && window.adminModeReplyContext[contextKey];
+            if (!context || !gData || !gData.className || !gData.foundUserKey) {
+                swalAlert('找不到原留言資料，請重新開啟學生畫面後再試。', '', 'warning');
+                return;
+            }
+            var input = document.getElementById('admin-reply-input-' + contextKey);
+            var content = input ? input.value.trim() : '';
+            if (!content) {
+                swalAlert('請輸入回覆內容', '', 'warning');
+                return;
+            }
+            var btn = input && input.nextElementSibling;
+            if (btn && btn.disabled) return;
+            if (btn) {
+                btn.disabled = true;
+                btn.innerText = '傳送中';
+            }
+
+            var originalContent = (context.content || '').toString().replace(/\s+/g, ' ').trim();
+            if (originalContent.length > 50) originalContent = originalContent.substring(0, 50) + '...';
+            var finalContent = '[quote:' + (context.type || '學生留言') + ']' + originalContent + '[/quote]\n' + content;
+            var tInfo = getTeacherInfo(gData.className);
+            var form = {
+                className: gData.className,
+                studentName: gData.studentName,
+                studentKey: gData.foundUserKey,
+                targetDate: context.targetDate,
+                type: tInfo.fullName + '回覆',
+                content: finalContent
+            };
+
+            try {
+                await writeFeedbackDirectToFirebase(gData.className, gData.foundUserKey, form);
+                if (input) input.value = '';
+                if (btn) {
+                    btn.innerText = '已回覆';
+                    btn.style.background = 'var(--primary)';
+                }
+            } catch (err) {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = '回覆';
+                }
+                swalAlert('回覆失敗', 'Firebase 寫入失敗，學生端尚未收到。' + (err && err.message ? ' ' + err.message : ''), 'error');
+            }
         }
 
         function parseScoreNumber(raw) {
