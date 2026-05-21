@@ -2777,6 +2777,11 @@
     const db = firebase.database();
     const qParams = new URLSearchParams(window.location.search);
     const BEAR_SUBJECT = qParams.get('subject') ? '/' + qParams.get('subject') : '/science';
+    let ebookGodSessionId = qParams.get('godSession') || '';
+    let ebookGodSessionInfo = null;
+    let ebookGodSessionLastActivityAt = Date.now();
+    let ebookGodSessionLastRenewAt = 0;
+    let ebookGodSessionHeartbeatTimer = null;
 
     const SCRIPT_URLS = {
       '/science': "https://script.google.com/macros/s/AKfycbz3ZwBnTp6gcf5TKzJnHni6oat0_jxsnhGkfXAR-Fu_NI3ZVMu4WrDjssayDUtJrQU/exec",
@@ -2825,13 +2830,12 @@
         let result = { found: false, className: "", studentName: "", dailyPost: [], grades: [], feedbackHistory: [], bulletins: [], stickers: 0 };
         
         try {
-            // Admin shortcut
             if (studentName.toLowerCase() === "admin") {
-                if (btoa(password) === "bWlhbw==") {
-                    let adminT = getTeacherInfo(targetClass || "").fullName;
-                    if (!targetClass && BEAR_SUBJECT === '/math') adminT = "數學老師";
-                    return { found: true, isAdmin: true, studentName: adminT, className: "管理者模式" };
-                }
+                return {
+                    found: false,
+                    adminRetired: true,
+                    msg: "eBook 內建管理入口已退場，請回行政中心操作。"
+                };
             }
 
             const snapS = await db.ref(BEAR_SUBJECT + '/students').once('value');
@@ -3022,7 +3026,16 @@
            try { const res = await executeFirebaseRead(u, p, false); if(onSuccess) onSuccess(res); } catch(e){ if(onErr) onErr(e); }
         },
         getStudentDataByAdmin: async function(cls, u, pwd) {
-           try { const res = await executeFirebaseRead(u, pwd, true, cls); if(onSuccess) onSuccess(res); } catch(e){ if(onErr) onErr(e); }
+           try {
+               const allowGodSession = ebookGodSessionInfo &&
+                   ebookGodSessionInfo.className === cls &&
+                   ebookGodSessionInfo.studentName === u &&
+                   ebookGodSessionInfo.permissions &&
+                   ebookGodSessionInfo.permissions.view === true;
+               if (!allowGodSession) throw new Error('上帝視角連線未驗證，請從行政中心重新開啟');
+               const res = await executeFirebaseRead(u, pwd, true, cls);
+               if(onSuccess) onSuccess(res);
+           } catch(e){ if(onErr) onErr(e); }
         },
         getAllClassNames: async function() {
            try { 
@@ -4010,7 +4023,10 @@
         }
         function loginSuccess(result, pass) {
             document.getElementById('loader-login').style.display = 'none';
-            if (!result.found) document.getElementById('loginMsg').innerText = "找不到資料，請確認姓名與密碼。";
+            if (result && result.adminRetired) {
+                document.getElementById('loginMsg').innerText = result.msg || "eBook 內建管理入口已退場，請回行政中心操作。";
+            }
+            else if (!result.found) document.getElementById('loginMsg').innerText = "找不到資料，請確認姓名與密碼。";
             else {
                 document.getElementById('loginMsg').innerText = "";
                 gPass = pass; // ★ 儲存密碼，供後續管理員 API 呼叫使用
@@ -5680,6 +5696,65 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             return (str === undefined || str === null ? "" : str.toString()).replace(/[^a-zA-Z0-9_-]/g, "_");
         }
 
+        function getGodSessionCallable(name) {
+            return firebase.functions().httpsCallable(name);
+        }
+
+        function markEbookGodSessionActivity() {
+            ebookGodSessionLastActivityAt = Date.now();
+        }
+
+        async function renewEbookGodSession(force) {
+            if (!ebookGodSessionId) return null;
+            var now = Date.now();
+            if (!force && now - ebookGodSessionLastRenewAt < 30000) return ebookGodSessionInfo;
+            var fn = getGodSessionCallable('getEbookGodSession');
+            var result = await fn({ sessionId: ebookGodSessionId });
+            ebookGodSessionInfo = result && result.data ? result.data : null;
+            ebookGodSessionLastRenewAt = now;
+            return ebookGodSessionInfo;
+        }
+
+        function startEbookGodSessionHeartbeat() {
+            if (ebookGodSessionHeartbeatTimer) clearInterval(ebookGodSessionHeartbeatTimer);
+            ['click', 'keydown', 'touchstart', 'scroll'].forEach(function(eventName) {
+                window.addEventListener(eventName, markEbookGodSessionActivity, { passive: true });
+            });
+            ebookGodSessionHeartbeatTimer = setInterval(function() {
+                if (!ebookGodSessionId) return;
+                var now = Date.now();
+                if (now - ebookGodSessionLastActivityAt > 2 * 60 * 1000) return;
+                renewEbookGodSession(false).catch(function(err) {
+                    console.warn('上帝視角 session 延長失敗:', err);
+                });
+            }, 60 * 1000);
+        }
+
+        async function enterEbookGodSession(sessionId) {
+            document.getElementById('full-loader').style.display = 'flex';
+            try {
+                ebookGodSessionId = sessionId;
+                var session = await renewEbookGodSession(true);
+                if (!session || !session.className || !session.studentName) throw new Error('session 資料不完整');
+                isAdminMode = true;
+                startEbookGodSessionHeartbeat();
+                google.script.run.withSuccessHandler(function(result) {
+                    if (result && result.found) {
+                        enterStudentView(result, 'god_session');
+                    } else {
+                        swalAlert('查無此學生資料', '請回行政中心重新開啟上帝視角。', 'warning');
+                        document.getElementById('full-loader').style.display = 'none';
+                    }
+                }).withFailureHandler(function(e) {
+                    swalAlert('上帝視角載入失敗', e && e.message ? e.message : String(e), 'error');
+                    document.getElementById('full-loader').style.display = 'none';
+                }).getStudentDataByAdmin(session.className, session.studentName, 'god_session');
+            } catch (err) {
+                swalAlert('上帝視角連線已失效', err && err.message ? err.message : '請回行政中心重新開啟。', 'warning');
+                document.getElementById('full-loader').style.display = 'none';
+            }
+        }
+
         function buildAdminReplyBox(contextKey) {
             return "<div class='admin-reply-box'>" +
                 "<div class='admin-reply-title'>老師回覆</div>" +
@@ -5690,12 +5765,12 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         }
 
         function canUseAdminModeReply() {
-            return isAdminMode && !!gPass && gPass !== "admin_view";
+            return isAdminMode && !!ebookGodSessionId && !!(ebookGodSessionInfo && ebookGodSessionInfo.permissions && ebookGodSessionInfo.permissions.reply);
         }
 
         async function sendAdminModeReply(contextKey) {
             if (!canUseAdminModeReply()) {
-                swalAlert('這個上帝視角入口只能查看學生畫面；請回行政中心留言列表回覆。', '', 'warning');
+                swalAlert('這個上帝視角連線不能回覆', '請回行政中心重新開啟學生畫面。', 'warning');
                 return;
             }
             var context = window.adminModeReplyContext && window.adminModeReplyContext[contextKey];
@@ -5716,21 +5791,17 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 btn.innerText = '傳送中';
             }
 
-            var originalContent = (context.content || '').toString().replace(/\s+/g, ' ').trim();
-            if (originalContent.length > 50) originalContent = originalContent.substring(0, 50) + '...';
-            var finalContent = '[quote:' + (context.type || '學生留言') + ']' + originalContent + '[/quote]\n' + content;
-            var tInfo = getTeacherInfo(gData.className);
-            var form = {
-                className: gData.className,
-                studentName: gData.studentName,
-                studentKey: gData.foundUserKey,
-                targetDate: context.targetDate,
-                type: tInfo.fullName + '回覆',
-                content: finalContent
-            };
-
             try {
-                await writeFeedbackDirectToFirebase(gData.className, gData.foundUserKey, form);
+                var fn = getGodSessionCallable('sendEbookGodReply');
+                var result = await fn({
+                    sessionId: ebookGodSessionId,
+                    feedbackKey: context.fbKey,
+                    targetDate: context.targetDate,
+                    replyContent: content
+                });
+                if (result && result.data && result.data.expiresAt && ebookGodSessionInfo) {
+                    ebookGodSessionInfo.expiresAt = result.data.expiresAt;
+                }
                 if (input) input.value = '';
                 if (btn) {
                     btn.innerText = '已回覆';
@@ -5741,7 +5812,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     btn.disabled = false;
                     btn.innerText = '回覆';
                 }
-                swalAlert('回覆失敗', 'Firebase 寫入失敗，學生端尚未收到。' + (err && err.message ? ' ' + err.message : ''), 'error');
+                swalAlert('回覆失敗', 'Google Sheet 寫入或 Firebase 同步失敗，學生端尚未收到。' + (err && err.message ? ' ' + err.message : ''), 'error');
             }
         }
 
@@ -6124,19 +6195,32 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             };
         }
 
+        function submitFeedbackToSheetAndSync(form) {
+            return new Promise(function(resolve, reject) {
+                google.script.run
+                    .withSuccessHandler(function(res) {
+                        if (res && res.success) {
+                            resolve(res);
+                        } else {
+                            reject(new Error((res && res.msg) || 'Google Sheet 寫入或 Firebase 同步失敗'));
+                        }
+                    })
+                    .withFailureHandler(function(err) {
+                        reject(err instanceof Error ? err : new Error(err && err.message ? err.message : String(err)));
+                    })
+                    .submitFeedback(form);
+            });
+        }
+
         async function writeFeedbackDirectToFirebase(cls, stuKey, form) {
-            var payload = {
-                time: formatFeedbackTimestamp(new Date()),
+            var res = await submitFeedbackToSheetAndSync({
+                className: form.className || cls,
+                studentName: form.studentName || '',
                 targetDate: form.targetDate,
                 type: form.type,
-                content: form.content,
-                source: 'dashboard_direct',
-                createdAt: firebase.database.ServerValue.TIMESTAMP,
-                createdBy: 'ebook_admin'
-            };
-            var ref = db.ref(BEAR_SUBJECT + '/feedbacks/' + safeKey(cls) + '/' + stuKey).push();
-            await ref.set(payload);
-            return ref.key;
+                content: form.content
+            });
+            return res && res.feedbackKey ? res.feedbackKey : '';
         }
 
         async function sendDirectStudentMessage(btn) {
@@ -6193,7 +6277,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 if (status) {
                     status.style.display = 'block';
                     status.style.color = '#dc2626';
-                    status.innerText = '送出失敗：Firebase 寫入失敗，學生端尚未收到。' + (err && err.message ? ' ' + err.message : '');
+                    status.innerText = '送出失敗：Google Sheet 寫入或 Firebase 同步失敗，學生端尚未收到。' + (err && err.message ? ' ' + err.message : '');
                 }
             }
         }
@@ -6419,7 +6503,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 btn.style.background = "var(--primary)";
                 input.value = "";
             } catch (err) {
-                swalAlert('回覆失敗', 'Firebase 寫入失敗，學生端尚未收到。' + (err && err.message ? ' ' + err.message : ''), 'error');
+                swalAlert('回覆失敗', 'Google Sheet 寫入或 Firebase 同步失敗，學生端尚未收到。' + (err && err.message ? ' ' + err.message : ''), 'error');
                 btn.innerText = "立即回覆";
                 btn.disabled = false;
             }
@@ -6939,24 +7023,18 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         
         document.addEventListener("DOMContentLoaded", function() {
             const params = new URLSearchParams(window.location.search);
+            const godSession = params.get('godSession');
             const bypassAdmin = params.get('admin');
             const bypassCls = params.get('cls');
             const bypassName = params.get('name');
 
-            if (bypassAdmin === btoa("miao") && bypassCls && bypassName) {
-                document.getElementById('full-loader').style.display = 'flex';
-                isAdminMode = true;
-                google.script.run.withSuccessHandler(function (result) {
-                    if (result && result.found) {
-                        enterStudentView(result, "admin_view");
-                    } else {
-                        alert("查無此學生資料");
-                        document.getElementById('full-loader').style.display = 'none';
-                    }
-                }).withFailureHandler(function(e) {
-                    alert("連線錯誤：" + e);
-                    document.getElementById('full-loader').style.display = 'none';
-                }).getStudentDataByAdmin(bypassCls, bypassName, atob(bypassAdmin));
+            if (godSession) {
+                enterEbookGodSession(godSession);
+                return;
+            }
+
+            if (bypassAdmin && bypassCls && bypassName) {
+                swalAlert('舊上帝視角連結已停用', '請從行政中心重新點學生姓名開啟安全上帝視角。', 'warning');
             }
         });
     </script>
