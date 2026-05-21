@@ -4895,7 +4895,7 @@ if (exam.dist) {
                             historyHtml += "<div class='history-msg'><div class='history-msg-avatar avatar-student'>" + avatarChar + "</div><div class='history-msg-body " + bodyCls + "'><span>" + icon + stickerData.reason + "</span><span class='" + badgeCls + "'>" + prefix + stickerData.count + "棒</span><br><span class='sticker-status " + statusClass + "'>" + (statusLabel === "通過" ? SVG.check : (statusLabel === "退回" ? SVG.cross : SVG.hourglass)) + statusLabel + "</span><div class='history-msg-time'>" + h.time.substring(5, 16) + "</div></div></div>";
                         } else {
                             var adminReplyHtml = "";
-                            if (isAdminMode && !isTeacher) {
+                            if (canUseAdminModeReply() && !isTeacher) {
                                 var contextKey = makeDomSafeId(post.date + "_" + (h.fbKey || h.time || Math.random().toString(36).slice(2)));
                                 window.adminModeReplyContext[contextKey] = {
                                     fbKey: h.fbKey || "",
@@ -5689,8 +5689,15 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 "</div></div>";
         }
 
+        function canUseAdminModeReply() {
+            return isAdminMode && !!gPass && gPass !== "admin_view";
+        }
+
         async function sendAdminModeReply(contextKey) {
-            if (!isAdminMode) return;
+            if (!canUseAdminModeReply()) {
+                swalAlert('這個上帝視角入口只能查看學生畫面；請回行政中心留言列表回覆。', '', 'warning');
+                return;
+            }
             var context = window.adminModeReplyContext && window.adminModeReplyContext[contextKey];
             if (!context || !gData || !gData.className || !gData.foundUserKey) {
                 swalAlert('找不到原留言資料，請重新開啟學生畫面後再試。', '', 'warning');
