@@ -4700,20 +4700,62 @@
         }
 
         function getFeedbackOverrideNum(exam, feedbackHistory) {
+            var report = getLatestMakeupReportInfo(exam, feedbackHistory);
+            return report ? report.reportedScoreNum : null;
+        }
+
+        function getExamDateCandidates(exam) {
+            var dateStr = (exam && exam.date ? exam.date : "").toString();
+            var candidates = [];
+            var match = dateStr.match(/(\d{1,2})[\/.-](\d{1,2})/);
+            if (match) {
+                var month = parseInt(match[1], 10);
+                var day = parseInt(match[2], 10);
+                if (month && day) {
+                    candidates.push(month + "/" + day);
+                    candidates.push(String(month).padStart(2, "0") + "/" + String(day).padStart(2, "0"));
+                    candidates.push(month + "-" + day);
+                    candidates.push(String(month).padStart(2, "0") + "-" + String(day).padStart(2, "0"));
+                }
+            }
+            return candidates;
+        }
+
+        function getLatestMakeupReportInfo(exam, feedbackHistory) {
             if (!feedbackHistory || feedbackHistory.length === 0) return null;
-            
             var rawScore = (exam.score || "").toString();
             var isHw = (exam.exam && exam.exam.indexOf("作業") > -1) || (exam.date && exam.date.indexOf("作業") > -1) || rawScore.indexOf("未交") > -1 || rawScore.indexOf("缺交") > -1 || rawScore.indexOf("缺繳") > -1;
-            if (isHw) return null; // 排除作業，作業不會有補考回報分數
+            if (isHw) return null;
 
+            var candidates = getExamDateCandidates(exam);
             for (var k = feedbackHistory.length - 1; k >= 0; k--) {
                 var fb = feedbackHistory[k];
                 if (fb.type === "補考回報") {
-                    var fbDatePart = fb.targetDate.substring(5).replace('-', '/');
-                    var fbDatePart2 = fb.targetDate.substring(5).replace('-', '/').replace(/^0/, '').replace(/\/0/, '/');
-                    if (exam.date.indexOf(fbDatePart) > -1 || exam.date.indexOf(fbDatePart2) > -1 || exam.date == fbDatePart2) {
+                    var fbTarget = (fb.targetDate || "").toString();
+                    var fbDatePart = fbTarget.substring(5).replace('-', '/');
+                    var fbDatePart2 = fbTarget.substring(5).replace('-', '/').replace(/^0/, '').replace(/\/0/, '/');
+                    var matchesDate = candidates.some(function(candidate) { return fbTarget.indexOf(candidate) > -1; }) || exam.date.indexOf(fbDatePart) > -1 || exam.date.indexOf(fbDatePart2) > -1 || exam.date == fbDatePart2;
+                    if (matchesDate) {
                         var match = fb.content.match(/(\d+(\.\d+)?)/);
-                        if (match) return parseFloat(match[0]);
+                        if (!match) return null;
+                        var reportedNum = parseFloat(match[0]);
+                        var sheetMatch = rawScore.match(/(\d+(\.\d+)?)/);
+                        var sheetNumText = sheetMatch ? sheetMatch[0] : "";
+                        var reportedText = match[0];
+                        var status = "";
+                        if (!rawScore || rawScore.indexOf("假") === -1) status = "unfilled";
+                        else if (sheetNumText === reportedText) status = "filled";
+                        else status = "changed";
+                        return {
+                            feedbackKey: fb.fbKey || "",
+                            targetDate: fb.targetDate || "",
+                            content: fb.content || "",
+                            reportedScoreText: reportedText,
+                            reportedScoreNum: reportedNum,
+                            scoreValue: reportedText + "假",
+                            sheetScore: rawScore,
+                            status: status
+                        };
                     }
                 }
             }
@@ -4869,7 +4911,7 @@
             window.adminModeDirectMessageContext = {};
             var container = document.getElementById('tab-content-0'); if (!posts || posts.length === 0) { container.innerHTML = "<div style='text-align:center; padding:30px; color:#999;'>目前沒有聯絡簿資料</div>"; return; } var html = ""; posts.forEach(function (post) {
                 var gradeHtml = ""; var exam = post.examData.main; var others = post.examData.others; var scoreReportHtml = ""; if (exam) {
-                    var logic = getDisplayLogic(exam, history); var unitDisplay = ""; if (!isNaN(parseFloat(logic.mainScore))) unitDisplay = "<span class='score-unit-big'>" + (exam.unit || "分") + "</span>"; var scoreDisplay = "<span class='" + logic.mainClass + "'>" + logic.mainScore + "</span>" + unitDisplay; var standardHtml = ""; var isHomeworkExam = (exam.exam && exam.exam.indexOf("作業") > -1) || (exam.date && exam.date.indexOf("作業") > -1); if (exam.note && exam.note !== "" && !isHomeworkExam) { standardHtml = "<div class='exam-standard-box'>" + SVG.target + " 補考標準：" + exam.note + "</div>"; } var safeDate = post.date.replace(/\//g, '-'); if (logic.needsReport && !isAdminMode) { scoreReportHtml = "<div class='score-report-section'><div style='font-weight:bold; color:#c0392b; margin-bottom:10px; font-size:1.35rem;'>" + SVG.edit + "回報補考分數</div><div class='input-box'><input type='number' class='score-input' id='score-in-" + safeDate + "' placeholder='輸入分數'><button class='score-btn' onclick=\"submitScoreReport('" + safeDate + "', '" + post.date + "')\">送出</button></div></div>"; } if (canUseAdminModeReview() && shouldShowGodMakeupReview(exam, logic)) { var makeupContextKey = makeDomSafeId("makeup_" + safeDate + "_" + (exam.colIndex || 0)); window.adminModeMakeupContext[makeupContextKey] = { className: gData.className, studentName: gData.studentName, examColIndex: exam.colIndex, title: exam.exam || "", currentColor: exam.cellColor || "" }; scoreReportHtml += buildGodMakeupReviewBox(makeupContextKey, exam, logic); } var chartHtml = "";
+                    var logic = getDisplayLogic(exam, history); var unitDisplay = ""; if (!isNaN(parseFloat(logic.mainScore))) unitDisplay = "<span class='score-unit-big'>" + (exam.unit || "分") + "</span>"; var scoreDisplay = "<span class='" + logic.mainClass + "'>" + logic.mainScore + "</span>" + unitDisplay; var standardHtml = ""; var isHomeworkExam = (exam.exam && exam.exam.indexOf("作業") > -1) || (exam.date && exam.date.indexOf("作業") > -1); if (exam.note && exam.note !== "" && !isHomeworkExam) { standardHtml = "<div class='exam-standard-box'>" + SVG.target + " 補考標準：" + exam.note + "</div>"; } var safeDate = post.date.replace(/\//g, '-'); if (logic.needsReport && !isAdminMode) { scoreReportHtml = "<div class='score-report-section'><div style='font-weight:bold; color:#c0392b; margin-bottom:10px; font-size:1.35rem;'>" + SVG.edit + "回報補考分數</div><div class='input-box'><input type='number' class='score-input' id='score-in-" + safeDate + "' placeholder='輸入分數'><button class='score-btn' onclick=\"submitScoreReport('" + safeDate + "', '" + post.date + "')\">送出</button></div></div>"; } if (canUseAdminModeReview() && shouldShowGodMakeupReview(exam, logic)) { var makeupContextKey = makeDomSafeId("makeup_" + safeDate + "_" + (exam.colIndex || 0)); window.adminModeMakeupContext[makeupContextKey] = { className: gData.className, studentName: gData.studentName, targetDate: post.date, examColIndex: exam.colIndex, title: exam.exam || "", currentColor: exam.cellColor || "", scoreReview: getLatestMakeupReportInfo(exam, history) }; scoreReportHtml += buildGodMakeupReviewBox(makeupContextKey, exam, logic); } var chartHtml = "";
 if (exam.dist) {
     var dist = exam.dist || [0,0,0,0,0];
     var labels = exam.labels || ["0~20","20~40","40~60","60~80","80~100"];
@@ -5908,6 +5950,16 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         function buildGodMakeupReviewBox(contextKey, exam, logic) {
             var currentInfo = getMakeupColorInfo(exam && exam.cellColor);
             var title = currentInfo ? ("目前：" + currentInfo.label + "｜" + currentInfo.text) : (logic && logic.showReviewing ? "學生已回報，請登記補考結果" : "可登記補考結果");
+            var scoreReview = window.adminModeMakeupContext && window.adminModeMakeupContext[contextKey] ? window.adminModeMakeupContext[contextKey].scoreReview : null;
+            var scoreHtml = "";
+            if (scoreReview) {
+                var scoreStatus = scoreReview.status === "filled" ? "已回填：" + scoreReview.sheetScore : (scoreReview.status === "changed" ? "需更新：目前大表 " + scoreReview.sheetScore + "，學生最新回報 " + scoreReview.reportedScoreText : "未回填：學生回報 " + scoreReview.reportedScoreText);
+                var scoreColor = scoreReview.status === "filled" ? "#16a34a" : (scoreReview.status === "changed" ? "#f59e0b" : "#dc2626");
+                scoreHtml = "<div style='background:#fff; border:1px solid #bfdbfe; border-radius:10px; padding:10px; margin-bottom:10px;'>" +
+                    "<div style='font-size:0.9rem; font-weight:900; color:" + scoreColor + "; margin-bottom:8px;'>" + escapeAdminHtml(scoreStatus) + "</div>" +
+                    (scoreReview.status === "filled" ? "" : "<button type='button' class='admin-btn btn-green' style='width:100%; margin:0;' onclick=\"writeGodMakeupScore(this, '" + contextKey + "')\">回填 " + escapeAdminHtml(scoreReview.scoreValue) + "</button>") +
+                    "</div>";
+            }
             var buttons = MAKEUP_RESULT_COLORS.map(function(color) {
                 return "<button type='button' class='makeup-color-btn makeup-" + color.key + "' onclick=\"setGodMakeupResultColor(this, '" + contextKey + "', '" + color.hex + "')\">" +
                     color.label + "<span>" + color.text + "</span></button>";
@@ -5915,6 +5967,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             return "<div class='god-makeup-review-box'>" +
                 "<div class='god-makeup-review-title'>補考結果登記</div>" +
                 "<div style='font-size:0.9rem; color:#475569; font-weight:800; margin-bottom:8px;'>" + escapeAdminHtml(title) + "</div>" +
+                scoreHtml +
                 "<div class='makeup-color-row'>" + buttons + "</div>" +
                 "<div class='god-makeup-status' id='god-makeup-status-" + contextKey + "'></div>" +
                 "</div>";
@@ -6053,6 +6106,58 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 if (status) {
                     status.style.color = '#dc2626';
                     status.innerText = '登記失敗：' + (err && err.message ? err.message : String(err));
+                }
+            }
+        }
+
+        async function writeGodMakeupScore(btn, contextKey) {
+            if (!canUseAdminModeReview()) {
+                swalAlert('這個上帝視角連線不能回填補考分數', '請回行政中心重新開啟學生畫面。', 'warning');
+                return;
+            }
+            var context = window.adminModeMakeupContext && window.adminModeMakeupContext[contextKey];
+            var status = document.getElementById('god-makeup-status-' + contextKey);
+            if (!context || !context.scoreReview || !context.scoreReview.scoreValue || !context.targetDate) {
+                swalAlert('找不到補考回報資料', '請重新整理後再試。', 'warning');
+                return;
+            }
+
+            var finalScore = context.scoreReview.scoreValue;
+            var ok = await swalConfirm('回填補考分數', '確定要把 ' + gData.studentName + ' 的補考回報寫回大表為「' + finalScore + '」嗎？');
+            if (!ok) return;
+
+            var originalText = btn ? btn.innerText : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerText = '回填中...';
+            }
+            if (status) {
+                status.style.color = '#64748b';
+                status.innerText = '正在回填補考分數...';
+            }
+            try {
+                await runGodAdminAction('writeScoreGas', {
+                    className: gData.className,
+                    studentName: gData.studentName,
+                    targetDateStr: context.targetDate,
+                    scoreValue: finalScore
+                });
+                if (btn) {
+                    btn.innerText = '已回填';
+                    btn.style.background = '#64748b';
+                }
+                if (status) {
+                    status.style.color = '#16a34a';
+                    status.innerText = '已回填 ' + finalScore + '，等待雲端同步顯示。';
+                }
+            } catch (err) {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = originalText || ('回填 ' + finalScore);
+                }
+                if (status) {
+                    status.style.color = '#dc2626';
+                    status.innerText = '回填失敗：' + (err && err.message ? err.message : String(err));
                 }
             }
         }
