@@ -3,6 +3,7 @@
 
 <head>
     <base target="_top">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>山熊科學數位聯絡簿</title>
     
@@ -2019,6 +2020,56 @@
             white-space: nowrap;
         }
 
+        .god-review-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        .god-review-actions button {
+            border: none;
+            border-radius: 999px;
+            padding: 8px 12px;
+            font-weight: 900;
+            cursor: pointer;
+            color: white;
+            background: #2563eb;
+            min-width: 88px;
+        }
+
+        .god-review-actions button.reject {
+            background: #dc2626;
+        }
+
+        .god-review-actions button:disabled,
+        .admin-reply-row button:disabled {
+            opacity: 0.55;
+            cursor: wait;
+        }
+
+        .god-makeup-review-box {
+            margin-top: 14px;
+            padding: 12px;
+            border: 1px solid #bfdbfe;
+            border-radius: 12px;
+            background: #eff6ff;
+        }
+
+        .god-makeup-review-title {
+            font-size: 0.92rem;
+            font-weight: 900;
+            color: #1d4ed8;
+            margin-bottom: 8px;
+        }
+
+        .god-makeup-status {
+            margin-top: 8px;
+            font-weight: 800;
+            font-size: 0.9rem;
+            color: #64748b;
+        }
+
         .quote-box {
             background-color: #f1f3f5;
             border-left: 4px solid #adb5bd;
@@ -2806,6 +2857,14 @@
 
     function ebookAdminFeatureRetired(onSuccess) {
       if (onSuccess) onSuccess({ success: false, msg: "eBook 內建管理功能已退場，請回行政中心操作。" });
+    }
+
+    function friendlySubmitError(err) {
+      var raw = (err && (err.message || err.toString())) ? (err.message || err.toString()) : String(err || "未知錯誤");
+      if (/Load failed|Failed to fetch|NetworkError|網路|network/i.test(raw)) {
+        return "連線不穩，這次送出沒有拿到伺服器確認。請先看畫面是否已更新；如果沒有出現，再按一次送出。";
+      }
+      return raw;
     }
     
     function safeKey(str) {
@@ -4798,9 +4857,12 @@
 
         function renderDailyPosts(posts, history) {
             window.adminModeReplyContext = {};
+            window.adminModeStickerContext = {};
+            window.adminModeMakeupContext = {};
+            window.adminModeDirectMessageContext = {};
             var container = document.getElementById('tab-content-0'); if (!posts || posts.length === 0) { container.innerHTML = "<div style='text-align:center; padding:30px; color:#999;'>目前沒有聯絡簿資料</div>"; return; } var html = ""; posts.forEach(function (post) {
                 var gradeHtml = ""; var exam = post.examData.main; var others = post.examData.others; var scoreReportHtml = ""; if (exam) {
-                    var logic = getDisplayLogic(exam, history); var unitDisplay = ""; if (!isNaN(parseFloat(logic.mainScore))) unitDisplay = "<span class='score-unit-big'>" + (exam.unit || "分") + "</span>"; var scoreDisplay = "<span class='" + logic.mainClass + "'>" + logic.mainScore + "</span>" + unitDisplay; var standardHtml = ""; var isHomeworkExam = (exam.exam && exam.exam.indexOf("作業") > -1) || (exam.date && exam.date.indexOf("作業") > -1); if (exam.note && exam.note !== "" && !isHomeworkExam) { standardHtml = "<div class='exam-standard-box'>" + SVG.target + " 補考標準：" + exam.note + "</div>"; } if (logic.needsReport) { var safeDate = post.date.replace(/\//g, '-'); scoreReportHtml = "<div class='score-report-section'><div style='font-weight:bold; color:#c0392b; margin-bottom:10px; font-size:1.35rem;'>" + SVG.edit + "回報補考分數</div><div class='input-box'><input type='number' class='score-input' id='score-in-" + safeDate + "' placeholder='輸入分數'><button class='score-btn' onclick=\"submitScoreReport('" + safeDate + "', '" + post.date + "')\">送出</button></div></div>"; } var chartHtml = "";
+                    var logic = getDisplayLogic(exam, history); var unitDisplay = ""; if (!isNaN(parseFloat(logic.mainScore))) unitDisplay = "<span class='score-unit-big'>" + (exam.unit || "分") + "</span>"; var scoreDisplay = "<span class='" + logic.mainClass + "'>" + logic.mainScore + "</span>" + unitDisplay; var standardHtml = ""; var isHomeworkExam = (exam.exam && exam.exam.indexOf("作業") > -1) || (exam.date && exam.date.indexOf("作業") > -1); if (exam.note && exam.note !== "" && !isHomeworkExam) { standardHtml = "<div class='exam-standard-box'>" + SVG.target + " 補考標準：" + exam.note + "</div>"; } var safeDate = post.date.replace(/\//g, '-'); if (logic.needsReport && !isAdminMode) { scoreReportHtml = "<div class='score-report-section'><div style='font-weight:bold; color:#c0392b; margin-bottom:10px; font-size:1.35rem;'>" + SVG.edit + "回報補考分數</div><div class='input-box'><input type='number' class='score-input' id='score-in-" + safeDate + "' placeholder='輸入分數'><button class='score-btn' onclick=\"submitScoreReport('" + safeDate + "', '" + post.date + "')\">送出</button></div></div>"; } if (canUseAdminModeReview() && shouldShowGodMakeupReview(exam, logic)) { var makeupContextKey = makeDomSafeId("makeup_" + safeDate + "_" + (exam.colIndex || 0)); window.adminModeMakeupContext[makeupContextKey] = { className: gData.className, studentName: gData.studentName, examColIndex: exam.colIndex, title: exam.exam || "", currentColor: exam.cellColor || "" }; scoreReportHtml += buildGodMakeupReviewBox(makeupContextKey, exam, logic); } var chartHtml = "";
 if (exam.dist) {
     var dist = exam.dist || [0,0,0,0,0];
     var labels = exam.labels || ["0~20","20~40","40~60","60~80","80~100"];
@@ -4916,8 +4978,18 @@ if (exam.dist) {
                             var badgeCls = isPenalty ? "penalty-badge" : "sticker-badge";
                             var prefix = isPenalty ? "" : "+";
                             var icon = isPenalty ? SVG.penalty : SVG.star;
+                            var stickerReviewHtml = "";
+                            if (canUseAdminModeReview() && statusLabel === "待審核" && h.fbKey) {
+                                var stickerContextKey = makeDomSafeId("sticker_" + post.date + "_" + h.fbKey);
+                                window.adminModeStickerContext[stickerContextKey] = {
+                                    fbKey: h.fbKey,
+                                    time: h.time || "",
+                                    count: parseInt(stickerData.count, 10) || 0
+                                };
+                                stickerReviewHtml = buildGodStickerReviewActions(stickerContextKey);
+                            }
                             
-                            historyHtml += "<div class='history-msg'><div class='history-msg-avatar avatar-student'>" + avatarChar + "</div><div class='history-msg-body " + bodyCls + "'><span>" + icon + stickerData.reason + "</span><span class='" + badgeCls + "'>" + prefix + stickerData.count + "棒</span><br><span class='sticker-status " + statusClass + "'>" + (statusLabel === "通過" ? SVG.check : (statusLabel === "退回" ? SVG.cross : SVG.hourglass)) + statusLabel + "</span><div class='history-msg-time'>" + h.time.substring(5, 16) + "</div></div></div>";
+                            historyHtml += "<div class='history-msg'><div class='history-msg-avatar avatar-student'>" + avatarChar + "</div><div class='history-msg-body " + bodyCls + "'><span>" + icon + stickerData.reason + "</span><span class='" + badgeCls + "'>" + prefix + stickerData.count + "棒</span><br><span class='sticker-status " + statusClass + "'>" + (statusLabel === "通過" ? SVG.check : (statusLabel === "退回" ? SVG.cross : SVG.hourglass)) + statusLabel + "</span><div class='history-msg-time'>" + h.time.substring(5, 16) + "</div>" + stickerReviewHtml + "</div></div>";
                         } else {
                             var adminReplyHtml = "";
                             if (canUseAdminModeReply() && !isTeacher) {
@@ -4986,9 +5058,17 @@ if (exam.dist) {
             <div class="penalty-hint">${SVG.warning} 送出後由老師審核，並自總棒數中扣除。勇敢負責是成長的第一步！</div>
         </div>
     `;
+                if (isAdminMode) uploadHtml = "";
+                var adminDirectHtml = "";
+                if (canUseAdminModeReply()) {
+                    var directContextKey = makeDomSafeId("direct_" + safeDateId);
+                    window.adminModeDirectMessageContext[directContextKey] = { targetDate: post.date };
+                    adminDirectHtml = buildAdminDirectMessageBox(directContextKey);
+                }
+                var studentInputHtml = isAdminMode ? "" : "<div class='input-box'><input type='text' class='fb-input' id='input-" + safeDateId + "' placeholder='" + inputPlaceholder + "'><button class='fb-btn' onclick=\"sendFeedback('" + safeDateId + "', '" + post.date + "', '學生留言')\">送出</button></div>";
 
                 // ★★★ v3.9 修正：家長留言 -> 留言內容 ★★★
-                var feedbackHtml = "<div class='feedback-section'>" + uploadHtml + "<div class='section-title'>" + SVG.chat + "留言內容</div><div id='history-" + safeDateId + "'>" + historyHtml + "</div><div class='input-box'><input type='text' class='fb-input' id='input-" + safeDateId + "' placeholder='" + inputPlaceholder + "'><button class='fb-btn' onclick=\"sendFeedback('" + safeDateId + "', '" + post.date + "', '學生留言')\">送出</button></div></div>"; var headerTitle = post.date + (post.title ? " " + post.title : ""); html += "<div class='post-card-wrapper'><div class='post-card'><div class='post-header'><span>" + SVG.calendar + headerTitle + "</span></div>" + gradeHtml + "<div class='content-section'><div class='section-title'>" + SVG.megaphone + "聯絡事項</div>" + contentHtml + "</div>" + feedbackHtml + "</div></div>";
+                var feedbackHtml = "<div class='feedback-section'>" + uploadHtml + "<div class='section-title'>" + SVG.chat + "留言內容</div><div id='history-" + safeDateId + "'>" + historyHtml + "</div>" + adminDirectHtml + studentInputHtml + "</div>"; var headerTitle = post.date + (post.title ? " " + post.title : ""); html += "<div class='post-card-wrapper'><div class='post-card'><div class='post-header'><span>" + SVG.calendar + headerTitle + "</span></div>" + gradeHtml + "<div class='content-section'><div class='section-title'>" + SVG.megaphone + "聯絡事項</div>" + contentHtml + "</div>" + feedbackHtml + "</div></div>";
 
             }); container.innerHTML = html;
 
@@ -5381,7 +5461,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 
                 alert("棒卡申請已送出！請等待老師審核。");
             }).withFailureHandler(function(e) {
-                alert('棒卡申請送出失敗: ' + e.message);
+                swalAlert('棒卡申請送出失敗', friendlySubmitError(e), 'warning');
                 if (submitBtn) { submitBtn.innerText = "送出申請"; submitBtn.disabled = false; }
             }).submitFeedback(form);
         }
@@ -5438,7 +5518,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 if(submitBtn) { submitBtn.innerText = "送出反省"; submitBtn.disabled = false; }
                 alert("改進申報已送出！勇敢面對是成長的開始。");
             }).withFailureHandler(function(e) {
-                alert('申報送出失敗: ' + (e.message || e));
+                swalAlert('申報送出失敗', friendlySubmitError(e), 'warning');
                 if(submitBtn) { submitBtn.innerText = "送出反省"; submitBtn.disabled = false; }
             }).submitFeedback(form);
         }
@@ -5463,7 +5543,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 }
                 if (callback) callback();
             }).withFailureHandler(function (e) {
-                alert("錯誤: " + e.message);
+                swalAlert("送出失敗", friendlySubmitError(e), 'warning');
                 if (btn) { btn.innerText = "送出"; btn.disabled = false; }
             }).submitFeedback(form);
         }
@@ -5481,7 +5561,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 btn.innerText = "送出"; btn.disabled = false;
                 alert("回報成功！分數已更新 (審核中)"); 
             }).withFailureHandler(function (e) { 
-                alert("錯誤: " + e.message); 
+                swalAlert("回報失敗", friendlySubmitError(e), 'warning');
                 btn.innerText = "送出"; btn.disabled = false; 
             }).submitFeedback(form); 
         }
@@ -5794,6 +5874,180 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
 
         function canUseAdminModeReply() {
             return isAdminMode && !!ebookGodSessionId && !!(ebookGodSessionInfo && ebookGodSessionInfo.permissions && ebookGodSessionInfo.permissions.reply);
+        }
+
+        function canUseAdminModeReview() {
+            return isAdminMode && !!ebookGodSessionId && !!(ebookGodSessionInfo && ebookGodSessionInfo.permissions && ebookGodSessionInfo.permissions.review);
+        }
+
+        function buildAdminDirectMessageBox(contextKey) {
+            return "<div class='admin-reply-box'>" +
+                "<div class='admin-reply-title'>老師直接留言</div>" +
+                "<div class='admin-reply-row'>" +
+                "<input type='text' id='admin-direct-input-" + contextKey + "' placeholder='不引用留言，直接以老師身分留言給學生'>" +
+                "<button type='button' onclick=\"sendAdminModeDirectMessage('" + contextKey + "')\">送出</button>" +
+                "</div></div>";
+        }
+
+        function shouldShowGodMakeupReview(exam, logic) {
+            if (!exam || (exam.exam && exam.exam.indexOf("作業") > -1) || (exam.date && exam.date.indexOf("作業") > -1)) return false;
+            if (logic && logic.showReviewing) return true;
+            if (exam.cellColor) return true;
+            if (logic && logic.effectiveNum !== null && exam.makeupThreshold > 0 && logic.effectiveNum < exam.makeupThreshold) return true;
+            if (logic && logic.needsReport) return true;
+            return false;
+        }
+
+        function buildGodMakeupReviewBox(contextKey, exam, logic) {
+            var currentInfo = getMakeupColorInfo(exam && exam.cellColor);
+            var title = currentInfo ? ("目前：" + currentInfo.label + "｜" + currentInfo.text) : (logic && logic.showReviewing ? "學生已回報，請登記補考結果" : "可登記補考結果");
+            var buttons = MAKEUP_RESULT_COLORS.map(function(color) {
+                return "<button type='button' class='makeup-color-btn makeup-" + color.key + "' onclick=\"setGodMakeupResultColor(this, '" + contextKey + "', '" + color.hex + "')\">" +
+                    color.label + "<span>" + color.text + "</span></button>";
+            }).join("");
+            return "<div class='god-makeup-review-box'>" +
+                "<div class='god-makeup-review-title'>補考結果登記</div>" +
+                "<div style='font-size:0.9rem; color:#475569; font-weight:800; margin-bottom:8px;'>" + escapeAdminHtml(title) + "</div>" +
+                "<div class='makeup-color-row'>" + buttons + "</div>" +
+                "<div class='god-makeup-status' id='god-makeup-status-" + contextKey + "'></div>" +
+                "</div>";
+        }
+
+        async function runGodAdminAction(action, data) {
+            var fn = getGodSessionCallable('runEbookGodAdminAction');
+            var result = await fn({
+                sessionId: ebookGodSessionId,
+                action: action,
+                data: data || {}
+            });
+            if (result && result.data && result.data.expiresAt && ebookGodSessionInfo) {
+                ebookGodSessionInfo.expiresAt = result.data.expiresAt;
+            }
+            return result && result.data ? result.data : {};
+        }
+
+        async function sendAdminModeDirectMessage(contextKey) {
+            if (!canUseAdminModeReply()) {
+                swalAlert('這個上帝視角連線不能留言', '請回行政中心重新開啟學生畫面。', 'warning');
+                return;
+            }
+            var context = window.adminModeDirectMessageContext && window.adminModeDirectMessageContext[contextKey];
+            var input = document.getElementById('admin-direct-input-' + contextKey);
+            var content = input ? input.value.trim() : '';
+            if (!context || !context.targetDate) {
+                swalAlert('找不到聯絡簿日期', '請重新開啟學生畫面後再試。', 'warning');
+                return;
+            }
+            if (!content) {
+                swalAlert('請輸入留言內容', '', 'warning');
+                return;
+            }
+            var btn = input && input.nextElementSibling;
+            if (btn && btn.disabled) return;
+            if (btn) {
+                btn.disabled = true;
+                btn.innerText = '傳送中';
+            }
+            try {
+                var fn = getGodSessionCallable('sendEbookGodDirectMessage');
+                var result = await fn({
+                    sessionId: ebookGodSessionId,
+                    targetDate: context.targetDate,
+                    content: content
+                });
+                if (result && result.data && result.data.expiresAt && ebookGodSessionInfo) {
+                    ebookGodSessionInfo.expiresAt = result.data.expiresAt;
+                }
+                if (input) input.value = '';
+                if (btn) {
+                    btn.innerText = '已送出';
+                    btn.style.background = 'var(--primary)';
+                }
+            } catch (err) {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = '送出';
+                }
+                swalAlert('留言失敗', 'Google Sheet 寫入或 Firebase 同步失敗，學生端尚未收到。' + (err && err.message ? ' ' + err.message : ''), 'error');
+            }
+        }
+
+        function buildGodStickerReviewActions(contextKey) {
+            return "<div class='god-review-actions'>" +
+                "<button type='button' onclick=\"approveGodSticker(this, '" + contextKey + "', '通過')\">通過</button>" +
+                "<button type='button' class='reject' onclick=\"approveGodSticker(this, '" + contextKey + "', '退回')\">退回</button>" +
+                "</div>";
+        }
+
+        async function approveGodSticker(btn, contextKey, actionStr) {
+            if (!canUseAdminModeReview()) {
+                swalAlert('這個上帝視角連線不能審核', '請回行政中心重新開啟學生畫面。', 'warning');
+                return;
+            }
+            var context = window.adminModeStickerContext && window.adminModeStickerContext[contextKey];
+            if (!context || !context.time) {
+                swalAlert('找不到棒卡申請資料', '請重新整理後再試。', 'warning');
+                return;
+            }
+            var ok = await swalConfirm(actionStr === '通過' ? '通過棒卡申請' : '退回棒卡申請', '確定要' + actionStr + '這筆申請嗎？');
+            if (!ok) return;
+            var row = btn ? btn.parentElement : null;
+            var buttons = row ? row.querySelectorAll('button') : [];
+            buttons.forEach(function(button) { button.disabled = true; });
+            var originalText = btn ? btn.innerText : '';
+            if (btn) btn.innerText = '處理中';
+            try {
+                await runGodAdminAction('approveStickerGas', {
+                    timeStr: context.time,
+                    className: gData.className,
+                    studentName: gData.studentName,
+                    count: actionStr === '通過' ? context.count : 0,
+                    actionStr: actionStr
+                });
+                if (btn) btn.innerText = actionStr === '通過' ? '已通過' : '已退回';
+            } catch (err) {
+                buttons.forEach(function(button) { button.disabled = false; });
+                if (btn) btn.innerText = originalText;
+                swalAlert('審核失敗', 'Google Sheet 寫入或 Firebase 同步失敗。' + (err && err.message ? ' ' + err.message : ''), 'error');
+            }
+        }
+
+        async function setGodMakeupResultColor(btn, contextKey, colorHex) {
+            if (!canUseAdminModeReview()) {
+                swalAlert('這個上帝視角連線不能登記補考結果', '請回行政中心重新開啟學生畫面。', 'warning');
+                return;
+            }
+            var context = window.adminModeMakeupContext && window.adminModeMakeupContext[contextKey];
+            var status = document.getElementById('god-makeup-status-' + contextKey);
+            if (!context || context.examColIndex === undefined || context.examColIndex === null) {
+                swalAlert('找不到補考欄位資料', '請重新整理後再試。', 'warning');
+                return;
+            }
+            var box = btn ? btn.closest('.god-makeup-review-box') : null;
+            var buttons = box ? box.querySelectorAll('button') : [];
+            buttons.forEach(function(button) { button.disabled = true; });
+            if (status) {
+                status.style.color = '#64748b';
+                status.innerText = '登記中...';
+            }
+            try {
+                await runGodAdminAction('writeMakeupResultColorGas', {
+                    className: gData.className,
+                    studentName: gData.studentName,
+                    examColIndex: context.examColIndex,
+                    colorHex: colorHex
+                });
+                if (status) {
+                    status.style.color = '#16a34a';
+                    status.innerText = '已登記，等待雲端同步顯示。';
+                }
+            } catch (err) {
+                buttons.forEach(function(button) { button.disabled = false; });
+                if (status) {
+                    status.style.color = '#dc2626';
+                    status.innerText = '登記失敗：' + (err && err.message ? err.message : String(err));
+                }
+            }
         }
 
         async function sendAdminModeReply(contextKey) {
