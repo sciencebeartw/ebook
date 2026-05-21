@@ -4335,10 +4335,17 @@
             clearRealtimeListeners();
             document.getElementById('full-loader').style.display = 'none';
             isAdminMode = false;
+            ebookGodSessionId = "";
+            ebookGodSessionInfo = null;
             document.getElementById('appContainer').classList.remove('admin-mode-border');
             document.getElementById('godModeExitBtn').style.display = 'none';
             document.getElementById('main-screen').style.display = 'none';
-            document.getElementById('admin-screen').style.display = 'block';
+            window.close();
+            setTimeout(function() {
+                if (!window.closed) {
+                    window.location.href = 'https://sciencebeartw.github.io/bear-admin-dashboard/';
+                }
+            }, 250);
         }
 
         function onClassChange() {
