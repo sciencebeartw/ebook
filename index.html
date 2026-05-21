@@ -2788,7 +2788,7 @@
       '/math': "https://script.google.com/macros/s/AKfycbw9XG4LAibiDKWHRPkNaRmYs_kgm0z3HtYsFhQhtmxwt7JmE3mf9oD91ulFea6pBNsylQ/exec"
     };
     const SCRIPT_URL = SCRIPT_URLS[BEAR_SUBJECT] || SCRIPT_URLS['/science'];
-    function doPostAction(action, data, onSuccess, onErr, adminPwd) {
+    function doPostAction(action, data, onSuccess, onErr) {
       if(SCRIPT_URL.includes("請在此填入")) {
          alert("⚠️ 錯誤：尚未填入 GAS Web App 網址在 index.html 內！");
          if(onErr) onErr("No Web App URL");
@@ -2797,11 +2797,15 @@
       fetch(SCRIPT_URL, {
          method: "POST",
          headers: { "Content-Type": "text/plain" }, // Bypass CORS preflight
-         body: JSON.stringify({ action: action, data: data, adminPassword: adminPwd || "" })
+         body: JSON.stringify({ action: action, data: data, adminPassword: "" })
       })
       .then(res => res.json())
       .then(res => { if(onSuccess) onSuccess(res); })
       .catch(err => { console.error(err); if(onErr) onErr(err); });
+    }
+
+    function ebookAdminFeatureRetired(onSuccess) {
+      if (onSuccess) onSuccess({ success: false, msg: "eBook 內建管理功能已退場，請回行政中心操作。" });
     }
     
     function safeKey(str) {
@@ -2809,6 +2813,10 @@
         .replace(/\./g, '_dot_').replace(/#/g, '_hash_').replace(/\$/g, '_dollar_')
         .replace(/\//g, '_slash_').replace(/\[/g, '_lb_').replace(/\]/g, '_rb_')
         .replace(/\s+/g, '_');
+    }
+
+    function normalizeLoginSecret(value) {
+        return (value || "").toString().replace(/[\s-]/g, "").trim();
     }
 
     function getTeacherInfo(className) {
@@ -2857,10 +2865,11 @@
                    if (bypassPwd) {
                        if (kid.name.trim() === studentName.trim()) isMatch = true;
                    } else {
-                       const pwdObj = kid.password;
-                       const finalPwdStr = (pwdObj || "").toString().replace(/-/g, "").trim();
-                       const inputPwdStr = (password || "").toString().replace(/-/g, "").trim();
-                       if (kid.name.trim() === studentName.trim() && finalPwdStr !== "" && finalPwdStr === inputPwdStr) {
+                       const inputPwdStr = normalizeLoginSecret(password);
+                       const passwordStr = normalizeLoginSecret(kid.password);
+                       const fallbackPhoneStr = passwordStr ? "" : normalizeLoginSecret(kid.phone);
+                       const expectedSecret = passwordStr || fallbackPhoneStr;
+                       if (kid.name.trim() === studentName.trim() && inputPwdStr !== "" && expectedSecret !== "" && expectedSecret === inputPwdStr) {
                            isMatch = true;
                        }
                    }
@@ -3103,15 +3112,15 @@
            }
         },
         submitFeedback: function(data) { doPostAction("submitFeedback", data, onSuccess, onErr); },
-        saveDailyPost: function(form, pwd) { doPostAction("saveDailyPost", form, onSuccess, onErr, pwd); },
-        deleteDailyPost: function(idx, pwd) { doPostAction("deleteDailyPost", {rowIndex: idx}, onSuccess, onErr, pwd); },
-        saveBulletin: function(form, pwd) { doPostAction("saveBulletin", form, onSuccess, onErr, pwd); },
-        deleteBulletin: function(idx, pwd) { doPostAction("deleteBulletin", {rowIndex: idx}, onSuccess, onErr, pwd); },
+        saveDailyPost: function() { ebookAdminFeatureRetired(onSuccess); },
+        deleteDailyPost: function() { ebookAdminFeatureRetired(onSuccess); },
+        saveBulletin: function() { ebookAdminFeatureRetired(onSuccess); },
+        deleteBulletin: function() { ebookAdminFeatureRetired(onSuccess); },
         changeUserPassword: function(u, oldP, newP) { doPostAction("changeUserPassword", {studentName: u, oldPass: oldP, newPass: newP}, onSuccess, onErr); },
-        approveStickerGas: function(pwd, timeStr, className, studentName, count, actionStr) { doPostAction("approveStickerGas", {timeStr: timeStr, className: className, studentName: studentName, count: count, actionStr: actionStr}, onSuccess, onErr, pwd); },
-        approveAllStickersGas: function(pwd, cls, jsonList) { doPostAction("approveAllStickersGas", {className: cls, pendingList: jsonList}, onSuccess, onErr, pwd); },
-        writeScoreGas: function(adminPassword, className, studentName, targetDateStr, scoreValue) { doPostAction("writeScoreGas", {className: className, studentName: studentName, targetDateStr: targetDateStr, scoreValue: scoreValue}, onSuccess, onErr, adminPassword); },
-        writeMakeupResultColorGas: function(adminPassword, className, studentName, examColIndex, colorHex) { doPostAction("writeMakeupResultColorGas", {className: className, studentName: studentName, examColIndex: examColIndex, colorHex: colorHex}, onSuccess, onErr, adminPassword); }
+        approveStickerGas: function() { ebookAdminFeatureRetired(onSuccess); },
+        approveAllStickersGas: function() { ebookAdminFeatureRetired(onSuccess); },
+        writeScoreGas: function() { ebookAdminFeatureRetired(onSuccess); },
+        writeMakeupResultColorGas: function() { ebookAdminFeatureRetired(onSuccess); }
       };
     }
 
@@ -4029,7 +4038,7 @@
             else if (!result.found) document.getElementById('loginMsg').innerText = "找不到資料，請確認姓名與密碼。";
             else {
                 document.getElementById('loginMsg').innerText = "";
-                gPass = pass; // ★ 儲存密碼，供後續管理員 API 呼叫使用
+                gPass = pass;
                 if (result.isAdmin) showAdminDashboard(); else enterStudentView(result, pass);
             }
         }
@@ -4888,7 +4897,7 @@ if (exam.dist) {
                     });
                 };
 
-                var labelHw1 = "今日作業"; if (post.hw2 && post.hw2.toString().trim() !== "") labelHw1 = "今日作業一"; var fields = [{ label: "今日課程進度", val: post.progress }, { label: "今日小考考卷", val: post.quiz }, { label: labelHw1, val: post.hw1 }, { label: "今日作業二", val: post.hw2 }, { label: "今日補考考卷", val: post.makeup }, { label: "下次小考範圍", val: post.range }, { label: "補充資料", val: post.note }]; fields.forEach(function (f) { if (f.val) contentHtml += "<div class='info-block'><span class='info-label'>" + f.label + "</span><div class='info-content'>" + parseBtn(f.val) + "</div></div>"; }); var pDateShort = post.date.substring(5).replace("-", "/"); var pDateFull = post.date.replace(/-/g, "/"); var myHistory = history.filter(function (h) { return h.targetDate == pDateShort || h.targetDate == post.date || h.targetDate == pDateFull; }); myHistory.sort(function(a,b) { return new Date(a.time) - new Date(b.time); }); var historyHtml = ""; myHistory.forEach(function (h) { if (h.type !== "補考回報") { var displayType = (h.type === "家長留言" || h.type === "家長/學生" || h.type === "學生留言") ? "學生留言" : h.type; var isTeacher = (h.type !== "學生留言" && h.type !== "家長留言" && h.type !== "家長/學生" && h.type !== "作業上傳" && h.type !== "棒卡申請");
+                var labelHw1 = "今日作業"; if (post.hw2 && post.hw2.toString().trim() !== "") labelHw1 = "今日作業一"; var fields = [{ label: "今日課程進度", val: post.progress }, { label: "今日小考考卷", val: post.quiz }, { label: labelHw1, val: post.hw1 }, { label: "今日作業二", val: post.hw2 }, { label: "今日補考考卷", val: post.makeup }, { label: "下次小考範圍", val: post.range }, { label: "補充資料", val: post.note }]; fields.forEach(function (f) { if (f.val) contentHtml += "<div class='info-block'><span class='info-label'>" + f.label + "</span><div class='info-content'>" + parseBtn(f.val) + "</div></div>"; }); var pDateShort = post.date.substring(5).replace("-", "/"); var pDateFull = post.date.replace(/-/g, "/"); var myHistory = history.filter(function (h) { return h.targetDate == pDateShort || h.targetDate == post.date || h.targetDate == pDateFull; }); myHistory.sort(function(a,b) { return new Date(a.time) - new Date(b.time); }); var historyHtml = ""; myHistory.forEach(function (h) { if (h.type !== FEEDBACK_TYPE_LABELS.makeup) { var displayType = (h.type === FEEDBACK_TYPE_LABELS.parent || h.type === FEEDBACK_TYPE_LABELS.parentStudent || h.type === FEEDBACK_TYPE_LABELS.student) ? "學生留言" : h.type; var isTeacher = (!isStudentSideFeedbackType(h.type));
                         var avatarClass = isTeacher ? "avatar-teacher" : "avatar-student";
                         var bodyClass = isTeacher ? "teacher-body" : "";
                         var sName = (gData && gData.studentName) ? gData.studentName : "學";
@@ -4896,7 +4905,7 @@ if (exam.dist) {
                         var classInfo = getTeacherInfo(gData && gData.className ? gData.className : "");
                         var tName = classInfo.name;
                         var avatarChar = isTeacher ? tName : sChar;
-                        if (h.type === "棒卡申請") {
+                        if (h.type === FEEDBACK_TYPE_LABELS.sticker) {
                             var stickerData = {};
                             try { stickerData = JSON.parse(h.content); } catch(e) { stickerData = { reason: h.content, count: '?', status: "待審核" }; }
                             var statusLabel = stickerData.status || "待審核";
@@ -5275,7 +5284,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 btn.innerText = originalText;
                 swalAlert('❌ 系統連線錯誤', err.toString(), 'error');
             }).approveStickerGas(
-                gPass, // 使用登入時的管理者密碼
+                gPass,
                 time, 
                 className, 
                 studentName, 
@@ -5694,6 +5703,25 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
 
         function makeDomSafeId(str) {
             return (str === undefined || str === null ? "" : str.toString()).replace(/[^a-zA-Z0-9_-]/g, "_");
+        }
+
+        const FEEDBACK_TYPE_LABELS = {
+            student: "\u5b78\u751f\u7559\u8a00",
+            parent: "\u5bb6\u9577\u7559\u8a00",
+            parentStudent: "\u5bb6\u9577/\u5b78\u751f",
+            upload: "\u4f5c\u696d\u4e0a\u50b3",
+            sticker: "\u68d2\u5361\u7533\u8acb",
+            makeup: "\u88dc\u8003\u56de\u5831"
+        };
+
+        function isStudentSideFeedbackType(type) {
+            return [
+                FEEDBACK_TYPE_LABELS.student,
+                FEEDBACK_TYPE_LABELS.parent,
+                FEEDBACK_TYPE_LABELS.parentStudent,
+                FEEDBACK_TYPE_LABELS.upload,
+                FEEDBACK_TYPE_LABELS.sticker
+            ].indexOf(type) > -1;
         }
 
         function getGodSessionCallable(name) {
