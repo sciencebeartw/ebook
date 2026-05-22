@@ -2111,6 +2111,54 @@
             display: block;
         }
 
+        .homework-done-box {
+            margin-top: 12px;
+            padding: 12px;
+            border-radius: 16px;
+            background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%);
+            border: 1px solid #bbf7d0;
+            text-align: center;
+            box-shadow: 0 6px 18px rgba(16, 185, 129, 0.12);
+        }
+
+        .homework-done-btn {
+            width: 100%;
+            border: none;
+            border-radius: 999px;
+            padding: 12px 18px;
+            background: linear-gradient(135deg, #22c55e 0%, #059669 100%);
+            color: white;
+            font-size: 1.08rem;
+            font-weight: 900;
+            letter-spacing: 0;
+            cursor: pointer;
+            box-shadow: 0 8px 20px rgba(5, 150, 105, 0.28);
+            transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease;
+        }
+
+        .homework-done-btn:active {
+            transform: scale(0.98);
+            box-shadow: 0 4px 12px rgba(5, 150, 105, 0.2);
+        }
+
+        .homework-done-btn.done {
+            background: linear-gradient(135deg, #86efac 0%, #22c55e 100%);
+            box-shadow: none;
+            cursor: default;
+        }
+
+        .homework-done-btn:disabled {
+            opacity: 0.75;
+            cursor: wait;
+        }
+
+        .homework-done-hint {
+            margin-top: 7px;
+            font-size: 0.84rem;
+            font-weight: 700;
+            color: #047857;
+        }
+
         /* ===== 棒卡申請區（橘色） ===== */
         .sticker-apply-box {
             background: #fff7ed;
@@ -2894,7 +2942,7 @@
     }
 
     async function executeFirebaseRead(studentName, password, bypassPwd, targetClass) {
-        let result = { found: false, className: "", studentName: "", dailyPost: [], grades: [], feedbackHistory: [], bulletins: [], stickers: 0 };
+        let result = { found: false, className: "", studentName: "", dailyPost: [], grades: [], feedbackHistory: [], bulletins: [], stickers: 0, homeworkDone: {} };
         
         try {
             if (studentName.toLowerCase() === "admin") {
@@ -3081,6 +3129,9 @@
                 return tA - tB;
             });
 
+            const snapHD = await db.ref(`${BEAR_SUBJECT}/homeworkDone/${safeC}/${foundUserKey}`).once('value');
+            result.homeworkDone = snapHD.val() || {};
+
             return result;
         } catch(e) {
             console.error("Firebase Read Error:", e);
@@ -3171,6 +3222,7 @@
            }
         },
         submitFeedback: function(data) { doPostAction("submitFeedback", data, onSuccess, onErr); },
+        submitHomeworkDone: function(data) { doPostAction("submitHomeworkDone", data, onSuccess, onErr); },
         saveDailyPost: function() { ebookAdminFeatureRetired(onSuccess); },
         deleteDailyPost: function() { ebookAdminFeatureRetired(onSuccess); },
         saveBulletin: function() { ebookAdminFeatureRetired(onSuccess); },
@@ -4155,6 +4207,11 @@
                         }
                     });
 
+                    watchRealtimeValue(BEAR_SUBJECT + '/homeworkDone/' + safeC + '/' + studentKey, function(snap) {
+                        gData.homeworkDone = snap.val() || {};
+                        renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
+                    });
+
                     // 3. 重要公告監聽 (班級 + 全校)
                     watchRealtimeValue(BEAR_SUBJECT + '/bulletins', function(snap) {
                         const allBulls = snap.val() || {};
@@ -4904,6 +4961,54 @@
             );
         }
 
+        function isGiftedScienceClassName(className) {
+            return (className || "").toString().indexOf("資優自然") > -1;
+        }
+
+        function getPostHomeworkItems(post) {
+            var items = [];
+            if (post && post.hw1 && post.hw1.toString().trim()) {
+                items.push({ label: post.hw2 && post.hw2.toString().trim() ? "今日作業一" : "今日作業", val: post.hw1 });
+            }
+            if (post && post.hw2 && post.hw2.toString().trim()) {
+                items.push({ label: "今日作業二", val: post.hw2 });
+            }
+            return items;
+        }
+
+        function getPostHomeworkText(post) {
+            return getPostHomeworkItems(post).map(function(item) {
+                return item.val || "";
+            }).join("\n").trim();
+        }
+
+        function getHomeworkDoneDateKey(targetDate) {
+            return safeKey((targetDate || "").toString().replace(/-/g, "/"));
+        }
+
+        function shouldShowHomeworkDoneButton(post) {
+            return BEAR_SUBJECT === "/science" &&
+                !isAdminMode &&
+                gData &&
+                !isGiftedScienceClassName(gData.className) &&
+                !!getPostHomeworkText(post);
+        }
+
+        function buildHomeworkDoneButton(post) {
+            if (!shouldShowHomeworkDoneButton(post)) return "";
+            var safeDateId = post.date.replace(/\//g, '-');
+            var dateKey = getHomeworkDoneDateKey(post.date);
+            var done = !!(gData && gData.homeworkDone && gData.homeworkDone[dateKey] && gData.homeworkDone[dateKey].status === "done");
+            var btnText = done ? "✓ 已回報完成" : "我已完成本次作業";
+            var doneClass = done ? " done" : "";
+            var disabled = done ? " disabled" : "";
+            var hint = done ? "已記錄到作業完成回報。" : "完成作業後按一下，老師會看到你的回報。";
+            return "<div class='homework-done-box' id='homework-done-box-" + safeDateId + "'>" +
+                "<button class='homework-done-btn" + doneClass + "' id='homework-done-btn-" + safeDateId + "' onclick=\"submitHomeworkDone('" + safeDateId + "', '" + post.date + "')\"" + disabled + ">" + btnText + "</button>" +
+                "<div class='homework-done-hint' id='homework-done-hint-" + safeDateId + "'>" + hint + "</div>" +
+                "</div>";
+        }
+
         function renderDailyPosts(posts, history) {
             window.adminModeReplyContext = {};
             window.adminModeStickerContext = {};
@@ -5008,7 +5113,14 @@ if (exam.dist) {
                     });
                 };
 
-                var labelHw1 = "今日作業"; if (post.hw2 && post.hw2.toString().trim() !== "") labelHw1 = "今日作業一"; var fields = [{ label: "今日課程進度", val: post.progress }, { label: "今日小考考卷", val: post.quiz }, { label: labelHw1, val: post.hw1 }, { label: "今日作業二", val: post.hw2 }, { label: "今日補考考卷", val: post.makeup }, { label: "下次小考範圍", val: post.range }, { label: "補充資料", val: post.note }]; fields.forEach(function (f) { if (f.val) contentHtml += "<div class='info-block'><span class='info-label'>" + f.label + "</span><div class='info-content'>" + parseBtn(f.val) + "</div></div>"; }); var pDateShort = post.date.substring(5).replace("-", "/"); var pDateFull = post.date.replace(/-/g, "/"); var myHistory = history.filter(function (h) { return h.targetDate == pDateShort || h.targetDate == post.date || h.targetDate == pDateFull; }); myHistory.sort(function(a,b) { return new Date(a.time) - new Date(b.time); }); var historyHtml = ""; myHistory.forEach(function (h) { if (h.type !== FEEDBACK_TYPE_LABELS.makeup) { var displayType = (h.type === FEEDBACK_TYPE_LABELS.parent || h.type === FEEDBACK_TYPE_LABELS.parentStudent || h.type === FEEDBACK_TYPE_LABELS.student) ? "學生留言" : h.type; var isTeacher = (!isStudentSideFeedbackType(h.type));
+                var homeworkItems = getPostHomeworkItems(post);
+                var fields = [{ label: "今日課程進度", val: post.progress }, { label: "今日小考考卷", val: post.quiz }];
+                homeworkItems.forEach(function(item, hwIdx) {
+                    var extra = hwIdx === homeworkItems.length - 1 ? buildHomeworkDoneButton(post) : "";
+                    fields.push({ label: item.label, val: item.val, extra: extra });
+                });
+                fields = fields.concat([{ label: "今日補考考卷", val: post.makeup }, { label: "下次小考範圍", val: post.range }, { label: "補充資料", val: post.note }]);
+                fields.forEach(function (f) { if (f.val) contentHtml += "<div class='info-block'><span class='info-label'>" + f.label + "</span><div class='info-content'>" + parseBtn(f.val) + (f.extra || "") + "</div></div>"; }); var pDateShort = post.date.substring(5).replace("-", "/"); var pDateFull = post.date.replace(/-/g, "/"); var myHistory = history.filter(function (h) { return h.targetDate == pDateShort || h.targetDate == post.date || h.targetDate == pDateFull; }); myHistory.sort(function(a,b) { return new Date(a.time) - new Date(b.time); }); var historyHtml = ""; myHistory.forEach(function (h) { if (h.type !== FEEDBACK_TYPE_LABELS.makeup) { var displayType = (h.type === FEEDBACK_TYPE_LABELS.parent || h.type === FEEDBACK_TYPE_LABELS.parentStudent || h.type === FEEDBACK_TYPE_LABELS.student) ? "學生留言" : h.type; var isTeacher = (!isStudentSideFeedbackType(h.type));
                         var avatarClass = isTeacher ? "avatar-teacher" : "avatar-student";
                         var bodyClass = isTeacher ? "teacher-body" : "";
                         var sName = (gData && gData.studentName) ? gData.studentName : "學";
@@ -5513,6 +5625,58 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 swalAlert('棒卡申請送出失敗', friendlySubmitError(e), 'warning');
                 if (submitBtn) { submitBtn.innerText = "送出申請"; submitBtn.disabled = false; }
             }).submitFeedback(form);
+        }
+
+        function submitHomeworkDone(safeId, realDate) {
+            if (!gData || !gData.className || !gData.studentName) return;
+            if (BEAR_SUBJECT !== "/science" || isGiftedScienceClassName(gData.className)) return;
+            var post = (gData.dailyPost || []).find(function(item) {
+                return item && item.date === realDate;
+            });
+            var homeworkText = getPostHomeworkText(post || {});
+            if (!homeworkText) {
+                swalAlert("沒有作業內容", "這一天聯絡簿沒有作業，不需要回報完成。", "info");
+                return;
+            }
+            var btn = document.getElementById("homework-done-btn-" + safeId);
+            var hint = document.getElementById("homework-done-hint-" + safeId);
+            if (!btn || btn.disabled) return;
+            var originalText = btn.innerText;
+            btn.disabled = true;
+            btn.innerText = "回報中...";
+            if (hint) hint.innerText = "正在寫入作業完成回報...";
+            var form = {
+                className: gData.className,
+                studentName: gData.studentName,
+                targetDate: realDate,
+                homeworkText: homeworkText
+            };
+            google.script.run.withSuccessHandler(function(res) {
+                if (res && res.success) {
+                    var dateKey = getHomeworkDoneDateKey(realDate);
+                    if (!gData.homeworkDone) gData.homeworkDone = {};
+                    gData.homeworkDone[dateKey] = {
+                        status: "done",
+                        targetDate: realDate,
+                        homeworkText: homeworkText,
+                        time: res.time || ""
+                    };
+                    btn.innerText = "✓ 已回報完成";
+                    btn.classList.add("done");
+                    btn.disabled = true;
+                    if (hint) hint.innerText = "已記錄到作業完成回報。";
+                } else {
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                    if (hint) hint.innerText = "回報失敗，請稍後再試。";
+                    swalAlert("作業完成回報失敗", (res && res.msg) || "未知錯誤", "warning");
+                }
+            }).withFailureHandler(function(e) {
+                btn.disabled = false;
+                btn.innerText = originalText;
+                if (hint) hint.innerText = "連線不穩，請稍後再試。";
+                swalAlert("作業完成回報失敗", friendlySubmitError(e), "warning");
+            }).submitHomeworkDone(form);
         }
 
         function onPenaltyReasonChange(safeId) {
