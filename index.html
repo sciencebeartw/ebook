@@ -3129,8 +3129,13 @@
                 return tA - tB;
             });
 
-            const snapHD = await db.ref(`${BEAR_SUBJECT}/homeworkDone/${safeC}/${foundUserKey}`).once('value');
-            result.homeworkDone = snapHD.val() || {};
+            try {
+                const snapHD = await db.ref(`${BEAR_SUBJECT}/homeworkDone/${safeC}/${foundUserKey}`).once('value');
+                result.homeworkDone = snapHD.val() || {};
+            } catch (homeworkDoneErr) {
+                console.warn("HomeworkDone read skipped:", homeworkDoneErr);
+                result.homeworkDone = {};
+            }
 
             return result;
         } catch(e) {
@@ -3911,9 +3916,11 @@
             activeRealtimeListeners = [];
         }
 
-        function watchRealtimeValue(path, handler) {
+        function watchRealtimeValue(path, handler, cancelHandler) {
             var ref = db.ref(path);
-            ref.on('value', handler);
+            ref.on('value', handler, cancelHandler || function(error) {
+                console.warn('即時監聽失敗：' + path, error);
+            });
             activeRealtimeListeners.push({ ref: ref, handler: handler });
             return ref;
         }
@@ -4207,10 +4214,16 @@
                         }
                     });
 
-                    watchRealtimeValue(BEAR_SUBJECT + '/homeworkDone/' + safeC + '/' + studentKey, function(snap) {
-                        gData.homeworkDone = snap.val() || {};
-                        renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
-                    });
+                    try {
+                        watchRealtimeValue(BEAR_SUBJECT + '/homeworkDone/' + safeC + '/' + studentKey, function(snap) {
+                            gData.homeworkDone = snap.val() || {};
+                            renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
+                        }, function(error) {
+                            console.warn("HomeworkDone realtime watch skipped:", error);
+                        });
+                    } catch (homeworkDoneWatchErr) {
+                        console.warn("HomeworkDone realtime watch skipped:", homeworkDoneWatchErr);
+                    }
 
                     // 3. 重要公告監聽 (班級 + 全校)
                     watchRealtimeValue(BEAR_SUBJECT + '/bulletins', function(snap) {
