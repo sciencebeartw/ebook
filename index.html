@@ -1807,6 +1807,34 @@
             color: white;
         }
 
+        .doc-link-wrap {
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .doc-link-wrap .btn-link,
+        .doc-link-wrap .btn-important-tag {
+            margin-bottom: 4px;
+        }
+
+        .doc-open-original {
+            display: inline-block;
+            margin: 0 0 8px 4px;
+            padding: 4px 9px;
+            border-radius: 999px;
+            background: #eef2ff;
+            color: #4338ca;
+            border: 1px solid #c7d2fe;
+            text-decoration: none;
+            font-size: 0.84rem;
+            font-weight: 800;
+        }
+
+        .doc-open-original:hover {
+            background: #e0e7ff;
+        }
+
         /* ★★★ v3.9.3 修正：強制讓公告與彈窗內文的連結變為小標籤樣式 (並加上圖示) ★★★ */
         .bulletin-content .btn-important-tag,
         .emergency-body .btn-important-tag {
@@ -1833,6 +1861,12 @@
             box-shadow: none;
             border: 1px solid #ccc;
             margin: 2px 5px 2px 0;
+        }
+
+        .bulletin-content .doc-link-wrap,
+        .emergency-body .doc-link-wrap {
+            display: inline-block;
+            width: auto;
         }
 
         .bulletin-content .btn-link:hover,
@@ -3849,6 +3883,56 @@
             return Swal.fire({ title: title, text: text, icon: 'warning', showCancelButton: true, confirmButtonColor: '#a855f7', cancelButtonColor: '#d1d5db', confirmButtonText: '確定', cancelButtonText: '取消' }).then(function(res) { return res.isConfirmed; });
         };
 
+        function decodeBasicHtmlEntities(str) {
+            return (str || "").toString()
+                .replace(/&amp;/g, "&")
+                .replace(/&quot;/g, '"')
+                .replace(/&#039;/g, "'")
+                .replace(/&lt;/g, "<")
+                .replace(/&gt;/g, ">");
+        }
+
+        function escapeHtmlAttr(str) {
+            return (str || "").toString()
+                .replace(/&/g, "&amp;")
+                .replace(/"/g, "&quot;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function getDriveDownloadUrlForViewer(url) {
+            var text = decodeBasicHtmlEntities(url);
+            var match = text.match(/drive\.google\.com\/file\/d\/([^/?#]+)/) ||
+                text.match(/[?&]id=([^&#]+)/);
+            return match && match[1]
+                ? "https://drive.google.com/uc?export=download&id=" + encodeURIComponent(match[1])
+                : text;
+        }
+
+        function isOfficeDocumentLink(name, url) {
+            var raw = decodeBasicHtmlEntities((name || "") + " " + (url || ""));
+            try { raw = decodeURIComponent(raw); } catch(e) {}
+            return /\.(doc|docx|ppt|pptx|xls|xlsx)(\?|#|$|\s)/i.test(raw);
+        }
+
+        function getOfficePreviewUrl(url) {
+            var directUrl = getDriveDownloadUrlForViewer(url);
+            return "https://docs.google.com/gview?embedded=1&url=" + encodeURIComponent(directUrl);
+        }
+
+        function renderParsedLink(name, url, className, iconHtml) {
+            var rawUrl = decodeBasicHtmlEntities(url);
+            var safeRawUrl = escapeHtmlAttr(rawUrl);
+            var safeName = name || "連結";
+            var icon = iconHtml || "";
+            if (isOfficeDocumentLink(name, rawUrl)) {
+                var previewUrl = escapeHtmlAttr(getOfficePreviewUrl(rawUrl));
+                return `<span class="doc-link-wrap"><a href="${previewUrl}" target="_blank" rel="noopener noreferrer" class="${className}">${icon}${safeName}</a><a href="${safeRawUrl}" target="_blank" rel="noopener noreferrer" class="doc-open-original">開原檔</a></span>`;
+            }
+            return `<a href="${safeRawUrl}" target="_blank" rel="noopener noreferrer" class="${className}">${icon}${safeName}</a>`;
+        }
+
         // ★★★ 全域工具函式：解析連結 (v3.9.2) ★★★
         function parseBtn(text) {
             if (!text) return "";
@@ -3857,11 +3941,11 @@
             var withBr = text.replace(/\n/g, '<br>');
             return withBr.replace(/\[(.*?)\](http[s]?:\/\/[^\s<]+)/g, function (match, name, url) {
                 if (name.indexOf("作業") > -1 || name.indexOf("上傳") > -1) {
-                    return `<a href="${url}" target="_blank" class="btn-important-tag">${SVG.upload}${name}</a>`;
+                    return renderParsedLink(name, url, "btn-important-tag", SVG.upload);
                 } else if (name.indexOf("附件") > -1) {
-                    return `<a href="${url}" target="_blank" class="btn-small-tag">${SVG.clip}${name}</a>`;
+                    return renderParsedLink(name, url, "btn-small-tag", SVG.clip);
                 } else {
-                    return `<a href="${url}" target="_blank" class="btn-link">${name}</a>`;
+                    return renderParsedLink(name, url, "btn-link", "");
                 }
             });
         };
@@ -4009,7 +4093,10 @@
                     // iOS 若未自動轉型，強制標記為 jpeg 給瀏覽器預覽（實務上 iOS Safari 取檔時已轉成 jpeg 串流）
                     actualType = 'image/jpeg';
                 }
-                var metadata = { contentType: actualType };
+                var metadata = {
+                    contentType: actualType,
+                    contentDisposition: 'inline; filename="' + safeName.replace(/"/g, '') + '"'
+                };
 
                 // 使用原生二進制上傳，最穩定且不吃前端記憶體
                 fileRef.put(file, metadata)
@@ -5117,11 +5204,11 @@ if (exam.dist) {
                     // 學生上傳的連結 -> 灰色小標籤 (透過 class="btn-small-tag" 區分)
                     return withBr.replace(/\[(.*?)\](http[s]?:\/\/[^\s<]+)/g, function (match, name, url) {
                         if (name.indexOf("作業") > -1 || name.indexOf("上傳") > -1) {
-                            return `<a href="${url}" target="_blank" class="btn-important-tag">${SVG.upload}${name}</a>`;
+                            return renderParsedLink(name, url, "btn-important-tag", SVG.upload);
                         } else if (name.indexOf("附件") > -1) {
-                            return `<a href="${url}" target="_blank" class="btn-small-tag">${SVG.clip}${name}</a>`;
+                            return renderParsedLink(name, url, "btn-small-tag", SVG.clip);
                         } else {
-                            return `<a href="${url}" target="_blank" class="btn-link">${name}</a>`;
+                            return renderParsedLink(name, url, "btn-link", "");
                         }
                     });
                 };
@@ -5846,7 +5933,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
 
                 var btnHtml = "";
                 if (b.btnName && b.btnUrl) {
-                    btnHtml = `<div class="btn-center-wrapper"><a href="${b.btnUrl}" target="_blank" class="btn-capsule">${b.btnName}</a></div>`;
+                    btnHtml = `<div class="btn-center-wrapper">${renderParsedLink(escapeHtml(b.btnName), b.btnUrl, "btn-capsule", "")}</div>`;
                 }
 
                 html += `
