@@ -2912,6 +2912,7 @@
     const BEAR_SUBJECT = qParams.get('subject') ? '/' + qParams.get('subject') : '/science';
     let ebookGodSessionId = qParams.get('godSession') || '';
     let ebookGodSessionInfo = null;
+    let isStudentPreviewMode = false;
     let ebookGodSessionLastActivityAt = Date.now();
     let ebookGodSessionLastRenewAt = 0;
     let ebookGodSessionHeartbeatTimer = null;
@@ -2922,6 +2923,15 @@
     };
     const SCRIPT_URL = SCRIPT_URLS[BEAR_SUBJECT] || SCRIPT_URLS['/science'];
     function doPostAction(action, data, onSuccess, onErr) {
+      if (isStudentPreviewMode) {
+         if (action === "logAccess") return;
+         if (["submitFeedback", "submitHomeworkDone", "changeUserPassword"].indexOf(action) > -1) {
+            var previewErr = new Error("學生視角預覽模式不會代替學生送出資料。");
+            blockStudentPreviewAction("送出資料");
+            if (onErr) onErr(previewErr);
+            return;
+         }
+      }
       if(SCRIPT_URL.includes("請在此填入")) {
          alert("⚠️ 錯誤：尚未填入 GAS Web App 網址在 index.html 內！");
          if(onErr) onErr("No Web App URL");
@@ -2947,6 +2957,16 @@
         return "連線不穩，這次送出沒有拿到伺服器確認。請先看畫面是否已更新；如果沒有出現，再按一次送出。";
       }
       return raw;
+    }
+
+    function blockStudentPreviewAction(actionLabel) {
+        if (!isStudentPreviewMode) return false;
+        swalAlert(
+            "學生視角預覽模式",
+            "這個畫面只用來確認學生登入後會看到什麼，不會代替學生" + (actionLabel || "送出資料") + "。",
+            "info"
+        );
+        return true;
     }
     
     function safeKey(str) {
@@ -4252,10 +4272,10 @@
             document.getElementById('full-loader').style.display = 'none';
             clearRealtimeListeners();
             gData = result;
-            if (pass !== "admin_view") gPass = pass; // ★ 防止神主模式覆蓋真正的密碼
+            if (pass !== "admin_view" && pass !== "god_session" && pass !== "student_preview") gPass = pass; // ★ 防止預覽模式覆蓋真正的密碼
 
             // ★ v4.0 登入記錄：fire-and-forget，不阻塞 UI
-            if (pass !== "admin_view" && !result.isAdmin) {
+            if (pass !== "admin_view" && pass !== "god_session" && pass !== "student_preview" && !result.isAdmin) {
                 doPostAction('logAccess', { className: result.className, studentName: result.studentName }, null, null, '');
             }
             document.getElementById('login-screen').style.display = 'none';
@@ -4492,6 +4512,7 @@
             clearRealtimeListeners();
             document.getElementById('full-loader').style.display = 'none';
             isAdminMode = false;
+            isStudentPreviewMode = false;
             ebookGodSessionId = "";
             ebookGodSessionInfo = null;
             document.getElementById('appContainer').classList.remove('admin-mode-border');
@@ -4981,6 +5002,10 @@
 
         function startStudentUpload(files, dateStr, inputToClear) {
             if (!files || files.length === 0) return;
+            if (blockStudentPreviewAction("上傳作業")) {
+                if (inputToClear) inputToClear.value = "";
+                return;
+            }
             if (files.length > 5) {
                 alert("一次最多只能上傳 5 個檔案！");
                 if (inputToClear) inputToClear.value = "";
@@ -5684,6 +5709,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         }
 
         function submitStickerApply(safeId, realDate) {
+            if (blockStudentPreviewAction("送出棒卡申請")) return;
             var btnStr = "sticker-btn-" + safeId;
             var submitBtn = document.getElementById(btnStr);
             if (!submitBtn) {
@@ -5729,6 +5755,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
 
         function submitHomeworkDone(safeId, realDate) {
             if (!gData || !gData.className || !gData.studentName) return;
+            if (blockStudentPreviewAction("回報作業完成")) return;
             if (BEAR_SUBJECT !== "/science" || isGiftedScienceClassName(gData.className)) return;
             var post = (gData.dailyPost || []).find(function(item) {
                 return item && item.date === realDate;
@@ -5795,6 +5822,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         }
 
         function submitPenaltyApply(safeId, realDate) {
+            if (blockStudentPreviewAction("送出反省申報")) return;
             var submitBtn = document.querySelector('#penalty-reason-' + safeId).parentElement.querySelector('.penalty-submit-btn');
 
             var selEl = document.getElementById('penalty-reason-' + safeId);
@@ -5837,6 +5865,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         }
 
         function sendFeedback(safeId, realDate, type, contentOverride, callback) {
+            if (blockStudentPreviewAction(type === "作業上傳" ? "上傳作業" : "送出留言")) return;
             var inputId = 'input-' + safeId;
             var val = contentOverride || document.getElementById(inputId).value;
             if (!val) return;
@@ -5862,6 +5891,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         }
 
         function submitScoreReport(safeId, realDate) { 
+            if (blockStudentPreviewAction("回報補考分數")) return;
             var inputId = 'score-in-' + safeId; 
             var val = document.getElementById(inputId).value; 
             if (!val) return; 
@@ -5881,6 +5911,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         function openPwdModal() { document.getElementById('pwdModal').style.display = 'flex'; }
         function closePwdModal() { document.getElementById('pwdModal').style.display = 'none'; }
         function doChangePwd() { 
+            if (blockStudentPreviewAction("修改密碼")) return;
             var btn = event.target;
             var originalText = btn.innerText;
             var oldP = document.getElementById('oldP').value; 
@@ -6157,21 +6188,23 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 ebookGodSessionId = sessionId;
                 var session = await renewEbookGodSession(true);
                 if (!session || !session.className || !session.studentName) throw new Error('session 資料不完整');
-                isAdminMode = true;
+                isStudentPreviewMode = !!(session.viewMode === 'student_preview' || (session.permissions && session.permissions.studentPreview === true));
+                isAdminMode = !isStudentPreviewMode;
                 startEbookGodSessionHeartbeat();
                 google.script.run.withSuccessHandler(function(result) {
                     if (result && result.found) {
-                        enterStudentView(result, 'god_session');
+                        enterStudentView(result, isStudentPreviewMode ? 'student_preview' : 'god_session');
                     } else {
-                        swalAlert('查無此學生資料', '請回行政中心重新開啟上帝視角。', 'warning');
+                        swalAlert('查無此學生資料', '請回行政中心重新開啟學生畫面。', 'warning');
                         document.getElementById('full-loader').style.display = 'none';
                     }
                 }).withFailureHandler(function(e) {
-                    swalAlert('上帝視角載入失敗', e && e.message ? e.message : String(e), 'error');
+                    swalAlert('學生畫面載入失敗', e && e.message ? e.message : String(e), 'error');
                     document.getElementById('full-loader').style.display = 'none';
                 }).getStudentDataByAdmin(session.className, session.studentName, 'god_session');
             } catch (err) {
-                swalAlert('上帝視角連線已失效', err && err.message ? err.message : '請回行政中心重新開啟。', 'warning');
+                isStudentPreviewMode = false;
+                swalAlert('學生畫面連線已失效', err && err.message ? err.message : '請回行政中心重新開啟。', 'warning');
                 document.getElementById('full-loader').style.display = 'none';
             }
         }
