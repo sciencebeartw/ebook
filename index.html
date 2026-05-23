@@ -5239,12 +5239,25 @@ if (exam.dist) {
                 };
 
                 var homeworkItems = getPostHomeworkItems(post);
-                var fields = [{ label: "今日課程進度", val: post.progress }, { label: "今日小考考卷", val: post.quiz }];
+                function getPostExamTypes(text) {
+                    var raw = (text || "").toString();
+                    var types = [];
+                    if (raw.indexOf("小考") > -1) types.push("小考");
+                    if (raw.indexOf("隨堂") > -1) types.push("隨堂考");
+                    if (raw.indexOf("鑑定") > -1) types.push("鑑定考");
+                    return types;
+                }
+                function getPostQuizFieldLabel(postData) {
+                    var types = getPostExamTypes([postData.quiz, postData.title, postData.progress].join("\n"));
+                    if (types.length === 1) return "今日" + types[0] + "考卷";
+                    return "今日考卷";
+                }
+                var fields = [{ label: "今日課程進度", val: post.progress }, { label: getPostQuizFieldLabel(post), val: post.quiz }];
                 homeworkItems.forEach(function(item, hwIdx) {
                     var extra = hwIdx === homeworkItems.length - 1 ? buildHomeworkDoneButton(post) : "";
                     fields.push({ label: item.label, val: item.val, extra: extra });
                 });
-                fields = fields.concat([{ label: "今日補考考卷", val: post.makeup }, { label: "下次小考範圍", val: post.range }, { label: "補充資料", val: post.note }]);
+                fields = fields.concat([{ label: "今日補考考卷", val: post.makeup }, { label: "下次考試範圍", val: post.range }, { label: "補充資料", val: post.note }]);
                 fields.forEach(function (f) { if (f.val) contentHtml += "<div class='info-block'><span class='info-label'>" + f.label + "</span><div class='info-content'>" + parseBtn(f.val) + (f.extra || "") + "</div></div>"; }); var pDateShort = post.date.substring(5).replace("-", "/"); var pDateFull = post.date.replace(/-/g, "/"); var myHistory = history.filter(function (h) { return h.targetDate == pDateShort || h.targetDate == post.date || h.targetDate == pDateFull; }); myHistory.sort(function(a,b) { return new Date(a.time) - new Date(b.time); }); var historyHtml = ""; myHistory.forEach(function (h) { if (h.type !== FEEDBACK_TYPE_LABELS.makeup) { var displayType = (h.type === FEEDBACK_TYPE_LABELS.parent || h.type === FEEDBACK_TYPE_LABELS.parentStudent || h.type === FEEDBACK_TYPE_LABELS.student) ? "學生留言" : h.type; var isTeacher = (!isStudentSideFeedbackType(h.type));
                         var avatarClass = isTeacher ? "avatar-teacher" : "avatar-student";
                         var bodyClass = isTeacher ? "teacher-body" : "";
