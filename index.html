@@ -1740,6 +1740,19 @@
             word-wrap: break-word;
         }
 
+        .quiz-answer-note {
+            margin: 8px 0 2px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #ecfdf5 0%, #f0fdfa 100%);
+            border: 1px solid #bbf7d0;
+            color: #047857;
+            font-size: 0.98rem;
+            font-weight: 850;
+            line-height: 1.45;
+            text-align: center;
+        }
+
         /* 老師發布的連結按鈕 (大膠囊) */
         .btn-link {
             display: block;
@@ -5252,7 +5265,13 @@ if (exam.dist) {
                     if (types.length === 1) return "今日" + types[0] + "考卷";
                     return "今日考卷";
                 }
-                var fields = [{ label: "今日課程進度", val: post.progress }, { label: getPostQuizFieldLabel(post), val: post.quiz }];
+                function buildScienceQuizAnswerNote(postData) {
+                    if (BEAR_SUBJECT !== '/science' || !postData.quiz) return "";
+                    var types = getPostExamTypes([postData.quiz, postData.title, postData.progress].join("\n"));
+                    var examLabel = types.length === 1 ? types[0] : "本次考卷";
+                    return "<div class='quiz-answer-note'>" + examLabel + "會於課堂直接訂正與對答；缺席同學請依影片連結自行補看，不另提供答案。</div>";
+                }
+                var fields = [{ label: "今日課程進度", val: post.progress }, { label: getPostQuizFieldLabel(post), val: post.quiz, extra: buildScienceQuizAnswerNote(post) }];
                 homeworkItems.forEach(function(item, hwIdx) {
                     var extra = hwIdx === homeworkItems.length - 1 ? buildHomeworkDoneButton(post) : "";
                     fields.push({ label: item.label, val: item.val, extra: extra });
