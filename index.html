@@ -1753,6 +1753,19 @@
             text-align: center;
         }
 
+        .homework-upload-note {
+            margin: 8px 0 2px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #faf5ff 0%, #f5f3ff 100%);
+            border: 1px solid #ddd6fe;
+            color: #6d28d9;
+            font-size: 0.98rem;
+            font-weight: 850;
+            line-height: 1.45;
+            text-align: center;
+        }
+
         /* 老師發布的連結按鈕 (大膠囊) */
         .btn-link {
             display: block;
@@ -5152,6 +5165,13 @@
                 "</div>";
         }
 
+        function buildGiftedScienceHomeworkUploadNote(homeworkText) {
+            if (BEAR_SUBJECT !== "/science" || !gData || !isGiftedScienceClassName(gData.className)) return "";
+            var raw = (homeworkText || "").toString();
+            if (!/\[(?:[^\]]*作業|[^\]]*上傳)[^\]]*\]http[s]?:\/\//.test(raw)) return "";
+            return "<div class='homework-upload-note'>上傳完成記得按查看答案，取得正解並在課本上以紅筆訂正，才算完成作業哦！</div>";
+        }
+
         function renderDailyPosts(posts, history) {
             window.adminModeReplyContext = {};
             window.adminModeStickerContext = {};
@@ -5279,7 +5299,8 @@ if (exam.dist) {
                 }
                 var fields = [{ label: "今日課程進度", val: post.progress }, { label: getPostQuizFieldLabel(post), val: post.quiz, extra: buildScienceQuizAnswerNote(post) }];
                 homeworkItems.forEach(function(item, hwIdx) {
-                    var extra = hwIdx === homeworkItems.length - 1 ? buildHomeworkDoneButton(post) : "";
+                    var extra = buildGiftedScienceHomeworkUploadNote(item.val);
+                    if (hwIdx === homeworkItems.length - 1) extra += buildHomeworkDoneButton(post);
                     fields.push({ label: item.label, val: item.val, extra: extra });
                 });
                 fields = fields.concat([{ label: "今日補考考卷", val: post.makeup }, { label: "下次考試範圍", val: post.range }, { label: "補充資料", val: post.note }]);
