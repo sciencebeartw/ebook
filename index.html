@@ -3966,13 +3966,17 @@
             return `<a href="${safeRawUrl}" target="_blank" rel="noopener noreferrer" class="${className}">${icon}${safeName}</a>`;
         }
 
+        function compactParsedButtonBreaks(html) {
+            return (html || "").replace(/<br>\s*(?=(?:<span class="doc-link-wrap"|<a [^>]*class="(?:btn-link|btn-important-tag|btn-small-tag)"))/g, "");
+        }
+
         // ★★★ 全域工具函式：解析連結 (v3.9.2) ★★★
         function parseBtn(text) {
             if (!text) return "";
             // 先對 HTML 特殊字元做跳脫 防範 XSS
             text = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
             var withBr = text.replace(/\n/g, '<br>');
-            return withBr.replace(/\[(.*?)\](http[s]?:\/\/[^\s<]+)/g, function (match, name, url) {
+            var parsed = withBr.replace(/\[(.*?)\](http[s]?:\/\/[^\s<]+)/g, function (match, name, url) {
                 if (name.indexOf("作業") > -1 || name.indexOf("上傳") > -1) {
                     return renderParsedLink(name, url, "btn-important-tag", SVG.upload);
                 } else if (name.indexOf("附件") > -1) {
@@ -3981,6 +3985,7 @@
                     return renderParsedLink(name, url, "btn-link", "");
                 }
             });
+            return compactParsedButtonBreaks(parsed);
         };
 
         const APP_LOGO = "https://www.sciencebear.com.tw/ebook/LOGO.png";
@@ -5240,7 +5245,7 @@ if (exam.dist) {
                     });
                     // 老師發布的連結 -> 藍色大膠囊
                     // 學生上傳的連結 -> 灰色小標籤 (透過 class="btn-small-tag" 區分)
-                    return withBr.replace(/\[(.*?)\](http[s]?:\/\/[^\s<]+)/g, function (match, name, url) {
+                    var parsed = withBr.replace(/\[(.*?)\](http[s]?:\/\/[^\s<]+)/g, function (match, name, url) {
                         if (name.indexOf("作業") > -1 || name.indexOf("上傳") > -1) {
                             return renderParsedLink(name, url, "btn-important-tag", SVG.upload);
                         } else if (name.indexOf("附件") > -1) {
@@ -5249,6 +5254,7 @@ if (exam.dist) {
                             return renderParsedLink(name, url, "btn-link", "");
                         }
                     });
+                    return compactParsedButtonBreaks(parsed);
                 };
 
                 var homeworkItems = getPostHomeworkItems(post);
