@@ -4018,7 +4018,7 @@
 
         function getOfficePreviewUrl(url) {
             var directUrl = getDriveDownloadUrlForViewer(url);
-            return "https://view.officeapps.live.com/op/view.aspx?src=" + encodeURIComponent(directUrl);
+            return "https://docs.google.com/gview?embedded=1&url=" + encodeURIComponent(directUrl);
         }
 
         function renderParsedLink(name, url, className, iconHtml) {
