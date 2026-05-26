@@ -6487,6 +6487,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             if (btn) btn.innerText = '處理中';
             try {
                 await runGodAdminAction('approveStickerGas', {
+                    feedbackKey: context.fbKey,
                     timeStr: context.time,
                     className: gData.className,
                     studentName: gData.studentName,
