@@ -1844,7 +1844,7 @@
             margin-bottom: 4px;
         }
 
-        .doc-preview-fallback {
+        .doc-open-original {
             display: inline-block;
             margin: 0 0 8px 4px;
             padding: 4px 9px;
@@ -1857,7 +1857,7 @@
             font-weight: 800;
         }
 
-        .doc-preview-fallback:hover {
+        .doc-open-original:hover {
             background: #e0e7ff;
         }
 
@@ -4028,7 +4028,7 @@
             var icon = iconHtml || "";
             if (isOfficeDocumentLink(name, rawUrl)) {
                 var previewUrl = escapeHtmlAttr(getOfficePreviewUrl(rawUrl));
-                return `<span class="doc-link-wrap"><a href="${safeRawUrl}" target="_blank" rel="noopener noreferrer" class="${className}">${icon}${safeName}</a><a href="${previewUrl}" target="_blank" rel="noopener noreferrer" class="doc-preview-fallback">線上預覽</a></span>`;
+                return `<span class="doc-link-wrap"><a href="${previewUrl}" target="_blank" rel="noopener noreferrer" class="${className}">${icon}${safeName}</a><a href="${safeRawUrl}" target="_blank" rel="noopener noreferrer" class="doc-open-original">開原檔</a></span>`;
             }
             return `<a href="${safeRawUrl}" target="_blank" rel="noopener noreferrer" class="${className}">${icon}${safeName}</a>`;
         }
