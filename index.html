@@ -7126,7 +7126,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     var ex = exams[colKey];
                     var title = (ex.examName || "") + " " + (ex.date || "");
                     if (title.indexOf("作業") > -1) continue;
-                    if (title.indexOf("小考") > -1 || title.indexOf("複習考") > -1 || title.indexOf("期中考") > -1 || title.indexOf("大考") > -1) {
+                    if (["小考", "複習", "期中", "大考", "隨堂", "鑑定"].some(function(keyword) { return title.indexOf(keyword) > -1; })) {
                         if (possibleDates.some(function(pd) { return title.indexOf(pd) > -1; })) return (ex.score || "").toString();
                     }
                 }
@@ -7270,7 +7270,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             
             const { value: finalScore } = await Swal.fire({
                 title: '寫入成績確認',
-                html: '即將寫入 <b>' + stuName + '</b> 在 <b>' + targetDate + '</b> 的小考/複習考欄位。<br><br>系統已萃取出分數，您可以修改要寫入的值：',
+                html: '即將寫入 <b>' + stuName + '</b> 在 <b>' + targetDate + '</b> 的考試欄位。<br><br>系統已萃取出分數，您可以修改要寫入的值：',
                 input: 'text',
                 inputValue: extractedScore,
                 showCancelButton: true,
@@ -7314,7 +7314,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
 
         function isMakeupReminderExamTitle(title) {
             if (!title || title.indexOf("作業") > -1) return false;
-            return ["小考", "複習", "鑑定"].some(function(keyword) {
+            return ["小考", "複習", "期中", "大考", "隨堂", "鑑定"].some(function(keyword) {
                 return title.indexOf(keyword) > -1;
             });
         }
