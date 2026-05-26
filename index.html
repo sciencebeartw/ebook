@@ -1844,7 +1844,7 @@
             margin-bottom: 4px;
         }
 
-        .doc-open-original {
+        .doc-preview-fallback {
             display: inline-block;
             margin: 0 0 8px 4px;
             padding: 4px 9px;
@@ -1857,7 +1857,7 @@
             font-weight: 800;
         }
 
-        .doc-open-original:hover {
+        .doc-preview-fallback:hover {
             background: #e0e7ff;
         }
 
@@ -3033,45 +3033,89 @@
                 };
             }
 
-            const snapS = await db.ref(BEAR_SUBJECT + '/students').once('value');
-            const allStudents = snapS.val() || {};
-            
             let foundClass = "";
             let foundStudentObj = null;
             let foundUserKey = "";
 
-            const classesToSearch = targetClass ? [targetClass] : Object.keys(allStudents);
-            
-            for (let c of classesToSearch) {
-                const sClass = safeKey(c);
-                const classKids = allStudents[sClass] || {};
+            function isLoginMatch(kid) {
+               if (!kid || !kid.name) return false;
+               if (bypassPwd) return kid.name.trim() === studentName.trim();
+               const inputPwdStr = normalizeLoginSecret(password);
+               const passwordStr = normalizeLoginSecret(kid.password);
+               const fallbackPhoneStr = passwordStr ? "" : normalizeLoginSecret(kid.phone);
+               const expectedSecret = passwordStr || fallbackPhoneStr;
+               return kid.name.trim() === studentName.trim() && inputPwdStr !== "" && expectedSecret !== "" && expectedSecret === inputPwdStr;
+            }
+
+            function acceptStudentMatch(className, studentKey, kid) {
+               foundClass = className;
+               foundStudentObj = kid;
+               foundUserKey = studentKey;
+               result.found = true;
+               result.className = className;
+               result.studentName = kid.name;
+               result.foundUserKey = studentKey;
+            }
+
+            async function tryIndexedStudent(entry) {
+               if (!entry || result.found) return;
+               const sClass = entry.classKey || safeKey(entry.className || "");
+               const studentKey = entry.studentKey || "";
+               if (!sClass || !studentKey) return;
+               const snapKid = await db.ref(`${BEAR_SUBJECT}/students/${sClass}/${studentKey}`).once('value');
+               const kid = snapKid.val();
+               if (isLoginMatch(kid)) acceptStudentMatch(entry.className || kid.className || sClass, studentKey, kid);
+            }
+
+            if (targetClass) {
+                const sClass = safeKey(targetClass);
+                const snapClass = await db.ref(`${BEAR_SUBJECT}/students/${sClass}`).once('value');
+                const classKids = snapClass.val() || {};
                 for (let k in classKids) {
                    const kid = classKids[k];
-                   if (!kid || !kid.name) continue;
-                   let isMatch = false;
-                   if (bypassPwd) {
-                       if (kid.name.trim() === studentName.trim()) isMatch = true;
-                   } else {
-                       const inputPwdStr = normalizeLoginSecret(password);
-                       const passwordStr = normalizeLoginSecret(kid.password);
-                       const fallbackPhoneStr = passwordStr ? "" : normalizeLoginSecret(kid.phone);
-                       const expectedSecret = passwordStr || fallbackPhoneStr;
-                       if (kid.name.trim() === studentName.trim() && inputPwdStr !== "" && expectedSecret !== "" && expectedSecret === inputPwdStr) {
-                           isMatch = true;
-                       }
-                   }
-                   if (isMatch) {
-                       foundClass = c;
-                       foundStudentObj = kid;
-                       foundUserKey = k;
-                       result.found = true;
-                       result.className = c;
-                       result.studentName = kid.name;
-                       result.foundUserKey = k;
+                   if (isLoginMatch(kid)) {
+                       acceptStudentMatch(targetClass, k, kid);
                        break;
                    }
                 }
-                if (result.found) break;
+            } else {
+                let indexedClasses = {};
+                let indexReadFailed = false;
+                try {
+                    const indexSnap = await db.ref(`${BEAR_SUBJECT}/studentLoginIndex/${safeKey(studentName)}`).once('value');
+                    indexedClasses = indexSnap.val() || {};
+                } catch (indexErr) {
+                    console.warn("studentLoginIndex read failed, falling back to legacy lookup:", indexErr);
+                    indexReadFailed = true;
+                }
+                const indexedEntries = [];
+                Object.keys(indexedClasses).forEach(function(classKey) {
+                    Object.keys(indexedClasses[classKey] || {}).forEach(function(studentKey) {
+                        indexedEntries.push(indexedClasses[classKey][studentKey]);
+                    });
+                });
+                for (let entry of indexedEntries) {
+                    await tryIndexedStudent(entry);
+                    if (result.found) break;
+                }
+
+                if (!result.found) {
+                    const snapS = await db.ref(BEAR_SUBJECT + '/students').once('value');
+                    const allStudents = snapS.val() || {};
+                    const classesToSearch = Object.keys(allStudents);
+                    for (let c of classesToSearch) {
+                        const sClass = safeKey(c);
+                        const classKids = allStudents[sClass] || {};
+                        for (let k in classKids) {
+                           const kid = classKids[k];
+                           if (isLoginMatch(kid)) {
+                               acceptStudentMatch(c, k, kid);
+                               break;
+                           }
+                        }
+                        if (result.found) break;
+                    }
+                }
             }
             
             if (!result.found) return result;
@@ -3094,7 +3138,8 @@
                 const isHomework = (eData.date + eData.examName).indexOf("作業") > -1;
                 
                 let rawMaxForUnit = 100;
-                if (eData.dist && eData.dist.length > 0) rawMaxForUnit = Math.max(...eData.dist);
+                if (typeof eData.distMax === "number") rawMaxForUnit = eData.distMax;
+                else if (eData.dist && eData.dist.length > 0 && !(eData.dist.length === 5 && eData.labels)) rawMaxForUnit = Math.max(...eData.dist);
                 if (isHomework && rawMaxForUnit <= 60) currentUnit = "題";
                 if (eData.score === "尚未繳交") currentUnit = "";
                 
@@ -3104,12 +3149,14 @@
                     if (thresholdMatch) makeupThreshold = parseInt(thresholdMatch[0]); 
                 }
 
-                const myB = eData.score === "尚未繳交" ? -1 : 0; // Legacy front relies on this. Actually frontend does not compute myBucket heavily if dist presents. Wait, frontend uses `myBucket`. Hmm if I don't have it precisely, dist bars may not show my bar in red. I will try to map it or we can skip for now since it's hard. Let's just put null. Frontend gracefully handles it or I will parse. Wait! FirebaseSync.gs pushed `dist` arrays into exams! 
-            
-                // Let's compute myBucket if dist exists.
                 let myBucketIndex = -1;
                 let rangeLabels = ["0~20","20~40","40~60","60~80","80~100"];
                 if (eData.dist && eData.dist.length > 0) {
+                     if (eData.dist.length === 5 && eData.labels) {
+                         rangeLabels = eData.labels;
+                         myBucketIndex = typeof eData.myBucket === "number" ? eData.myBucket : -1;
+                         eData.total = eData.total || eData.dist.reduce((sum, n) => sum + (parseInt(n) || 0), 0);
+                     } else {
                      const total = eData.dist.length;
                      const rawMax = Math.max(...eData.dist);
                      const rawMin = Math.min(...eData.dist);
@@ -3125,7 +3172,6 @@
                          if (sIdx >= 5) sIdx = 4; if (sIdx < 0) sIdx = 0;
                          myBucketIndex = sIdx;
                      }
-                     // Actually FirebaseSync.gs already pushed eData.dist which is ALL SCORES. We need to bucketize it.
                      const buckets = [0,0,0,0,0];
                      eData.dist.forEach(v => {
                          let idx = Math.floor((v - minS) / step);
@@ -3134,6 +3180,7 @@
                      });
                      eData.dist = buckets;
                      eData.total = total;
+                     }
                 } else {
                      eData.dist = [0,0,0,0,0]; eData.total = 0;
                 }
@@ -3185,8 +3232,15 @@
             result.dailyPost = classPosts;
 
             // Fetch Bulletins
-            const snapB = await db.ref(`${BEAR_SUBJECT}/bulletins/${safeC}`).once('value');
-            const bullObj = snapB.val() || {};
+            const globalBulletinKey = safeKey("全校");
+            const bulletinSnaps = await Promise.all([
+                db.ref(`${BEAR_SUBJECT}/bulletins/${safeC}`).once('value'),
+                safeC === globalBulletinKey ? Promise.resolve(null) : db.ref(`${BEAR_SUBJECT}/bulletins/${globalBulletinKey}`).once('value')
+            ]);
+            const bullObj = Object.assign({},
+                (bulletinSnaps[0] && bulletinSnaps[0].val()) || {},
+                (bulletinSnaps[1] && bulletinSnaps[1].val()) || {}
+            );
             let bulls = [];
             for (let id in bullObj) {
                 const b = bullObj[id];
@@ -3964,7 +4018,7 @@
 
         function getOfficePreviewUrl(url) {
             var directUrl = getDriveDownloadUrlForViewer(url);
-            return "https://docs.google.com/gview?embedded=1&url=" + encodeURIComponent(directUrl);
+            return "https://view.officeapps.live.com/op/view.aspx?src=" + encodeURIComponent(directUrl);
         }
 
         function renderParsedLink(name, url, className, iconHtml) {
@@ -3974,7 +4028,7 @@
             var icon = iconHtml || "";
             if (isOfficeDocumentLink(name, rawUrl)) {
                 var previewUrl = escapeHtmlAttr(getOfficePreviewUrl(rawUrl));
-                return `<span class="doc-link-wrap"><a href="${previewUrl}" target="_blank" rel="noopener noreferrer" class="${className}">${icon}${safeName}</a><a href="${safeRawUrl}" target="_blank" rel="noopener noreferrer" class="doc-open-original">開原檔</a></span>`;
+                return `<span class="doc-link-wrap"><a href="${safeRawUrl}" target="_blank" rel="noopener noreferrer" class="${className}">${icon}${safeName}</a><a href="${previewUrl}" target="_blank" rel="noopener noreferrer" class="doc-preview-fallback">線上預覽</a></span>`;
             }
             return `<a href="${safeRawUrl}" target="_blank" rel="noopener noreferrer" class="${className}">${icon}${safeName}</a>`;
         }
@@ -4364,8 +4418,12 @@
                     }
 
                     // 3. 重要公告監聽 (班級 + 全校)
-                    watchRealtimeValue(BEAR_SUBJECT + '/bulletins', function(snap) {
-                        const allBulls = snap.val() || {};
+                    const globalBulletinKey = safeKey("全校");
+                    const bulletinSources = { classOnly: {}, global: {} };
+                    function rebuildBulletinsFromScopedSources() {
+                        const allBulls = {};
+                        allBulls[safeC] = bulletinSources.classOnly || {};
+                        if (safeC !== globalBulletinKey) allBulls[globalBulletinKey] = bulletinSources.global || {};
                         let bulls = [];
                         for (let cls in allBulls) {
                             const bObj = allBulls[cls];
@@ -4378,7 +4436,17 @@
                         }
                         gData.bulletins = bulls;
                         renderBulletins(gData.bulletins);
+                    }
+                    watchRealtimeValue(BEAR_SUBJECT + '/bulletins/' + safeC, function(snap) {
+                        bulletinSources.classOnly = snap.val() || {};
+                        rebuildBulletinsFromScopedSources();
                     });
+                    if (safeC !== globalBulletinKey) {
+                        watchRealtimeValue(BEAR_SUBJECT + '/bulletins/' + globalBulletinKey, function(snap) {
+                            bulletinSources.global = snap.val() || {};
+                            rebuildBulletinsFromScopedSources();
+                        });
+                    }
 
                     // 4. 成績資料監聽 (近期成績更新)
                     watchRealtimeValue(BEAR_SUBJECT + '/grades/' + safeC + '/' + studentKey + '/exams', function(snap) {
@@ -4397,7 +4465,8 @@
                             
                             // Automatically infer unit
                             let rawDistMax = 100;
-                            if (eData.dist && eData.dist.length > 0) rawDistMax = Math.max(...eData.dist);
+                            if (typeof eData.distMax === "number") rawDistMax = eData.distMax;
+                            else if (eData.dist && eData.dist.length > 0 && !(eData.dist.length === 5 && eData.labels)) rawDistMax = Math.max(...eData.dist);
                             let unit = (isHW && rawDistMax <= 60) ? "題" : (eData.score === "尚未繳交" ? "" : "分");
                             
                             let threshold = 0;
@@ -4406,7 +4475,8 @@
                                 if (tm) threshold = parseInt(tm[0]); 
                             }
                             
-                            let myBucket = -1; let labels = ["0~20","20~40","40~60","60~80","80~100"];
+                            let myBucket = typeof eData.myBucket === "number" ? eData.myBucket : -1;
+                            let labels = eData.labels || ["0~20","20~40","40~60","60~80","80~100"];
                             if (eData.dist && eData.dist.length > 0) {
                                 if (eData.dist.length !== 5) {
                                     const rawDist = eData.dist;
@@ -4425,13 +4495,16 @@
                                         if (myBucket >= 5) myBucket = 4; if (myBucket < 0) myBucket = 0;
                                     }
                                     eData.dist = buckets;
+                                    eData.total = rawDist.length;
+                                } else if (typeof eData.total !== "number") {
+                                    eData.total = eData.dist.reduce((sum, n) => sum + (parseInt(n, 10) || 0), 0);
                                 }
                             }
                             fullGradeList.push({
                                 className: result.className, date: eData.date, exam: eData.examName, note: eData.note, 
                                 makeupThreshold: threshold, score: eData.score, scoreNum: isNaN(scNum) ? null : scNum,
                                 unit: unit, average: eData.average, dist: eData.dist, labels: labels, myBucket: myBucket,
-                                colIndex: parseInt(col.replace('col_','')), cellColor: eData.cellColor
+                                total: eData.total, colIndex: parseInt(col.replace('col_','')), cellColor: eData.cellColor
                             });
                         }
                         gData.grades = fullGradeList.sort((a, b) => a.colIndex - b.colIndex);
@@ -5799,7 +5872,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var content = JSON.stringify({ reason: reason, count: count, status: "待審核" });
             var form = { className: gData.className, studentName: gData.studentName, targetDate: realDate, type: '棒卡申請', content: content };
             google.script.run.withSuccessHandler(function(res) {
-                // 不需要手動寫入 Firebase，因為 GAS 的 submitFeedback 內部會觸發 SyncFeedbacks 完成寫入
+                // 不需要手動寫入 Firebase，因為 GAS 的 submitFeedback 內部會觸發單筆 feedback 同步
                 // 且 Firebase .on('value') 監聽器會處理即時更新
                 if (selEl) { selEl.selectedIndex = 0; }
                 if (customEl) { customEl.value = ''; customEl.style.display = 'none'; }
