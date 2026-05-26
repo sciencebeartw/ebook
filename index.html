@@ -4021,6 +4021,45 @@
             return "https://docs.google.com/gview?embedded=1&url=" + encodeURIComponent(directUrl);
         }
 
+        function getOfficeDownloadFileName(name, url) {
+            var text = decodeBasicHtmlEntities(url);
+            var fileName = (name || "檔案").toString().trim();
+            var storageMatch = text.match(/\/o\/([^?]+)/);
+            if (storageMatch && storageMatch[1]) {
+                try {
+                    var storagePath = decodeURIComponent(storageMatch[1]);
+                    var storageFileName = storagePath.split('/').pop();
+                    if (storageFileName) fileName = storageFileName;
+                } catch(e) {}
+            }
+            return fileName.replace(/[/\\?%*:|"<>]/g, "-") || "檔案";
+        }
+
+        async function downloadOfficeOriginal(event, link) {
+            if (event) event.preventDefault();
+            var rawUrl = decodeBasicHtmlEntities(link.getAttribute("href") || "");
+            var fileName = getOfficeDownloadFileName(link.getAttribute("data-file-name") || "", rawUrl);
+            try {
+                var res = await fetch(rawUrl, { mode: "cors", credentials: "omit" });
+                if (!res.ok) throw new Error("HTTP " + res.status);
+                var blob = await res.blob();
+                var objectUrl = URL.createObjectURL(blob);
+                var a = document.createElement("a");
+                a.href = objectUrl;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(function() {
+                    URL.revokeObjectURL(objectUrl);
+                    if (a.parentNode) a.parentNode.removeChild(a);
+                }, 1000);
+            } catch(err) {
+                console.warn("Office original download fallback:", err);
+                window.open(rawUrl, "_blank", "noopener,noreferrer");
+            }
+            return false;
+        }
+
         function renderParsedLink(name, url, className, iconHtml) {
             var rawUrl = decodeBasicHtmlEntities(url);
             var safeRawUrl = escapeHtmlAttr(rawUrl);
@@ -4028,7 +4067,8 @@
             var icon = iconHtml || "";
             if (isOfficeDocumentLink(name, rawUrl)) {
                 var previewUrl = escapeHtmlAttr(getOfficePreviewUrl(rawUrl));
-                return `<span class="doc-link-wrap"><a href="${previewUrl}" target="_blank" rel="noopener noreferrer" class="${className}">${icon}${safeName}</a><a href="${safeRawUrl}" target="_blank" rel="noopener noreferrer" class="doc-open-original">開原檔</a></span>`;
+                var safeDownloadName = escapeHtmlAttr(getOfficeDownloadFileName(name, rawUrl));
+                return `<span class="doc-link-wrap"><a href="${previewUrl}" target="_blank" rel="noopener noreferrer" class="${className}">${icon}${safeName}</a><a href="${safeRawUrl}" target="_blank" rel="noopener noreferrer" class="doc-open-original" download="${safeDownloadName}" data-file-name="${safeDownloadName}" onclick="return downloadOfficeOriginal(event, this)">開原檔</a></span>`;
             }
             return `<a href="${safeRawUrl}" target="_blank" rel="noopener noreferrer" class="${className}">${icon}${safeName}</a>`;
         }
