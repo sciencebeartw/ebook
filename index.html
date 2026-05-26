@@ -3099,7 +3099,7 @@
                     if (result.found) break;
                 }
 
-                if (!result.found) {
+                if (!result.found && (indexReadFailed || indexedEntries.length === 0)) {
                     const snapS = await db.ref(BEAR_SUBJECT + '/students').once('value');
                     const allStudents = snapS.val() || {};
                     const classesToSearch = Object.keys(allStudents);
