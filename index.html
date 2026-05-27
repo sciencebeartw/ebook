@@ -3021,6 +3021,35 @@
         return { name: "喵", fullName: "阿喵老師" };
     }
 
+    function isDailyPostExamGrade(grade) {
+        if (!grade) return false;
+        var title = ((grade.date || "") + " " + (grade.exam || grade.examName || "")).toString();
+        if (title.indexOf("作業") > -1) return false;
+        return ["小考", "複習", "期中", "大考", "隨堂", "鑑定"].some(function(keyword) {
+            return title.indexOf(keyword) > -1;
+        });
+    }
+
+    function getDailyPostExamMatches(postDate, grades) {
+        var pDate = new Date(postDate);
+        var shortDate = (pDate.getMonth() + 1) + "/" + pDate.getDate();
+        var exactPostDate = (postDate || "").toString();
+        var regex = new RegExp("(^|[^0-9])" + shortDate.replace("/", "\\/") + "([^0-9]|$)", "g");
+        return (grades || []).filter(function(g) {
+            if (!isDailyPostExamGrade(g)) return false;
+            if (g.date === shortDate || g.date === exactPostDate) return true;
+            regex.lastIndex = 0;
+            return regex.test(g.date || "");
+        });
+    }
+
+    function getRelatedHomeworkScoresForExam(exam, grades) {
+        if (!exam) return [];
+        return (grades || []).filter(function(g) {
+            return g.exam === exam.exam && (g.date || "").indexOf("作業") > -1 && g.colIndex !== exam.colIndex;
+        });
+    }
+
     async function executeFirebaseRead(studentName, password, bypassPwd, targetClass) {
         let result = { found: false, className: "", studentName: "", dailyPost: [], grades: [], feedbackHistory: [], bulletins: [], stickers: 0, homeworkDone: {} };
         
@@ -3213,18 +3242,14 @@
                     makeup: pRow.makeup, quiz: pRow.quiz, range: pRow.range, note: pRow.note, examData: { main: null, others: [] }
                 };
                 
-                let pDate = new Date(pRow.date);
-                let shortDate = (pDate.getMonth() + 1) + "/" + pDate.getDate();
-                
-                let todayMainExam = result.grades.find(g => {
-                   if (g.date === shortDate || g.date === pRow.date) return true;
-                   let regex = new RegExp("(^|[^0-9])" + shortDate.replace('/','\\/') + "([^0-9]|$)", "g");
-                   if (!regex.test(g.date)) return false;
-                   return (g.date.indexOf("小考") > -1 || g.date.indexOf("隨堂") > -1 || g.date.indexOf("複習") > -1 || g.date.indexOf("鑑定") > -1);
-                });
-                if (todayMainExam) {
+                let todayExams = getDailyPostExamMatches(pRow.date, result.grades);
+                if (todayExams.length > 0) {
+                    let todayMainExam = todayExams[0];
                     postObj.examData.main = todayMainExam;
-                    postObj.examData.others = result.grades.filter(g => g.exam === todayMainExam.exam && g.date.indexOf("作業") > -1 && g.colIndex !== todayMainExam.colIndex);
+                    postObj.examData.others = getRelatedHomeworkScoresForExam(todayMainExam, result.grades);
+                    postObj.examData.exams = todayExams.map(function(exam) {
+                        return { main: exam, others: getRelatedHomeworkScoresForExam(exam, result.grades) };
+                    });
                 }
                 classPosts.push(postObj);
             }
@@ -3255,7 +3280,7 @@
             const fbsObj = snapF.val() || {};
             for (let fbid in fbsObj) {
                 const fb = fbsObj[fbid];
-                result.feedbackHistory.push({ time: fb.time, targetDate: fb.targetDate, type: fb.type, content: fb.content, fbKey: fbid });
+                result.feedbackHistory.push({ time: fb.time, targetDate: fb.targetDate, type: fb.type, content: fb.content, fbKey: fbid, targetExamColIndex: fb.targetExamColIndex || "", targetExamTitle: fb.targetExamTitle || "" });
             }
             result.feedbackHistory.sort(function(a, b) {
                 var tA = new Date(a.time).getTime() || 0;
@@ -4430,7 +4455,7 @@
                         let newFbs = [];
                         for (let fbid in fbsObj) {
                             const fb = fbsObj[fbid];
-                            newFbs.push({ time: fb.time, targetDate: fb.targetDate, type: fb.type, content: fb.content, fbKey: fbid });
+                            newFbs.push({ time: fb.time, targetDate: fb.targetDate, type: fb.type, content: fb.content, fbKey: fbid, targetExamColIndex: fb.targetExamColIndex || "", targetExamTitle: fb.targetExamTitle || "" });
                         }
                         newFbs.sort(function(a, b) {
                             var tA = new Date(a.time).getTime() || 0;
@@ -4584,15 +4609,17 @@
                             let pDate = new Date(postObj.date);
                             let shortDate = (pDate.getMonth() + 1) + "/" + pDate.getDate();
                             
-                            let todayMainExam = gData.grades.find(g => {
-                               if (g.date === shortDate || g.date === postObj.date) return true;
-                               let regex = new RegExp("(^|[^0-9])" + shortDate.replace('/','\\/') + "([^0-9]|$)", "g");
-                               if (!regex.test(g.date)) return false;
-                               return (g.date.indexOf("小考") > -1 || g.date.indexOf("隨堂") > -1 || g.date.indexOf("複習") > -1 || g.date.indexOf("鑑定") > -1);
-                            });
-                            if (todayMainExam) {
+                            let todayExams = getDailyPostExamMatches(postObj.date, gData.grades);
+                            if (todayExams.length > 0) {
+                                let todayMainExam = todayExams[0];
                                 postObj.examData.main = todayMainExam;
-                                postObj.examData.others = gData.grades.filter(g => g.exam === todayMainExam.exam && g.date.indexOf("作業") > -1 && g.colIndex !== todayMainExam.colIndex);
+                                postObj.examData.others = getRelatedHomeworkScoresForExam(todayMainExam, gData.grades);
+                                postObj.examData.exams = todayExams.map(function(exam) {
+                                    return {
+                                        main: exam,
+                                        others: getRelatedHomeworkScoresForExam(exam, gData.grades)
+                                    };
+                                });
                             }
                         });
                     }
@@ -5050,38 +5077,50 @@
             if (isHw) return null;
 
             var candidates = getExamDateCandidates(exam);
+            function buildReportFromFeedback(fb) {
+                var match = fb.content.match(/(\d+(\.\d+)?)/);
+                if (!match) return null;
+                var reportedNum = parseFloat(match[0]);
+                var sheetMatch = rawScore.match(/(\d+(\.\d+)?)/);
+                var sheetNumText = sheetMatch ? sheetMatch[0] : "";
+                var reportedText = match[0];
+                var status = "";
+                if (!rawScore || rawScore.indexOf("假") === -1) status = "unfilled";
+                else if (sheetNumText === reportedText) status = "filled";
+                else status = "changed";
+                return {
+                    feedbackKey: fb.fbKey || "",
+                    targetDate: fb.targetDate || "",
+                    targetExamColIndex: fb.targetExamColIndex || "",
+                    targetExamTitle: fb.targetExamTitle || "",
+                    content: fb.content || "",
+                    reportedScoreText: reportedText,
+                    reportedScoreNum: reportedNum,
+                    scoreValue: reportedText + "假",
+                    sheetScore: rawScore,
+                    status: status
+                };
+            }
+
+            var exactFallbackReport = null;
             for (var k = feedbackHistory.length - 1; k >= 0; k--) {
                 var fb = feedbackHistory[k];
                 if (fb.type === "補考回報") {
                     var fbTarget = (fb.targetDate || "").toString();
+                    var fbExamCol = fb.targetExamColIndex;
+                    var hasFbExamCol = fbExamCol !== undefined && fbExamCol !== null && fbExamCol !== "";
+                    if (hasFbExamCol) {
+                        if (String(fbExamCol) === String(exam.colIndex)) return buildReportFromFeedback(fb);
+                        continue;
+                    }
+                    if (exactFallbackReport) continue;
                     var fbDatePart = fbTarget.substring(5).replace('-', '/');
                     var fbDatePart2 = fbTarget.substring(5).replace('-', '/').replace(/^0/, '').replace(/\/0/, '/');
                     var matchesDate = candidates.some(function(candidate) { return fbTarget.indexOf(candidate) > -1; }) || exam.date.indexOf(fbDatePart) > -1 || exam.date.indexOf(fbDatePart2) > -1 || exam.date == fbDatePart2;
-                    if (matchesDate) {
-                        var match = fb.content.match(/(\d+(\.\d+)?)/);
-                        if (!match) return null;
-                        var reportedNum = parseFloat(match[0]);
-                        var sheetMatch = rawScore.match(/(\d+(\.\d+)?)/);
-                        var sheetNumText = sheetMatch ? sheetMatch[0] : "";
-                        var reportedText = match[0];
-                        var status = "";
-                        if (!rawScore || rawScore.indexOf("假") === -1) status = "unfilled";
-                        else if (sheetNumText === reportedText) status = "filled";
-                        else status = "changed";
-                        return {
-                            feedbackKey: fb.fbKey || "",
-                            targetDate: fb.targetDate || "",
-                            content: fb.content || "",
-                            reportedScoreText: reportedText,
-                            reportedScoreNum: reportedNum,
-                            scoreValue: reportedText + "假",
-                            sheetScore: rawScore,
-                            status: status
-                        };
-                    }
+                    if (matchesDate) exactFallbackReport = buildReportFromFeedback(fb);
                 }
             }
-            return null;
+            return exactFallbackReport;
         }
 
         function getDisplayLogic(exam, feedbackHistory) {
@@ -5285,60 +5324,110 @@
             return "<div class='homework-upload-note'>上傳完成記得按查看答案，取得正解並在課本上以紅筆訂正，才算完成作業哦！</div>";
         }
 
+        function buildDailyPostExamCard(post, exam, others, history) {
+            if (!exam) return "";
+            var scoreReportHtml = "";
+            var logic = getDisplayLogic(exam, history);
+            var unitDisplay = "";
+            if (!isNaN(parseFloat(logic.mainScore))) unitDisplay = "<span class='score-unit-big'>" + (exam.unit || "分") + "</span>";
+            var scoreDisplay = "<span class='" + logic.mainClass + "'>" + logic.mainScore + "</span>" + unitDisplay;
+            var standardHtml = "";
+            var isHomeworkExam = (exam.exam && exam.exam.indexOf("作業") > -1) || (exam.date && exam.date.indexOf("作業") > -1);
+            if (exam.note && exam.note !== "" && !isHomeworkExam) {
+                standardHtml = "<div class='exam-standard-box'>" + SVG.target + " 補考標準：" + exam.note + "</div>";
+            }
+            var safeDate = post.date.replace(/\//g, '-');
+            var hasExamColIndex = exam.colIndex !== undefined && exam.colIndex !== null && exam.colIndex !== "";
+            var scoreInputId = "score-in-" + safeDate + (hasExamColIndex ? ("-" + exam.colIndex) : "");
+            if (logic.needsReport && !isAdminMode) {
+                scoreReportHtml = "<div class='score-report-section'><div style='font-weight:bold; color:#c0392b; margin-bottom:10px; font-size:1.35rem;'>" + SVG.edit + "回報補考分數</div><div class='input-box'><input type='number' class='score-input' id='" + scoreInputId + "' placeholder='輸入分數'><button class='score-btn' onclick=\"submitScoreReport('" + safeDate + "', '" + post.date + "', '" + (hasExamColIndex ? exam.colIndex : "") + "', '" + escapeInlineJs(exam.exam || "") + "')\">送出</button></div></div>";
+            }
+            if (canUseAdminModeReview() && shouldShowGodMakeupReview(exam, logic)) {
+                var makeupContextKey = makeDomSafeId("makeup_" + safeDate + "_" + (exam.colIndex || 0));
+                window.adminModeMakeupContext[makeupContextKey] = { className: gData.className, studentName: gData.studentName, targetDate: post.date, examColIndex: exam.colIndex, title: exam.exam || "", currentColor: exam.cellColor || "", scoreReview: getLatestMakeupReportInfo(exam, history) };
+                scoreReportHtml += buildGodMakeupReviewBox(makeupContextKey, exam, logic);
+            }
+            var chartHtml = "";
+            if (exam.dist) {
+                var dist = exam.dist || [0,0,0,0,0];
+                var labels = exam.labels || ["0~20","20~40","40~60","60~80","80~100"];
+                var maxVal = Math.max(...dist);
+                if (maxVal === 0) maxVal = 1;
+
+                var barCols = "";
+                dist.forEach((val, idx) => {
+                    var lbl = labels[idx] || "";
+                    var isMyGroup = false;
+
+                    var scNum = parseFloat(logic.mainScore);
+                    if (!isNaN(scNum)) {
+                        if (exam.myBucket !== undefined && exam.myBucket !== -1) {
+                            if (idx === exam.myBucket) isMyGroup = true;
+                        } else if (lbl.includes("-") || lbl.includes("~")) {
+                            var pts = lbl.split(/-|~/);
+                            if(scNum >= parseInt(pts[0]) && scNum <= parseInt(pts[1])) isMyGroup = true;
+                            if(scNum === 100 && idx === dist.length - 1) isMyGroup = true;
+                        }
+                    }
+
+                    var fillGrad = "#5b9bd5";
+                    var boxShad = "";
+                    if (isMyGroup) {
+                        if (idx === 4) {
+                            fillGrad = "linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%)";
+                            boxShad = "box-shadow: 0 0 10px var(--primary-glow);";
+                        }
+                        else if (idx === 2 || idx === 3) { fillGrad = "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)"; boxShad = "box-shadow: 0 0 10px rgba(245,158,11,0.3);"; }
+                        else { fillGrad = "linear-gradient(135deg, #ef4444 0%, #dc3545 100%)"; boxShad = "box-shadow: 0 0 10px rgba(239,68,68,0.3);"; }
+                    }
+
+                    var h = (val / maxVal * 100) + '%';
+                    barCols += `<div class="v2-bar-col"><div class="v2-bar-fill" data-val="${val}" style="--target-height: ${h}; background: ${fillGrad}; ${boxShad}"></div><div class="v2-bar-label">${lbl}</div></div>`;
+                });
+                chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
+            }
+            var refHwHtml = "";
+            if (others.length > 0) {
+                refHwHtml = "<div class='ref-hw-box'><div class='ref-hw-title'>" + SVG.edit + " 相同範圍作業分數：</div>";
+                others.forEach(function (o) {
+                    var sDisplay = o.score;
+                    var hwColorClass = "";
+                    if (sDisplay == "#N/A") sDisplay = "<span class='text-red' style='font-size:1rem'>尚未繳交</span>";
+                    else {
+                        var m = sDisplay.match(/(\d+(\.\d+)?)/);
+                        if (m) {
+                            var u = o.unit || "題";
+                            if (o.myBucket === 4) hwColorClass = " score-green";
+                            else if (o.myBucket <= 1 && o.myBucket >= 0) hwColorClass = " score-red";
+                            sDisplay = "<span class='hw-score-val" + hwColorClass + "'>" + m[0] + "</span><span class='score-unit'>" + u + "</span>";
+                        }
+                    }
+                    refHwHtml += "<div class='ref-hw-item'><span>" + o.date + " " + o.exam + "</span><div>" + sDisplay + "</div></div>";
+                });
+                refHwHtml += "</div>";
+            }
+
+            var examTitle = "今日小考成績";
+            if (exam.date.indexOf("複習") > -1) examTitle = "今日複習考成績";
+            else if (exam.date.indexOf("鑑定") > -1) examTitle = "今日鑑定考成績";
+            else if (exam.date.indexOf("隨堂") > -1) examTitle = "今日隨堂考成績";
+
+            return "<div class='grade-section'><div class='main-exam-title'>" + examTitle + "</div><div class='main-exam-range'>" + exam.exam + "</div><div class='main-score'>" + scoreDisplay + "</div>" + logic.statusHtml + "<div class='score-sub'>班平均: " + exam.average + "</div>" + standardHtml + scoreReportHtml + chartHtml + refHwHtml + "</div>";
+        }
+
         function renderDailyPosts(posts, history) {
             window.adminModeReplyContext = {};
             window.adminModeStickerContext = {};
             window.adminModeMakeupContext = {};
             window.adminModeDirectMessageContext = {};
             var container = document.getElementById('tab-content-0'); if (!posts || posts.length === 0) { container.innerHTML = "<div style='text-align:center; padding:30px; color:#999;'>目前沒有聯絡簿資料</div>"; return; } var html = ""; posts.forEach(function (post) {
-                var gradeHtml = ""; var exam = post.examData.main; var others = post.examData.others; var scoreReportHtml = ""; if (exam) {
-                    var logic = getDisplayLogic(exam, history); var unitDisplay = ""; if (!isNaN(parseFloat(logic.mainScore))) unitDisplay = "<span class='score-unit-big'>" + (exam.unit || "分") + "</span>"; var scoreDisplay = "<span class='" + logic.mainClass + "'>" + logic.mainScore + "</span>" + unitDisplay; var standardHtml = ""; var isHomeworkExam = (exam.exam && exam.exam.indexOf("作業") > -1) || (exam.date && exam.date.indexOf("作業") > -1); if (exam.note && exam.note !== "" && !isHomeworkExam) { standardHtml = "<div class='exam-standard-box'>" + SVG.target + " 補考標準：" + exam.note + "</div>"; } var safeDate = post.date.replace(/\//g, '-'); if (logic.needsReport && !isAdminMode) { scoreReportHtml = "<div class='score-report-section'><div style='font-weight:bold; color:#c0392b; margin-bottom:10px; font-size:1.35rem;'>" + SVG.edit + "回報補考分數</div><div class='input-box'><input type='number' class='score-input' id='score-in-" + safeDate + "' placeholder='輸入分數'><button class='score-btn' onclick=\"submitScoreReport('" + safeDate + "', '" + post.date + "')\">送出</button></div></div>"; } if (canUseAdminModeReview() && shouldShowGodMakeupReview(exam, logic)) { var makeupContextKey = makeDomSafeId("makeup_" + safeDate + "_" + (exam.colIndex || 0)); window.adminModeMakeupContext[makeupContextKey] = { className: gData.className, studentName: gData.studentName, targetDate: post.date, examColIndex: exam.colIndex, title: exam.exam || "", currentColor: exam.cellColor || "", scoreReview: getLatestMakeupReportInfo(exam, history) }; scoreReportHtml += buildGodMakeupReviewBox(makeupContextKey, exam, logic); } var chartHtml = "";
-if (exam.dist) {
-    var dist = exam.dist || [0,0,0,0,0];
-    var labels = exam.labels || ["0~20","20~40","40~60","60~80","80~100"];
-    var maxVal = Math.max(...dist);
-    if (maxVal === 0) maxVal = 1;
-    
-    var barCols = "";
-    dist.forEach((val, idx) => {
-        var lbl = labels[idx] || "";
-        var isMyGroup = false;
-        
-        var scNum = parseFloat(logic.mainScore);
-        if (!isNaN(scNum)) {
-            if (exam.myBucket !== undefined && exam.myBucket !== -1) {
-                if (idx === exam.myBucket) isMyGroup = true;
-            } else if (lbl.includes("-") || lbl.includes("~")) {
-                var pts = lbl.split(/-|~/);
-                if(scNum >= parseInt(pts[0]) && scNum <= parseInt(pts[1])) isMyGroup = true;
-                if(scNum === 100 && idx === dist.length - 1) isMyGroup = true;
-            }
-        }
-        
-        var fillGrad = "#5b9bd5";
-        var boxShad = "";
-        if (isMyGroup) {
-            if (idx === 4) { 
-                fillGrad = "linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%)"; 
-                boxShad = "box-shadow: 0 0 10px var(--primary-glow);"; 
-            }
-            else if (idx === 2 || idx === 3) { fillGrad = "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)"; boxShad = "box-shadow: 0 0 10px rgba(245,158,11,0.3);"; }
-            else { fillGrad = "linear-gradient(135deg, #ef4444 0%, #dc3545 100%)"; boxShad = "box-shadow: 0 0 10px rgba(239,68,68,0.3);"; }
-        }
-        
-        var h = (val / maxVal * 100) + '%';
-        barCols += `<div class="v2-bar-col"><div class="v2-bar-fill" data-val="${val}" style="--target-height: ${h}; background: ${fillGrad}; ${boxShad}"></div><div class="v2-bar-label">${lbl}</div></div>`;
-    });
-    chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
-} var refHwHtml = ""; if (others.length > 0) { refHwHtml = "<div class='ref-hw-box'><div class='ref-hw-title'>" + SVG.edit + " 相同範圍作業分數：</div>"; others.forEach(function (o) { var sDisplay = o.score; var hwColorClass = ""; if (sDisplay == "#N/A") sDisplay = "<span class='text-red' style='font-size:1rem'>尚未繳交</span>"; else { var m = sDisplay.match(/(\d+(\.\d+)?)/); if (m) { var u = o.unit || "題"; if (o.myBucket === 4) hwColorClass = " score-green"; else if (o.myBucket <= 1 && o.myBucket >= 0) hwColorClass = " score-red"; sDisplay = "<span class='hw-score-val" + hwColorClass + "'>" + m[0] + "</span><span class='score-unit'>" + u + "</span>"; } } refHwHtml += "<div class='ref-hw-item'><span>" + o.date + " " + o.exam + "</span><div>" + sDisplay + "</div></div>"; }); refHwHtml += "</div>"; }
-
-                    var examTitle = "今日小考成績";
-                    if (exam.date.indexOf("複習") > -1) examTitle = "今日複習考成績";
-                    else if (exam.date.indexOf("鑑定") > -1) examTitle = "今日鑑定考成績";
-                    else if (exam.date.indexOf("隨堂") > -1) examTitle = "今日隨堂考成績";
-
-                    gradeHtml = "<div class='grade-section'><div class='main-exam-title'>" + examTitle + "</div><div class='main-exam-range'>" + exam.exam + "</div><div class='main-score'>" + scoreDisplay + "</div>" + logic.statusHtml + "<div class='score-sub'>班平均: " + exam.average + "</div>" + standardHtml + scoreReportHtml + chartHtml + refHwHtml + "</div>";
-                } var contentHtml = "";
+                var examCards = (post.examData && post.examData.exams && post.examData.exams.length)
+                    ? post.examData.exams
+                    : ((post.examData && post.examData.main) ? [{ main: post.examData.main, others: post.examData.others || [] }] : []);
+                var gradeHtml = examCards.map(function(item) {
+                    return buildDailyPostExamCard(post, item.main, item.others || [], history);
+                }).join("");
+                var contentHtml = "";
 
                 // ★★★ v3.9 修正：連結解析邏輯 (支援小標籤) ★★★
                 var parseBtn = function (text) {
@@ -6062,14 +6151,19 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }).submitFeedback(form);
         }
 
-        function submitScoreReport(safeId, realDate) { 
+        function submitScoreReport(safeId, realDate, examColIndex, examTitle) {
             if (blockStudentPreviewAction("回報補考分數")) return;
-            var inputId = 'score-in-' + safeId; 
+            var hasExamColIndex = examColIndex !== undefined && examColIndex !== null && examColIndex !== "";
+            var inputId = 'score-in-' + safeId + (hasExamColIndex ? ('-' + examColIndex) : '');
             var val = document.getElementById(inputId).value; 
             if (!val) return; 
             var btn = document.querySelector("#" + inputId + " + button"); 
             btn.innerText = "送出..."; btn.disabled = true; 
             var form = { className: gData.className, studentName: gData.studentName, targetDate: realDate, type: '補考回報', content: val }; 
+            if (hasExamColIndex) {
+                form.targetExamColIndex = examColIndex;
+                form.targetExamTitle = examTitle || "";
+            }
             google.script.run.withSuccessHandler(function (res) { 
                 // 監聽器會處理數據更新，此處僅清理輸入
                 document.getElementById(inputId).value = "";
@@ -6606,12 +6700,17 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 status.innerText = '正在回填補考分數...';
             }
             try {
-                await runGodAdminAction('writeScoreGas', {
+                var payload = {
                     className: gData.className,
                     studentName: gData.studentName,
                     targetDateStr: context.targetDate,
                     scoreValue: finalScore
-                });
+                };
+                if (context.scoreReview.targetExamColIndex !== undefined && context.scoreReview.targetExamColIndex !== null && context.scoreReview.targetExamColIndex !== "") {
+                    payload.examColIndex = context.scoreReview.targetExamColIndex;
+                    payload.targetExamTitle = context.scoreReview.targetExamTitle || context.title || "";
+                }
+                await runGodAdminAction('writeScoreGas', payload);
                 if (btn) {
                     btn.innerText = '已回填';
                     btn.style.background = '#64748b';
@@ -7194,7 +7293,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                         var fb = fbs[fid];
                         var fType = fb.type || '學生留言';
                         if (fType.indexOf('棒卡') > -1) continue; 
-                        rawList.push({ fbKey: fid, stuKey: sKey, type: fType, content: fb.content, time: fb.time, date: fb.targetDate || fb.time.substring(0,10).replace(/-/g,'/'), cls: cls, stuName: sName, safeC: safeC });
+                        rawList.push({ fbKey: fid, stuKey: sKey, type: fType, content: fb.content, time: fb.time, date: fb.targetDate || fb.time.substring(0,10).replace(/-/g,'/'), cls: cls, stuName: sName, safeC: safeC, targetExamColIndex: fb.targetExamColIndex || "", targetExamTitle: fb.targetExamTitle || "" });
                     }
                 }
             } else {
@@ -7207,15 +7306,20 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     var fb = fbs[fid];
                     var fType = fb.type || '學生留言';
                     if (fType.indexOf('棒卡') > -1) continue;
-                    rawList.push({ fbKey: fid, stuKey: stuKey, type: fType, content: fb.content, time: fb.time, date: fb.targetDate || fb.time.substring(0,10).replace(/-/g,'/'), cls: cls, stuName: stuName, safeC: safeC });
+                    rawList.push({ fbKey: fid, stuKey: stuKey, type: fType, content: fb.content, time: fb.time, date: fb.targetDate || fb.time.substring(0,10).replace(/-/g,'/'), cls: cls, stuName: stuName, safeC: safeC, targetExamColIndex: fb.targetExamColIndex || "", targetExamTitle: fb.targetExamTitle || "" });
                 }
             }
 
             // --- 智慧狀態判定引擎：最新覆蓋法則 ---
             var groups = {};
+            function getMakeupGroupKey(item) {
+                var targetCol = (item.targetExamColIndex !== undefined && item.targetExamColIndex !== null) ? item.targetExamColIndex.toString() : "";
+                return item.stuKey + '_' + item.date + (targetCol !== "" ? ('_' + targetCol) : '');
+            }
+
             rawList.forEach(function(item) {
                 if (item.type.indexOf('補考') > -1) {
-                    var key = item.stuKey + '_' + item.date;
+                    var key = getMakeupGroupKey(item);
                     if (!groups[key]) groups[key] = [];
                     groups[key].push(item);
                 }
@@ -7228,9 +7332,15 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }
             
             // 尋找大表成績
-            function getSheetScoreForDate(stuK, targetDateStr) {
+            function getSheetScoreForFeedback(stuK, item) {
                 if (!classGrades[stuK] || !classGrades[stuK].exams) return null;
                 var exams = classGrades[stuK].exams;
+                var targetCol = (item.targetExamColIndex !== undefined && item.targetExamColIndex !== null) ? item.targetExamColIndex.toString() : "";
+                if (targetCol !== "") {
+                    var exactExam = exams['col_' + targetCol];
+                    return exactExam ? (exactExam.score || "").toString() : null;
+                }
+                var targetDateStr = item.date || "";
                 var parts = targetDateStr.replace(/-/g, "/").split("/");
                 if (parts.length < 2) return null;
                 var m = parseInt(parts[parts.length-2], 10).toString();
@@ -7258,7 +7368,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     if (!item.isLatestMakeup) {
                         item.statusFlag = "🌚 已作廢";
                     } else {
-                        var sScore = getSheetScoreForDate(item.stuKey, item.date);
+                        var sScore = getSheetScoreForFeedback(item.stuKey, item);
                         item.sheetScore = sScore;
                         var rMatch = item.content.match(/(\d+(\.\d+)?)/);
                         var rScore = rMatch ? rMatch[0] : "";
@@ -7330,7 +7440,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     '<div style="display:flex; gap:6px;">' +
                     '<input type="text" id="fb-reply-'+idx+'" placeholder="輸入' + tInfo.name + '老師回覆..." style="flex:1; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.95rem;">' +
                     '<button onclick="sendAdminReply('+idx+', \'' + item.safeC + '\', \'' + item.stuKey + '\', \'' + item.date + '\', \'' + item.cls + '\', \'' + item.stuName + '\')" style="background:#3b82f6; color:white; border:none; border-radius:6px; padding:8px 14px; font-weight:700; cursor:pointer; flex-shrink:0;">立即回覆</button>' +
-                    (isScore && item.statusFlag !== "✅ 已回填" && item.statusFlag !== "🌚 已作廢" ? '<button id="btn-score-'+idx+'" onclick="autoWriteScore('+idx+', \'' + item.cls + '\', \'' + item.stuName + '\', \'' + item.date + '\')" style="background:#10b981; color:white; border:none; border-radius:6px; padding:8px 14px; font-weight:700; cursor:pointer; flex-shrink:0;">📝 自動填入</button>' : '') +
+                    (isScore && item.statusFlag !== "✅ 已回填" && item.statusFlag !== "🌚 已作廢" ? '<button id="btn-score-'+idx+'" onclick="autoWriteScore('+idx+', \'' + escapeInlineJs(item.cls) + '\', \'' + escapeInlineJs(item.stuName) + '\', \'' + escapeInlineJs(item.date) + '\', \'' + escapeInlineJs(item.targetExamColIndex || "") + '\', \'' + escapeInlineJs(item.targetExamTitle || "") + '\')" style="background:#10b981; color:white; border:none; border-radius:6px; padding:8px 14px; font-weight:700; cursor:pointer; flex-shrink:0;">📝 自動填入</button>' : '') +
                     '</div>' +
                 '</div>';
             });
@@ -7373,7 +7483,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }
         }
 
-        window.autoWriteScore = async function(idx, clsName, stuName, targetDate) {
+        window.autoWriteScore = async function(idx, clsName, stuName, targetDate, targetExamColIndex, targetExamTitle) {
             var originalContent = document.getElementById('fb-content-' + idx).innerText;
             // 嘗試從留言中萃取數字
             var match = originalContent.match(/(\d+(\.\d+)?)/);
@@ -7416,7 +7526,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 }).withFailureHandler(function(err) {
                     Swal.close();
                     swalAlert('❌ 系統連線錯誤', err.toString(), 'error');
-                }).writeScoreGas(gPass, clsName, stuName, targetDate, finalScore);
+                }).writeScoreGas(gPass, clsName, stuName, targetDate, finalScore, targetExamColIndex, targetExamTitle || "");
             }
         };
 
