@@ -5432,7 +5432,7 @@
             if (!exam || exam.colIndex === undefined || exam.colIndex === null) return false;
             if (currentExamColMap && currentExamColMap[String(exam.colIndex)]) return false;
             if (!isMakeupExamTitle(((exam.date || "") + " " + (exam.exam || "")).trim())) return false;
-            if (exam.cellColor) return false;
+            if (getMakeupColorInfo(exam.cellColor)) return false;
             if (!exam.makeupThreshold || exam.makeupThreshold <= 0) return false;
             var logic = getDisplayLogic(exam, history);
             return logic && logic.effectiveNum !== null && logic.effectiveNum < exam.makeupThreshold;
