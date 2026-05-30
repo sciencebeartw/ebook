@@ -5177,6 +5177,8 @@
         var uploadQueue = [];
         var isUploading = false;
         var currentUploadDate = "";
+        var uploadBatchUrls = [];
+        var uploadBatchSkipped = [];
 
         function handleStudentUpload(input, dateStr) {
             if (input.files.length === 0) return;
@@ -5189,14 +5191,23 @@
                 if (inputToClear) inputToClear.value = "";
                 return;
             }
-            if (files.length > 5) {
-                alert("一次最多只能上傳 5 個檔案！");
+            if (isUploading) {
+                alert("目前還有檔案正在上傳，請等這批完成後再上傳下一批。");
+                if (inputToClear) inputToClear.value = "";
+                return;
+            }
+            if (files.length > 10) {
+                alert("一次最多只能上傳 10 個檔案！");
                 if (inputToClear) inputToClear.value = "";
                 return;
             }
 
             currentUploadDate = dateStr;
             uploadQueue = files;
+            uploadBatchUrls = [];
+            uploadBatchSkipped = [];
+            isUploading = true;
+            if (inputToClear) inputToClear.value = "";
             processUploadQueue(dateStr);
         }
 
@@ -5227,9 +5238,38 @@
         // ★★★ v3.9 學生作業上傳佇列 → Firebase Storage ★★★
         function processUploadQueue(dateStr) {
             if (uploadQueue.length === 0) {
-                alert('✅ 所有檔案上傳完成！');
                 var sd = document.getElementById('upload-status-' + dateStr.replace(/\//g, '-'));
-                if (sd) sd.innerText = '';
+                if (uploadBatchUrls.length === 0) {
+                    var skippedOnlyCount = uploadBatchSkipped.length;
+                    isUploading = false;
+                    currentUploadDate = "";
+                    uploadBatchSkipped = [];
+                    if (sd) sd.innerText = '';
+                    alert(skippedOnlyCount > 0 ? '沒有檔案成功上傳。' : '沒有可上傳的檔案。');
+                    return;
+                }
+
+                if (sd) sd.innerHTML = SVG.hourglass + ' 正在寫入留言...';
+                var content = uploadBatchUrls.map(function(url) {
+                    return '[附件]' + url;
+                }).join('\n');
+                var uploadedCount = uploadBatchUrls.length;
+                var skippedCount = uploadBatchSkipped.length;
+
+                sendFeedback(dateStr.replace(/\//g, '-'), dateStr, '作業上傳', content, function() {
+                    isUploading = false;
+                    currentUploadDate = "";
+                    uploadBatchUrls = [];
+                    uploadBatchSkipped = [];
+                    if (sd) sd.innerText = '';
+                    var msg = '✅ 已上傳 ' + uploadedCount + ' 個檔案，並合併成一則留言！';
+                    if (skippedCount > 0) msg += '\n另有 ' + skippedCount + ' 個檔案未成功上傳。';
+                    alert(msg);
+                }, function() {
+                    isUploading = false;
+                    currentUploadDate = "";
+                    if (sd) sd.innerText = '';
+                });
                 return;
             }
 
@@ -5238,6 +5278,7 @@
 
             if (file.size > 10 * 1024 * 1024) {
                 alert('❌ 檔案 ' + file.name + ' 超過 10MB，已略過。');
+                uploadBatchSkipped.push(file.name);
                 processUploadQueue(dateStr);
                 return;
             }
@@ -5255,15 +5296,13 @@
 
             uploadToFirebase(file, path,
                 function(res) {
-                    // 上傳成功：用 [📄附件] 格式寫入回饋
-                    var content = '[附件]' + res.url;
-                    sendFeedback(dateStr.replace(/\//g, '-'), dateStr, '作業上傳', content, function() {
-                        processUploadQueue(dateStr); // 繼續下一個
-                    });
+                    uploadBatchUrls.push(res.url);
+                    processUploadQueue(dateStr);
                 },
                 function(err) {
                     if (statusDiv) statusDiv.innerText = '';
                     alert('❌ 上傳錯誤：' + (err.message || err.toString()));
+                    uploadBatchSkipped.push(file.name);
                     processUploadQueue(dateStr); // 略過繼續
                 }
             );
@@ -6125,7 +6164,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }).submitFeedback(form);
         }
 
-        function sendFeedback(safeId, realDate, type, contentOverride, callback) {
+        function sendFeedback(safeId, realDate, type, contentOverride, callback, failureCallback) {
             if (blockStudentPreviewAction(type === "作業上傳" ? "上傳作業" : "送出留言")) return;
             var inputId = 'input-' + safeId;
             var val = contentOverride || document.getElementById(inputId).value;
@@ -6148,6 +6187,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }).withFailureHandler(function (e) {
                 swalAlert("送出失敗", friendlySubmitError(e), 'warning');
                 if (btn) { btn.innerText = "送出"; btn.disabled = false; }
+                if (failureCallback) failureCallback(e);
             }).submitFeedback(form);
         }
 
