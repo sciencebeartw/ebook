@@ -1914,6 +1914,42 @@
             border: 2px dashed #e74c3c;
         }
 
+        .makeup-result-report-section {
+            background: #fff7ed;
+            padding: 16px;
+            margin: 14px 0 4px;
+            border-radius: 12px;
+            border: 2px dashed #fb923c;
+        }
+
+        .makeup-result-report-title {
+            font-weight: 900;
+            color: #c2410c;
+            margin-bottom: 10px;
+            font-size: 1.15rem;
+        }
+
+        .makeup-result-report-card {
+            background: rgba(255,255,255,0.86);
+            border: 1px solid #fed7aa;
+            border-radius: 10px;
+            padding: 12px;
+            margin-top: 10px;
+        }
+
+        .makeup-result-report-meta {
+            color: #7c2d12;
+            font-size: 0.95rem;
+            font-weight: 800;
+            line-height: 1.45;
+        }
+
+        .makeup-result-report-status {
+            color: #c2410c;
+            font-weight: 900;
+            margin-top: 8px;
+        }
+
         .feedback-section {
             background: transparent;
             padding: 20px 16px;
@@ -5363,6 +5399,78 @@
             return "<div class='homework-upload-note'>上傳完成記得按查看答案，取得正解並在課本上以紅筆訂正，才算完成作業哦！</div>";
         }
 
+        function getDailyPostExamLabel(exam) {
+            var raw = ((exam && exam.date) || "") + " " + ((exam && exam.exam) || "");
+            if (raw.indexOf("複習") > -1) return "複習考";
+            if (raw.indexOf("鑑定") > -1) return "鑑定考";
+            if (raw.indexOf("隨堂") > -1) return "隨堂考";
+            return "小考";
+        }
+
+        function isMakeupResultReportType(type) {
+            return type === (typeof FEEDBACK_TYPE_LABELS !== "undefined" ? FEEDBACK_TYPE_LABELS.makeupResult : "補考結果回報");
+        }
+
+        function getLatestMakeupResultReportInfo(exam, feedbackHistory) {
+            if (!exam || exam.colIndex === undefined || exam.colIndex === null || !feedbackHistory || feedbackHistory.length === 0) return null;
+            for (var k = feedbackHistory.length - 1; k >= 0; k--) {
+                var fb = feedbackHistory[k] || {};
+                if (!isMakeupResultReportType(fb.type)) continue;
+                if (String(fb.targetExamColIndex || "") !== String(exam.colIndex)) continue;
+                var match = (fb.content || "").toString().match(/(\d+(\.\d+)?)/);
+                return {
+                    feedbackKey: fb.fbKey || "",
+                    targetDate: fb.targetDate || "",
+                    content: fb.content || "",
+                    reportedScoreText: match ? match[0] : (fb.content || "").toString()
+                };
+            }
+            return null;
+        }
+
+        function isPendingMakeupResultExam(exam, history, currentExamColMap) {
+            if (!exam || exam.colIndex === undefined || exam.colIndex === null) return false;
+            if (currentExamColMap && currentExamColMap[String(exam.colIndex)]) return false;
+            if (!isMakeupExamTitle(((exam.date || "") + " " + (exam.exam || "")).trim())) return false;
+            if (exam.cellColor) return false;
+            if (!exam.makeupThreshold || exam.makeupThreshold <= 0) return false;
+            var logic = getDisplayLogic(exam, history);
+            return logic && logic.effectiveNum !== null && logic.effectiveNum < exam.makeupThreshold;
+        }
+
+        function buildPendingMakeupResultReportHtml(post, history, examCards) {
+            if (!post || !post.makeup || isAdminMode || !gData || !gData.grades || !gData.grades.length) return "";
+            var currentExamColMap = {};
+            (examCards || []).forEach(function(item) {
+                var exam = item && item.main;
+                if (exam && exam.colIndex !== undefined && exam.colIndex !== null) currentExamColMap[String(exam.colIndex)] = true;
+            });
+            var pending = gData.grades.filter(function(exam) {
+                return isPendingMakeupResultExam(exam, history, currentExamColMap);
+            });
+            if (pending.length === 0) return "";
+
+            var safeDate = post.date.replace(/\//g, "-");
+            var html = "<div class='makeup-result-report-section'><div class='makeup-result-report-title'>上次未達標需補考回報</div>";
+            pending.forEach(function(exam) {
+                var report = getLatestMakeupResultReportInfo(exam, history);
+                var domId = makeDomSafeId("makeup-result-" + safeDate + "-" + exam.colIndex);
+                var title = ((exam.date || "") + " " + (exam.exam || "")).trim();
+                var scoreText = exam.score ? exam.score : "空白";
+                html += "<div class='makeup-result-report-card'>" +
+                    "<div class='makeup-result-report-meta'>" + escapeHtml(title || ("考試欄位 " + exam.colIndex)) + "</div>" +
+                    "<div class='makeup-result-report-meta'>原本成績：" + escapeHtml(scoreText) + "｜補考標準：" + escapeHtml(exam.makeupThreshold) + "</div>";
+                if (report) {
+                    html += "<div class='makeup-result-report-status'>已回報 " + escapeHtml(report.reportedScoreText) + "，等待老師登記補考結果。</div>";
+                } else {
+                    html += "<div class='input-box' style='margin-top:10px;'><input type='number' class='score-input' id='" + domId + "' placeholder='輸入補考分數'><button class='score-btn' onclick=\"submitMakeupResultReport('" + domId + "', '" + post.date + "', '" + exam.colIndex + "', '" + escapeInlineJs(title || "") + "')\">送出</button></div>";
+                }
+                html += "</div>";
+            });
+            html += "</div>";
+            return html;
+        }
+
         function buildDailyPostExamCard(post, exam, others, history) {
             if (!exam) return "";
             var scoreReportHtml = "";
@@ -5379,7 +5487,7 @@
             var hasExamColIndex = exam.colIndex !== undefined && exam.colIndex !== null && exam.colIndex !== "";
             var scoreInputId = "score-in-" + safeDate + (hasExamColIndex ? ("-" + exam.colIndex) : "");
             if (logic.needsReport && !isAdminMode) {
-                scoreReportHtml = "<div class='score-report-section'><div style='font-weight:bold; color:#c0392b; margin-bottom:10px; font-size:1.35rem;'>" + SVG.edit + "回報補考分數</div><div class='input-box'><input type='number' class='score-input' id='" + scoreInputId + "' placeholder='輸入分數'><button class='score-btn' onclick=\"submitScoreReport('" + safeDate + "', '" + post.date + "', '" + (hasExamColIndex ? exam.colIndex : "") + "', '" + escapeInlineJs(exam.exam || "") + "')\">送出</button></div></div>";
+                scoreReportHtml = "<div class='score-report-section'><div style='font-weight:bold; color:#c0392b; margin-bottom:10px; font-size:1.35rem;'>" + SVG.edit + "回報今日" + getDailyPostExamLabel(exam) + "缺考分數</div><div class='input-box'><input type='number' class='score-input' id='" + scoreInputId + "' placeholder='輸入分數'><button class='score-btn' onclick=\"submitScoreReport('" + safeDate + "', '" + post.date + "', '" + (hasExamColIndex ? exam.colIndex : "") + "', '" + escapeInlineJs(exam.exam || "") + "')\">送出</button></div></div>";
             }
             if (canUseAdminModeReview() && shouldShowGodMakeupReview(exam, logic)) {
                 var makeupContextKey = makeDomSafeId("makeup_" + safeDate + "_" + (exam.colIndex || 0));
@@ -5446,10 +5554,7 @@
                 refHwHtml += "</div>";
             }
 
-            var examTitle = "今日小考成績";
-            if (exam.date.indexOf("複習") > -1) examTitle = "今日複習考成績";
-            else if (exam.date.indexOf("鑑定") > -1) examTitle = "今日鑑定考成績";
-            else if (exam.date.indexOf("隨堂") > -1) examTitle = "今日隨堂考成績";
+            var examTitle = "今日" + getDailyPostExamLabel(exam) + "成績";
 
             return "<div class='grade-section'><div class='main-exam-title'>" + examTitle + "</div><div class='main-exam-range'>" + exam.exam + "</div><div class='main-score'>" + scoreDisplay + "</div>" + logic.statusHtml + "<div class='score-sub'>班平均: " + exam.average + "</div>" + standardHtml + scoreReportHtml + chartHtml + refHwHtml + "</div>";
         }
@@ -5544,8 +5649,8 @@
                     if (hwIdx === homeworkItems.length - 1) extra += buildHomeworkDoneButton(post);
                     fields.push({ label: item.label, val: item.val, extra: extra });
                 });
-                fields = fields.concat([{ label: "今日補考考卷", val: post.makeup }, { label: "下次考試範圍", val: post.range }, { label: "補充資料", val: post.note }]);
-                fields.forEach(function (f) { if (f.val) contentHtml += "<div class='info-block'><span class='info-label'>" + f.label + "</span><div class='info-content'>" + parseBtn(f.val) + (f.extra || "") + "</div></div>"; }); var pDateShort = post.date.substring(5).replace("-", "/"); var pDateFull = post.date.replace(/-/g, "/"); var myHistory = history.filter(function (h) { return h.targetDate == pDateShort || h.targetDate == post.date || h.targetDate == pDateFull; }); myHistory.sort(function(a,b) { return new Date(a.time) - new Date(b.time); }); var historyHtml = ""; myHistory.forEach(function (h) { if (h.type !== FEEDBACK_TYPE_LABELS.makeup) { var displayType = (h.type === FEEDBACK_TYPE_LABELS.parent || h.type === FEEDBACK_TYPE_LABELS.parentStudent || h.type === FEEDBACK_TYPE_LABELS.student) ? "學生留言" : h.type; var isTeacher = (!isStudentSideFeedbackType(h.type));
+                fields = fields.concat([{ label: "今日補考考卷", val: post.makeup, extra: buildPendingMakeupResultReportHtml(post, history, examCards) }, { label: "下次考試範圍", val: post.range }, { label: "補充資料", val: post.note }]);
+                fields.forEach(function (f) { if (f.val) contentHtml += "<div class='info-block'><span class='info-label'>" + f.label + "</span><div class='info-content'>" + parseBtn(f.val) + (f.extra || "") + "</div></div>"; }); var pDateShort = post.date.substring(5).replace("-", "/"); var pDateFull = post.date.replace(/-/g, "/"); var myHistory = history.filter(function (h) { return h.targetDate == pDateShort || h.targetDate == post.date || h.targetDate == pDateFull; }); myHistory.sort(function(a,b) { return new Date(a.time) - new Date(b.time); }); var historyHtml = ""; myHistory.forEach(function (h) { if (h.type !== FEEDBACK_TYPE_LABELS.makeup && h.type !== FEEDBACK_TYPE_LABELS.makeupResult) { var displayType = (h.type === FEEDBACK_TYPE_LABELS.parent || h.type === FEEDBACK_TYPE_LABELS.parentStudent || h.type === FEEDBACK_TYPE_LABELS.student) ? "學生留言" : h.type; var isTeacher = (!isStudentSideFeedbackType(h.type));
                         var avatarClass = isTeacher ? "avatar-teacher" : "avatar-student";
                         var bodyClass = isTeacher ? "teacher-body" : "";
                         var sName = (gData && gData.studentName) ? gData.studentName : "學";
@@ -6214,6 +6319,32 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 btn.innerText = "送出"; btn.disabled = false; 
             }).submitFeedback(form); 
         }
+
+        function submitMakeupResultReport(inputId, realDate, examColIndex, examTitle) {
+            if (blockStudentPreviewAction("回報補考結果")) return;
+            var input = document.getElementById(inputId);
+            var val = input ? input.value : "";
+            if (!val) return;
+            var btn = input ? input.nextElementSibling : null;
+            if (btn) { btn.innerText = "送出..."; btn.disabled = true; }
+            var form = {
+                className: gData.className,
+                studentName: gData.studentName,
+                targetDate: realDate,
+                type: FEEDBACK_TYPE_LABELS.makeupResult,
+                content: val,
+                targetExamColIndex: examColIndex,
+                targetExamTitle: examTitle || ""
+            };
+            google.script.run.withSuccessHandler(function (res) {
+                if (input) input.value = "";
+                if (btn) { btn.innerText = "已送出"; btn.disabled = true; }
+                alert("已回報補考分數，等待老師登記補考結果。");
+            }).withFailureHandler(function (e) {
+                swalAlert("回報失敗", friendlySubmitError(e), 'warning');
+                if (btn) { btn.innerText = "送出"; btn.disabled = false; }
+            }).submitFeedback(form);
+        }
         function openPwdModal() { document.getElementById('pwdModal').style.display = 'flex'; }
         function closePwdModal() { document.getElementById('pwdModal').style.display = 'none'; }
         function doChangePwd() { 
@@ -6441,7 +6572,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             parentStudent: "\u5bb6\u9577/\u5b78\u751f",
             upload: "\u4f5c\u696d\u4e0a\u50b3",
             sticker: "\u68d2\u5361\u7533\u8acb",
-            makeup: "\u88dc\u8003\u56de\u5831"
+            makeup: "\u88dc\u8003\u56de\u5831",
+            makeupResult: "\u88dc\u8003\u7d50\u679c\u56de\u5831"
         };
 
         function isStudentSideFeedbackType(type) {
