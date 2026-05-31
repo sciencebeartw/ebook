@@ -5628,7 +5628,12 @@
                             var quotedStickerStatusKind = getStickerReviewStatusKind(quotedStickerStatus);
                             var statusColor = quotedStickerStatusKind === 'pending' ? '#f59e0b' : (quotedStickerStatusKind === 'rejected' ? '#ef4444' : 'var(--primary)');
                             var statusIcon = quotedStickerStatusKind === 'pending' ? SVG.hourglass : (quotedStickerStatusKind === 'rejected' ? SVG.cross : SVG.check);
-                            var rendered = `<div style="font-weight:bold; font-size:1.1rem; color:#431407; margin-bottom:4px;">${SVG.star}${d.reason} <span style="background:linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); color:white; padding:2px 8px; border-radius:12px; font-size:0.9rem;">+${d.count}棒</span></div><div style="font-weight:bold; color:${statusColor}; font-size:0.95rem; background:rgba(255,255,255,0.7); display:inline-block; padding:2px 8px; border-radius:4px; margin-top:4px;">${statusIcon} ${quotedStickerStatus}</div>`;
+                            var quotedStickerPenalty = parseInt(d.count, 10) < 0;
+                            var quotedStickerIcon = quotedStickerPenalty ? SVG.penalty : SVG.star;
+                            var quotedStickerBadgeStyle = quotedStickerPenalty
+                                ? 'background:linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);'
+                                : 'background:linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);';
+                            var rendered = `<div style="font-weight:bold; font-size:1.1rem; color:#431407; margin-bottom:4px;">${quotedStickerIcon}${d.reason} <span style="${quotedStickerBadgeStyle} color:white; padding:2px 8px; border-radius:12px; font-size:0.9rem;">${formatStickerCountText(d.count)}</span></div><div style="font-weight:bold; color:${statusColor}; font-size:0.95rem; background:rgba(255,255,255,0.7); display:inline-block; padding:2px 8px; border-radius:4px; margin-top:4px;">${statusIcon} ${quotedStickerStatus}</div>`;
                             return `<div class="quote-box" style="background:#fef3c7; border-left:4px solid #f59e0b; border-radius:8px; padding:12px; margin:10px 0; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
                                       <div class="quote-content">${rendered}</div>
                                     </div>`;
@@ -5696,9 +5701,12 @@
                             var statusClass = statusKind === "approved" ? "approved" : (statusKind === "rejected" ? "rejected" : "");
                             
                             var isPenalty = parseInt(stickerData.count) < 0;
+                            var isTeacherSticker = isTeacherStickerAdjustment(stickerData);
                             var bodyCls = isPenalty ? "penalty-body" : "sticker-body";
                             var badgeCls = isPenalty ? "penalty-badge" : "sticker-badge";
                             var icon = isPenalty ? SVG.penalty : SVG.star;
+                            var stickerAvatarClass = isTeacherSticker ? "avatar-teacher" : "avatar-student";
+                            var stickerAvatarChar = isTeacherSticker ? tName : avatarChar;
                             var stickerReviewHtml = "";
                             if (canUseAdminModeReview() && statusLabel === "待審核" && h.fbKey) {
                                 var stickerContextKey = makeDomSafeId("sticker_" + post.date + "_" + h.fbKey);
@@ -5710,7 +5718,7 @@
                                 stickerReviewHtml = buildGodStickerReviewActions(stickerContextKey);
                             }
                             
-                            historyHtml += "<div class='history-msg'><div class='history-msg-avatar avatar-student'>" + avatarChar + "</div><div class='history-msg-body " + bodyCls + "'><span>" + icon + stickerData.reason + "</span><span class='" + badgeCls + "'>" + formatStickerCountText(stickerData.count) + "</span><br><span class='sticker-status " + statusClass + "'>" + (statusKind === "approved" ? SVG.check : (statusKind === "rejected" ? SVG.cross : SVG.hourglass)) + statusLabel + "</span><div class='history-msg-time'>" + h.time.substring(5, 16) + "</div>" + stickerReviewHtml + "</div></div>";
+                            historyHtml += "<div class='history-msg'><div class='history-msg-avatar " + stickerAvatarClass + "'>" + stickerAvatarChar + "</div><div class='history-msg-body " + bodyCls + "'><span>" + icon + stickerData.reason + "</span><span class='" + badgeCls + "'>" + formatStickerCountText(stickerData.count) + "</span><br><span class='sticker-status " + statusClass + "'>" + (statusKind === "approved" ? SVG.check : (statusKind === "rejected" ? SVG.cross : SVG.hourglass)) + statusLabel + "</span><div class='history-msg-time'>" + h.time.substring(5, 16) + "</div>" + stickerReviewHtml + "</div></div>";
                         } else {
                             var adminReplyHtml = "";
                             if (canUseAdminModeReply() && !isTeacher) {
@@ -6065,7 +6073,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         }
 
         async function approveStickerApply(btn, fbKey, className, studentName, count, time) {
-            var confirmResult = await swalConfirm('通過審核', '確認通過 +' + count + ' 棒？');
+            var countText = formatStickerCountText(count);
+            var confirmResult = await swalConfirm('通過審核', '確認通過 ' + countText + '？');
             if (!confirmResult) return;
             
             const originalText = btn.innerText;
@@ -6080,7 +6089,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 btn.disabled = false;
                 btn.innerText = originalText;
                 if (res.success) {
-                    swalAlert('✅ 已通過！', '棒卡 +' + count, 'success');
+                    swalAlert('✅ 已通過！', '棒卡 ' + countText, 'success');
                     // 本地更新 gData (若有需要即時反映在介面上)
                     if (typeof gData !== 'undefined' && gData && gData.studentName === studentName) {
                         gData.stickers = (parseInt(gData.stickers) || 0) + parseInt(count);
@@ -6864,6 +6873,13 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             if (text === '通過') return 'approved';
             if (text === '退回' || text.indexOf('退回：') === 0) return 'rejected';
             return 'pending';
+        }
+
+        function isTeacherStickerAdjustment(data) {
+            var reason = (data && data.reason ? data.reason : '').toString();
+            return reason.indexOf('老師獎勵：') === 0 ||
+                reason.indexOf('老師處分：') === 0 ||
+                reason.indexOf('補登棒卡：') === 0;
         }
 
         function formatStickerCountText(value) {
