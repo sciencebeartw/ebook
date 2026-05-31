@@ -5589,9 +5589,10 @@
         function renderDailyPosts(posts, history) {
             window.adminModeReplyContext = {};
             window.adminModeStickerContext = {};
+            window.adminModeStickerAdjustmentContext = {};
             window.adminModeMakeupContext = {};
             window.adminModeDirectMessageContext = {};
-            var container = document.getElementById('tab-content-0'); if (!posts || posts.length === 0) { container.innerHTML = "<div style='text-align:center; padding:30px; color:#999;'>目前沒有聯絡簿資料</div>"; return; } var html = ""; posts.forEach(function (post) {
+            var container = document.getElementById('tab-content-0'); if (!posts || posts.length === 0) { container.innerHTML = "<div style='text-align:center; padding:30px; color:#999;'>目前沒有聯絡簿資料</div>"; return; } var latestStickerPostDate = posts[0] && posts[0].date; var html = ""; posts.forEach(function (post) {
                 var examCards = (post.examData && post.examData.exams && post.examData.exams.length)
                     ? post.examData.exams
                     : ((post.examData && post.examData.main) ? [{ main: post.examData.main, others: post.examData.others || [] }] : []);
@@ -5623,9 +5624,11 @@
                         }
                         
                         if (d && d.reason) {
-                            var statusColor = d.status === '待審核' ? '#f59e0b' : (d.status === '退回' ? '#ef4444' : 'var(--primary)');
-                            var statusIcon = d.status === '待審核' ? SVG.hourglass : (d.status === '退回' ? SVG.cross : SVG.check);
-                            var rendered = `<div style="font-weight:bold; font-size:1.1rem; color:#431407; margin-bottom:4px;">${SVG.star}${d.reason} <span style="background:linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); color:white; padding:2px 8px; border-radius:12px; font-size:0.9rem;">+${d.count}棒</span></div><div style="font-weight:bold; color:${statusColor}; font-size:0.95rem; background:rgba(255,255,255,0.7); display:inline-block; padding:2px 8px; border-radius:4px; margin-top:4px;">${statusIcon} ${d.status}</div>`;
+                            var quotedStickerStatus = (d.status || '待審核').toString();
+                            var quotedStickerStatusKind = getStickerReviewStatusKind(quotedStickerStatus);
+                            var statusColor = quotedStickerStatusKind === 'pending' ? '#f59e0b' : (quotedStickerStatusKind === 'rejected' ? '#ef4444' : 'var(--primary)');
+                            var statusIcon = quotedStickerStatusKind === 'pending' ? SVG.hourglass : (quotedStickerStatusKind === 'rejected' ? SVG.cross : SVG.check);
+                            var rendered = `<div style="font-weight:bold; font-size:1.1rem; color:#431407; margin-bottom:4px;">${SVG.star}${d.reason} <span style="background:linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); color:white; padding:2px 8px; border-radius:12px; font-size:0.9rem;">+${d.count}棒</span></div><div style="font-weight:bold; color:${statusColor}; font-size:0.95rem; background:rgba(255,255,255,0.7); display:inline-block; padding:2px 8px; border-radius:4px; margin-top:4px;">${statusIcon} ${quotedStickerStatus}</div>`;
                             return `<div class="quote-box" style="background:#fef3c7; border-left:4px solid #f59e0b; border-radius:8px; padding:12px; margin:10px 0; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
                                       <div class="quote-content">${rendered}</div>
                                     </div>`;
@@ -5689,12 +5692,12 @@
                             var stickerData = {};
                             try { stickerData = JSON.parse(h.content); } catch(e) { stickerData = { reason: h.content, count: '?', status: "待審核" }; }
                             var statusLabel = stickerData.status || "待審核";
-                            var statusClass = (statusLabel === "通過") ? "approved" : (statusLabel === "退回" ? "rejected" : "");
+                            var statusKind = getStickerReviewStatusKind(statusLabel);
+                            var statusClass = statusKind === "approved" ? "approved" : (statusKind === "rejected" ? "rejected" : "");
                             
                             var isPenalty = parseInt(stickerData.count) < 0;
                             var bodyCls = isPenalty ? "penalty-body" : "sticker-body";
                             var badgeCls = isPenalty ? "penalty-badge" : "sticker-badge";
-                            var prefix = isPenalty ? "" : "+";
                             var icon = isPenalty ? SVG.penalty : SVG.star;
                             var stickerReviewHtml = "";
                             if (canUseAdminModeReview() && statusLabel === "待審核" && h.fbKey) {
@@ -5707,7 +5710,7 @@
                                 stickerReviewHtml = buildGodStickerReviewActions(stickerContextKey);
                             }
                             
-                            historyHtml += "<div class='history-msg'><div class='history-msg-avatar avatar-student'>" + avatarChar + "</div><div class='history-msg-body " + bodyCls + "'><span>" + icon + stickerData.reason + "</span><span class='" + badgeCls + "'>" + prefix + stickerData.count + "棒</span><br><span class='sticker-status " + statusClass + "'>" + (statusLabel === "通過" ? SVG.check : (statusLabel === "退回" ? SVG.cross : SVG.hourglass)) + statusLabel + "</span><div class='history-msg-time'>" + h.time.substring(5, 16) + "</div>" + stickerReviewHtml + "</div></div>";
+                            historyHtml += "<div class='history-msg'><div class='history-msg-avatar avatar-student'>" + avatarChar + "</div><div class='history-msg-body " + bodyCls + "'><span>" + icon + stickerData.reason + "</span><span class='" + badgeCls + "'>" + formatStickerCountText(stickerData.count) + "</span><br><span class='sticker-status " + statusClass + "'>" + (statusKind === "approved" ? SVG.check : (statusKind === "rejected" ? SVG.cross : SVG.hourglass)) + statusLabel + "</span><div class='history-msg-time'>" + h.time.substring(5, 16) + "</div>" + stickerReviewHtml + "</div></div>";
                         } else {
                             var adminReplyHtml = "";
                             if (canUseAdminModeReply() && !isTeacher) {
@@ -5723,16 +5726,8 @@
                             historyHtml += "<div class='history-msg'><div class='history-msg-avatar " + avatarClass + "'>" + avatarChar + "</div><div class='history-msg-body " + bodyClass + "'>" + parseBtn(h.content) + "<div class='history-msg-time'>" + h.time.substring(5, 16) + "</div>" + adminReplyHtml + "</div></div>";
                         } }}); var inputPlaceholder = "留言給老師..."; var safeDateId = post.date.replace(/\//g, '-');
 
-                var uploadHtml = `
-        <div class="student-upload-box" ondragenter="handleStudentUploadDrag(event)" ondragover="handleStudentUploadDrag(event)" ondragleave="handleStudentUploadDragLeave(event)" ondrop="handleStudentUploadDrop(event, '${post.date}')">
-            <span class="upload-title"><svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' style='vertical-align:middle;margin-right:4px'><polyline points='16 16 12 12 8 16'/><line x1='12' y1='12' x2='12' y2='21'/><path d='M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3'/></svg>作業/筆記上傳區</span>
-            <div style="font-size:0.82rem; color:#64748b; font-weight:bold; margin-bottom:8px;">可多選檔案，也可以直接拖曳檔案到這個區塊。</div>
-            <div class="upload-btn-wrapper">
-                <button class="upload-btn-real"><svg width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='3' stroke-linecap='round' style='vertical-align:middle;margin-right:3px'><line x1='12' y1='5' x2='12' y2='19'/><line x1='5' y1='12' x2='19' y2='12'/></svg> 選擇檔案 (可多選)</button>
-                <input type="file" multiple onchange="handleStudentUpload(this, '${post.date}')">
-            </div>
-            <div id="upload-status-${safeDateId}" class="upload-status"></div>
-        </div>
+                var isLatestStickerPost = post.date === latestStickerPostDate;
+                var stickerStudentToolsHtml = isLatestStickerPost ? `
         <div class="sticker-apply-box">
             <span class="sticker-apply-title">${SVG.starLg} 棒卡申請</span>
             <div class="sticker-apply-row">
@@ -5775,6 +5770,18 @@
             <input type="text" class="sticker-reason-custom" id="penalty-custom-${safeDateId}" placeholder="請輸入改進事項..." style="border-color: #fca5a5; color: #7f1d1d;">
             <div class="penalty-hint">${SVG.warning} 送出後由老師審核，並自總棒數中扣除。勇敢負責是成長的第一步！</div>
         </div>
+    ` : `<div class="sticker-hint" style="margin:10px 0;">棒卡申請與自我處分只開放最新一份聯絡簿。</div>`;
+                var uploadHtml = `
+        <div class="student-upload-box" ondragenter="handleStudentUploadDrag(event)" ondragover="handleStudentUploadDrag(event)" ondragleave="handleStudentUploadDragLeave(event)" ondrop="handleStudentUploadDrop(event, '${post.date}')">
+            <span class="upload-title"><svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' style='vertical-align:middle;margin-right:4px'><polyline points='16 16 12 12 8 16'/><line x1='12' y1='12' x2='12' y2='21'/><path d='M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3'/></svg>作業/筆記上傳區</span>
+            <div style="font-size:0.82rem; color:#64748b; font-weight:bold; margin-bottom:8px;">可多選檔案，也可以直接拖曳檔案到這個區塊。</div>
+            <div class="upload-btn-wrapper">
+                <button class="upload-btn-real"><svg width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='3' stroke-linecap='round' style='vertical-align:middle;margin-right:3px'><line x1='12' y1='5' x2='12' y2='19'/><line x1='5' y1='12' x2='19' y2='12'/></svg> 選擇檔案 (可多選)</button>
+                <input type="file" multiple onchange="handleStudentUpload(this, '${post.date}')">
+            </div>
+            <div id="upload-status-${safeDateId}" class="upload-status"></div>
+        </div>
+        ${stickerStudentToolsHtml}
     `;
                 if (isAdminMode) uploadHtml = "";
                 var adminDirectHtml = "";
@@ -5783,10 +5790,16 @@
                     window.adminModeDirectMessageContext[directContextKey] = { targetDate: post.date };
                     adminDirectHtml = buildAdminDirectMessageBox(directContextKey);
                 }
+                var godStickerAdjustmentHtml = "";
+                if (canUseAdminModeReview()) {
+                    var adjustmentContextKey = makeDomSafeId("adjust_" + safeDateId);
+                    window.adminModeStickerAdjustmentContext[adjustmentContextKey] = { targetDate: post.date };
+                    godStickerAdjustmentHtml = buildGodStickerAdjustmentBox(adjustmentContextKey);
+                }
                 var studentInputHtml = isAdminMode ? "" : "<div class='input-box'><input type='text' class='fb-input' id='input-" + safeDateId + "' placeholder='" + inputPlaceholder + "'><button class='fb-btn' onclick=\"sendFeedback('" + safeDateId + "', '" + post.date + "', '學生留言')\">送出</button></div>";
 
                 // ★★★ v3.9 修正：家長留言 -> 留言內容 ★★★
-                var feedbackHtml = "<div class='feedback-section'>" + uploadHtml + "<div class='section-title'>" + SVG.chat + "留言內容</div><div id='history-" + safeDateId + "'>" + historyHtml + "</div>" + adminDirectHtml + studentInputHtml + "</div>"; var headerTitle = post.date + (post.title ? " " + post.title : ""); html += "<div class='post-card-wrapper'><div class='post-card'><div class='post-header'><span>" + SVG.calendar + headerTitle + "</span></div>" + gradeHtml + "<div class='content-section'><div class='section-title'>" + SVG.megaphone + "聯絡事項</div>" + contentHtml + "</div>" + feedbackHtml + "</div></div>";
+                var feedbackHtml = "<div class='feedback-section'>" + uploadHtml + "<div class='section-title'>" + SVG.chat + "留言內容</div><div id='history-" + safeDateId + "'>" + historyHtml + "</div>" + godStickerAdjustmentHtml + adminDirectHtml + studentInputHtml + "</div>"; var headerTitle = post.date + (post.title ? " " + post.title : ""); html += "<div class='post-card-wrapper'><div class='post-card'><div class='post-header'><span>" + SVG.calendar + headerTitle + "</span></div>" + gradeHtml + "<div class='content-section'><div class='section-title'>" + SVG.megaphone + "聯絡事項</div>" + contentHtml + "</div>" + feedbackHtml + "</div></div>";
 
             }); container.innerHTML = html;
 
@@ -5877,18 +5890,18 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 var data = {};
                 try { data = JSON.parse(h.content); } catch(e) { data = { reason: h.content, count: '?', status: '待審核' }; }
                 var status = data.status || '待審核';
+                var statusKind = getStickerReviewStatusKind(status);
                 var isPenalty = parseInt(data.count) < 0;
                 
-                var statusColor = status === '通過' ? '#15803d' : (status === '退回' ? '#dc2626' : '#92400e');
-                var statusBg = status === '通過' ? '#dcfce7' : (status === '退回' ? '#fee2e2' : '#fef3c7');
+                var statusColor = statusKind === 'approved' ? '#15803d' : (statusKind === 'rejected' ? '#dc2626' : '#92400e');
+                var statusBg = statusKind === 'approved' ? '#dcfce7' : (statusKind === 'rejected' ? '#fee2e2' : '#fef3c7');
                 var icon = isPenalty ? SVG.penalty : SVG.star;
-                var prefix = isPenalty ? "" : "+";
                 var countColor = isPenalty ? "#dc2626" : "#d97706";
-                var itemBg = isPenalty ? (status === '待審核' ? '#fef2f2' : statusBg) : statusBg;
+                var itemBg = isPenalty ? (statusKind === 'pending' ? '#fef2f2' : statusBg) : statusBg;
 
                 var fbKey = h.fbKey || '';
                 html += "<div style='background:" + itemBg + "; border-radius:12px; padding:10px 12px; margin-bottom:10px; border:" + (isPenalty ? "1px dashed #fca5a5" : "none") + ";'>" +
-                    "<div style='font-weight:700; color:#1e293b; font-size:1rem;'>" + icon + data.reason + " <span style='color:" + countColor + "; font-weight:900;'>" + prefix + data.count + "棒</span></div>" +
+                    "<div style='font-weight:700; color:#1e293b; font-size:1rem;'>" + icon + data.reason + " <span style='color:" + countColor + "; font-weight:900;'>" + formatStickerCountText(data.count) + "</span></div>" +
                     "<div style='font-size:0.85rem; color:#64748b; margin-top:2px;'>" + h.time.substring(5, 16) + " ｜ <span style='background:" + statusBg + "; color:" + statusColor + "; font-weight:700; padding:1px 8px; border-radius:10px;'>" + status + "</span></div>" +
                     (status === '待審核' ? "<div style='display:flex; gap:8px; margin-top:8px;'>" +
                         "<button onclick=\"approveStickerApply(this, '" + fbKey + "','" + className + "','" + studentName + "'," + data.count + ",'" + h.time + "');\" style='flex:1; background:linear-gradient(135deg, var(--primary-light), var(--primary)); color:white; border:none; border-radius:20px; padding:6px; font-weight:700; cursor:pointer;'>✓ 通過</button>" +
@@ -5990,15 +6003,15 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var html = '';
             pendingList.forEach(function(item) {
                 var isPenalty = parseInt(item.count) < 0;
-                var statusBg = item.status === '通過' ? '#dcfce7' : (item.status === '退回' ? '#fee2e2' : '#fef9c3');
-                var statusColor = item.status === '通過' ? '#15803d' : (item.status === '退回' ? '#dc2626' : '#92400e');
+                var statusKind = getStickerReviewStatusKind(item.status);
+                var statusBg = statusKind === 'approved' ? '#dcfce7' : (statusKind === 'rejected' ? '#fee2e2' : '#fef9c3');
+                var statusColor = statusKind === 'approved' ? '#15803d' : (statusKind === 'rejected' ? '#dc2626' : '#92400e');
                 var icon = isPenalty ? SVG.penalty : SVG.star;
-                var prefix = isPenalty ? "" : "+";
                 var countColor = isPenalty ? "#dc2626" : "#d97706";
-                var itemBg = isPenalty ? (item.status === '待審核' ? '#fef2f2' : statusBg) : statusBg;
+                var itemBg = isPenalty ? (statusKind === 'pending' ? '#fef2f2' : statusBg) : statusBg;
 
                 html += '<div style="background:' + itemBg + '; border-radius:12px; padding:12px; margin-bottom:10px; border:' + (isPenalty ? '1px dashed #fca5a5' : 'none') + ';">' +
-                    '<div style="font-weight:700; font-size:1.05rem;"><span style="color:#2563eb;">[' + item.stuName + ']</span> ' + icon + item.reason + ' <span style="color:' + countColor + ';">' + prefix + item.count + '棒</span></div>' +
+                    '<div style="font-weight:700; font-size:1.05rem;"><span style="color:#2563eb;">[' + item.stuName + ']</span> ' + icon + item.reason + ' <span style="color:' + countColor + ';">' + formatStickerCountText(item.count) + '</span></div>' +
                     '<div style="font-size:0.85rem; color:#64748b; margin:4px 0;">' + item.time.substring(5, 16) + ' ｜ <b style="color:' + statusColor + '">' + item.status + '</b></div>' +
                     (item.status === '待審核' ?
                         '<div style="display:flex; gap:8px; margin-top:8px;">' +
@@ -6846,6 +6859,170 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 "</div>";
         }
 
+        function getStickerReviewStatusKind(status) {
+            var text = (status || '').toString();
+            if (text === '通過') return 'approved';
+            if (text === '退回' || text.indexOf('退回：') === 0) return 'rejected';
+            return 'pending';
+        }
+
+        function formatStickerCountText(value) {
+            var count = parseInt(value, 10) || 0;
+            return (count > 0 ? '+' : '') + count + '棒';
+        }
+
+        function buildGodStickerAdjustmentBox(contextKey) {
+            return "<div class='god-makeup-review-box'>" +
+                "<div class='god-makeup-review-title'>棒卡調整</div>" +
+                "<div class='god-review-actions'>" +
+                "<button type='button' onclick=\"writeGodStickerAdjustment(this, '" + contextKey + "', 'makeup')\">補登棒卡</button>" +
+                "<button type='button' onclick=\"writeGodStickerAdjustment(this, '" + contextKey + "', 'reward')\">老師獎勵</button>" +
+                "<button type='button' class='reject' onclick=\"writeGodStickerAdjustment(this, '" + contextKey + "', 'discipline')\">老師處分</button>" +
+                "</div>" +
+                "<div class='god-makeup-status' id='god-sticker-adjust-status-" + contextKey + "'></div>" +
+                "</div>";
+        }
+
+        async function chooseStickerAdjustment(mode) {
+            var isDiscipline = mode === 'discipline';
+            var isReward = mode === 'reward';
+            var title = isDiscipline ? '老師處分' : (isReward ? '老師獎勵' : '補登棒卡');
+            var reasonOptions = isDiscipline
+                ? { '聯絡簿未簽名': '聯絡簿未簽名', '作業未完成': '作業未完成', '上課違規': '上課違規', '其他': '其他' }
+                : (isReward
+                    ? { '課堂表現': '課堂表現', '主動幫忙': '主動幫忙', '作業優良': '作業優良', '其他': '其他' }
+                    : { '小考高分': '小考高分', '即時練習': '即時練習', '課堂表現': '課堂表現', '作業表現': '作業表現', '其他': '其他' });
+            var countOptions = isDiscipline
+                ? { '-5': '-5 棒', '-10': '-10 棒', 'custom': '自訂' }
+                : { '5': '+5 棒', '10': '+10 棒', '15': '+15 棒', '20': '+20 棒', 'custom': '自訂' };
+            var result = await Swal.fire({
+                title: title,
+                html:
+                    '<div style="display:grid; gap:10px; text-align:left;">' +
+                    '<select id="stickerAdjustReason" class="swal2-select" style="width:100%; margin:0;">' +
+                    Object.keys(reasonOptions).map(function(key) { return '<option value="' + escapeHtml(key) + '">' + escapeHtml(reasonOptions[key]) + '</option>'; }).join('') +
+                    '</select>' +
+                    '<input id="stickerAdjustReasonCustom" class="swal2-input" placeholder="其他原因" style="display:none; width:100%; margin:0;">' +
+                    '<select id="stickerAdjustCount" class="swal2-select" style="width:100%; margin:0;">' +
+                    Object.keys(countOptions).map(function(key) { return '<option value="' + escapeHtml(key) + '">' + escapeHtml(countOptions[key]) + '</option>'; }).join('') +
+                    '</select>' +
+                    '<input id="stickerAdjustCountCustom" type="number" class="swal2-input" placeholder="棒數" style="display:none; width:100%; margin:0;">' +
+                    '</div>',
+                showCancelButton: true,
+                confirmButtonText: isDiscipline ? '直接扣棒' : '直接加棒',
+                cancelButtonText: '取消',
+                confirmButtonColor: isDiscipline ? '#dc2626' : '#16a34a',
+                didOpen: function() {
+                    var reasonEl = document.getElementById('stickerAdjustReason');
+                    var reasonCustom = document.getElementById('stickerAdjustReasonCustom');
+                    var countEl = document.getElementById('stickerAdjustCount');
+                    var countCustom = document.getElementById('stickerAdjustCountCustom');
+                    if (reasonEl) reasonEl.onchange = function() { reasonCustom.style.display = reasonEl.value === '其他' ? 'block' : 'none'; };
+                    if (countEl) countEl.onchange = function() { countCustom.style.display = countEl.value === 'custom' ? 'block' : 'none'; };
+                },
+                preConfirm: function() {
+                    var reasonEl = document.getElementById('stickerAdjustReason');
+                    var reasonCustom = document.getElementById('stickerAdjustReasonCustom');
+                    var countEl = document.getElementById('stickerAdjustCount');
+                    var countCustom = document.getElementById('stickerAdjustCountCustom');
+                    var reason = reasonEl ? reasonEl.value : '';
+                    if (reason === '其他') reason = reasonCustom ? reasonCustom.value.trim() : '';
+                    var count = countEl ? countEl.value : '';
+                    if (count === 'custom') count = countCustom ? countCustom.value.trim() : '';
+                    count = parseInt(count, 10) || 0;
+                    if (isDiscipline && count > 0) count = -count;
+                    if (!isDiscipline && count < 0) count = -count;
+                    if (!reason) return Swal.showValidationMessage('請填寫原因');
+                    if (!count) return Swal.showValidationMessage('請填寫棒數');
+                    if (Math.abs(count) > 100) return Swal.showValidationMessage('單次調整請勿超過 100 棒');
+                    return { reason: title + '：' + reason, count: count };
+                }
+            });
+            return result.isConfirmed ? result.value : null;
+        }
+
+        async function writeGodStickerAdjustment(btn, contextKey, mode) {
+            if (!canUseAdminModeReview()) {
+                swalAlert('這個上帝視角連線不能調整棒卡', '請回行政中心重新開啟學生畫面。', 'warning');
+                return;
+            }
+            var context = window.adminModeStickerAdjustmentContext && window.adminModeStickerAdjustmentContext[contextKey];
+            if (!context || !context.targetDate) {
+                swalAlert('找不到聯絡簿日期', '請重新整理後再試。', 'warning');
+                return;
+            }
+            var adjustment = await chooseStickerAdjustment(mode);
+            if (!adjustment) return;
+            var status = document.getElementById('god-sticker-adjust-status-' + contextKey);
+            var row = btn ? btn.parentElement : null;
+            var buttons = row ? row.querySelectorAll('button') : [];
+            buttons.forEach(function(button) { button.disabled = true; });
+            var originalText = btn ? btn.innerText : '';
+            if (btn) btn.innerText = '處理中';
+            if (status) status.textContent = '寫入中...';
+            try {
+                await runGodAdminAction('writeStickerAdjustmentGas', {
+                    className: gData.className,
+                    studentName: gData.studentName,
+                    targetDate: context.targetDate,
+                    reason: adjustment.reason,
+                    count: adjustment.count
+                });
+                if (status) status.textContent = '已完成：' + adjustment.reason + ' ' + formatStickerCountText(adjustment.count);
+                if (btn) btn.innerText = '已完成';
+            } catch (err) {
+                buttons.forEach(function(button) { button.disabled = false; });
+                if (btn) btn.innerText = originalText;
+                if (status) status.textContent = '';
+                swalAlert('棒卡調整失敗', 'Google Sheet 寫入或 Firebase 同步失敗。' + (err && err.message ? ' ' + err.message : ''), 'error');
+            }
+        }
+
+        async function chooseStickerRejectAction() {
+            var reasons = {
+                '紙本未登記': '紙本未登記',
+                '棒數不符': '棒數不符',
+                '名目不符': '名目不符',
+                '重複申請': '重複申請',
+                '其他': '其他'
+            };
+            var result = await Swal.fire({
+                title: '退回原因',
+                input: 'select',
+                inputOptions: reasons,
+                inputPlaceholder: '請選擇退回原因',
+                showCancelButton: true,
+                confirmButtonText: '退回',
+                cancelButtonText: '取消',
+                confirmButtonColor: '#dc2626',
+                inputValidator: function(value) {
+                    if (!value) return '請選擇退回原因';
+                    return null;
+                }
+            });
+            if (!result.isConfirmed || !result.value) return '';
+            var reason = result.value;
+            if (reason === '其他') {
+                var custom = await Swal.fire({
+                    title: '其他原因',
+                    input: 'text',
+                    inputPlaceholder: '請輸入簡短原因',
+                    showCancelButton: true,
+                    confirmButtonText: '退回',
+                    cancelButtonText: '取消',
+                    confirmButtonColor: '#dc2626',
+                    inputValidator: function(value) {
+                        if (!value || !value.trim()) return '請輸入原因';
+                        if (value.trim().length > 20) return '原因請控制在 20 字內';
+                        return null;
+                    }
+                });
+                if (!custom.isConfirmed || !custom.value) return '';
+                reason = custom.value.trim();
+            }
+            return '退回：' + reason;
+        }
+
         async function approveGodSticker(btn, contextKey, actionStr) {
             if (!canUseAdminModeReview()) {
                 swalAlert('這個上帝視角連線不能審核', '請回行政中心重新開啟學生畫面。', 'warning');
@@ -6856,8 +7033,14 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 swalAlert('找不到棒卡申請資料', '請重新整理後再試。', 'warning');
                 return;
             }
-            var ok = await swalConfirm(actionStr === '通過' ? '通過棒卡申請' : '退回棒卡申請', '確定要' + actionStr + '這筆申請嗎？');
-            if (!ok) return;
+            var finalAction = actionStr;
+            if (actionStr === '通過') {
+                var ok = await swalConfirm('通過棒卡申請', '確定要通過這筆申請嗎？');
+                if (!ok) return;
+            } else {
+                finalAction = await chooseStickerRejectAction();
+                if (!finalAction) return;
+            }
             var row = btn ? btn.parentElement : null;
             var buttons = row ? row.querySelectorAll('button') : [];
             buttons.forEach(function(button) { button.disabled = true; });
@@ -6869,10 +7052,10 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     timeStr: context.time,
                     className: gData.className,
                     studentName: gData.studentName,
-                    count: actionStr === '通過' ? context.count : 0,
-                    actionStr: actionStr
+                    count: finalAction === '通過' ? context.count : 0,
+                    actionStr: finalAction
                 });
-                if (btn) btn.innerText = actionStr === '通過' ? '已通過' : '已退回';
+                if (btn) btn.innerText = finalAction === '通過' ? '已通過' : '已退回';
             } catch (err) {
                 buttons.forEach(function(button) { button.disabled = false; });
                 if (btn) btn.innerText = originalText;
