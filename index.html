@@ -3306,7 +3306,7 @@
             for (let id in bullObj) {
                 const b = bullObj[id];
                 if (b.className === "全校" || b.className === result.className || b.className.indexOf(result.className) > -1 || result.className.indexOf(b.className) > -1) {
-                    bulls.push({ id: b.id, time: b.time, className: b.className, type: b.type, title: b.title, content: b.content, btnName: b.btnName, btnUrl: b.btnUrl });
+                    bulls.push({ id: b.id, time: b.time, className: b.className, type: b.type, title: b.title, content: b.content, btnName: b.btnName, btnUrl: b.btnUrl, reserveTime: b.reserveTime || "", expiresAt: b.expiresAt || "" });
                 }
             }
             result.bulletins = bulls.reverse(); // Reverse to roughly match desc order
@@ -3963,9 +3963,11 @@
 
                     <div class="editor-label" style="color:#e67e22;">⏰ 預約發布時間 (選填，留空則立即發布)</div>
                     <input type="datetime-local" id="bulletinReserveTime" class="editor-input">
+                    <div class="editor-label" style="color:#b91c1c;">⏱ 有效期限 (緊急通知必填)</div>
+                    <input type="datetime-local" id="bulletinExpiresAt" class="editor-input">
 
                     <div class="editor-label">類型</div>
-                    <select id="bulletinType" class="editor-input">
+                    <select id="bulletinType" class="editor-input" onchange="onBulletinTypeChange()">
                         <option value="一般">📢 一般公告</option>
                         <option value="跑馬燈">💡 跑馬燈 (置頂橫幅)</option>
                         <option value="緊急">🔴 緊急通知 (會跳彈窗)</option>
@@ -4531,7 +4533,7 @@
                             for (let id in bObj) {
                                 const b = bObj[id];
                                 if (b.className === "全校" || b.className === result.className || b.className.indexOf(result.className) > -1 || result.className.indexOf(b.className) > -1) {
-                                    bulls.push({ id: b.id, time: b.time, className: b.className, type: b.type, title: b.title, content: b.content, btnName: b.btnName, btnUrl: b.btnUrl });
+                                    bulls.push({ id: b.id, time: b.time, className: b.className, type: b.type, title: b.title, content: b.content, btnName: b.btnName, btnUrl: b.btnUrl, reserveTime: b.reserveTime || "", expiresAt: b.expiresAt || "" });
                                 }
                             }
                         }
@@ -4781,6 +4783,25 @@
             return (value || '').toString().trim().replace('T', ' ');
         }
 
+        function toDatetimeLocalFromDate(date) {
+            var pad = function(n) { return String(n).padStart(2, '0'); };
+            return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) + 'T' + pad(date.getHours()) + ':' + pad(date.getMinutes());
+        }
+
+        function defaultBulletinExpiresAtValue() {
+            var date = new Date();
+            date.setHours(date.getHours() + 24);
+            return toDatetimeLocalFromDate(date);
+        }
+
+        function onBulletinTypeChange() {
+            var typeInput = document.getElementById('bulletinType');
+            var expiresInput = document.getElementById('bulletinExpiresAt');
+            if (typeInput && expiresInput && typeInput.value === '緊急' && !expiresInput.value) {
+                expiresInput.value = defaultBulletinExpiresAtValue();
+            }
+        }
+
         function onBulletinClassChange() {
             var cls = document.getElementById('bulletinTargetClass').value;
             if (!cls) return;
@@ -4797,7 +4818,8 @@
                 list.forEach(function (b) {
                     var safeJson = encodeURIComponent(JSON.stringify(b));
                     var typeIcon = b.type === '緊急' ? '🔴' : (b.type === '課表' ? '📅' : (b.type === '跑馬燈' ? '💡' : '📢'));
-                    html += '<div class="history-item"><div class="history-info">' + typeIcon + ' ' + b.title + ' <br><small>' + b.time + '</small></div><button class="edit-btn-small" onclick="openBulletinModal(\'' + safeJson + '\')">✏️ 修改</button></div>';
+                    var expiresLine = b.expiresAt ? '<br><small style="color:#b91c1c;">有效至 ' + escapeHtml(b.expiresAt) + '</small>' : '';
+                    html += '<div class="history-item"><div class="history-info">' + typeIcon + ' ' + escapeHtml(b.title) + ' <br><small>' + escapeHtml(b.time) + '</small>' + expiresLine + '</div><button class="edit-btn-small" onclick="openBulletinModal(\'' + safeJson + '\')">✏️ 修改</button></div>';
                 });
                 document.getElementById('bulletinHistoryList').innerHTML = html;
             }).getBulletins(cls);
@@ -4860,6 +4882,7 @@
             if (jsonStr) {
                 var b = JSON.parse(decodeURIComponent(jsonStr));
                 currentEditingBulletin = b;
+                document.getElementById('bulletinClass').value = b.className || cls;
                 document.getElementById('bulletinModalTitle').innerText = "編輯公告";
                 document.getElementById('btnDeleteBulletin').style.display = 'block';
                 document.getElementById('bulletinType').value = b.type;
@@ -4867,7 +4890,8 @@
                 document.getElementById('bulletinContent').value = b.content;
                 document.getElementById('bulletinBtnName').value = b.btnName;
                 document.getElementById('bulletinBtnUrl').value = b.btnUrl;
-                document.getElementById('bulletinReserveTime').value = b.reserveTime || "";
+                document.getElementById('bulletinReserveTime').value = toDatetimeLocalValue(b.reserveTime);
+                document.getElementById('bulletinExpiresAt').value = toDatetimeLocalValue(b.expiresAt);
             } else {
                 currentEditingBulletin = null;
                 document.getElementById('bulletinModalTitle').innerText = "發布公告";
@@ -4878,6 +4902,7 @@
                 document.getElementById('bulletinBtnName').value = "";
                 document.getElementById('bulletinBtnUrl').value = "";
                 document.getElementById('bulletinReserveTime').value = "";
+                document.getElementById('bulletinExpiresAt').value = "";
             }
             document.getElementById('bulletinModal').style.display = 'flex';
         }
@@ -5013,7 +5038,8 @@
             var formData = {
                 rowIndex: idx,
                 id: id,
-                reserveTime: document.getElementById('bulletinReserveTime').value,
+                reserveTime: toSheetDatetimeValue(document.getElementById('bulletinReserveTime').value),
+                expiresAt: toSheetDatetimeValue(document.getElementById('bulletinExpiresAt').value),
                 className: document.getElementById('bulletinClass').value,
                 type: document.getElementById('bulletinType').value,
                 title: document.getElementById('bulletinTitle').value,
@@ -5021,7 +5047,8 @@
                 btnName: document.getElementById('bulletinBtnName').value,
                 btnUrl: document.getElementById('bulletinBtnUrl').value
             };
-            if (!formData.title || !formData.content) { alert("標題與內容為必填！"); return; }
+            if (!formData.title || !formData.content) { swalAlert("欄位未填", "標題與內容為必填！", "warning"); return; }
+            if (formData.type === '緊急' && !formData.expiresAt) { swalAlert("請設定有效期限", "緊急通知請設定有效期限。", "warning"); return; }
             
             // Disable button
             btn.disabled = true;
@@ -6379,20 +6406,46 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 .changeUserPassword(gData.studentName, oldP, newP); 
         }
 
+        function parseLocalDateTimeValue(value) {
+            var raw = (value || '').toString().trim();
+            if (!raw) return null;
+            var match = raw.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/);
+            if (match) {
+                return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), Number(match[4] || 0), Number(match[5] || 0));
+            }
+            var parsed = new Date(raw);
+            return isNaN(parsed.getTime()) ? null : parsed;
+        }
+
+        function isBulletinEffective(b, now) {
+            if (!b) return false;
+            var refNow = now || new Date();
+            var reserveDate = parseLocalDateTimeValue(b.reserveTime);
+            if (reserveDate && reserveDate > refNow) return false;
+            var expiresDate = parseLocalDateTimeValue(b.expiresAt);
+            if (expiresDate && expiresDate <= refNow) return false;
+            return true;
+        }
+
         function renderBulletins(list) {
             var container = document.getElementById('tab-content-2');
-            if (!list || list.length === 0) {
+            var now = new Date();
+            var activeList = (list || []).filter(function(b) { return isBulletinEffective(b, now); });
+            if (activeList.length === 0) {
                 container.innerHTML = "<div style='text-align:center; padding:30px; color:#999;'>目前沒有公告</div>";
+                updateBulletinTabs(activeList);
+                renderStickyNotice(activeList);
+                checkEmergency(activeList);
                 return;
             }
 
             // ★ 排序邏輯：由新到舊 (使用字串直接比對最穩定) ★
-            list.sort(function(a, b) {
+            activeList.sort(function(a, b) {
                 return b.time.localeCompare(a.time);
             });
 
             var html = "";
-            list.forEach(function (b) {
+            activeList.forEach(function (b) {
                 var cardClass = "bulletin-card";
                 var tagClass = "tag-gray";
                 if (b.type === "緊急") { cardClass += " type-emergency"; tagClass = "tag-red"; }
@@ -6417,8 +6470,9 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             container.innerHTML = html;
 
             // ★ 執行提醒邏輯 ★
-            updateBulletinTabs(list);
-            renderStickyNotice(list);
+            updateBulletinTabs(activeList);
+            renderStickyNotice(activeList);
+            checkEmergency(activeList);
 
             var observer = new IntersectionObserver(function(entries, obs) {
                 entries.forEach(function(entry) {
@@ -6523,16 +6577,34 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         }
 
         function checkEmergency(list) {
-            if (!list || list.length === 0) return;
-            var emergency = list.find(b => b.type === "緊急");
+            var modal = document.getElementById('emergencyModal');
+            var activeList = (list || []).filter(function(b) { return isBulletinEffective(b); });
+            if (activeList.length === 0) {
+                if (modal) modal.style.display = 'none';
+                return;
+            }
+            var emergency = activeList.find(b => b.type === "緊急");
             if (emergency) {
+                var dismissKey = 'emergency_' + (emergency.id || emergency.time || emergency.title || '').toString().replace(/[^a-zA-Z0-9_-]/g, '_') + '_' + (emergency.time || '').toString().replace(/[^a-zA-Z0-9_-]/g, '_');
+                if (localStorage.getItem(dismissKey) === 'dismissed') {
+                    if (modal) modal.style.display = 'none';
+                    return;
+                }
                 document.getElementById('emergencyContent').innerHTML = parseBtn(emergency.content);
-                document.getElementById('emergencyModal').style.display = 'flex';
+                if (modal) {
+                    modal.dataset.dismissKey = dismissKey;
+                    modal.style.display = 'flex';
+                }
+            } else if (modal) {
+                modal.style.display = 'none';
             }
         }
 
         function closeEmergencyModal() {
-            document.getElementById('emergencyModal').style.display = 'none';
+            var modal = document.getElementById('emergencyModal');
+            if (!modal) return;
+            if (modal.dataset.dismissKey) localStorage.setItem(modal.dataset.dismissKey, 'dismissed');
+            modal.style.display = 'none';
         }
 
 
