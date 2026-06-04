@@ -5471,12 +5471,53 @@
             return type === (typeof FEEDBACK_TYPE_LABELS !== "undefined" ? FEEDBACK_TYPE_LABELS.makeupResult : "補考結果回報");
         }
 
+        function normalizeEbookExamLookupText(value) {
+            return (value === undefined || value === null ? "" : value.toString()).replace(/\s+/g, "");
+        }
+
+        function ebookExamLookupTextHasDate(value) {
+            return /(\d{1,2})[\/.-](\d{1,2})/.test((value || "").toString());
+        }
+
+        function getEbookExamLookupDateCandidates(value) {
+            var match = (value || "").toString().match(/(\d{1,2})[\/.-](\d{1,2})/);
+            if (!match) return [];
+            var month = parseInt(match[1], 10);
+            var day = parseInt(match[2], 10);
+            if (isNaN(month) || isNaN(day)) return [];
+            var m = month.toString();
+            var d = day.toString();
+            var mm = m.length === 1 ? "0" + m : m;
+            var dd = d.length === 1 ? "0" + d : d;
+            return [m + "/" + d, mm + "/" + dd, m + "-" + d, mm + "-" + dd].map(normalizeEbookExamLookupText);
+        }
+
+        function ebookFeedbackMatchesExam(fb, exam) {
+            var targetTitle = normalizeEbookExamLookupText(fb && fb.targetExamTitle);
+            if (!targetTitle) return false;
+            var examName = normalizeEbookExamLookupText(exam && exam.exam);
+            var fullTitle = normalizeEbookExamLookupText(((exam && exam.date) || "") + " " + ((exam && exam.exam) || ""));
+            if (fullTitle.indexOf(targetTitle) > -1) return true;
+            if (ebookExamLookupTextHasDate(fb && fb.targetExamTitle)) {
+                var targetDates = getEbookExamLookupDateCandidates(fb && fb.targetExamTitle);
+                var hasMatchingDate = targetDates.some(function(targetDate) {
+                    return targetDate && fullTitle.indexOf(targetDate) > -1;
+                });
+                return hasMatchingDate && !!(examName && targetTitle.indexOf(examName) > -1);
+            }
+            return !!(examName && targetTitle.indexOf(examName) > -1);
+        }
+
         function getLatestMakeupResultReportInfo(exam, feedbackHistory) {
             if (!exam || exam.colIndex === undefined || exam.colIndex === null || !feedbackHistory || feedbackHistory.length === 0) return null;
             for (var k = feedbackHistory.length - 1; k >= 0; k--) {
                 var fb = feedbackHistory[k] || {};
                 if (!isMakeupResultReportType(fb.type)) continue;
-                if (String(fb.targetExamColIndex || "") !== String(exam.colIndex)) continue;
+                if (normalizeEbookExamLookupText(fb.targetExamTitle)) {
+                    if (!ebookFeedbackMatchesExam(fb, exam)) continue;
+                } else if (String(fb.targetExamColIndex || "") !== String(exam.colIndex)) {
+                    continue;
+                }
                 var match = (fb.content || "").toString().match(/(\d+(\.\d+)?)/);
                 return {
                     feedbackKey: fb.fbKey || "",
