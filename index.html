@@ -5498,9 +5498,9 @@
             return logic && logic.effectiveNum !== null && logic.effectiveNum < exam.makeupThreshold;
         }
 
-        function buildPendingMakeupResultReportHtml(post, history, examCards, latestMakeupResultPostDate) {
-            if (!post || !post.makeup || isAdminMode || !gData || !gData.grades || !gData.grades.length) return "";
-            if (latestMakeupResultPostDate && post.date !== latestMakeupResultPostDate) return "";
+        function buildPendingMakeupResultReportHtml(post, history, examCards, latestPostDate) {
+            if (!post || isAdminMode || !gData || !gData.grades || !gData.grades.length) return "";
+            if (latestPostDate && post.date !== latestPostDate) return "";
             var currentExamColMap = {};
             (examCards || []).forEach(function(item) {
                 var exam = item && item.main;
@@ -5626,7 +5626,7 @@
             window.adminModeStickerAdjustmentContext = {};
             window.adminModeMakeupContext = {};
             window.adminModeDirectMessageContext = {};
-            var container = document.getElementById('tab-content-0'); if (!posts || posts.length === 0) { container.innerHTML = "<div style='text-align:center; padding:30px; color:#999;'>目前沒有聯絡簿資料</div>"; return; } var latestStickerPostDate = posts[0] && posts[0].date; var latestMakeupResultPost = posts.find(function(item) { return item && item.makeup && item.makeup.toString().trim(); }); var latestMakeupResultPostDate = latestMakeupResultPost ? latestMakeupResultPost.date : ""; var html = ""; posts.forEach(function (post) {
+            var container = document.getElementById('tab-content-0'); if (!posts || posts.length === 0) { container.innerHTML = "<div style='text-align:center; padding:30px; color:#999;'>目前沒有聯絡簿資料</div>"; return; } var latestStickerPostDate = posts[0] && posts[0].date; var latestPostDate = posts[0] && posts[0].date; var html = ""; posts.forEach(function (post) {
                 var examCards = (post.examData && post.examData.exams && post.examData.exams.length)
                     ? post.examData.exams
                     : ((post.examData && post.examData.main) ? [{ main: post.examData.main, others: post.examData.others || [] }] : []);
@@ -5718,8 +5718,8 @@
                     if (hwIdx === homeworkItems.length - 1) extra += buildHomeworkDoneButton(post);
                     fields.push({ label: item.label, val: item.val, extra: extra });
                 });
-                fields = fields.concat([{ label: "今日補考考卷", val: post.makeup, extra: buildPendingMakeupResultReportHtml(post, history, examCards, latestMakeupResultPostDate) }, { label: "下次考試範圍", val: post.range }, { label: "補充資料", val: post.note }]);
-                fields.forEach(function (f) { if (f.val) contentHtml += "<div class='info-block'><span class='info-label'>" + f.label + "</span><div class='info-content'>" + parseBtn(f.val) + (f.extra || "") + "</div></div>"; }); var pDateShort = post.date.substring(5).replace("-", "/"); var pDateFull = post.date.replace(/-/g, "/"); var myHistory = history.filter(function (h) { return h.targetDate == pDateShort || h.targetDate == post.date || h.targetDate == pDateFull; }); myHistory.sort(function(a,b) { return new Date(a.time) - new Date(b.time); }); var historyHtml = ""; myHistory.forEach(function (h) { if (h.type !== FEEDBACK_TYPE_LABELS.makeup && h.type !== FEEDBACK_TYPE_LABELS.makeupResult) { var displayType = (h.type === FEEDBACK_TYPE_LABELS.parent || h.type === FEEDBACK_TYPE_LABELS.parentStudent || h.type === FEEDBACK_TYPE_LABELS.student) ? "學生留言" : h.type; var isTeacher = (!isStudentSideFeedbackType(h.type));
+                fields = fields.concat([{ label: "今日補考考卷", val: post.makeup, extra: buildPendingMakeupResultReportHtml(post, history, examCards, latestPostDate) }, { label: "下次考試範圍", val: post.range }, { label: "補充資料", val: post.note }]);
+                fields.forEach(function (f) { if (f.val || f.extra) contentHtml += "<div class='info-block'><span class='info-label'>" + f.label + "</span><div class='info-content'>" + parseBtn(f.val || "") + (f.extra || "") + "</div></div>"; }); var pDateShort = post.date.substring(5).replace("-", "/"); var pDateFull = post.date.replace(/-/g, "/"); var myHistory = history.filter(function (h) { return h.targetDate == pDateShort || h.targetDate == post.date || h.targetDate == pDateFull; }); myHistory.sort(function(a,b) { return new Date(a.time) - new Date(b.time); }); var historyHtml = ""; myHistory.forEach(function (h) { if (h.type !== FEEDBACK_TYPE_LABELS.makeup && h.type !== FEEDBACK_TYPE_LABELS.makeupResult) { var displayType = (h.type === FEEDBACK_TYPE_LABELS.parent || h.type === FEEDBACK_TYPE_LABELS.parentStudent || h.type === FEEDBACK_TYPE_LABELS.student) ? "學生留言" : h.type; var isTeacher = (!isStudentSideFeedbackType(h.type));
                         var avatarClass = isTeacher ? "avatar-teacher" : "avatar-student";
                         var bodyClass = isTeacher ? "teacher-body" : "";
                         var sName = (gData && gData.studentName) ? gData.studentName : "學";
