@@ -5292,13 +5292,15 @@
                 else acceptedFiles.push(file);
             });
             if (oversizedFiles.length) {
-                alert(
+                swalAlert(
+                    "檔案過大",
                     "有 " + oversizedFiles.length + " 個檔案超過 " + formatUploadSize(STUDENT_UPLOAD_MAX_BYTES) + "，已先略過：\n" +
                     oversizedFiles.slice(0, 5).map(function(file) {
                         return "・" + file.name + "（" + formatUploadSize(file.size) + "）";
                     }).join("\n") +
                     (oversizedFiles.length > 5 ? "\n另有 " + (oversizedFiles.length - 5) + " 個檔案。" : "") +
-                    "\n\n照片太大時，請改用較小尺寸、截圖後上傳，或一次少傳幾張。"
+                    "\n\n照片太大時，請改用較小尺寸、截圖後上傳，或一次少傳幾張。",
+                    "warning"
                 );
             }
             if (!acceptedFiles.length) {
@@ -5349,7 +5351,7 @@
                     currentUploadDate = "";
                     uploadBatchSkipped = [];
                     if (sd) sd.innerText = '';
-                    alert(skippedOnlyCount > 0 ? '沒有檔案成功上傳。' : '沒有可上傳的檔案。');
+                    swalAlert("沒有檔案上傳", skippedOnlyCount > 0 ? '沒有檔案成功上傳。' : '沒有可上傳的檔案。', "info");
                     return;
                 }
 
@@ -5368,7 +5370,7 @@
                     if (sd) sd.innerText = '';
                     var msg = '✅ 已上傳 ' + uploadedCount + ' 個檔案，並合併成一則留言！';
                     if (skippedCount > 0) msg += '\n另有 ' + skippedCount + ' 個檔案未成功上傳。';
-                    alert(msg);
+                    swalAlert("上傳完成", msg, "success");
                 }, function() {
                     isUploading = false;
                     currentUploadDate = "";
@@ -5381,7 +5383,7 @@
             var statusDiv = document.getElementById('upload-status-' + dateStr.replace(/\//g, '-'));
 
             if (file.size > STUDENT_UPLOAD_MAX_BYTES) {
-                alert('❌ 檔案 ' + file.name + ' 超過 ' + formatUploadSize(STUDENT_UPLOAD_MAX_BYTES) + '，已略過。');
+                swalAlert("檔案過大", '檔案 ' + file.name + ' 超過 ' + formatUploadSize(STUDENT_UPLOAD_MAX_BYTES) + '，已略過。', "warning");
                 uploadBatchSkipped.push(file.name);
                 processUploadQueue(dateStr);
                 return;
@@ -5405,7 +5407,7 @@
                 },
                 function(err) {
                     if (statusDiv) statusDiv.innerText = '';
-                    alert('❌ 上傳錯誤：' + getUploadErrorText(err));
+                    swalAlert("上傳錯誤", getUploadErrorText(err), "warning");
                     uploadBatchSkipped.push(file.name);
                     processUploadQueue(dateStr); // 略過繼續
                 }
