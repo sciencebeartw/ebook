@@ -5241,11 +5241,27 @@
         }
 
         // ★★★ v3.9 新增：學生上傳佇列處理 ★★★
+        var STUDENT_UPLOAD_MAX_BYTES = 15 * 1024 * 1024;
         var uploadQueue = [];
         var isUploading = false;
         var currentUploadDate = "";
         var uploadBatchUrls = [];
         var uploadBatchSkipped = [];
+
+        function formatUploadSize(bytes) {
+            var size = Number(bytes || 0);
+            if (!size) return "0MB";
+            return (size / 1024 / 1024).toFixed(size >= 10 * 1024 * 1024 ? 1 : 2).replace(/\.0+$/, "") + "MB";
+        }
+
+        function getUploadErrorText(err) {
+            var raw = (err && (err.message || err.toString())) ? (err.message || err.toString()) : String(err || "");
+            if (/quota|storage\/quota-exceeded/i.test(raw)) return "儲存空間或上傳額度暫時受限，請稍後再試。";
+            if (/unauthorized|permission|storage\/unauthorized/i.test(raw)) return "目前沒有上傳權限，請通知老師。";
+            if (/canceled|cancelled|storage\/canceled/i.test(raw)) return "上傳已取消。";
+            if (/retry-limit|network|failed|load failed|timeout/i.test(raw)) return "連線不穩或檔案太大導致上傳逾時，請換穩定網路或改傳較小照片。";
+            return raw || "未知錯誤";
+        }
 
         function handleStudentUpload(input, dateStr) {
             if (input.files.length === 0) return;
@@ -5269,10 +5285,31 @@
                 return;
             }
 
+            var acceptedFiles = [];
+            var oversizedFiles = [];
+            files.forEach(function(file) {
+                if (file.size > STUDENT_UPLOAD_MAX_BYTES) oversizedFiles.push(file);
+                else acceptedFiles.push(file);
+            });
+            if (oversizedFiles.length) {
+                alert(
+                    "有 " + oversizedFiles.length + " 個檔案超過 " + formatUploadSize(STUDENT_UPLOAD_MAX_BYTES) + "，已先略過：\n" +
+                    oversizedFiles.slice(0, 5).map(function(file) {
+                        return "・" + file.name + "（" + formatUploadSize(file.size) + "）";
+                    }).join("\n") +
+                    (oversizedFiles.length > 5 ? "\n另有 " + (oversizedFiles.length - 5) + " 個檔案。" : "") +
+                    "\n\n照片太大時，請改用較小尺寸、截圖後上傳，或一次少傳幾張。"
+                );
+            }
+            if (!acceptedFiles.length) {
+                if (inputToClear) inputToClear.value = "";
+                return;
+            }
+
             currentUploadDate = dateStr;
-            uploadQueue = files;
+            uploadQueue = acceptedFiles;
             uploadBatchUrls = [];
-            uploadBatchSkipped = [];
+            uploadBatchSkipped = oversizedFiles.map(function(file) { return file.name; });
             isUploading = true;
             if (inputToClear) inputToClear.value = "";
             processUploadQueue(dateStr);
@@ -5343,8 +5380,8 @@
             var file = uploadQueue.shift();
             var statusDiv = document.getElementById('upload-status-' + dateStr.replace(/\//g, '-'));
 
-            if (file.size > 10 * 1024 * 1024) {
-                alert('❌ 檔案 ' + file.name + ' 超過 10MB，已略過。');
+            if (file.size > STUDENT_UPLOAD_MAX_BYTES) {
+                alert('❌ 檔案 ' + file.name + ' 超過 ' + formatUploadSize(STUDENT_UPLOAD_MAX_BYTES) + '，已略過。');
                 uploadBatchSkipped.push(file.name);
                 processUploadQueue(dateStr);
                 return;
@@ -5368,7 +5405,7 @@
                 },
                 function(err) {
                     if (statusDiv) statusDiv.innerText = '';
-                    alert('❌ 上傳錯誤：' + (err.message || err.toString()));
+                    alert('❌ 上傳錯誤：' + getUploadErrorText(err));
                     uploadBatchSkipped.push(file.name);
                     processUploadQueue(dateStr); // 略過繼續
                 }
