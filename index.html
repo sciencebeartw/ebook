@@ -5280,12 +5280,12 @@
                 return;
             }
             if (isUploading) {
-                alert("目前還有檔案正在上傳，請等這批完成後再上傳下一批。");
+                swalAlert("正在上傳中", "目前還有檔案正在上傳，請等這批完成後再上傳下一批。", "info");
                 if (inputToClear) inputToClear.value = "";
                 return;
             }
             if (files.length > 10) {
-                alert("一次最多只能上傳 10 個檔案！");
+                swalAlert("檔案太多", "一次最多只能上傳 10 個檔案。", "warning");
                 if (inputToClear) inputToClear.value = "";
                 return;
             }
