@@ -3021,6 +3021,10 @@
       return raw;
     }
 
+    function getSubmitFailureMessage(res, fallback) {
+      return (res && res.msg) ? res.msg : (fallback || "Google Sheet 寫入或 Firebase 同步失敗，請稍後再試。");
+    }
+
     function blockStudentPreviewAction(actionLabel) {
         if (!isStudentPreviewMode) return false;
         swalAlert(
@@ -6269,6 +6273,11 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var content = JSON.stringify({ reason: reason, count: count, status: "待審核" });
             var form = { className: gData.className, studentName: gData.studentName, targetDate: realDate, type: '棒卡申請', content: content };
             google.script.run.withSuccessHandler(function(res) {
+                if (!res || res.success !== true) {
+                    swalAlert('棒卡申請送出失敗', getSubmitFailureMessage(res), 'warning');
+                    if (submitBtn) { submitBtn.innerText = "送出申請"; submitBtn.disabled = false; }
+                    return;
+                }
                 // 不需要手動寫入 Firebase，因為 GAS 的 submitFeedback 內部會觸發單筆 feedback 同步
                 // 且 Firebase .on('value') 監聽器會處理即時更新
                 if (selEl) { selEl.selectedIndex = 0; }
@@ -6383,6 +6392,11 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var form = { className: gData.className, studentName: gData.studentName, targetDate: realDate, type: '棒卡申請', content: content };
             
             google.script.run.withSuccessHandler(function(res) {
+                if (!res || res.success !== true) {
+                    swalAlert('申報送出失敗', getSubmitFailureMessage(res), 'warning');
+                    if(submitBtn) { submitBtn.innerText = "送出反省"; submitBtn.disabled = false; }
+                    return;
+                }
                 if (selEl) { selEl.selectedIndex = 0; }
                 if (customEl) { customEl.value = ''; customEl.style.display = 'none'; }
                 if(submitBtn) { submitBtn.innerText = "送出反省"; submitBtn.disabled = false; }
@@ -6405,6 +6419,12 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var form = { className: gData.className, studentName: gData.studentName, targetDate: realDate, type: type, content: val };
 
             google.script.run.withSuccessHandler(function (res) {
+                if (!res || res.success !== true) {
+                    swalAlert("送出失敗", getSubmitFailureMessage(res), 'warning');
+                    if (btn) { btn.innerText = "送出"; btn.disabled = false; }
+                    if (failureCallback) failureCallback(res);
+                    return;
+                }
                 // 不需要手動寫入 Firebase 或 historyDiv，監聽器會處理即時更新
                 if (!contentOverride) {
                     var el = document.getElementById(inputId);
@@ -6434,6 +6454,11 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 form.targetExamTitle = examTitle || "";
             }
             google.script.run.withSuccessHandler(function (res) { 
+                if (!res || res.success !== true) {
+                    swalAlert("回報失敗", getSubmitFailureMessage(res), 'warning');
+                    btn.innerText = "送出"; btn.disabled = false;
+                    return;
+                }
                 // 監聽器會處理數據更新，此處僅清理輸入
                 document.getElementById(inputId).value = "";
                 btn.innerText = "送出"; btn.disabled = false;
@@ -6461,6 +6486,11 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 targetExamTitle: examTitle || ""
             };
             google.script.run.withSuccessHandler(function (res) {
+                if (!res || res.success !== true) {
+                    swalAlert("回報失敗", getSubmitFailureMessage(res), 'warning');
+                    if (btn) { btn.innerText = "送出"; btn.disabled = false; }
+                    return;
+                }
                 if (input) input.value = "";
                 if (btn) { btn.innerText = "已送出"; btn.disabled = true; }
                 alert("已回報補考分數，等待老師登記補考結果。");
