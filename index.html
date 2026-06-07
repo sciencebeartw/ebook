@@ -4936,7 +4936,7 @@
                     btn.innerText = originalText;
                     alert("❌ 刪除出錯：" + err);
                 })
-                .deleteDailyPost(currentEditingPost.rowIndex, gPass);
+                .deleteDailyPost(currentEditingPost.id || currentEditingPost.rowIndex, gPass);
         }
 
         function deleteBulletin() {
@@ -4963,7 +4963,7 @@
                     btn.innerText = originalText;
                     alert("❌ 刪除出錯：" + err);
                 })
-                .deleteBulletin(currentEditingBulletin.rowIndex, gPass);
+                .deleteBulletin(currentEditingBulletin.id || currentEditingBulletin.rowIndex, gPass);
         }
 
         function submitPost() {
@@ -5174,10 +5174,15 @@
                 var fb = feedbackHistory[k];
                 if (fb.type === "補考回報") {
                     var fbTarget = (fb.targetDate || "").toString();
+                    var fbTitle = (fb.targetExamTitle || "").toString().trim();
                     var fbExamCol = fb.targetExamColIndex;
                     var hasFbExamCol = fbExamCol !== undefined && fbExamCol !== null && fbExamCol !== "";
                     if (hasFbExamCol) {
-                        if (String(fbExamCol) === String(exam.colIndex)) return buildReportFromFeedback(fb);
+                        if (String(fbExamCol) === String(exam.colIndex)) {
+                            if (fbTitle ? ebookFeedbackMatchesExam(fb, exam) : ebookFeedbackMatchesExamDate(fb, exam)) return buildReportFromFeedback(fb);
+                            continue;
+                        }
+                        if (fbTitle && ebookFeedbackMatchesExam(fb, exam)) return buildReportFromFeedback(fb);
                         continue;
                     }
                     if (exactFallbackReport) continue;
@@ -5538,8 +5543,9 @@
         function ebookFeedbackMatchesExam(fb, exam) {
             var targetTitle = normalizeEbookExamLookupText(fb && fb.targetExamTitle);
             if (!targetTitle) return false;
-            var examName = normalizeEbookExamLookupText(exam && exam.exam);
-            var fullTitle = normalizeEbookExamLookupText(((exam && exam.date) || "") + " " + ((exam && exam.exam) || ""));
+            if (!ebookFeedbackMatchesExamDate(fb, exam)) return false;
+            var examName = normalizeEbookExamLookupText(exam && (exam.exam || exam.examName || exam.title));
+            var fullTitle = normalizeEbookExamLookupText(((exam && exam.date) || "") + " " + ((exam && (exam.exam || exam.examName || exam.title)) || ""));
             if (fullTitle.indexOf(targetTitle) > -1) return true;
             if (ebookExamLookupTextHasDate(fb && fb.targetExamTitle)) {
                 var targetDates = getEbookExamLookupDateCandidates(fb && fb.targetExamTitle);
@@ -5551,6 +5557,13 @@
             return !!(examName && targetTitle.indexOf(examName) > -1);
         }
 
+        function ebookFeedbackMatchesExamDate(fb, exam) {
+            var targetParts = parseEbookComparableDate(fb && fb.targetDate);
+            if (!targetParts) return true;
+            var examParts = parseEbookComparableDate(exam && exam.date, targetParts.year);
+            return getEbookComparableDateKey(targetParts) === getEbookComparableDateKey(examParts);
+        }
+
         function getLatestMakeupResultReportInfo(exam, feedbackHistory) {
             if (!exam || exam.colIndex === undefined || exam.colIndex === null || !feedbackHistory || feedbackHistory.length === 0) return null;
             for (var k = feedbackHistory.length - 1; k >= 0; k--) {
@@ -5559,6 +5572,8 @@
                 if (normalizeEbookExamLookupText(fb.targetExamTitle)) {
                     if (!ebookFeedbackMatchesExam(fb, exam)) continue;
                 } else if (String(fb.targetExamColIndex || "") !== String(exam.colIndex)) {
+                    continue;
+                } else if (!ebookFeedbackMatchesExamDate(fb, exam)) {
                     continue;
                 }
                 var match = (fb.content || "").toString().match(/(\d+(\.\d+)?)/);
@@ -7246,6 +7261,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     className: gData.className,
                     studentName: gData.studentName,
                     examColIndex: context.examColIndex,
+                    targetDateStr: context.targetDate || "",
+                    targetExamTitle: context.title || "",
                     colorHex: colorHex
                 });
                 if (status) {
@@ -7293,8 +7310,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     targetDateStr: context.targetDate,
                     scoreValue: finalScore
                 };
-                if (context.scoreReview.targetExamColIndex !== undefined && context.scoreReview.targetExamColIndex !== null && context.scoreReview.targetExamColIndex !== "") {
-                    payload.examColIndex = context.scoreReview.targetExamColIndex;
+                if (context.examColIndex !== undefined && context.examColIndex !== null && context.examColIndex !== "") {
+                    payload.examColIndex = context.examColIndex;
                     payload.targetExamTitle = context.scoreReview.targetExamTitle || context.title || "";
                 }
                 await runGodAdminAction('writeScoreGas', payload);
@@ -7418,7 +7435,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 '</div>';
         }
 
-        function getMakeupRowsForExam(studentsObj, gradesObj, colIndex, threshold) {
+        function getMakeupRowsForExam(studentsObj, gradesObj, colIndex, threshold, selectedExam) {
             var orderedStudents = Object.keys(studentsObj || {}).map(function(stuKey) {
                 var stu = studentsObj[stuKey] || {};
                 return { key: stuKey, name: stu.name || "", rowIndex: stu.rowIndex || 9999 };
@@ -7452,6 +7469,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 summary.rows.push({
                     name: stu.name,
                     score: exam.score || "",
+                    targetDateStr: selectedExam ? (selectedExam.rawDate || selectedExam.date || "") : (exam.date || ""),
+                    targetExamTitle: selectedExam ? (selectedExam.examName || selectedExam.title || "") : (exam.examName || exam.exam || ""),
                     cellColor: exam.cellColor || "",
                     colorInfo: colorInfo,
                     needsMakeup: needsMakeup,
@@ -7496,6 +7515,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                             examMap[colIndex] = {
                                 colIndex: colIndex,
                                 title: title || ("考試欄位 " + colIndex),
+                                rawDate: exam.date || "",
+                                examName: exam.examName || exam.exam || "",
                                 note: exam.note || "",
                                 average: exam.average || "-"
                             };
@@ -7523,7 +7544,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 var opts = '<option value="" disabled selected>請選擇小考/鑑定考</option>';
                 exams.forEach(function(exam) {
                     var threshold = parseMakeupThreshold(exam.note);
-                    var summary = getMakeupRowsForExam(studentsObj, gradesObj, exam.colIndex, threshold);
+                    var summary = getMakeupRowsForExam(studentsObj, gradesObj, exam.colIndex, threshold, exam);
                     var suffix = (threshold > 0 ? ("｜標準 " + threshold) : "") + "｜待補 " + summary.pendingCount;
                     opts += '<option value="' + exam.colIndex + '">' + escapeAdminHtml(exam.title + suffix) + '</option>';
                 });
@@ -7574,7 +7595,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             if (!selectedExam) return;
 
             var threshold = parseMakeupThreshold(selectedExam.note);
-            var summary = getMakeupRowsForExam(currentMakeupExamData.students, currentMakeupExamData.grades, colIndex, threshold);
+            var summary = getMakeupRowsForExam(currentMakeupExamData.students, currentMakeupExamData.grades, colIndex, threshold, selectedExam);
             if (metaDiv) {
                 metaDiv.style.display = 'block';
                 metaDiv.innerHTML = '<b>' + escapeAdminHtml(selectedExam.title) + '</b><br>補考標準：' + (threshold > 0 ? threshold : '未設定') + '｜班平均：' + escapeAdminHtml(selectedExam.average || '-') + buildMakeupSummaryHtml(summary);
@@ -7620,6 +7641,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             if (!card || !status || card.classList.contains('is-saving')) return;
 
             var colorInfo = getMakeupColorInfo(colorHex);
+            var targetRow = currentMakeupRows[idx] || {};
             card.classList.add('is-saving');
             status.className = 'makeup-inline-status';
             status.innerText = '登記中...';
@@ -7645,7 +7667,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 card.querySelectorAll('.makeup-color-btn').forEach(function(button) { button.disabled = false; });
                 status.className = 'makeup-inline-status error';
                 status.innerText = '連線失敗：' + (err && err.message ? err.message : err.toString());
-            }).writeMakeupResultColorGas(gPass, clsName, stuName, examColIndex, colorHex);
+            }).writeMakeupResultColorGas(gPass, clsName, stuName, examColIndex, colorHex, targetRow.targetDateStr || "", targetRow.targetExamTitle || "");
         }
 
         async function onDirectMessageClassChange() {
@@ -7900,8 +7922,9 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             // --- 智慧狀態判定引擎：最新覆蓋法則 ---
             var groups = {};
             function getMakeupGroupKey(item) {
+                var targetTitle = normalizeEbookExamLookupText(item.targetExamTitle);
                 var targetCol = (item.targetExamColIndex !== undefined && item.targetExamColIndex !== null) ? item.targetExamColIndex.toString() : "";
-                return item.stuKey + '_' + item.date + (targetCol !== "" ? ('_' + targetCol) : '');
+                return (item.type || "") + '_' + item.stuKey + '_' + normalizeEbookExamLookupText(item.date) + '_' + (targetTitle || (targetCol !== "" ? ('col_' + targetCol) : ''));
             }
 
             rawList.forEach(function(item) {
@@ -7918,30 +7941,61 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 });
             }
             
-            // 尋找大表成績
-            function getSheetScoreForFeedback(stuK, item) {
+            // 尋找大表考試欄位
+            function getSheetExamForFeedback(stuK, item) {
                 if (!classGrades[stuK] || !classGrades[stuK].exams) return null;
                 var exams = classGrades[stuK].exams;
                 var targetCol = (item.targetExamColIndex !== undefined && item.targetExamColIndex !== null) ? item.targetExamColIndex.toString() : "";
+                function withResolvedExam(colKey, exam) {
+                    var resolved = Object.assign({}, exam || {});
+                    resolved._resolvedColIndex = colKey.replace(/^col_/, "");
+                    if (!resolved.exam) resolved.exam = resolved.examName || resolved.title || "";
+                    return resolved;
+                }
+                function getExamTitle(exam) {
+                    return ((exam && (exam.examName || exam.exam || exam.title)) || "") + " " + ((exam && exam.date) || "");
+                }
+                function examMatchesFeedbackDate(exam) {
+                    var targetParts = parseEbookComparableDate(item.date || item.targetDate);
+                    if (!targetParts) return true;
+                    var examParts = parseEbookComparableDate(exam && exam.date, targetParts.year);
+                    return getEbookComparableDateKey(targetParts) === getEbookComparableDateKey(examParts);
+                }
+                function examMatchesFeedbackTitle(exam) {
+                    if (!normalizeEbookExamLookupText(item.targetExamTitle)) return true;
+                    return ebookFeedbackMatchesExam({ targetDate: item.date || item.targetDate || "", targetExamTitle: item.targetExamTitle || "" }, withResolvedExam("", exam));
+                }
+                function isScoreExam(exam) {
+                    return isMakeupExamTitle(getExamTitle(exam));
+                }
+                function findByDateAndTitle(requireTitle) {
+                    var matches = [];
+                    for (var colKey in exams) {
+                        var candidate = exams[colKey];
+                        if (!isScoreExam(candidate)) continue;
+                        if (!examMatchesFeedbackDate(candidate)) continue;
+                        if (requireTitle && !examMatchesFeedbackTitle(candidate)) continue;
+                        matches.push(withResolvedExam(colKey, candidate));
+                    }
+                    if (requireTitle) return matches[0] || null;
+                    return matches.length === 1 ? matches[0] : null;
+                }
                 if (targetCol !== "") {
                     var exactExam = exams['col_' + targetCol];
-                    return exactExam ? (exactExam.score || "").toString() : null;
-                }
-                var targetDateStr = item.date || "";
-                var parts = targetDateStr.replace(/-/g, "/").split("/");
-                if (parts.length < 2) return null;
-                var m = parseInt(parts[parts.length-2], 10).toString();
-                var d = parseInt(parts[parts.length-1], 10).toString();
-                var possibleDates = [m + "/" + d, (m.length===1?"0"+m:m) + "/" + (d.length===1?"0"+d:d)];
-                for (var colKey in exams) {
-                    var ex = exams[colKey];
-                    var title = (ex.examName || "") + " " + (ex.date || "");
-                    if (title.indexOf("作業") > -1) continue;
-                    if (["小考", "複習", "期中", "大考", "隨堂", "鑑定"].some(function(keyword) { return title.indexOf(keyword) > -1; })) {
-                        if (possibleDates.some(function(pd) { return title.indexOf(pd) > -1; })) return (ex.score || "").toString();
+                    if (exactExam && isScoreExam(exactExam) && examMatchesFeedbackDate(exactExam) && examMatchesFeedbackTitle(exactExam)) {
+                        return withResolvedExam('col_' + targetCol, exactExam);
                     }
+                    if (normalizeEbookExamLookupText(item.targetExamTitle)) return findByDateAndTitle(true);
+                    return findByDateAndTitle(false);
                 }
-                return null;
+                if (normalizeEbookExamLookupText(item.targetExamTitle)) return findByDateAndTitle(true);
+                return findByDateAndTitle(false);
+            }
+
+            // 尋找大表成績
+            function getSheetScoreForFeedback(stuK, item) {
+                var exam = getSheetExamForFeedback(stuK, item);
+                return exam ? (exam.score || "").toString() : null;
             }
 
             var pendingList = [];
@@ -7955,7 +8009,10 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     if (!item.isLatestMakeup) {
                         item.statusFlag = "🌚 已作廢";
                     } else {
-                        var sScore = getSheetScoreForFeedback(item.stuKey, item);
+                        var sExam = getSheetExamForFeedback(item.stuKey, item);
+                        var sScore = sExam ? (sExam.score || "").toString() : null;
+                        if (sExam && sExam._resolvedColIndex) item.resolvedExamColIndex = sExam._resolvedColIndex;
+                        item.resolvedExamTitle = sExam ? (sExam.exam || sExam.examName || sExam.title || item.targetExamTitle || "") : (item.targetExamTitle || "");
                         item.sheetScore = sScore;
                         var rMatch = item.content.match(/(\d+(\.\d+)?)/);
                         var rScore = rMatch ? rMatch[0] : "";
@@ -8027,7 +8084,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     '<div style="display:flex; gap:6px;">' +
                     '<input type="text" id="fb-reply-'+idx+'" placeholder="輸入' + tInfo.name + '老師回覆..." style="flex:1; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.95rem;">' +
                     '<button onclick="sendAdminReply('+idx+', \'' + item.safeC + '\', \'' + item.stuKey + '\', \'' + item.date + '\', \'' + item.cls + '\', \'' + item.stuName + '\')" style="background:#3b82f6; color:white; border:none; border-radius:6px; padding:8px 14px; font-weight:700; cursor:pointer; flex-shrink:0;">立即回覆</button>' +
-                    (isScore && item.statusFlag !== "✅ 已回填" && item.statusFlag !== "🌚 已作廢" ? '<button id="btn-score-'+idx+'" onclick="autoWriteScore('+idx+', \'' + escapeInlineJs(item.cls) + '\', \'' + escapeInlineJs(item.stuName) + '\', \'' + escapeInlineJs(item.date) + '\', \'' + escapeInlineJs(item.targetExamColIndex || "") + '\', \'' + escapeInlineJs(item.targetExamTitle || "") + '\')" style="background:#10b981; color:white; border:none; border-radius:6px; padding:8px 14px; font-weight:700; cursor:pointer; flex-shrink:0;">📝 自動填入</button>' : '') +
+                    (isScore && item.statusFlag !== "✅ 已回填" && item.statusFlag !== "🌚 已作廢" ? '<button id="btn-score-'+idx+'" onclick="autoWriteScore('+idx+', \'' + escapeInlineJs(item.cls) + '\', \'' + escapeInlineJs(item.stuName) + '\', \'' + escapeInlineJs(item.date) + '\', \'' + escapeInlineJs(item.resolvedExamColIndex || item.targetExamColIndex || "") + '\', \'' + escapeInlineJs(item.resolvedExamTitle || item.targetExamTitle || "") + '\')" style="background:#10b981; color:white; border:none; border-radius:6px; padding:8px 14px; font-weight:700; cursor:pointer; flex-shrink:0;">📝 自動填入</button>' : '') +
                     '</div>' +
                 '</div>';
             });
