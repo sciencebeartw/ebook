@@ -6574,7 +6574,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         }
 
         function submitScoreReport(safeId, realDate, examColIndex, examTitle) {
-            if (blockStudentPreviewAction("回報補考分數")) return;
+            if (blockStudentPreviewAction("回報缺考分數")) return;
             var hasExamColIndex = examColIndex !== undefined && examColIndex !== null && examColIndex !== "";
             var inputId = 'score-in-' + safeId + (hasExamColIndex ? ('-' + examColIndex) : '');
             var val = document.getElementById(inputId).value; 
@@ -6594,8 +6594,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 }
                 // 監聽器會處理數據更新，此處僅清理輸入
                 document.getElementById(inputId).value = "";
-                btn.innerText = "送出"; btn.disabled = false;
-                alert("回報成功！分數已更新 (審核中)"); 
+                btn.innerText = "已送出"; btn.disabled = true;
+                swalAlert("已回報缺考分數", "分數已送出，等待老師回填大表。", "success");
             }).withFailureHandler(function (e) { 
                 swalAlert("回報失敗", friendlySubmitError(e), 'warning');
                 btn.innerText = "送出"; btn.disabled = false; 
@@ -7030,8 +7030,13 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
 
         function buildGodMakeupReviewBox(contextKey, exam, logic) {
             var currentInfo = getMakeupColorInfo(exam && exam.cellColor);
-            var title = currentInfo ? ("目前：" + currentInfo.label + "｜" + currentInfo.text) : (logic && logic.showReviewing ? "學生已回報，請登記補考結果" : "可登記補考結果");
             var scoreReview = window.adminModeMakeupContext && window.adminModeMakeupContext[contextKey] ? window.adminModeMakeupContext[contextKey].scoreReview : null;
+            var hasPendingScoreWriteback = scoreReview && scoreReview.status !== "filled";
+            var title = currentInfo
+                ? ("目前：" + currentInfo.label + "｜" + currentInfo.text)
+                : (hasPendingScoreWriteback
+                    ? "學生已回報缺考分數，請先回填大表"
+                    : (logic && logic.showReviewing ? "請登記補考結果" : "可登記補考結果"));
             var scoreHtml = "";
             if (scoreReview) {
                 var scoreStatus = scoreReview.status === "filled" ? "已回填：" + scoreReview.sheetScore : (scoreReview.status === "changed" ? "需更新：目前大表 " + scoreReview.sheetScore + "，學生最新回報 " + scoreReview.reportedScoreText : "未回填：學生回報 " + scoreReview.reportedScoreText);
