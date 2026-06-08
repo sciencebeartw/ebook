@@ -3718,7 +3718,7 @@
             </div>
 
             <div class="admin-card">
-                <div class="admin-card-title">💬 學生留言與補考審核</div>
+                <div class="admin-card-title">💬 學生留言與缺考/補考結果審核</div>
                 <div style="margin-bottom:10px; display:flex; gap:8px; flex-wrap:wrap;">
                     <select id="fbClassSelect" class="admin-select" onchange="loadFbApplicants()" style="flex:1;">
                         <option value="" disabled selected>請選擇班級</option>
@@ -3727,10 +3727,10 @@
                         <option value="" disabled selected>請選擇學生</option>
                     </select>
                     <select id="fbTypeSelect" class="admin-select" style="flex:1;">
-                        <option value="待處理" selected>🚨 補考 (待處理)</option>
+                        <option value="待處理" selected>🚨 缺考/補考結果 (待處理)</option>
                         <option value="全部">全部類型 (不含棒卡)</option>
                         <option value="學生留言">一般留言與作業</option>
-                        <option value="補考">所有補考回報</option>
+                        <option value="補考">所有缺考與補考結果回報</option>
                     </select>
                 </div>
                 <div style="display:flex; gap:8px;">
@@ -5172,7 +5172,7 @@
             var exactFallbackReport = null;
             for (var k = feedbackHistory.length - 1; k >= 0; k--) {
                 var fb = feedbackHistory[k];
-                if (fb.type === "補考回報") {
+                if (isMakeupScoreReportType(fb.type)) {
                     var fbTarget = (fb.targetDate || "").toString();
                     var fbTitle = (fb.targetExamTitle || "").toString().trim();
                     var fbExamCol = fb.targetExamColIndex;
@@ -5507,6 +5507,17 @@
             return (parts.year * 10000) + (parts.month * 100) + parts.day;
         }
 
+        function formatEbookComparableDate(parts) {
+            if (!parts || !parts.year || !parts.month || !parts.day) return "";
+            return parts.year + "/" + String(parts.month).padStart(2, "0") + "/" + String(parts.day).padStart(2, "0");
+        }
+
+        function getMakeupResultTargetDate(exam, post) {
+            var postParts = parseEbookComparableDate(post && post.date);
+            var examParts = parseEbookComparableDate(exam && exam.date, postParts && postParts.year);
+            return formatEbookComparableDate(examParts) || ((post && post.date) || "");
+        }
+
         function isExamOnOrBeforePostDate(exam, post) {
             var postParts = parseEbookComparableDate(post && post.date);
             if (!postParts) return true;
@@ -5515,8 +5526,63 @@
             return getEbookComparableDateKey(examParts) <= getEbookComparableDateKey(postParts);
         }
 
+        function isExamBeforePostDate(exam, post) {
+            var postParts = parseEbookComparableDate(post && post.date);
+            if (!postParts) return false;
+            var examParts = parseEbookComparableDate(exam && exam.date, postParts.year);
+            if (!examParts) return false;
+            return getEbookComparableDateKey(examParts) < getEbookComparableDateKey(postParts);
+        }
+
         function isMakeupResultReportType(type) {
             return type === (typeof FEEDBACK_TYPE_LABELS !== "undefined" ? FEEDBACK_TYPE_LABELS.makeupResult : "補考結果回報");
+        }
+
+        function normalizeMakeupResultReportContent(content) {
+            var text = (content === undefined || content === null ? "" : content.toString()).trim();
+            if (text.charAt(0) === "'") text = text.substring(1).trim();
+            return text;
+        }
+
+        function getMakeupResultWrongCount(content) {
+            var text = normalizeMakeupResultReportContent(content);
+            var match = text.match(/^錯\s*(\d+)\s*題?$/) ||
+                text.match(/^錯題數[：:\s]*(\d+)\s*題?$/) ||
+                text.match(/^(\d+)\s*題$/);
+            return match ? match[1] : "";
+        }
+
+        function isMakeupResultWrongCountContent(content) {
+            return !!getMakeupResultWrongCount(content);
+        }
+
+        function getMakeupResultReportDisplayText(content) {
+            var wrongCount = getMakeupResultWrongCount(content);
+            if (wrongCount) return "錯 " + wrongCount + " 題";
+            return normalizeMakeupResultReportContent(content);
+        }
+
+        function getMakeupResultReportContentHtml(content) {
+            var displayText = getMakeupResultReportDisplayText(content);
+            if (isMakeupResultWrongCountContent(content)) {
+                return "<b>補考結果回報：錯題數</b>｜" + escapeHtml(displayText || "未填");
+            }
+            return escapeHtml(displayText || "");
+        }
+
+        function isAdminMakeupFeedbackType(item) {
+            var type = (item && item.type ? item.type : "").toString();
+            return type.indexOf("補考") > -1 || type === "缺考回報";
+        }
+
+        function isAdminMakeupScoreReportType(type) {
+            return type === "補考回報" || type === "缺考回報";
+        }
+
+        function getAdminFeedbackTypeDisplayLabel(type) {
+            var text = (type || "學生留言").toString().trim() || "學生留言";
+            if (text === "補考回報" || text === "缺考回報") return "小考/隨堂考/鑑定考缺考回報";
+            return text;
         }
 
         function normalizeEbookExamLookupText(value) {
@@ -5558,6 +5624,13 @@
         }
 
         function ebookFeedbackMatchesExamDate(fb, exam) {
+            var titleDates = getEbookExamLookupDateCandidates(fb && fb.targetExamTitle);
+            if (titleDates.length) {
+                var fullTitle = normalizeEbookExamLookupText(((exam && exam.date) || "") + " " + ((exam && (exam.exam || exam.examName || exam.title)) || ""));
+                return titleDates.some(function(targetDate) {
+                    return targetDate && fullTitle.indexOf(targetDate) > -1;
+                });
+            }
             var targetParts = parseEbookComparableDate(fb && fb.targetDate);
             if (!targetParts) return true;
             var examParts = parseEbookComparableDate(exam && exam.date, targetParts.year);
@@ -5577,11 +5650,14 @@
                     continue;
                 }
                 var match = (fb.content || "").toString().match(/(\d+(\.\d+)?)/);
+                var reportDisplayText = getMakeupResultReportDisplayText(fb.content);
                 return {
                     feedbackKey: fb.fbKey || "",
                     targetDate: fb.targetDate || "",
                     content: fb.content || "",
-                    reportedScoreText: match ? match[0] : (fb.content || "").toString()
+                    reportedScoreText: reportDisplayText,
+                    reportedResultText: reportDisplayText,
+                    isWrongCountReport: isMakeupResultWrongCountContent(fb.content)
                 };
             }
             return null;
@@ -5592,6 +5668,7 @@
             if (currentExamColMap && currentExamColMap[String(exam.colIndex)]) return false;
             if (!isMakeupExamTitle(((exam.date || "") + " " + (exam.exam || "")).trim())) return false;
             if (getMakeupColorInfo(exam.cellColor)) return false;
+            if (getLatestMakeupResultReportInfo(exam, history)) return false;
             if (!exam.makeupThreshold || exam.makeupThreshold <= 0) return false;
             var logic = getDisplayLogic(exam, history);
             return logic && logic.effectiveNum !== null && logic.effectiveNum < exam.makeupThreshold;
@@ -5606,24 +5683,26 @@
                 if (exam && exam.colIndex !== undefined && exam.colIndex !== null) currentExamColMap[String(exam.colIndex)] = true;
             });
             var pending = gData.grades.filter(function(exam) {
-                return isExamOnOrBeforePostDate(exam, post) && isPendingMakeupResultExam(exam, history, currentExamColMap);
+                return isExamBeforePostDate(exam, post) && isPendingMakeupResultExam(exam, history, currentExamColMap);
             });
             if (pending.length === 0) return "";
 
             var safeDate = post.date.replace(/\//g, "-");
-            var html = "<div class='makeup-result-report-section'><div class='makeup-result-report-title'>上次未達標需補考回報</div>";
+            var html = "<div class='makeup-result-report-section'><div class='makeup-result-report-title'>上次未達標補考結果回報</div>";
             pending.forEach(function(exam) {
                 var report = getLatestMakeupResultReportInfo(exam, history);
                 var domId = makeDomSafeId("makeup-result-" + safeDate + "-" + exam.colIndex);
                 var title = ((exam.date || "") + " " + (exam.exam || "")).trim();
+                var targetDate = getMakeupResultTargetDate(exam, post);
                 var scoreText = exam.score ? exam.score : "空白";
                 html += "<div class='makeup-result-report-card'>" +
                     "<div class='makeup-result-report-meta'>" + escapeHtml(title || ("考試欄位 " + exam.colIndex)) + "</div>" +
                     "<div class='makeup-result-report-meta'>原本成績：" + escapeHtml(scoreText) + "｜補考標準：" + escapeHtml(exam.makeupThreshold) + "</div>";
                 if (report) {
-                    html += "<div class='makeup-result-report-status'>已回報 " + escapeHtml(report.reportedScoreText) + "，等待老師登記補考結果。</div>";
+                    var reportLabel = report.isWrongCountReport ? "補考結果回報：錯題數" : "已回報";
+                    html += "<div class='makeup-result-report-status'>" + escapeHtml(reportLabel) + "｜" + escapeHtml(report.reportedResultText || report.reportedScoreText) + "，等待老師登記補考結果。</div>";
                 } else {
-                    html += "<div class='input-box' style='margin-top:10px;'><input type='number' class='score-input' id='" + domId + "' placeholder='輸入補考分數'><button class='score-btn' onclick=\"submitMakeupResultReport('" + domId + "', '" + post.date + "', '" + exam.colIndex + "', '" + escapeInlineJs(title || "") + "')\">送出</button></div>";
+                    html += "<div class='input-box' style='margin-top:10px;'><input type='number' min='0' step='1' inputmode='numeric' class='score-input' id='" + domId + "' placeholder='輸入補考錯題數'><button class='score-btn' onclick=\"submitMakeupResultReport('" + domId + "', '" + escapeInlineJs(targetDate) + "', '" + exam.colIndex + "', '" + escapeInlineJs(title || "") + "')\">送出</button></div>";
                 }
                 html += "</div>";
             });
@@ -5818,7 +5897,7 @@
                     fields.push({ label: item.label, val: item.val, extra: extra });
                 });
                 fields = fields.concat([{ label: "今日補考考卷", val: post.makeup, extra: buildPendingMakeupResultReportHtml(post, history, examCards, latestPostDate) }, { label: "下次考試範圍", val: post.range }, { label: "補充資料", val: post.note }]);
-                fields.forEach(function (f) { if (f.val || f.extra) contentHtml += "<div class='info-block'><span class='info-label'>" + f.label + "</span><div class='info-content'>" + parseBtn(f.val || "") + (f.extra || "") + "</div></div>"; }); var pDateShort = post.date.substring(5).replace("-", "/"); var pDateFull = post.date.replace(/-/g, "/"); var myHistory = history.filter(function (h) { return h.targetDate == pDateShort || h.targetDate == post.date || h.targetDate == pDateFull; }); myHistory.sort(function(a,b) { return new Date(a.time) - new Date(b.time); }); var historyHtml = ""; myHistory.forEach(function (h) { if (h.type !== FEEDBACK_TYPE_LABELS.makeup && h.type !== FEEDBACK_TYPE_LABELS.makeupResult) { var displayType = (h.type === FEEDBACK_TYPE_LABELS.parent || h.type === FEEDBACK_TYPE_LABELS.parentStudent || h.type === FEEDBACK_TYPE_LABELS.student) ? "學生留言" : h.type; var isTeacher = (!isStudentSideFeedbackType(h.type));
+                fields.forEach(function (f) { if (f.val || f.extra) contentHtml += "<div class='info-block'><span class='info-label'>" + f.label + "</span><div class='info-content'>" + parseBtn(f.val || "") + (f.extra || "") + "</div></div>"; }); var pDateShort = post.date.substring(5).replace("-", "/"); var pDateFull = post.date.replace(/-/g, "/"); var myHistory = history.filter(function (h) { return h.targetDate == pDateShort || h.targetDate == post.date || h.targetDate == pDateFull; }); myHistory.sort(function(a,b) { return new Date(a.time) - new Date(b.time); }); var historyHtml = ""; myHistory.forEach(function (h) { if (!isMakeupScoreReportType(h.type) && h.type !== FEEDBACK_TYPE_LABELS.makeupResult) { var displayType = (h.type === FEEDBACK_TYPE_LABELS.parent || h.type === FEEDBACK_TYPE_LABELS.parentStudent || h.type === FEEDBACK_TYPE_LABELS.student) ? "學生留言" : h.type; var isTeacher = (!isStudentSideFeedbackType(h.type));
                         var avatarClass = isTeacher ? "avatar-teacher" : "avatar-student";
                         var bodyClass = isTeacher ? "teacher-body" : "";
                         var sName = (gData && gData.studentName) ? gData.studentName : "學";
@@ -6502,7 +6581,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             if (!val) return; 
             var btn = document.querySelector("#" + inputId + " + button"); 
             btn.innerText = "送出..."; btn.disabled = true; 
-            var form = { className: gData.className, studentName: gData.studentName, targetDate: realDate, type: '補考回報', content: val }; 
+            var form = { className: gData.className, studentName: gData.studentName, targetDate: realDate, type: FEEDBACK_TYPE_LABELS.makeup, content: val };
             if (hasExamColIndex) {
                 form.targetExamColIndex = examColIndex;
                 form.targetExamTitle = examTitle || "";
@@ -6524,10 +6603,19 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         }
 
         function submitMakeupResultReport(inputId, realDate, examColIndex, examTitle) {
-            if (blockStudentPreviewAction("回報補考結果")) return;
+            if (blockStudentPreviewAction("回報補考結果錯題數")) return;
             var input = document.getElementById(inputId);
-            var val = input ? input.value : "";
+            var val = input ? input.value.trim() : "";
             if (!val) return;
+            if (!/^\d+$/.test(val)) {
+                swalAlert("請輸入錯題數", "請填 0、1、2 這樣的整數題數。", "warning");
+                return;
+            }
+            var wrongCount = parseInt(val, 10);
+            if (wrongCount < 0 || wrongCount > 100) {
+                swalAlert("錯題數不合理", "請確認錯題數是否填錯。", "warning");
+                return;
+            }
             var btn = input ? input.nextElementSibling : null;
             if (btn) { btn.innerText = "送出..."; btn.disabled = true; }
             var form = {
@@ -6535,7 +6623,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 studentName: gData.studentName,
                 targetDate: realDate,
                 type: FEEDBACK_TYPE_LABELS.makeupResult,
-                content: val,
+                content: "錯 " + wrongCount + " 題",
                 targetExamColIndex: examColIndex,
                 targetExamTitle: examTitle || ""
             };
@@ -6547,7 +6635,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 }
                 if (input) input.value = "";
                 if (btn) { btn.innerText = "已送出"; btn.disabled = true; }
-                alert("已回報補考分數，等待老師登記補考結果。");
+                swalAlert("已回報補考結果", "錯題數已送出，等待老師登記補考結果。", "success");
             }).withFailureHandler(function (e) {
                 swalAlert("回報失敗", friendlySubmitError(e), 'warning');
                 if (btn) { btn.innerText = "送出"; btn.disabled = false; }
@@ -6825,9 +6913,14 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             parentStudent: "\u5bb6\u9577/\u5b78\u751f",
             upload: "\u4f5c\u696d\u4e0a\u50b3",
             sticker: "\u68d2\u5361\u7533\u8acb",
-            makeup: "\u88dc\u8003\u56de\u5831",
+            makeup: "\u7f3a\u8003\u56de\u5831",
+            legacyMakeup: "\u88dc\u8003\u56de\u5831",
             makeupResult: "\u88dc\u8003\u7d50\u679c\u56de\u5831"
         };
+
+        function isMakeupScoreReportType(type) {
+            return type === FEEDBACK_TYPE_LABELS.makeup || type === FEEDBACK_TYPE_LABELS.legacyMakeup;
+        }
 
         function isStudentSideFeedbackType(type) {
             return [
@@ -7286,12 +7379,12 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var context = window.adminModeMakeupContext && window.adminModeMakeupContext[contextKey];
             var status = document.getElementById('god-makeup-status-' + contextKey);
             if (!context || !context.scoreReview || !context.scoreReview.scoreValue || !context.targetDate) {
-                swalAlert('找不到補考回報資料', '請重新整理後再試。', 'warning');
+                swalAlert('找不到缺考回報資料', '請重新整理後再試。', 'warning');
                 return;
             }
 
             var finalScore = context.scoreReview.scoreValue;
-            var ok = await swalConfirm('回填補考分數', '確定要把 ' + gData.studentName + ' 的補考回報寫回大表為「' + finalScore + '」嗎？');
+            var ok = await swalConfirm('回填缺考分數', '確定要把 ' + gData.studentName + ' 的缺考回報寫回大表為「' + finalScore + '」嗎？');
             if (!ok) return;
 
             var originalText = btn ? btn.innerText : '';
@@ -7301,7 +7394,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }
             if (status) {
                 status.style.color = '#64748b';
-                status.innerText = '正在回填補考分數...';
+                status.innerText = '正在回填缺考分數...';
             }
             try {
                 var payload = {
@@ -7924,11 +8017,13 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             function getMakeupGroupKey(item) {
                 var targetTitle = normalizeEbookExamLookupText(item.targetExamTitle);
                 var targetCol = (item.targetExamColIndex !== undefined && item.targetExamColIndex !== null) ? item.targetExamColIndex.toString() : "";
-                return (item.type || "") + '_' + item.stuKey + '_' + normalizeEbookExamLookupText(item.date) + '_' + (targetTitle || (targetCol !== "" ? ('col_' + targetCol) : ''));
+                var titleDates = getEbookExamLookupDateCandidates(item && item.targetExamTitle);
+                var targetDate = titleDates.length ? titleDates[0] : normalizeEbookExamLookupText(item.date);
+                return (item.type || "") + '_' + item.stuKey + '_' + targetDate + '_' + (targetTitle || (targetCol !== "" ? ('col_' + targetCol) : ''));
             }
 
             rawList.forEach(function(item) {
-                if (item.type.indexOf('補考') > -1) {
+                if (isAdminMakeupFeedbackType(item)) {
                     var key = getMakeupGroupKey(item);
                     if (!groups[key]) groups[key] = [];
                     groups[key].push(item);
@@ -7956,6 +8051,13 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     return ((exam && (exam.examName || exam.exam || exam.title)) || "") + " " + ((exam && exam.date) || "");
                 }
                 function examMatchesFeedbackDate(exam) {
+                    var titleDates = getEbookExamLookupDateCandidates(item && item.targetExamTitle);
+                    if (titleDates.length) {
+                        var titleText = normalizeEbookExamLookupText(getExamTitle(exam));
+                        return titleDates.some(function(targetDate) {
+                            return targetDate && titleText.indexOf(targetDate) > -1;
+                        });
+                    }
                     var targetParts = parseEbookComparableDate(item.date || item.targetDate);
                     if (!targetParts) return true;
                     var examParts = parseEbookComparableDate(exam && exam.date, targetParts.year);
@@ -7985,10 +8087,10 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     if (exactExam && isScoreExam(exactExam) && examMatchesFeedbackDate(exactExam) && examMatchesFeedbackTitle(exactExam)) {
                         return withResolvedExam('col_' + targetCol, exactExam);
                     }
-                    if (normalizeEbookExamLookupText(item.targetExamTitle)) return findByDateAndTitle(true);
+                    if (normalizeEbookExamLookupText(item.targetExamTitle)) return findByDateAndTitle(true) || findByDateAndTitle(false);
                     return findByDateAndTitle(false);
                 }
-                if (normalizeEbookExamLookupText(item.targetExamTitle)) return findByDateAndTitle(true);
+                if (normalizeEbookExamLookupText(item.targetExamTitle)) return findByDateAndTitle(true) || findByDateAndTitle(false);
                 return findByDateAndTitle(false);
             }
 
@@ -8001,7 +8103,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var pendingList = [];
             rawList.forEach(function(item) {
                 var matchFilter = false;
-                var isMakeup = item.type.indexOf('補考') > -1;
+                var isMakeup = isAdminMakeupFeedbackType(item);
                 item.statusFlag = "";
                 item.sheetScore = "";
                 
@@ -8014,24 +8116,30 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                         if (sExam && sExam._resolvedColIndex) item.resolvedExamColIndex = sExam._resolvedColIndex;
                         item.resolvedExamTitle = sExam ? (sExam.exam || sExam.examName || sExam.title || item.targetExamTitle || "") : (item.targetExamTitle || "");
                         item.sheetScore = sScore;
-                        var rMatch = item.content.match(/(\d+(\.\d+)?)/);
-                        var rScore = rMatch ? rMatch[0] : "";
-                        
-                        if (!sScore || sScore.indexOf("假") === -1) {
-                            item.statusFlag = "🔴 未回填";
+                        if (!isAdminMakeupScoreReportType(item.type)) {
+                            var colorInfo = sExam ? getMakeupColorInfo(sExam.cellColor) : null;
+                            item.sheetColor = colorInfo ? colorInfo.hex : "";
+                            item.statusFlag = colorInfo ? "✅ 已登記結果" : "🔴 待登記顏色";
                         } else {
-                            var sMatch = sScore.match(/(\d+(\.\d+)?)/);
-                            var sNum = sMatch ? sMatch[0] : "";
-                            if (sNum === rScore && rScore !== "") {
-                                item.statusFlag = "✅ 已回填";
+                            var rMatch = item.content.match(/(\d+(\.\d+)?)/);
+                            var rScore = rMatch ? rMatch[0] : "";
+
+                            if (!sScore || sScore.indexOf("假") === -1) {
+                                item.statusFlag = "🔴 未回填";
                             } else {
-                                item.statusFlag = "⚠️ 需更新 (異動)";
+                                var sMatch = sScore.match(/(\d+(\.\d+)?)/);
+                                var sNum = sMatch ? sMatch[0] : "";
+                                if (sNum === rScore && rScore !== "") {
+                                    item.statusFlag = "✅ 已回填";
+                                } else {
+                                    item.statusFlag = "⚠️ 需更新 (異動)";
+                                }
                             }
                         }
                     }
                     
                     if (filterType === '待處理') {
-                        if (item.statusFlag === "🔴 未回填" || item.statusFlag === "⚠️ 需更新 (異動)") matchFilter = true;
+                        if (item.statusFlag === "🔴 未回填" || item.statusFlag === "⚠️ 需更新 (異動)" || item.statusFlag === "🔴 待登記顏色") matchFilter = true;
                     } else if (filterType === '全部' || filterType === '補考') {
                         matchFilter = true;
                     }
@@ -8048,30 +8156,36 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             if (pendingList.length === 0) { listDiv.innerHTML = '<div style="color:#999; padding:10px;">目前沒有相關記錄。</div>'; return; }
             var html = '';
             pendingList.forEach(function(item, idx) {
-                var isScore = (item.type.indexOf("補考") > -1);
-                var bg = isScore ? '#fef2f2' : '#f0fdf4';
-                var accent = isScore ? '#ef4444' : 'var(--primary)';
-                if (isScore && item.statusFlag === "✅ 已回填") { bg = '#f8fafc'; accent = '#94a3b8'; }
-                if (!isScore && item.type === '作業上傳') { bg = '#f0f9ff'; accent = '#0ea5e9'; }
+                var isMakeupFeedback = isAdminMakeupFeedbackType(item);
+                var isScoreReport = isAdminMakeupScoreReportType(item.type);
+                var isMakeupResult = isMakeupResultReportType(item.type);
+                var bg = isMakeupFeedback ? '#fef2f2' : '#f0fdf4';
+                var accent = isMakeupFeedback ? '#ef4444' : 'var(--primary)';
+                if (isMakeupFeedback && (item.statusFlag === "✅ 已回填" || item.statusFlag === "✅ 已登記結果")) { bg = '#f8fafc'; accent = '#94a3b8'; }
+                if (!isMakeupFeedback && item.type === '作業上傳') { bg = '#f0f9ff'; accent = '#0ea5e9'; }
                 
                 var displayContent = (item.content !== undefined && item.content !== null) ? item.content.toString() : "";
                 if (displayContent.startsWith("'")) displayContent = displayContent.substring(1);
-                
-                displayContent = displayContent.replace(/\[quote:([^\]]+)\](.*?)\[\/quote\]/gi, function(match, qtype, qContent) {
-                    return "<div style='background:#e2e8f0; padding:6px 10px; border-left:3px solid #94a3b8; margin-bottom:6px; font-size:0.85rem; color:#475569;'><b>" + qtype + "</b>: " + qContent + "</div>";
-                });
-                displayContent = displayContent.replace(/\[附件\](https?:\/\/[^\s<]+)/g, "<br><a href='$1' target='_blank' style='display:inline-block; margin-top:5px; padding:5px 10px; background:#e0f2fe; color:#0284c7; border-radius:5px; text-decoration:none; font-weight:bold; font-size:0.9rem;'>📄 點此檢視附件</a>");
+
+                if (isMakeupResult) {
+                    displayContent = getMakeupResultReportContentHtml(item.content);
+                } else {
+                    displayContent = displayContent.replace(/\[quote:([^\]]+)\](.*?)\[\/quote\]/gi, function(match, qtype, qContent) {
+                        return "<div style='background:#e2e8f0; padding:6px 10px; border-left:3px solid #94a3b8; margin-bottom:6px; font-size:0.85rem; color:#475569;'><b>" + qtype + "</b>: " + qContent + "</div>";
+                    });
+                    displayContent = displayContent.replace(/\[附件\](https?:\/\/[^\s<]+)/g, "<br><a href='$1' target='_blank' style='display:inline-block; margin-top:5px; padding:5px 10px; background:#e0f2fe; color:#0284c7; border-radius:5px; text-decoration:none; font-weight:bold; font-size:0.9rem;'>📄 點此檢視附件</a>");
+                }
 
                 var statusTagHtml = '';
-                if (isScore) {
-                    var flagColor = item.statusFlag.indexOf('未回填') > -1 ? '#ef4444' : (item.statusFlag.indexOf('需更新') > -1 ? '#f59e0b' : '#64748b');
-                    var sheetInfo = item.sheetScore ? "大表: " + item.sheetScore : "大表: 空白";
+                if (isMakeupFeedback) {
+                    var flagColor = (item.statusFlag.indexOf('未回填') > -1 || item.statusFlag.indexOf('待登記') > -1) ? '#ef4444' : (item.statusFlag.indexOf('需更新') > -1 ? '#f59e0b' : '#64748b');
+                    var sheetInfo = isScoreReport ? (item.sheetScore ? "大表: " + item.sheetScore : "大表: 空白") : (item.sheetColor ? "已填顏色: " + item.sheetColor : "尚未填顏色");
                     statusTagHtml = '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">' +
-                                    '<span style="display:inline-block; background:#e2e8f0; padding:3px 10px; border-radius:12px; font-size:0.8rem; font-weight:bold; color:#475569;" id="fb-type-'+idx+'">' + item.type + '</span>' +
+                                    '<span style="display:inline-block; background:#e2e8f0; padding:3px 10px; border-radius:12px; font-size:0.8rem; font-weight:bold; color:#475569;" id="fb-type-'+idx+'">' + getAdminFeedbackTypeDisplayLabel(item.type) + '</span>' +
                                     '<span style="font-size:0.85rem; font-weight:bold; color:' + flagColor + ';">' + item.statusFlag + ' <span style="font-size:0.75rem; color:#94a3b8;">[' + sheetInfo + ']</span></span>' +
                                     '</div>';
                 } else {
-                    statusTagHtml = '<div style="margin-bottom:6px;"><span style="display:inline-block; background:#e2e8f0; padding:3px 10px; border-radius:12px; font-size:0.8rem; font-weight:bold; color:#475569;" id="fb-type-'+idx+'">' + item.type + '</span></div>';
+                    statusTagHtml = '<div style="margin-bottom:6px;"><span style="display:inline-block; background:#e2e8f0; padding:3px 10px; border-radius:12px; font-size:0.8rem; font-weight:bold; color:#475569;" id="fb-type-'+idx+'">' + getAdminFeedbackTypeDisplayLabel(item.type) + '</span></div>';
                 }
 
                 let tInfo = getTeacherInfo(item.cls);
@@ -8084,7 +8198,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     '<div style="display:flex; gap:6px;">' +
                     '<input type="text" id="fb-reply-'+idx+'" placeholder="輸入' + tInfo.name + '老師回覆..." style="flex:1; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.95rem;">' +
                     '<button onclick="sendAdminReply('+idx+', \'' + item.safeC + '\', \'' + item.stuKey + '\', \'' + item.date + '\', \'' + item.cls + '\', \'' + item.stuName + '\')" style="background:#3b82f6; color:white; border:none; border-radius:6px; padding:8px 14px; font-weight:700; cursor:pointer; flex-shrink:0;">立即回覆</button>' +
-                    (isScore && item.statusFlag !== "✅ 已回填" && item.statusFlag !== "🌚 已作廢" ? '<button id="btn-score-'+idx+'" onclick="autoWriteScore('+idx+', \'' + escapeInlineJs(item.cls) + '\', \'' + escapeInlineJs(item.stuName) + '\', \'' + escapeInlineJs(item.date) + '\', \'' + escapeInlineJs(item.resolvedExamColIndex || item.targetExamColIndex || "") + '\', \'' + escapeInlineJs(item.resolvedExamTitle || item.targetExamTitle || "") + '\')" style="background:#10b981; color:white; border:none; border-radius:6px; padding:8px 14px; font-weight:700; cursor:pointer; flex-shrink:0;">📝 自動填入</button>' : '') +
+                    (isScoreReport && item.statusFlag !== "✅ 已回填" && item.statusFlag !== "🌚 已作廢" ? '<button id="btn-score-'+idx+'" onclick="autoWriteScore('+idx+', \'' + escapeInlineJs(item.cls) + '\', \'' + escapeInlineJs(item.stuName) + '\', \'' + escapeInlineJs(item.date) + '\', \'' + escapeInlineJs(item.resolvedExamColIndex || item.targetExamColIndex || "") + '\', \'' + escapeInlineJs(item.resolvedExamTitle || item.targetExamTitle || "") + '\')" style="background:#10b981; color:white; border:none; border-radius:6px; padding:8px 14px; font-weight:700; cursor:pointer; flex-shrink:0;">📝 自動填入</button>' : '') +
                     '</div>' +
                 '</div>';
             });
@@ -8184,6 +8298,25 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             if (!title || title.indexOf("作業") > -1) return false;
             return ["小考", "複習", "期中", "大考", "隨堂", "鑑定"].some(function(keyword) {
                 return title.indexOf(keyword) > -1;
+            });
+        }
+
+        function normalizeMissingExamColIndex(value) {
+            if (value === undefined || value === null) return "";
+            return value.toString().trim().replace(/^col_/, "");
+        }
+
+        function hasSubmittedMakeupReport(feedbackRoot, stuKey, examColIndex, acceptedTypes, targetExam) {
+            var feedbacks = feedbackRoot && feedbackRoot[stuKey] ? feedbackRoot[stuKey] : {};
+            var targetCol = normalizeMissingExamColIndex(examColIndex);
+            return Object.keys(feedbacks || {}).some(function(fbKey) {
+                var fb = feedbacks[fbKey] || {};
+                if (acceptedTypes.indexOf(fb.type || "") === -1) return false;
+                var fbCol = normalizeMissingExamColIndex(fb.targetExamColIndex);
+                if (targetCol && fbCol === targetCol) {
+                    return targetExam ? ebookFeedbackMatchesExam(fb, targetExam) : true;
+                }
+                return targetExam ? ebookFeedbackMatchesExam(fb, targetExam) : false;
             });
         }
 
@@ -8358,18 +8491,38 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 var missingList = [];
                 // 1. 讀取 Firebase 快取資料
                 const db = firebase.database();
-                var stuSnap = await db.ref(BEAR_SUBJECT + '/students').once('value');
-                var grdSnap = await db.ref(BEAR_SUBJECT + '/grades').once('value');
-                var allStudents = stuSnap.val() || {};
-                var allGrades = grdSnap.val() || {};
+	                var allStudents = {};
+	                var allGrades = {};
+	                var allFeedbacks = {};
+	                var targetClassKey = targetClass && targetClass !== "all" ? safeKey(targetClass) : targetClass;
+	                if (targetClassKey && targetClassKey !== "all") {
+	                    var scopedSnaps = await Promise.all([
+	                        db.ref(BEAR_SUBJECT + '/students/' + targetClassKey).once('value'),
+	                        db.ref(BEAR_SUBJECT + '/grades/' + targetClassKey).once('value'),
+	                        db.ref(BEAR_SUBJECT + '/feedbacks/' + targetClassKey).once('value')
+	                    ]);
+	                    allStudents[targetClassKey] = scopedSnaps[0].val() || {};
+	                    allGrades[targetClassKey] = scopedSnaps[1].val() || {};
+	                    allFeedbacks[targetClassKey] = scopedSnaps[2].val() || {};
+	                } else {
+	                    var rootSnaps = await Promise.all([
+	                        db.ref(BEAR_SUBJECT + '/students').once('value'),
+	                        db.ref(BEAR_SUBJECT + '/grades').once('value'),
+	                        db.ref(BEAR_SUBJECT + '/feedbacks').once('value')
+	                    ]);
+	                    allStudents = rootSnaps[0].val() || {};
+	                    allGrades = rootSnaps[1].val() || {};
+	                    allFeedbacks = rootSnaps[2].val() || {};
+	                }
 
                 // 2. 處理每一個班級
-                var classNames = targetClass === "all" ? Object.keys(allGrades) : [targetClass];
+	                var classNames = targetClassKey === "all" ? Object.keys(allGrades) : [targetClassKey];
                 classNames.forEach(function(cls) {
                     if (cls.startsWith('_') || cls.indexOf('總名單') > -1 || cls.indexOf('核對') > -1) return;
                     
-                    var clsStudents = allStudents[cls] || {};
-                    var clsGrades = allGrades[cls] || {};
+	                    var clsStudents = allStudents[cls] || {};
+	                    var clsGrades = allGrades[cls] || {};
+	                    var clsFeedbacks = allFeedbacks[cls] || {};
                     
                     // 抓取這個班上隨便一個學生的考卷清單來做「結構解析」
                     var anyStuKey = Object.keys(clsGrades)[0];
@@ -8389,8 +8542,14 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                         var nameStr = (ex.date || "") + " " + (ex.examName || "");
                         if (nameStr.indexOf("作業") > -1) {
                             homeworkCols.push({ id: colKey, title: nameStr.trim(), rawDate: ex.date || "" });
-                        } else if (isMakeupReminderExamTitle(nameStr)) {
-                            makeupExamCols.push({ id: colKey, title: nameStr.trim() });
+	                        } else if (isMakeupReminderExamTitle(nameStr)) {
+	                            makeupExamCols.push({
+	                                id: colKey,
+	                                title: nameStr.trim(),
+	                                rawDate: ex.date || "",
+	                                targetDate: ex.date || "",
+	                                examName: ex.examName || ex.exam || ""
+	                            });
                         }
                     });
                     
@@ -8428,11 +8587,17 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                             }
                         });
 
-                        makeupExamCols.forEach(function(exam) {
-                            var scoreInfo = stuGrades[exam.id];
-                            var rawScore = scoreInfo ? (scoreInfo.score || "").toString().trim() : "";
-                            if (rawScore === "假") {
-                                missingList.push({
+	                        makeupExamCols.forEach(function(exam) {
+	                            var scoreInfo = stuGrades[exam.id];
+	                            var rawScore = scoreInfo ? (scoreInfo.score || "").toString().trim() : "";
+	                            var scoreNum = parseScoreNumber(rawScore);
+	                            var colorInfo = scoreInfo ? getMakeupColorInfo(scoreInfo.cellColor) : null;
+	                            var hasScoreReport = hasSubmittedMakeupReport(clsFeedbacks, stuKey, exam.id, ["補考回報", "缺考回報"], {
+	                                date: exam.targetDate || exam.rawDate || "",
+	                                exam: exam.examName || exam.title || ""
+	                            });
+	                            if (!colorInfo && !hasScoreReport && (rawScore === "假" || (rawScore.indexOf("假") > -1 && scoreNum === null))) {
+	                                missingList.push({
                                     type: "makeup",
                                     sheet: cls,
                                     name: stuInfo.name,
