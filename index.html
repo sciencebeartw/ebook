@@ -5186,9 +5186,7 @@
                         continue;
                     }
                     if (exactFallbackReport) continue;
-                    var fbDatePart = fbTarget.substring(5).replace('-', '/');
-                    var fbDatePart2 = fbTarget.substring(5).replace('-', '/').replace(/^0/, '').replace(/\/0/, '/');
-                    var matchesDate = candidates.some(function(candidate) { return fbTarget.indexOf(candidate) > -1; }) || exam.date.indexOf(fbDatePart) > -1 || exam.date.indexOf(fbDatePart2) > -1 || exam.date == fbDatePart2;
+                    var matchesDate = ebookExamLookupDatesMatch(fbTarget, exam && exam.date);
                     if (matchesDate) exactFallbackReport = buildReportFromFeedback(fb);
                 }
             }
@@ -5606,6 +5604,23 @@
             return [m + "/" + d, mm + "/" + dd, m + "-" + d, mm + "-" + dd].map(normalizeEbookExamLookupText);
         }
 
+        function getEbookExamLookupDateKey(value) {
+            var raw = (value === undefined || value === null ? "" : value.toString());
+            var full = raw.match(/\d{4}[\/.-](\d{1,2})[\/.-](\d{1,2})/);
+            var match = full || raw.match(/(\d{1,2})[\/.-](\d{1,2})/);
+            if (!match) return "";
+            var month = parseInt(match[1], 10);
+            var day = parseInt(match[2], 10);
+            if (isNaN(month) || isNaN(day)) return "";
+            return month + "/" + day;
+        }
+
+        function ebookExamLookupDatesMatch(leftValue, rightValue) {
+            var leftKey = getEbookExamLookupDateKey(leftValue);
+            var rightKey = getEbookExamLookupDateKey(rightValue);
+            return !!(leftKey && rightKey && leftKey === rightKey);
+        }
+
         function ebookFeedbackMatchesExam(fb, exam) {
             var targetTitle = normalizeEbookExamLookupText(fb && fb.targetExamTitle);
             if (!targetTitle) return false;
@@ -5614,10 +5629,7 @@
             var fullTitle = normalizeEbookExamLookupText(((exam && exam.date) || "") + " " + ((exam && (exam.exam || exam.examName || exam.title)) || ""));
             if (fullTitle.indexOf(targetTitle) > -1) return true;
             if (ebookExamLookupTextHasDate(fb && fb.targetExamTitle)) {
-                var targetDates = getEbookExamLookupDateCandidates(fb && fb.targetExamTitle);
-                var hasMatchingDate = targetDates.some(function(targetDate) {
-                    return targetDate && fullTitle.indexOf(targetDate) > -1;
-                });
+                var hasMatchingDate = ebookExamLookupDatesMatch(fb && fb.targetExamTitle, fullTitle);
                 return hasMatchingDate && !!(examName && targetTitle.indexOf(examName) > -1);
             }
             return !!(examName && targetTitle.indexOf(examName) > -1);
@@ -5627,9 +5639,7 @@
             var titleDates = getEbookExamLookupDateCandidates(fb && fb.targetExamTitle);
             if (titleDates.length) {
                 var fullTitle = normalizeEbookExamLookupText(((exam && exam.date) || "") + " " + ((exam && (exam.exam || exam.examName || exam.title)) || ""));
-                return titleDates.some(function(targetDate) {
-                    return targetDate && fullTitle.indexOf(targetDate) > -1;
-                });
+                return ebookExamLookupDatesMatch(fb && fb.targetExamTitle, fullTitle);
             }
             var targetParts = parseEbookComparableDate(fb && fb.targetDate);
             if (!targetParts) return true;
@@ -7022,7 +7032,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         function shouldShowGodMakeupReview(exam, logic) {
             if (!exam || (exam.exam && exam.exam.indexOf("作業") > -1) || (exam.date && exam.date.indexOf("作業") > -1)) return false;
             if (logic && logic.showReviewing) return true;
-            if (exam.cellColor) return true;
+            if (getMakeupColorInfo(exam.cellColor)) return true;
             if (logic && logic.effectiveNum !== null && exam.makeupThreshold > 0 && logic.effectiveNum < exam.makeupThreshold) return true;
             if (logic && logic.needsReport) return true;
             return false;
@@ -8059,9 +8069,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     var titleDates = getEbookExamLookupDateCandidates(item && item.targetExamTitle);
                     if (titleDates.length) {
                         var titleText = normalizeEbookExamLookupText(getExamTitle(exam));
-                        return titleDates.some(function(targetDate) {
-                            return targetDate && titleText.indexOf(targetDate) > -1;
-                        });
+                        return ebookExamLookupDatesMatch(item && item.targetExamTitle, titleText);
                     }
                     var targetParts = parseEbookComparableDate(item.date || item.targetDate);
                     if (!targetParts) return true;
