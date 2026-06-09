@@ -1950,6 +1950,134 @@
             margin-top: 8px;
         }
 
+        .makeup-result-prompt {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 14px 0 12px;
+            padding: 10px 12px;
+            border-radius: 16px;
+            background: #fee2e2;
+            color: #991b1b;
+            font-size: 1.15rem;
+            font-weight: 900;
+            line-height: 1.35;
+        }
+
+        .makeup-result-prompt-icon {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: #ef4444;
+            color: #fff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 auto;
+            font-size: 1.35rem;
+            font-weight: 900;
+        }
+
+        .makeup-wrong-count-widget {
+            display: grid;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .makeup-wrong-count-row {
+            display: grid;
+            grid-template-columns: 54px minmax(0, 1fr) 54px;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .makeup-wrong-step-btn,
+        .makeup-wrong-submit-btn {
+            border: 0;
+            cursor: pointer;
+            font-weight: 900;
+            transition: transform 0.15s ease, opacity 0.15s ease;
+        }
+
+        .makeup-wrong-step-btn {
+            height: 56px;
+            border: 2px solid #fecaca;
+            border-radius: 18px;
+            background: #fee2e2;
+            color: #991b1b;
+            font-size: 1.7rem;
+            line-height: 1;
+        }
+
+        .makeup-wrong-step-btn:active,
+        .makeup-wrong-submit-btn:active {
+            transform: scale(0.98);
+        }
+
+        .makeup-wrong-count-field {
+            min-height: 62px;
+            border: 3px solid #ef4444;
+            border-radius: 22px;
+            background: #fff;
+            color: #991b1b;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 8px 12px;
+            font-size: 2.45rem;
+            font-weight: 900;
+            line-height: 1;
+            white-space: nowrap;
+        }
+
+        .makeup-wrong-count-input {
+            width: 2.2em;
+            min-width: 44px;
+            max-width: 90px;
+            border: 0;
+            outline: none;
+            background: transparent;
+            color: #991b1b;
+            font: inherit;
+            line-height: 1;
+            text-align: center;
+            -moz-appearance: textfield;
+        }
+
+        .makeup-wrong-count-input::-webkit-outer-spin-button,
+        .makeup-wrong-count-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        .makeup-wrong-count-input::placeholder {
+            color: #991b1b;
+            opacity: 0.32;
+        }
+
+        .makeup-wrong-submit-btn {
+            min-height: 58px;
+            border-radius: 18px;
+            background: #ef4444;
+            color: white;
+            font-size: 1.55rem;
+        }
+
+        .makeup-wrong-submit-btn:disabled,
+        .makeup-wrong-step-btn:disabled,
+        .makeup-wrong-count-input:disabled {
+            cursor: default;
+            opacity: 0.72;
+        }
+
+        .makeup-wrong-count-hint {
+            color: #9a3412;
+            font-size: 0.9rem;
+            font-weight: 800;
+            text-align: center;
+        }
+
         .feedback-section {
             background: transparent;
             padding: 20px 16px;
@@ -5702,6 +5830,7 @@
             pending.forEach(function(exam) {
                 var report = getLatestMakeupResultReportInfo(exam, history);
                 var domId = makeDomSafeId("makeup-result-" + safeDate + "-" + exam.colIndex);
+                var submitId = domId + "-submit";
                 var title = ((exam.date || "") + " " + (exam.exam || "")).trim();
                 var targetDate = getMakeupResultTargetDate(exam, post);
                 var scoreText = exam.score ? exam.score : "空白";
@@ -5712,7 +5841,16 @@
                     var reportLabel = report.isWrongCountReport ? "補考結果回報：錯題數" : "已回報";
                     html += "<div class='makeup-result-report-status'>" + escapeHtml(reportLabel) + "｜" + escapeHtml(report.reportedResultText || report.reportedScoreText) + "，等待老師登記補考結果。</div>";
                 } else {
-                    html += "<div class='input-box' style='margin-top:10px;'><input type='number' min='0' step='1' inputmode='numeric' class='score-input' id='" + domId + "' placeholder='輸入補考錯題數'><button class='score-btn' onclick=\"submitMakeupResultReport('" + domId + "', '" + escapeInlineJs(targetDate) + "', '" + exam.colIndex + "', '" + escapeInlineJs(title || "") + "')\">送出</button></div>";
+                    html += "<div class='makeup-wrong-count-widget'>" +
+                        "<div class='makeup-result-prompt'><span class='makeup-result-prompt-icon'>?</span><span>補考後錯了幾題？</span></div>" +
+                        "<div class='makeup-wrong-count-row'>" +
+                        "<button type='button' class='makeup-wrong-step-btn' onclick=\"adjustMakeupWrongCount('" + domId + "', -1)\">-</button>" +
+                        "<label class='makeup-wrong-count-field' for='" + domId + "'><span>錯</span><input type='number' min='0' max='100' step='1' inputmode='numeric' pattern='[0-9]*' class='makeup-wrong-count-input' id='" + domId + "' placeholder='0' aria-label='補考錯題數'><span>題</span></label>" +
+                        "<button type='button' class='makeup-wrong-step-btn' onclick=\"adjustMakeupWrongCount('" + domId + "', 1)\">+</button>" +
+                        "</div>" +
+                        "<button type='button' class='makeup-wrong-submit-btn' id='" + submitId + "' onclick=\"submitMakeupResultReport('" + domId + "', '" + escapeInlineJs(targetDate) + "', '" + exam.colIndex + "', '" + escapeInlineJs(title || "") + "', '" + submitId + "')\">送出錯題數</button>" +
+                        "<div class='makeup-wrong-count-hint'>可手動輸入，也可用 +/- 微調</div>" +
+                        "</div>";
                 }
                 html += "</div>";
             });
@@ -6612,11 +6750,32 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }).submitFeedback(form); 
         }
 
-        function submitMakeupResultReport(inputId, realDate, examColIndex, examTitle) {
+        function adjustMakeupWrongCount(inputId, delta) {
+            var input = document.getElementById(inputId);
+            if (!input || input.disabled) return;
+            var current = /^\d+$/.test((input.value || "").trim()) ? parseInt(input.value, 10) : 0;
+            var next = Math.max(0, Math.min(100, current + delta));
+            input.value = String(next);
+            input.focus();
+        }
+
+        function setMakeupWrongCountWidgetDisabled(input, disabled) {
+            if (!input) return;
+            var widget = input.closest ? input.closest(".makeup-wrong-count-widget") : null;
+            if (!widget) return;
+            widget.querySelectorAll("button, input").forEach(function(el) {
+                el.disabled = !!disabled;
+            });
+        }
+
+        function submitMakeupResultReport(inputId, realDate, examColIndex, examTitle, submitButtonId) {
             if (blockStudentPreviewAction("回報補考結果錯題數")) return;
             var input = document.getElementById(inputId);
             var val = input ? input.value.trim() : "";
-            if (!val) return;
+            if (!val) {
+                swalAlert("請輸入錯題數", "補考全對請填 0，或用 +/- 調整題數。", "warning");
+                return;
+            }
             if (!/^\d+$/.test(val)) {
                 swalAlert("請輸入錯題數", "請填 0、1、2 這樣的整數題數。", "warning");
                 return;
@@ -6626,8 +6785,9 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 swalAlert("錯題數不合理", "請確認錯題數是否填錯。", "warning");
                 return;
             }
-            var btn = input ? input.nextElementSibling : null;
-            if (btn) { btn.innerText = "送出..."; btn.disabled = true; }
+            var btn = submitButtonId ? document.getElementById(submitButtonId) : (input ? input.nextElementSibling : null);
+            if (btn) { btn.innerText = "送出..."; }
+            setMakeupWrongCountWidgetDisabled(input, true);
             var form = {
                 className: gData.className,
                 studentName: gData.studentName,
@@ -6640,7 +6800,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             google.script.run.withSuccessHandler(function (res) {
                 if (!res || res.success !== true) {
                     swalAlert("回報失敗", getSubmitFailureMessage(res), 'warning');
-                    if (btn) { btn.innerText = "送出"; btn.disabled = false; }
+                    setMakeupWrongCountWidgetDisabled(input, false);
+                    if (btn) { btn.innerText = "送出錯題數"; }
                     return;
                 }
                 if (input) input.value = "";
@@ -6648,7 +6809,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 swalAlert("已回報補考結果", "錯題數已送出，等待老師登記補考結果。", "success");
             }).withFailureHandler(function (e) {
                 swalAlert("回報失敗", friendlySubmitError(e), 'warning');
-                if (btn) { btn.innerText = "送出"; btn.disabled = false; }
+                setMakeupWrongCountWidgetDisabled(input, false);
+                if (btn) { btn.innerText = "送出錯題數"; }
             }).submitFeedback(form);
         }
         function openPwdModal() { document.getElementById('pwdModal').style.display = 'flex'; }
