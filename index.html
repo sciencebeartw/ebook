@@ -3139,15 +3139,7 @@
     };
     const SCRIPT_URL = SCRIPT_URLS[BEAR_SUBJECT] || SCRIPT_URLS['/science'];
     function doPostAction(action, data, onSuccess, onErr) {
-      if (isStudentPreviewMode) {
-         if (action === "logAccess") return;
-         if (["submitFeedback", "submitHomeworkDone", "changeUserPassword"].indexOf(action) > -1) {
-            var previewErr = new Error("學生視角預覽模式不會代替學生送出資料。");
-            blockStudentPreviewAction("送出資料");
-            if (onErr) onErr(previewErr);
-            return;
-         }
-      }
+      if (isStudentPreviewMode && action === "logAccess") return;
       if(SCRIPT_URL.includes("請在此填入")) {
          alert("⚠️ 錯誤：尚未填入 GAS Web App 網址在 index.html 內！");
          if(onErr) onErr("No Web App URL");
@@ -3179,14 +3171,21 @@
       return (res && res.msg) ? res.msg : (fallback || "Google Sheet 寫入或 Firebase 同步失敗，請稍後再試。");
     }
 
-    function blockStudentPreviewAction(actionLabel) {
-        if (!isStudentPreviewMode) return false;
-        swalAlert(
-            "學生視角預覽模式",
-            "這個畫面只用來確認學生登入後會看到什麼，不會代替學生" + (actionLabel || "送出資料") + "。",
-            "info"
-        );
-        return true;
+    function confirmStudentPreviewAction(actionLabel) {
+        if (!isStudentPreviewMode) return Promise.resolve(true);
+        var actionText = actionLabel || "送出資料";
+        var studentName = (gData && gData.studentName) ? gData.studentName : "這位學生";
+        return Swal.fire({
+            title: "確認以學生身分操作",
+            text: "你現在是從 Dashboard 開啟的學生視角。按下確認後，會真的以「" + studentName + "」的身分" + actionText + "，資料會寫入正式聯絡簿。",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonText: "確認操作",
+            cancelButtonText: "取消",
+            reverseButtons: true
+        }).then(function(result) {
+            return !!result.isConfirmed;
+        });
     }
     
     function safeKey(str) {
@@ -4191,7 +4190,7 @@
                 <div class="input-group"><input type="password" id="newP" placeholder="新密碼 (請勿使用簡易密碼)"></div>
                 <div style="display:flex; gap:10px;"><button class="login-btn" style="background:#ccc;"
                         onclick="closePwdModal()">取消</button><button class="login-btn"
-                        onclick="doChangePwd()">確認</button></div>
+                        onclick="doChangePwd(this)">確認</button></div>
             </div>
         </div>
     </div>
@@ -5425,9 +5424,9 @@
             startStudentUpload(Array.from(input.files), dateStr, input);
         }
 
-        function startStudentUpload(files, dateStr, inputToClear) {
+        async function startStudentUpload(files, dateStr, inputToClear) {
             if (!files || files.length === 0) return;
-            if (blockStudentPreviewAction("上傳作業")) {
+            if (!(await confirmStudentPreviewAction("上傳作業"))) {
                 if (inputToClear) inputToClear.value = "";
                 return;
             }
@@ -5532,7 +5531,7 @@
                     isUploading = false;
                     currentUploadDate = "";
                     if (sd) sd.innerText = '';
-                });
+                }, true);
                 return;
             }
 
@@ -6558,8 +6557,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }
         }
 
-        function submitStickerApply(safeId, realDate) {
-            if (blockStudentPreviewAction("送出棒卡申請")) return;
+        async function submitStickerApply(safeId, realDate) {
+            if (!(await confirmStudentPreviewAction("送出棒卡申請"))) return;
             var btnStr = "sticker-btn-" + safeId;
             var submitBtn = document.getElementById(btnStr);
             if (!submitBtn) {
@@ -6608,9 +6607,9 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }).submitFeedback(form);
         }
 
-        function submitHomeworkDone(safeId, realDate) {
+        async function submitHomeworkDone(safeId, realDate) {
             if (!gData || !gData.className || !gData.studentName) return;
-            if (blockStudentPreviewAction("回報作業完成")) return;
+            if (!(await confirmStudentPreviewAction("回報作業完成"))) return;
             if (!shouldUseHomeworkDoneFlowForClass(gData.className)) return;
             var post = (gData.dailyPost || []).find(function(item) {
                 return item && item.date === realDate;
@@ -6676,8 +6675,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }
         }
 
-        function submitPenaltyApply(safeId, realDate) {
-            if (blockStudentPreviewAction("送出反省申報")) return;
+        async function submitPenaltyApply(safeId, realDate) {
+            if (!(await confirmStudentPreviewAction("送出反省申報"))) return;
             var submitBtn = document.querySelector('#penalty-reason-' + safeId).parentElement.querySelector('.penalty-submit-btn');
 
             var selEl = document.getElementById('penalty-reason-' + safeId);
@@ -6724,8 +6723,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }).submitFeedback(form);
         }
 
-        function sendFeedback(safeId, realDate, type, contentOverride, callback, failureCallback) {
-            if (blockStudentPreviewAction(type === "作業上傳" ? "上傳作業" : "送出留言")) return;
+        async function sendFeedback(safeId, realDate, type, contentOverride, callback, failureCallback, skipStudentPreviewConfirm) {
+            if (!skipStudentPreviewConfirm && !(await confirmStudentPreviewAction(type === "作業上傳" ? "上傳作業" : "送出留言"))) return;
             var inputId = 'input-' + safeId;
             var val = contentOverride || document.getElementById(inputId).value;
             if (!val) return;
@@ -6757,8 +6756,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }).submitFeedback(form);
         }
 
-        function submitScoreReport(safeId, realDate, examColIndex, examTitle) {
-            if (blockStudentPreviewAction("回報缺考分數")) return;
+        async function submitScoreReport(safeId, realDate, examColIndex, examTitle) {
+            if (!(await confirmStudentPreviewAction("回報缺考分數"))) return;
             var hasExamColIndex = examColIndex !== undefined && examColIndex !== null && examColIndex !== "";
             var inputId = 'score-in-' + safeId + (hasExamColIndex ? ('-' + examColIndex) : '');
             var val = document.getElementById(inputId).value; 
@@ -6804,8 +6803,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             });
         }
 
-        function submitMakeupResultReport(inputId, realDate, examColIndex, examTitle, submitButtonId) {
-            if (blockStudentPreviewAction("回報補考結果錯題數")) return;
+        async function submitMakeupResultReport(inputId, realDate, examColIndex, examTitle, submitButtonId) {
+            if (!(await confirmStudentPreviewAction("回報補考結果錯題數"))) return;
             var input = document.getElementById(inputId);
             var val = input ? input.value.trim() : "";
             if (!val) {
@@ -6851,9 +6850,10 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         }
         function openPwdModal() { document.getElementById('pwdModal').style.display = 'flex'; }
         function closePwdModal() { document.getElementById('pwdModal').style.display = 'none'; }
-        function doChangePwd() { 
-            if (blockStudentPreviewAction("修改密碼")) return;
-            var btn = event.target;
+        async function doChangePwd(btn) {
+            btn = btn || ((typeof event !== "undefined" && event && event.target) ? event.target : null);
+            if (!(await confirmStudentPreviewAction("修改密碼"))) return;
+            if (!btn) return;
             var originalText = btn.innerText;
             var oldP = document.getElementById('oldP').value; 
             var newP = document.getElementById('newP').value; 
