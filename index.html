@@ -3206,7 +3206,7 @@
             if (className && (className.includes("小六資優數學") || className.includes("小六資優數"))) {
                 return { name: "東", fullName: "小東老師" };
             }
-            if (className && className.includes("數學超前班")) {
+            if (className && className.includes("數學超前")) {
                 return { name: "翔", fullName: "李翔老師" };
             }
             return { name: "師", fullName: "數學老師" };
@@ -5577,7 +5577,7 @@
 
         function isMathHomeworkDoneClassName(className) {
             className = (className || "").toString();
-            return className.indexOf("資優數學") > -1 || className.indexOf("數學超前班") > -1;
+            return className.indexOf("資優數學") > -1 || className.indexOf("數學超前") > -1;
         }
 
         function shouldUseHomeworkDoneFlowForClass(className) {
