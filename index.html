@@ -5575,6 +5575,17 @@
             return (className || "").toString().indexOf("資優自然") > -1;
         }
 
+        function isMathHomeworkDoneClassName(className) {
+            className = (className || "").toString();
+            return className.indexOf("資優數學") > -1 || className.indexOf("數學超前班") > -1;
+        }
+
+        function shouldUseHomeworkDoneFlowForClass(className) {
+            if (BEAR_SUBJECT === "/science") return !isGiftedScienceClassName(className);
+            if (BEAR_SUBJECT === "/math") return isMathHomeworkDoneClassName(className);
+            return false;
+        }
+
         function getPostHomeworkItems(post) {
             var items = [];
             if (post && post.hw1 && post.hw1.toString().trim()) {
@@ -5597,10 +5608,9 @@
         }
 
         function shouldShowHomeworkDoneButton(post) {
-            return BEAR_SUBJECT === "/science" &&
+            return shouldUseHomeworkDoneFlowForClass(gData && gData.className) &&
                 !isAdminMode &&
                 gData &&
-                !isGiftedScienceClassName(gData.className) &&
                 !!getPostHomeworkText(post);
         }
 
@@ -6601,7 +6611,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         function submitHomeworkDone(safeId, realDate) {
             if (!gData || !gData.className || !gData.studentName) return;
             if (blockStudentPreviewAction("回報作業完成")) return;
-            if (BEAR_SUBJECT !== "/science" || isGiftedScienceClassName(gData.className)) return;
+            if (!shouldUseHomeworkDoneFlowForClass(gData.className)) return;
             var post = (gData.dailyPost || []).find(function(item) {
                 return item && item.date === realDate;
             });
