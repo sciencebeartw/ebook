@@ -1740,6 +1740,36 @@
             word-wrap: break-word;
         }
 
+        .rich-emphasis-bold {
+            font-weight: 950;
+        }
+
+        .rich-emphasis-red {
+            color: #a65f62;
+            font-weight: 850;
+        }
+
+        .rich-emphasis-blue {
+            color: #4f6f8c;
+            font-weight: 850;
+        }
+
+        .rich-emphasis-mark {
+            background: linear-gradient(180deg, transparent 18%, #fff1b8 18%, #fff1b8 86%, transparent 86%);
+            color: #4b5563;
+            padding: 0 0.08em;
+            border-radius: 0.16em;
+            font-weight: 850;
+        }
+
+        .rich-emphasis-underline-double {
+            text-decoration-line: underline;
+            text-decoration-style: double;
+            text-decoration-thickness: 0.08em;
+            text-underline-offset: 0.18em;
+            text-decoration-color: currentColor;
+        }
+
         .quiz-answer-note {
             margin: 8px 0 2px;
             padding: 10px 12px;
@@ -4327,6 +4357,90 @@
             return `<a href="${safeRawUrl}" target="_blank" rel="noopener noreferrer" class="${className}">${icon}${safeName}</a>`;
         }
 
+        function renderEbookRichTextFormat(escapedText) {
+            var source = (escapedText || "").toString();
+            var styleMap = {
+                red: "rich-emphasis-red",
+                blue: "rich-emphasis-blue",
+                mark: "rich-emphasis-mark",
+                u: "rich-emphasis-underline-double"
+            };
+
+            function findClosingBold(text, start) {
+                return text.indexOf("**", start);
+            }
+
+            function findClosingBrace(text, openIndex) {
+                var depth = 0;
+                for (var i = openIndex; i < text.length; i++) {
+                    if (text.charAt(i) === "{") depth++;
+                    else if (text.charAt(i) === "}") {
+                        depth--;
+                        if (depth === 0) return i;
+                    }
+                }
+                return -1;
+            }
+
+            function renderRange(text) {
+                var out = "";
+                for (var i = 0; i < text.length;) {
+                    if (text.slice(i, i + 2) === "**") {
+                        var boldEnd = findClosingBold(text, i + 2);
+                        if (boldEnd > i + 2) {
+                            out += '<strong class="rich-emphasis-bold">' + renderRange(text.slice(i + 2, boldEnd)) + '</strong>';
+                            i = boldEnd + 2;
+                            continue;
+                        }
+                    }
+
+                    var token = text.slice(i).match(/^\{(red|blue|mark|u):/);
+                    if (token) {
+                        var closeIndex = findClosingBrace(text, i);
+                        if (closeIndex > -1) {
+                            var innerStart = i + token[0].length;
+                            out += '<span class="' + styleMap[token[1]] + '">' + renderRange(text.slice(innerStart, closeIndex)) + '</span>';
+                            i = closeIndex + 1;
+                            continue;
+                        }
+                    }
+
+                    out += text.charAt(i);
+                    i++;
+                }
+                return out;
+            }
+
+            return renderRange(source);
+        }
+
+        function renderEbookPlainSegment(escapedText) {
+            return renderEbookRichTextFormat((escapedText || "").replace(/\n/g, "<br>"));
+        }
+
+        function parseEbookEscapedTextLinks(escapedText) {
+            var source = (escapedText || "").toString();
+            var linkPattern = /\[([^\]\n]*)\](http[s]?:\/\/[^\s<]+)/g;
+            var html = "";
+            var lastIndex = 0;
+            var match;
+            while ((match = linkPattern.exec(source)) !== null) {
+                html += renderEbookPlainSegment(source.slice(lastIndex, match.index));
+                var name = match[1] || "連結";
+                var url = match[2] || "";
+                if (name.indexOf("作業") > -1 || name.indexOf("上傳") > -1) {
+                    html += renderParsedLink(name, url, "btn-important-tag", SVG.upload);
+                } else if (name.indexOf("附件") > -1) {
+                    html += renderParsedLink(name, url, "btn-small-tag", SVG.clip);
+                } else {
+                    html += renderParsedLink(name, url, "btn-link", "");
+                }
+                lastIndex = linkPattern.lastIndex;
+            }
+            html += renderEbookPlainSegment(source.slice(lastIndex));
+            return compactParsedButtonBreaks(html);
+        }
+
         function compactParsedButtonBreaks(html) {
             return (html || "").replace(/<br>\s*(?=(?:<span class="doc-link-wrap"|<a [^>]*class="(?:btn-link|btn-important-tag|btn-small-tag)"))/g, "");
         }
@@ -4335,18 +4449,8 @@
         function parseBtn(text) {
             if (!text) return "";
             // 先對 HTML 特殊字元做跳脫 防範 XSS
-            text = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-            var withBr = text.replace(/\n/g, '<br>');
-            var parsed = withBr.replace(/\[(.*?)\](http[s]?:\/\/[^\s<]+)/g, function (match, name, url) {
-                if (name.indexOf("作業") > -1 || name.indexOf("上傳") > -1) {
-                    return renderParsedLink(name, url, "btn-important-tag", SVG.upload);
-                } else if (name.indexOf("附件") > -1) {
-                    return renderParsedLink(name, url, "btn-small-tag", SVG.clip);
-                } else {
-                    return renderParsedLink(name, url, "btn-link", "");
-                }
-            });
-            return compactParsedButtonBreaks(parsed);
+            var escapedText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            return parseEbookEscapedTextLinks(escapedText);
         };
 
         const APP_LOGO = "https://www.sciencebear.com.tw/ebook/LOGO.png";
@@ -6216,15 +6320,24 @@
                     });
                     // 老師發布的連結 -> 藍色大膠囊
                     // 學生上傳的連結 -> 灰色小標籤 (透過 class="btn-small-tag" 區分)
-                    var parsed = withBr.replace(/\[(.*?)\](http[s]?:\/\/[^\s<]+)/g, function (match, name, url) {
+                    var linkPattern = /\[(.*?)\](http[s]?:\/\/[^\s<]+)/g;
+                    var parsed = "";
+                    var lastIndex = 0;
+                    var linkMatch;
+                    while ((linkMatch = linkPattern.exec(withBr)) !== null) {
+                        parsed += renderEbookRichTextFormat(withBr.slice(lastIndex, linkMatch.index));
+                        var name = linkMatch[1];
+                        var url = linkMatch[2];
                         if (name.indexOf("作業") > -1 || name.indexOf("上傳") > -1) {
-                            return renderParsedLink(name, url, "btn-important-tag", SVG.upload);
+                            parsed += renderParsedLink(name, url, "btn-important-tag", SVG.upload);
                         } else if (name.indexOf("附件") > -1) {
-                            return renderParsedLink(name, url, "btn-small-tag", SVG.clip);
+                            parsed += renderParsedLink(name, url, "btn-small-tag", SVG.clip);
                         } else {
-                            return renderParsedLink(name, url, "btn-link", "");
+                            parsed += renderParsedLink(name, url, "btn-link", "");
                         }
-                    });
+                        lastIndex = linkPattern.lastIndex;
+                    }
+                    parsed += renderEbookRichTextFormat(withBr.slice(lastIndex));
                     return compactParsedButtonBreaks(parsed);
                 };
 
