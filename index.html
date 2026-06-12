@@ -3110,6 +3110,31 @@
             width: 200%;
         }
 
+        .draft-preview-banner {
+            margin: 0 12px 12px;
+            padding: 10px 12px;
+            border: 1px solid #bfdbfe;
+            border-radius: 12px;
+            background: #eff6ff;
+            color: #1e40af;
+            font-size: 0.92rem;
+            font-weight: 900;
+            line-height: 1.5;
+            text-align: center;
+        }
+
+        body.draft-preview-mode .refresh-btn,
+        body.draft-preview-mode .pwd-btn,
+        body.draft-preview-mode .logout-btn,
+        body.draft-preview-mode #headStickers,
+        body.draft-preview-mode #godModeExitBtn {
+            display: none !important;
+        }
+
+        body.draft-preview-mode #tab-content-1 {
+            display: none !important;
+        }
+
 
         </style>
 
@@ -3129,6 +3154,7 @@
     let ebookGodSessionId = qParams.get('godSession') || '';
     let ebookGodSessionInfo = null;
     let isStudentPreviewMode = false;
+    let isDashboardDraftPreviewMode = qParams.get('preview') === 'dashboard-draft';
     let ebookGodSessionLastActivityAt = Date.now();
     let ebookGodSessionLastRenewAt = 0;
     let ebookGodSessionHeartbeatTimer = null;
@@ -3139,6 +3165,10 @@
     };
     const SCRIPT_URL = SCRIPT_URLS[BEAR_SUBJECT] || SCRIPT_URLS['/science'];
     function doPostAction(action, data, onSuccess, onErr) {
+      if (isDashboardDraftPreviewMode) {
+        if (onErr) onErr(new Error("Dashboard 草稿預覽不允許寫入正式資料。"));
+        return;
+      }
       if (isStudentPreviewMode && action === "logAccess") return;
       if(SCRIPT_URL.includes("請在此填入")) {
          alert("⚠️ 錯誤：尚未填入 GAS Web App 網址在 index.html 內！");
@@ -3172,6 +3202,10 @@
     }
 
     function confirmStudentPreviewAction(actionLabel) {
+        if (isDashboardDraftPreviewMode) {
+            swalAlert("預覽模式不可送出", "Dashboard 草稿預覽只允許檢查畫面與外部連結，不會寫入正式資料。", "warning");
+            return Promise.resolve(false);
+        }
         if (!isStudentPreviewMode) return Promise.resolve(true);
         var actionText = actionLabel || "送出資料";
         var studentName = (gData && gData.studentName) ? gData.studentName : "這位學生";
@@ -4374,6 +4408,144 @@
             return ref;
         }
 
+        function getDashboardDraftPreviewStorageKey(key) {
+            return 'dashboardDraftPreviewPayload:' + (key || 'latest');
+        }
+
+        function sanitizeDashboardDraftPreviewText(value) {
+            return (value === undefined || value === null ? '' : value.toString())
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+
+        function isAllowedDashboardDraftPreviewOrigin(origin) {
+            if (!origin) return false;
+            if (origin === window.location.origin) return true;
+            if (origin === 'https://www.sciencebear.com.tw') return true;
+            if (origin === 'https://sciencebeartw.github.io') return true;
+            if (/^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(origin)) return true;
+            return false;
+        }
+
+        function normalizeDashboardDraftPreviewPayload(payload) {
+            payload = payload || {};
+            var subject = payload.subject === 'math' ? 'math' : 'science';
+            var kind = payload.kind === 'bulletin' ? 'bulletin' : 'dailyPost';
+            var className = sanitizeDashboardDraftPreviewText(payload.className || '草稿預覽班級');
+            var dailyPosts = Array.isArray(payload.dailyPosts) ? payload.dailyPosts : [];
+            var bulletins = Array.isArray(payload.bulletins) ? payload.bulletins : [];
+            return {
+                version: 1,
+                kind: kind,
+                subject: subject,
+                className: className,
+                studentName: sanitizeDashboardDraftPreviewText(payload.studentName || '家長端預覽'),
+                dailyPosts: dailyPosts.map(function(post) {
+                    post = post || {};
+                    return {
+                        date: sanitizeDashboardDraftPreviewText(post.date),
+                        title: sanitizeDashboardDraftPreviewText(post.title),
+                        progress: sanitizeDashboardDraftPreviewText(post.progress),
+                        hw1: sanitizeDashboardDraftPreviewText(post.hw1),
+                        hw2: sanitizeDashboardDraftPreviewText(post.hw2),
+                        quiz: sanitizeDashboardDraftPreviewText(post.quiz),
+                        makeup: sanitizeDashboardDraftPreviewText(post.makeup),
+                        range: sanitizeDashboardDraftPreviewText(post.range),
+                        note: sanitizeDashboardDraftPreviewText(post.note),
+                        examData: post.examData || { main: null, others: [] }
+                    };
+                }),
+                bulletins: bulletins.map(function(bulletin) {
+                    bulletin = bulletin || {};
+                    return {
+                        id: sanitizeDashboardDraftPreviewText(bulletin.id || 'dashboard_preview'),
+                        time: sanitizeDashboardDraftPreviewText(bulletin.time),
+                        className: sanitizeDashboardDraftPreviewText(bulletin.className || className),
+                        type: sanitizeDashboardDraftPreviewText(bulletin.type || '一般'),
+                        title: sanitizeDashboardDraftPreviewText(bulletin.title),
+                        content: sanitizeDashboardDraftPreviewText(bulletin.content),
+                        btnName: sanitizeDashboardDraftPreviewText(bulletin.btnName),
+                        btnUrl: sanitizeDashboardDraftPreviewText(bulletin.btnUrl),
+                        reserveTime: sanitizeDashboardDraftPreviewText(bulletin.reserveTime),
+                        expiresAt: sanitizeDashboardDraftPreviewText(bulletin.expiresAt)
+                    };
+                })
+            };
+        }
+
+        function loadDashboardDraftPreviewPayload() {
+            var params = new URLSearchParams(window.location.search);
+            var key = params.get('previewKey') || 'latest';
+            try {
+                var raw = localStorage.getItem(getDashboardDraftPreviewStorageKey(key));
+                if (raw) return normalizeDashboardDraftPreviewPayload(JSON.parse(raw));
+            } catch (err) {
+                console.warn('Dashboard 草稿預覽讀取失敗：', err);
+            }
+            return null;
+        }
+
+        function renderDashboardDraftPreviewError(message) {
+            document.getElementById('full-loader').style.display = 'none';
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('admin-screen').style.display = 'none';
+            document.getElementById('main-screen').style.display = 'block';
+            document.body.classList.add('draft-preview-mode');
+            document.getElementById('headName').innerText = '草稿預覽';
+            document.getElementById('headClass').innerText = '資料讀取失敗';
+            document.getElementById('tab-content-0').innerHTML = '<div style="text-align:center; padding:30px; color:#b91c1c; font-weight:900;">' + escapeHtml(message || '找不到 Dashboard 草稿預覽資料。') + '</div>';
+            document.getElementById('tab-content-1').innerHTML = '';
+            document.getElementById('tab-content-2').innerHTML = '';
+        }
+
+        function enterDashboardDraftPreview(payload) {
+            payload = normalizeDashboardDraftPreviewPayload(payload);
+            isDashboardDraftPreviewMode = true;
+            isStudentPreviewMode = false;
+            isAdminMode = true;
+            ebookGodSessionId = "";
+            ebookGodSessionInfo = null;
+            clearRealtimeListeners();
+            document.body.classList.add('draft-preview-mode');
+            document.getElementById('full-loader').style.display = 'none';
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('admin-screen').style.display = 'none';
+            document.getElementById('main-screen').style.display = 'block';
+            document.getElementById('headName').innerText = payload.studentName || '家長端預覽';
+            document.getElementById('headClass').innerText = payload.className.replace(/\d+/g, '');
+            document.getElementById('headStickerCount').innerText = '0';
+            var previewBanner = '<div class="draft-preview-banner">Dashboard 發佈前預覽：這裡使用 eBook 家長端畫面渲染。外部連結可以點開檢查；留言、上傳、補考回報、棒卡與改密碼已停用。</div>';
+            gData = {
+                found: true,
+                className: payload.className,
+                studentName: payload.studentName || '家長端預覽',
+                dailyPost: payload.dailyPosts,
+                grades: [],
+                feedbackHistory: [],
+                bulletins: payload.bulletins,
+                stickers: 0,
+                homeworkDone: {}
+            };
+            renderDailyPosts(payload.dailyPosts, []);
+            renderOldGradeCards([]);
+            renderBulletins(payload.bulletins);
+            document.getElementById('tab-content-0').insertAdjacentHTML('afterbegin', previewBanner);
+            if (payload.kind === 'bulletin') {
+                switchTab(2);
+                document.getElementById('tab-content-2').insertAdjacentHTML('afterbegin', previewBanner);
+            } else {
+                switchTab(0);
+            }
+            window.scrollTo(0, 0);
+        }
+
+        function handleDashboardDraftPreviewMessage(event) {
+            if (!isAllowedDashboardDraftPreviewOrigin(event && event.origin)) return;
+            var data = event && event.data ? event.data : null;
+            if (!data || data.type !== 'sciencebear-dashboard-draft-preview') return;
+            enterDashboardDraftPreview(data.payload || {});
+        }
+
 
         document.addEventListener("DOMContentLoaded", function () {
             document.querySelectorAll('.logo-target').forEach(function (img) { img.src = APP_LOGO; });
@@ -4617,10 +4789,10 @@
             document.getElementById('full-loader').style.display = 'none';
             clearRealtimeListeners();
             gData = result;
-            if (pass !== "admin_view" && pass !== "god_session" && pass !== "student_preview") gPass = pass; // ★ 防止預覽模式覆蓋真正的密碼
+            if (pass !== "admin_view" && pass !== "god_session" && pass !== "student_preview" && pass !== "dashboard_draft_preview") gPass = pass; // ★ 防止預覽模式覆蓋真正的密碼
 
             // ★ v4.0 登入記錄：fire-and-forget，不阻塞 UI
-            if (pass !== "admin_view" && pass !== "god_session" && pass !== "student_preview" && !result.isAdmin) {
+            if (pass !== "admin_view" && pass !== "god_session" && pass !== "student_preview" && pass !== "dashboard_draft_preview" && !result.isAdmin) {
                 doPostAction('logAccess', { className: result.className, studentName: result.studentName }, null, null, '');
             }
             document.getElementById('login-screen').style.display = 'none';
@@ -4634,6 +4806,7 @@
             
             // ★即時監聽系統
             try {
+                if (isDashboardDraftPreviewMode) throw new Error("skip-realtime-for-dashboard-draft-preview");
                 if (typeof db !== 'undefined') {
                     const safeC = result.className.replace(/[.#$[\]]/g, '-');
                     const studentKey = result.foundUserKey || result.studentName.replace(/[.#$[\]]/g, '-');
@@ -4819,7 +4992,9 @@
                         });
                     }
                 }
-            } catch(e) { console.warn('Firebase real-time listener error:', e); }
+            } catch(e) {
+                if (!(e && e.message === "skip-realtime-for-dashboard-draft-preview")) console.warn('Firebase real-time listener error:', e);
+            }
 
             renderDailyPosts(result.dailyPost, result.feedbackHistory);
             renderOldGradeCards(result.grades);
@@ -6186,7 +6361,7 @@
         </div>
         ${stickerStudentToolsHtml}
     `;
-                if (isAdminMode) uploadHtml = "";
+                if (isAdminMode || isDashboardDraftPreviewMode) uploadHtml = "";
                 var adminDirectHtml = "";
                 if (canUseAdminModeReply()) {
                     var directContextKey = makeDomSafeId("direct_" + safeDateId);
@@ -6199,7 +6374,7 @@
                     window.adminModeStickerAdjustmentContext[adjustmentContextKey] = { targetDate: post.date };
                     godStickerAdjustmentHtml = buildGodStickerAdjustmentBox(adjustmentContextKey);
                 }
-                var studentInputHtml = isAdminMode ? "" : "<div class='input-box'><input type='text' class='fb-input' id='input-" + safeDateId + "' placeholder='" + inputPlaceholder + "'><button class='fb-btn' onclick=\"sendFeedback('" + safeDateId + "', '" + post.date + "', '學生留言')\">送出</button></div>";
+                var studentInputHtml = (isAdminMode || isDashboardDraftPreviewMode) ? "" : "<div class='input-box'><input type='text' class='fb-input' id='input-" + safeDateId + "' placeholder='" + inputPlaceholder + "'><button class='fb-btn' onclick=\"sendFeedback('" + safeDateId + "', '" + post.date + "', '學生留言')\">送出</button></div>";
 
                 // ★★★ v3.9 修正：家長留言 -> 留言內容 ★★★
                 var feedbackHtml = "<div class='feedback-section'>" + uploadHtml + "<div class='section-title'>" + SVG.chat + "留言內容</div><div id='history-" + safeDateId + "'>" + historyHtml + "</div>" + godStickerAdjustmentHtml + adminDirectHtml + studentInputHtml + "</div>"; var headerTitle = post.date + (post.title ? " " + post.title : ""); html += "<div class='post-card-wrapper'><div class='post-card'><div class='post-header'><span>" + SVG.calendar + headerTitle + "</span></div>" + gradeHtml + "<div class='content-section'><div class='section-title'>" + SVG.megaphone + "聯絡事項</div>" + contentHtml + "</div>" + feedbackHtml + "</div></div>";
@@ -6907,7 +7082,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         function renderBulletins(list) {
             var container = document.getElementById('tab-content-2');
             var now = new Date();
-            var activeList = (list || []).filter(function(b) { return isBulletinEffective(b, now); });
+            var activeList = isDashboardDraftPreviewMode ? (list || []) : (list || []).filter(function(b) { return isBulletinEffective(b, now); });
             if (activeList.length === 0) {
                 container.innerHTML = "<div style='text-align:center; padding:30px; color:#999;'>目前沒有公告</div>";
                 updateBulletinTabs(activeList);
@@ -7013,7 +7188,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }
             
             var stickyId = 'sticky_' + (sticky.id || sticky.time.replace(/[: /]/g, '_'));
-            if (localStorage.getItem(stickyId) === 'dismissed') { container.innerHTML = ''; return; }
+            if (!isDashboardDraftPreviewMode && localStorage.getItem(stickyId) === 'dismissed') { container.innerHTML = ''; return; }
             
             // 4. 內容處理：如果沒內容就只顯示標題，避免出現多餘的冒號
             var cleanTitle = sticky.title.trim();
@@ -7055,7 +7230,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
 
         function checkEmergency(list) {
             var modal = document.getElementById('emergencyModal');
-            var activeList = (list || []).filter(function(b) { return isBulletinEffective(b); });
+            var activeList = isDashboardDraftPreviewMode ? (list || []) : (list || []).filter(function(b) { return isBulletinEffective(b); });
             if (activeList.length === 0) {
                 if (modal) modal.style.display = 'none';
                 return;
@@ -7063,7 +7238,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var emergency = activeList.find(b => b.type === "緊急");
             if (emergency) {
                 var dismissKey = 'emergency_' + (emergency.id || emergency.time || emergency.title || '').toString().replace(/[^a-zA-Z0-9_-]/g, '_') + '_' + (emergency.time || '').toString().replace(/[^a-zA-Z0-9_-]/g, '_');
-                if (localStorage.getItem(dismissKey) === 'dismissed') {
+                if (!isDashboardDraftPreviewMode && localStorage.getItem(dismissKey) === 'dismissed') {
                     if (modal) modal.style.display = 'none';
                     return;
                 }
@@ -9021,6 +9196,22 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             const bypassAdmin = params.get('admin');
             const bypassCls = params.get('cls');
             const bypassName = params.get('name');
+            const previewMode = params.get('preview');
+
+            if (previewMode === 'dashboard-draft') {
+                isDashboardDraftPreviewMode = true;
+                window.addEventListener('message', handleDashboardDraftPreviewMessage);
+                var payload = loadDashboardDraftPreviewPayload();
+                if (payload) {
+                    enterDashboardDraftPreview(payload);
+                } else {
+                    document.getElementById('full-loader').style.display = 'flex';
+                    setTimeout(function() {
+                        if (!gData) renderDashboardDraftPreviewError('找不到 Dashboard 草稿預覽資料，請回 Dashboard 重新按一次預覽。');
+                    }, 1200);
+                }
+                return;
+            }
 
             if (godSession) {
                 enterEbookGodSession(godSession);
