@@ -6355,19 +6355,64 @@
                     if (types.length === 1) return "今日" + types[0] + "考卷";
                     return "今日考卷";
                 }
+                function splitPostMultiLinkValue(value) {
+                    return (value || "").toString().split(/\n+/).map(function(line) {
+                        return line.trim();
+                    }).filter(Boolean);
+                }
+                function getPostLineExamType(line) {
+                    var raw = (line || "").toString();
+                    if (raw.indexOf("鑑定") > -1) return "鑑定考";
+                    if (raw.indexOf("隨堂") > -1) return "隨堂考";
+                    if (raw.indexOf("小考") > -1) return "小考";
+                    return "";
+                }
+                function buildPostQuizFields(postData) {
+                    var quizText = postData.quiz || "";
+                    var lines = splitPostMultiLinkValue(quizText);
+                    var groups = {};
+                    var order = [];
+                    lines.forEach(function(line) {
+                        var label = getPostLineExamType(line) || "今日考卷";
+                        if (!groups[label]) {
+                            groups[label] = [];
+                            order.push(label);
+                        }
+                        groups[label].push(line);
+                    });
+                    if (order.length <= 1) {
+                        return [{ label: getPostQuizFieldLabel(postData), val: quizText, extra: buildScienceQuizAnswerNote(postData) }];
+                    }
+                    return order.map(function(label, idx) {
+                        return {
+                            label: label === "今日考卷" ? label : ("今日" + label + "考卷"),
+                            val: groups[label].join("\n"),
+                            extra: idx === order.length - 1 ? buildScienceQuizAnswerNote(postData) : ""
+                        };
+                    });
+                }
                 function buildScienceQuizAnswerNote(postData) {
                     if (BEAR_SUBJECT !== '/science' || !postData.quiz) return "";
                     var types = getPostExamTypes([postData.quiz, postData.title, postData.progress].join("\n"));
                     var examLabel = types.length === 1 ? types[0] : "本次考卷";
                     return "<div class='quiz-answer-note'>" + examLabel + "會於課堂直接訂正與對答；缺席同學請依影片連結自行補看，不另提供答案。</div>";
                 }
-                var fields = [{ label: "今日課程進度", val: post.progress }, { label: getPostQuizFieldLabel(post), val: post.quiz, extra: buildScienceQuizAnswerNote(post) }];
+                function buildPostMakeupFields(postData, extraHtml) {
+                    var lines = splitPostMultiLinkValue(postData.makeup || "");
+                    if (lines.length <= 1) return [{ label: "今日補考考卷", val: postData.makeup, extra: extraHtml }];
+                    return [
+                        { label: "今日補考題目", val: lines[0] || "" },
+                        { label: "今日補考答案", val: lines.slice(1).join("\n") },
+                        { label: "補考結果回報", val: "", extra: extraHtml }
+                    ];
+                }
+                var fields = [{ label: "今日課程進度", val: post.progress }].concat(buildPostQuizFields(post));
                 homeworkItems.forEach(function(item, hwIdx) {
                     var extra = buildGiftedScienceHomeworkUploadNote(item.val);
                     if (hwIdx === homeworkItems.length - 1) extra += buildHomeworkDoneButton(post);
                     fields.push({ label: item.label, val: item.val, extra: extra });
                 });
-                fields = fields.concat([{ label: "今日補考考卷", val: post.makeup, extra: buildPendingMakeupResultReportHtml(post, history, examCards, latestPostDate) }, { label: "下次考試範圍", val: post.range }, { label: "補充資料", val: post.note }]);
+                fields = fields.concat(buildPostMakeupFields(post, buildPendingMakeupResultReportHtml(post, history, examCards, latestPostDate)), [{ label: "下次考試範圍", val: post.range }, { label: "補充資料", val: post.note }]);
                 fields.forEach(function (f) { if (f.val || f.extra) contentHtml += "<div class='info-block'><span class='info-label'>" + f.label + "</span><div class='info-content'>" + parseBtn(f.val || "") + (f.extra || "") + "</div></div>"; }); var pDateShort = post.date.substring(5).replace("-", "/"); var pDateFull = post.date.replace(/-/g, "/"); var myHistory = history.filter(function (h) { return h.targetDate == pDateShort || h.targetDate == post.date || h.targetDate == pDateFull; }); myHistory.sort(function(a,b) { return new Date(a.time) - new Date(b.time); }); var historyHtml = ""; myHistory.forEach(function (h) { if (!isMakeupScoreReportType(h.type) && h.type !== FEEDBACK_TYPE_LABELS.makeupResult) { var displayType = (h.type === FEEDBACK_TYPE_LABELS.parent || h.type === FEEDBACK_TYPE_LABELS.parentStudent || h.type === FEEDBACK_TYPE_LABELS.student) ? "學生留言" : h.type; var isTeacher = (!isStudentSideFeedbackType(h.type));
                         var avatarClass = isTeacher ? "avatar-teacher" : "avatar-student";
                         var bodyClass = isTeacher ? "teacher-body" : "";
