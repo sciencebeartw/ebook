@@ -7307,14 +7307,15 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var cleanTitle = sticky.title.trim();
             var cleanContent = (sticky.content && sticky.content.trim() !== '') ? sticky.content.trim().replace(/\n/g, ' ') : '';
             var displayContent = cleanContent ? (cleanTitle + '：' + cleanContent) : cleanTitle;
+            var displayContentHtml = renderEbookRichTextFormat(escapeHtml(displayContent));
             
             container.innerHTML = `
                 <div class="sticky-notice-banner" id="active-sticky-banner" onclick="switchTab(2)">
                     <div class="sticky-notice-content">
                         ${SVG.bulb}
                         <div class="sticky-notice-text-wrapper">
-                            <div class="sticky-notice-text">${displayContent}</div>
-                            <div class="sticky-notice-text">${displayContent}</div>
+                            <div class="sticky-notice-text">${displayContentHtml}</div>
+                            <div class="sticky-notice-text">${displayContentHtml}</div>
                         </div>
                     </div>
                     <div class="sticky-notice-close" onclick="event.stopPropagation(); dismissStickyNotice('${stickyId}')">✕</div>
