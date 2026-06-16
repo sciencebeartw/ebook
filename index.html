@@ -3560,7 +3560,7 @@
             for (let id in bullObj) {
                 const b = bullObj[id];
                 if (b.className === "全校" || b.className === result.className || b.className.indexOf(result.className) > -1 || result.className.indexOf(b.className) > -1) {
-                    bulls.push({ id: b.id, time: b.time, className: b.className, type: b.type, title: b.title, content: b.content, btnName: b.btnName, btnUrl: b.btnUrl, reserveTime: b.reserveTime || "", expiresAt: b.expiresAt || "" });
+                    bulls.push({ id: b.id, time: b.time, className: b.className, type: b.type, label: b.label || b.type || "", title: b.title, content: b.content, btnName: b.btnName, btnUrl: b.btnUrl, reserveTime: b.reserveTime || "", expiresAt: b.expiresAt || "" });
                 }
             }
             result.bulletins = bulls.reverse(); // Reverse to roughly match desc order
@@ -3852,7 +3852,7 @@
         <!-- 緊急彈窗 -->
         <div id="emergencyModal" class="emergency-modal">
             <div class="emergency-box">
-                <div class="emergency-header">⚠️ 緊急公告</div>
+                <div class="emergency-header" id="emergencyTitle">⚠️ 緊急公告</div>
                 <div class="emergency-body" id="emergencyContent"></div>
                 <div class="emergency-footer">
                     <button class="emergency-btn" onclick="closeEmergencyModal()">我已閱讀</button>
@@ -4599,6 +4599,7 @@
                         time: sanitizeDashboardDraftPreviewText(bulletin.time),
                         className: sanitizeDashboardDraftPreviewText(bulletin.className || className),
                         type: sanitizeDashboardDraftPreviewText(bulletin.type || '一般'),
+                        label: sanitizeDashboardDraftPreviewText(bulletin.label || bulletin.type || '公告'),
                         title: sanitizeDashboardDraftPreviewText(bulletin.title),
                         content: sanitizeDashboardDraftPreviewText(bulletin.content),
                         btnName: sanitizeDashboardDraftPreviewText(bulletin.btnName),
@@ -5000,7 +5001,7 @@
                             for (let id in bObj) {
                                 const b = bObj[id];
                                 if (b.className === "全校" || b.className === result.className || b.className.indexOf(result.className) > -1 || result.className.indexOf(b.className) > -1) {
-                                    bulls.push({ id: b.id, time: b.time, className: b.className, type: b.type, title: b.title, content: b.content, btnName: b.btnName, btnUrl: b.btnUrl, reserveTime: b.reserveTime || "", expiresAt: b.expiresAt || "" });
+                                    bulls.push({ id: b.id, time: b.time, className: b.className, type: b.type, label: b.label || b.type || "", title: b.title, content: b.content, btnName: b.btnName, btnUrl: b.btnUrl, reserveTime: b.reserveTime || "", expiresAt: b.expiresAt || "" });
                                 }
                             }
                         }
@@ -7312,6 +7313,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 if (b.type === "緊急") { cardClass += " type-emergency"; tagClass = "tag-red"; }
                 else if (b.type === "課表") { cardClass += " type-schedule"; tagClass = "tag-blue"; }
                 else { cardClass += " type-normal"; tagClass = "tag-gray"; }
+                var displayLabel = (b.label || b.type || "公告").toString().trim();
 
                 var btnHtml = "";
                 if (b.btnName && b.btnUrl) {
@@ -7321,8 +7323,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 html += `
             <div class="${cardClass}">
                 <div class="bulletin-header">
-                    <div><span class="bulletin-tag ${tagClass}">${b.type}</span><span class="bulletin-title">${b.title}</span></div>
-                    <div class="bulletin-date">${b.time.substring(5, 16)}</div>
+                    <div><span class="bulletin-tag ${tagClass}">${escapeHtml(displayLabel)}</span><span class="bulletin-title">${escapeHtml(b.title)}</span></div>
+                    <div class="bulletin-date">${escapeHtml((b.time || '').substring(5, 16))}</div>
                 </div>
                 <div class="bulletin-content">${parseBtn(b.content)}</div>
                 ${btnHtml}
@@ -7452,6 +7454,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     if (modal) modal.style.display = 'none';
                     return;
                 }
+                var emergencyTitle = document.getElementById('emergencyTitle');
+                if (emergencyTitle) emergencyTitle.textContent = '⚠️ ' + ((emergency.title || '緊急公告').toString().trim() || '緊急公告');
                 document.getElementById('emergencyContent').innerHTML = parseBtn(emergency.content);
                 if (modal) {
                     modal.dataset.dismissKey = dismissKey;
