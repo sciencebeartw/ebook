@@ -3524,7 +3524,8 @@
             for (let rowId in postsObj) {
                 const pRow = postsObj[rowId];
                 if (pRow.reserveTime && pRow.reserveTime.trim() !== "") {
-                    if (new Date(pRow.reserveTime) > now) continue;
+                    var postReserveDate = parseLocalDateTimeValue(pRow.reserveTime);
+                    if (postReserveDate && postReserveDate > now) continue;
                 }
                 
                 let postObj = {
@@ -5095,7 +5096,8 @@
                         let now = new Date();
                         for (let rowId in postsObj) {
                             const pRow = postsObj[rowId];
-                            if (pRow.reserveTime && new Date(pRow.reserveTime) > now) continue;
+                            var postReserveDate = parseLocalDateTimeValue(pRow.reserveTime);
+                            if (postReserveDate && postReserveDate > now) continue;
                             let postObj = {
                                 date: pRow.date, title: pRow.title, progress: pRow.progress, hw1: pRow.hw1, hw2: pRow.hw2,
                                 makeup: pRow.makeup, quiz: pRow.quiz, range: pRow.range, note: pRow.note, examData: { main: null, others: [] }
@@ -8425,7 +8427,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                         reserveTime: (post.reserveTime || '').toString()
                     };
                 }).filter(function(post) {
-                    if (post.reserveTime.trim() && new Date(post.reserveTime) > now) return false;
+                    var postReserveDate = parseLocalDateTimeValue(post.reserveTime);
+                    if (postReserveDate && postReserveDate > now) return false;
                     return !!post.date;
                 });
                 posts.sort(function(a, b) { return b.date.localeCompare(a.date); });
