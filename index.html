@@ -4153,7 +4153,7 @@
                             <select id="teacherUploadType" class="editor-input" style="flex:1; margin-bottom:0;">
                                 <option value="小考">小考卷</option>
                                 <option value="補考">補考卷</option>
-                                <option value="補充">補充資料</option>
+                                <option value="補充">補充資訊</option>
                             </select>
                             <input type="file" id="teacherFileInput" class="editor-input"
                                 style="flex:2; margin-bottom:0;" onchange="handleTeacherFileSelect()">
@@ -4192,7 +4192,7 @@
                     </div>
                     <div class="editor-label">下次小考範圍</div>
                     <input type="text" id="postRange" class="editor-input" onfocus="setFocus(this)">
-                    <div class="editor-label">備註/補充資料</div>
+                    <div class="editor-label">備註/補充資訊</div>
                     <textarea id="postNote" class="editor-textarea" style="height:60px;"
                         onfocus="setFocus(this)"></textarea>
                 </div>
@@ -4242,7 +4242,7 @@
                         <div style="display:flex; gap:5px; margin-bottom:5px;">
                             <select id="bulletinUploadType" class="editor-input" style="flex:1; margin-bottom:0;">
                                 <option value="公告">公告附件</option>
-                                <option value="補充">補充資料</option>
+                                <option value="補充">補充資訊</option>
                             </select>
                             <input type="file" id="bulletinFileInput" class="editor-input"
                                 style="flex:2; margin-bottom:0;" onchange="handleBulletinFileSelect()">
@@ -6466,7 +6466,7 @@
                     if (hwIdx === homeworkItems.length - 1) extra += buildHomeworkDoneButton(post);
                     fields.push({ label: item.label, val: item.val, extra: extra });
                 });
-                fields = fields.concat(buildPostMakeupFields(post, buildPendingMakeupResultReportHtml(post, history, examCards, latestPostDate)), [{ label: "下次考試範圍", val: post.range }, { label: "補充資料", val: post.note }]);
+                fields = fields.concat(buildPostMakeupFields(post, buildPendingMakeupResultReportHtml(post, history, examCards, latestPostDate)), [{ label: "下次考試範圍", val: post.range }, { label: "補充資訊", val: post.note }]);
                 fields.forEach(function (f) { contentHtml += renderPostInfoBlock(f); }); var pDateShort = post.date.substring(5).replace("-", "/"); var pDateFull = post.date.replace(/-/g, "/"); var myHistory = history.filter(function (h) { return h.targetDate == pDateShort || h.targetDate == post.date || h.targetDate == pDateFull; }); myHistory.sort(function(a,b) { return new Date(a.time) - new Date(b.time); }); var historyHtml = ""; myHistory.forEach(function (h) { if (!isMakeupScoreReportType(h.type) && h.type !== FEEDBACK_TYPE_LABELS.makeupResult) { var displayType = (h.type === FEEDBACK_TYPE_LABELS.parent || h.type === FEEDBACK_TYPE_LABELS.parentStudent || h.type === FEEDBACK_TYPE_LABELS.student) ? "學生留言" : h.type; var isTeacher = (!isStudentSideFeedbackType(h.type));
                         var avatarClass = isTeacher ? "avatar-teacher" : "avatar-student";
                         var bodyClass = isTeacher ? "teacher-body" : "";

@@ -70,7 +70,7 @@ function renderDailyPosts(posts, history) {
                     { label: "今日作業二", val: post.hw2 }, 
                     { label: "補考考卷", val: post.makeup }, 
                     { label: "下週範圍", val: post.range }, 
-                    { label: "補充資料", val: post.note }
+                    { label: "補充資訊", val: post.note }
                 ]; 
                 
                 var feedDescInner = "";
@@ -125,6 +125,3 @@ function renderDailyPosts(posts, history) {
             }); 
             container.innerHTML = html;
         }
-
-
-        
