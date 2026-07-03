@@ -3292,6 +3292,80 @@
         .replace(/\s+/g, '_');
     }
 
+    function getHomeworkDoneCourseAliasKey(className) {
+        var cls = (className || "").toString();
+        if (BEAR_SUBJECT === "/science" && cls.indexOf("自然超前") > -1 && cls.indexOf("資優自然") === -1) {
+            var match = cls.match(/^(\d{3,4})國([一二])自然超前/);
+            var gradeMap = { "一": 1, "二": 2 };
+            if (!match || !gradeMap[match[2]]) return "";
+            return "science:natural-advanced:" + (parseInt(match[1], 10) - gradeMap[match[2]]);
+        }
+        return "";
+    }
+
+    function getHomeworkDoneRelatedClassKeys(classKey, classNodeMap) {
+        var keys = Object.keys(classNodeMap || {});
+        var aliasKey = getHomeworkDoneCourseAliasKey(classKey);
+        if (!aliasKey) return classKey ? [classKey] : [];
+        return keys.filter(function(key) {
+            return getHomeworkDoneCourseAliasKey(key) === aliasKey;
+        }).sort(function(a, b) {
+            return a.localeCompare(b, "zh-Hant");
+        });
+    }
+
+    function mergeHomeworkClassNode(classNodeMap, classKey) {
+        var merged = {};
+        getHomeworkDoneRelatedClassKeys(classKey, classNodeMap).forEach(function(key) {
+            var classPosts = classNodeMap[key] || {};
+            Object.keys(classPosts).forEach(function(postKey) {
+                merged[postKey] = Object.assign({ className: key }, classPosts[postKey] || {});
+            });
+        });
+        return merged;
+    }
+
+    function mergeHomeworkDoneForStudent(classNodeMap, classKey, studentKey) {
+        var merged = {};
+        getHomeworkDoneRelatedClassKeys(classKey, classNodeMap).forEach(function(key) {
+            Object.assign(merged, ((classNodeMap[key] || {})[studentKey]) || {});
+        });
+        return merged;
+    }
+
+    function mergeFeedbackForStudent(classNodeMap, classKey, studentKey) {
+        var merged = {};
+        getHomeworkDoneRelatedClassKeys(classKey, classNodeMap).forEach(function(key) {
+            Object.assign(merged, ((classNodeMap[key] || {})[studentKey]) || {});
+        });
+        return merged;
+    }
+
+    function mergeFeedbackClassNode(classNodeMap, classKey) {
+        var merged = {};
+        getHomeworkDoneRelatedClassKeys(classKey, classNodeMap).forEach(function(key) {
+            var classRows = classNodeMap[key] || {};
+            Object.keys(classRows).forEach(function(studentKey) {
+                if (!merged[studentKey]) merged[studentKey] = {};
+                Object.assign(merged[studentKey], classRows[studentKey] || {});
+            });
+        });
+        return merged;
+    }
+
+    function buildFeedbackHistoryList(fbsObj) {
+        var list = [];
+        for (let fbid in (fbsObj || {})) {
+            const fb = fbsObj[fbid];
+            list.push({ time: fb.time, targetDate: fb.targetDate, type: fb.type, content: fb.content, fbKey: fbid, targetExamColIndex: fb.targetExamColIndex || "", targetExamTitle: fb.targetExamTitle || "" });
+        }
+        return list.sort(function(a, b) {
+            var tA = new Date(a.time).getTime() || 0;
+            var tB = new Date(b.time).getTime() || 0;
+            return tA - tB;
+        });
+    }
+
     function normalizeLoginSecret(value) {
         return (value || "").toString().replace(/[\s-]/g, "").trim();
     }
@@ -3440,6 +3514,7 @@
             if (!result.found) return result;
             
             const safeC = safeKey(result.className);
+            const hasHomeworkCohortAlias = !!getHomeworkDoneCourseAliasKey(safeC);
 
             // Fetch Grades
             const snapG = await db.ref(`${BEAR_SUBJECT}/grades/${safeC}/${foundUserKey}/exams`).once('value');
@@ -3517,8 +3592,9 @@
             result.grades = fullGradeList.sort((a, b) => a.colIndex - b.colIndex);
 
             // Fetch Posts
-            const snapP = await db.ref(`${BEAR_SUBJECT}/dailyPosts/${safeC}`).once('value');
-            const postsObj = snapP.val() || {};
+            const snapP = await db.ref(`${BEAR_SUBJECT}/dailyPosts${hasHomeworkCohortAlias ? "" : "/" + safeC}`).once('value');
+            result.cohortDailyPostRoot = hasHomeworkCohortAlias ? (snapP.val() || {}) : null;
+            const postsObj = hasHomeworkCohortAlias ? mergeHomeworkClassNode(result.cohortDailyPostRoot, safeC) : (snapP.val() || {});
             let classPosts = [];
             let now = new Date();
             for (let rowId in postsObj) {
@@ -3529,6 +3605,7 @@
                 }
                 
                 let postObj = {
+                    className: pRow.className || result.className,
                     date: pRow.date, title: pRow.title, progress: pRow.progress, hw1: pRow.hw1, hw2: pRow.hw2,
                     makeup: pRow.makeup, quiz: pRow.quiz, range: pRow.range, note: pRow.note, examData: { main: null, others: [] }
                 };
@@ -3567,23 +3644,28 @@
             result.bulletins = bulls.reverse(); // Reverse to roughly match desc order
 
             // Fetch Feedbacks
-            const snapF = await db.ref(`${BEAR_SUBJECT}/feedbacks/${safeC}/${foundUserKey}`).once('value');
-            const fbsObj = snapF.val() || {};
-            for (let fbid in fbsObj) {
-                const fb = fbsObj[fbid];
-                result.feedbackHistory.push({ time: fb.time, targetDate: fb.targetDate, type: fb.type, content: fb.content, fbKey: fbid, targetExamColIndex: fb.targetExamColIndex || "", targetExamTitle: fb.targetExamTitle || "" });
+            if (hasHomeworkCohortAlias) {
+                const feedbackRootSnap = await db.ref(`${BEAR_SUBJECT}/feedbacks`).once('value');
+                result.cohortFeedbackRoot = feedbackRootSnap.val() || {};
+                result.feedbackHistory = buildFeedbackHistoryList(mergeFeedbackForStudent(result.cohortFeedbackRoot, safeC, foundUserKey));
+            } else {
+                const snapF = await db.ref(`${BEAR_SUBJECT}/feedbacks/${safeC}/${foundUserKey}`).once('value');
+                result.cohortFeedbackRoot = null;
+                result.feedbackHistory = buildFeedbackHistoryList(snapF.val() || {});
             }
-            result.feedbackHistory.sort(function(a, b) {
-                var tA = new Date(a.time).getTime() || 0;
-                var tB = new Date(b.time).getTime() || 0;
-                return tA - tB;
-            });
 
             try {
-                const snapHD = await db.ref(`${BEAR_SUBJECT}/homeworkDone/${safeC}/${foundUserKey}`).once('value');
-                result.homeworkDone = snapHD.val() || {};
+                const snapHD = await db.ref(`${BEAR_SUBJECT}/homeworkDone${hasHomeworkCohortAlias ? "" : "/" + safeC + "/" + foundUserKey}`).once('value');
+                if (hasHomeworkCohortAlias) {
+                    result.cohortHomeworkDoneRoot = snapHD.val() || {};
+                    result.homeworkDone = mergeHomeworkDoneForStudent(result.cohortHomeworkDoneRoot, safeC, foundUserKey);
+                } else {
+                    result.cohortHomeworkDoneRoot = null;
+                    result.homeworkDone = snapHD.val() || {};
+                }
             } catch (homeworkDoneErr) {
                 console.warn("HomeworkDone read skipped:", homeworkDoneErr);
+                result.cohortHomeworkDoneRoot = null;
                 result.homeworkDone = {};
             }
 
@@ -3631,8 +3713,10 @@
         },
         getPostHistory: async function(cls) {
            try {
-               const snap = await db.ref(`${BEAR_SUBJECT}/dailyPosts/${safeKey(cls)}`).once('value');
-               const obj = snap.val() || {};
+               const safeC = safeKey(cls);
+               const hasHomeworkCohortAlias = !!getHomeworkDoneCourseAliasKey(safeC);
+               const snap = await db.ref(`${BEAR_SUBJECT}/dailyPosts${hasHomeworkCohortAlias ? "" : "/" + safeC}`).once('value');
+               const obj = hasHomeworkCohortAlias ? mergeHomeworkClassNode(snap.val() || {}, safeC) : (snap.val() || {});
                let arr = [];
                for(let k in obj) { let p = obj[k]; p.rowIndex = k; arr.push(p); }
                arr.sort((a,b) => new Date(b.date) - new Date(a.date));
@@ -4949,6 +5033,7 @@
                 if (typeof db !== 'undefined') {
                     const safeC = result.className.replace(/[.#$[\]]/g, '-');
                     const studentKey = result.foundUserKey || result.studentName.replace(/[.#$[\]]/g, '-');
+                    const hasHomeworkCohortAlias = !!getHomeworkDoneCourseAliasKey(safeC);
                     result.foundUserKey = studentKey;
 
                     // 1. 棒卡數監聽
@@ -4959,17 +5044,14 @@
                     // 2. 留言回報監聽 (包含審核狀態與老師回覆)
                     watchRealtimeValue(BEAR_SUBJECT + '/feedbacks/' + safeC + '/' + studentKey, function(snap) {
                         const fbsObj = snap.val() || {};
-                        let newFbs = [];
-                        for (let fbid in fbsObj) {
-                            const fb = fbsObj[fbid];
-                            newFbs.push({ time: fb.time, targetDate: fb.targetDate, type: fb.type, content: fb.content, fbKey: fbid, targetExamColIndex: fb.targetExamColIndex || "", targetExamTitle: fb.targetExamTitle || "" });
+                        if (hasHomeworkCohortAlias) {
+                            if (!gData.cohortFeedbackRoot) gData.cohortFeedbackRoot = {};
+                            if (!gData.cohortFeedbackRoot[safeC]) gData.cohortFeedbackRoot[safeC] = {};
+                            gData.cohortFeedbackRoot[safeC][studentKey] = fbsObj;
+                            gData.feedbackHistory = buildFeedbackHistoryList(mergeFeedbackForStudent(gData.cohortFeedbackRoot, safeC, studentKey));
+                        } else {
+                            gData.feedbackHistory = buildFeedbackHistoryList(fbsObj);
                         }
-                        newFbs.sort(function(a, b) {
-                            var tA = new Date(a.time).getTime() || 0;
-                            var tB = new Date(b.time).getTime() || 0;
-                            return tA - tB;
-                        });
-                        gData.feedbackHistory = newFbs;
                         // 重新渲染聯絡簿區塊，確保狀態即時更新
                         renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
                         // 同步重新渲染近期分數區塊，讓待審核狀態即時顯示在成績卡片上
@@ -4980,7 +5062,14 @@
 
                     try {
                         watchRealtimeValue(BEAR_SUBJECT + '/homeworkDone/' + safeC + '/' + studentKey, function(snap) {
-                            gData.homeworkDone = snap.val() || {};
+                            if (hasHomeworkCohortAlias) {
+                                if (!gData.cohortHomeworkDoneRoot) gData.cohortHomeworkDoneRoot = {};
+                                if (!gData.cohortHomeworkDoneRoot[safeC]) gData.cohortHomeworkDoneRoot[safeC] = {};
+                                gData.cohortHomeworkDoneRoot[safeC][studentKey] = snap.val() || {};
+                                gData.homeworkDone = mergeHomeworkDoneForStudent(gData.cohortHomeworkDoneRoot, safeC, studentKey);
+                            } else {
+                                gData.homeworkDone = snap.val() || {};
+                            }
                             renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
                         }, function(error) {
                             console.warn("HomeworkDone realtime watch skipped:", error);
@@ -5091,7 +5180,11 @@
 
                     // 5. 聯絡簿內容監聽
                     watchRealtimeValue(BEAR_SUBJECT + '/dailyPosts/' + safeC, function(snap) {
-                        const postsObj = snap.val() || {};
+                        if (hasHomeworkCohortAlias) {
+                            if (!gData.cohortDailyPostRoot) gData.cohortDailyPostRoot = {};
+                            gData.cohortDailyPostRoot[safeC] = snap.val() || {};
+                        }
+                        const postsObj = hasHomeworkCohortAlias ? mergeHomeworkClassNode(gData.cohortDailyPostRoot || {}, safeC) : (snap.val() || {});
                         let classPosts = [];
                         let now = new Date();
                         for (let rowId in postsObj) {
@@ -5099,6 +5192,7 @@
                             var postReserveDate = parseLocalDateTimeValue(pRow.reserveTime);
                             if (postReserveDate && postReserveDate > now) continue;
                             let postObj = {
+                                className: pRow.className || result.className,
                                 date: pRow.date, title: pRow.title, progress: pRow.progress, hw1: pRow.hw1, hw2: pRow.hw2,
                                 makeup: pRow.makeup, quiz: pRow.quiz, range: pRow.range, note: pRow.note, examData: { main: null, others: [] }
                             };
@@ -5222,7 +5316,10 @@
                 var html = '';
                 posts.forEach(function (p) {
                     var safeJson = encodeURIComponent(JSON.stringify(p));
-                    html += '<div class="history-item"><div class="history-info">📅 ' + p.date + ' <br><small>' + p.title + '</small></div><div style="display:flex; gap:6px; flex-shrink:0;"><button class="edit-btn-small" onclick="openPostModal(\'' + safeJson + '\')">✏️ 修改</button><button class="edit-btn-small" style="background:#6366f1;" onclick="openPostModal(\'' + safeJson + '\', \'copy\')">📋 複製</button></div></div>';
+                    var isCohortSource = p.className && p.className !== cls;
+                    var sourceLine = isCohortSource ? '<br><small style="color:#64748b;">來源：' + escapeHtml(p.className) + '，舊聯絡簿只提供複製</small>' : '';
+                    var editButton = isCohortSource ? '' : '<button class="edit-btn-small" onclick="openPostModal(\'' + safeJson + '\')">✏️ 修改</button>';
+                    html += '<div class="history-item"><div class="history-info">📅 ' + p.date + ' <br><small>' + p.title + '</small>' + sourceLine + '</div><div style="display:flex; gap:6px; flex-shrink:0;">' + editButton + '<button class="edit-btn-small" style="background:#6366f1;" onclick="openPostModal(\'' + safeJson + '\', \'copy\')">📋 複製</button></div></div>';
                 });
                 document.getElementById('postHistoryList').innerHTML = html;
             }).getPostHistory(cls);
@@ -7014,7 +7111,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             btn.innerText = "回報中...";
             if (hint) hint.innerText = "正在寫入作業完成回報...";
             var form = {
-                className: gData.className,
+                className: (post && post.className) || gData.className,
                 studentName: gData.studentName,
                 targetDate: realDate,
                 homeworkText: homeworkText
@@ -8588,11 +8685,12 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var snapG = await db.ref(BEAR_SUBJECT + '/grades/' + safeC).once('value');
             var kids = snapS.val() || {};
             var classGrades = snapG.val() || {};
+            var hasHomeworkCohortAlias = !!getHomeworkDoneCourseAliasKey(safeC);
             var rawList = [];
 
             if (stuName === 'all') {
-                var snapF = await db.ref(BEAR_SUBJECT + '/feedbacks/' + safeC).once('value');
-                var allFbs = snapF.val() || {};
+                var snapF = await db.ref(BEAR_SUBJECT + '/feedbacks' + (hasHomeworkCohortAlias ? '' : '/' + safeC)).once('value');
+                var allFbs = hasHomeworkCohortAlias ? mergeFeedbackClassNode(snapF.val() || {}, safeC) : (snapF.val() || {});
                 for (var sKey in allFbs) {
                     var fbs = allFbs[sKey];
                     var sName = kids[sKey] ? kids[sKey].name : '未知';
@@ -8607,8 +8705,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 var stuKey = '';
                 for (var k in kids) { if (kids[k] && kids[k].name === stuName) { stuKey = k; break; } }
                 if (!stuKey) return;
-                var snapF = await db.ref(BEAR_SUBJECT + '/feedbacks/' + safeC + '/' + stuKey).once('value');
-                var fbs = snapF.val() || {};
+                var snapF = await db.ref(BEAR_SUBJECT + '/feedbacks' + (hasHomeworkCohortAlias ? '' : '/' + safeC + '/' + stuKey)).once('value');
+                var fbs = hasHomeworkCohortAlias ? mergeFeedbackForStudent(snapF.val() || {}, safeC, stuKey) : (snapF.val() || {});
                 for (var fid in fbs) {
                     var fb = fbs[fid];
                     var fType = fb.type || '學生留言';
