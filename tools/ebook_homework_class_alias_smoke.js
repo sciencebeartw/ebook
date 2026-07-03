@@ -23,6 +23,7 @@ const context = { BEAR_SUBJECT: '/science' };
 vm.createContext(context);
 [
   'getHomeworkDoneCourseAliasKey',
+  'getHomeworkDoneRelatedClassKeyCandidates',
   'getHomeworkDoneRelatedClassKeys',
   'mergeHomeworkClassNode',
   'mergeHomeworkDoneForStudent',
@@ -47,19 +48,31 @@ if (context.getHomeworkDoneCourseAliasKey('116國三自然超前班') !== '') {
   throw new Error('natural advanced is a two-year class; grade 9 must not be aliased');
 }
 
+assertDeepEqual(
+  context.getHomeworkDoneRelatedClassKeyCandidates('115國二自然超前班'),
+  ['114國一自然超前班', '115國二自然超前班'],
+  'promoted grade 8 class should read only old grade 7 plus current grade 8 nodes'
+);
+
+assertDeepEqual(
+  context.getHomeworkDoneRelatedClassKeyCandidates('115國一自然超前班'),
+  ['115國一自然超前班', '116國二自然超前班'],
+  'new grade 7 class should not read the promoted grade 8 cohort'
+);
+
 const dailyPosts = {
-  '114國一自然超前班': { oldPost: { date: '2026/06/20', title: '國一自然超前' } },
+  '114國一自然超前班': { row5: { date: '2026/06/20', title: '國一自然超前' } },
   '115國一自然超前班': { wrongPost: { date: '2026/07/04', title: '另一屆國一自然超前' } },
-  '115國二自然超前班': { newPost: { date: '2026/07/04', title: '國二自然超前' } }
+  '115國二自然超前班': { row5: { date: '2026/07/04', title: '國二自然超前' } }
 };
 
 assertDeepEqual(
   context.mergeHomeworkClassNode(dailyPosts, '115國二自然超前班'),
   {
-    oldPost: { className: '114國一自然超前班', date: '2026/06/20', title: '國一自然超前' },
-    newPost: { className: '115國二自然超前班', date: '2026/07/04', title: '國二自然超前' }
+    row5: { className: '114國一自然超前班', date: '2026/06/20', title: '國一自然超前' },
+    '115國二自然超前班__row5': { className: '115國二自然超前班', date: '2026/07/04', title: '國二自然超前' }
   },
-  'eBook should merge old grade 7 and new grade 8 posts only'
+  'eBook should merge old grade 7 and new grade 8 posts without row-key collisions'
 );
 
 const homeworkDoneRoot = {
@@ -97,5 +110,16 @@ assertDeepEqual(
   },
   'eBook admin feedback query should merge same cohort class nodes only'
 );
+
+[
+  '`${BEAR_SUBJECT}/dailyPosts${hasHomeworkCohortAlias ?',
+  '`${BEAR_SUBJECT}/homeworkDone${hasHomeworkCohortAlias ?',
+  '`${BEAR_SUBJECT}/feedbacks`).once',
+  "BEAR_SUBJECT + '/feedbacks' + (hasHomeworkCohortAlias ? ''"
+].forEach((pattern) => {
+  if (html.includes(pattern)) {
+    throw new Error(`promotion alias must not read whole Firebase nodes: ${pattern}`);
+  }
+});
 
 console.log('ebook homework class alias smoke passed');

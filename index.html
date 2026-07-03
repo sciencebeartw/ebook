@@ -3303,15 +3303,74 @@
         return "";
     }
 
+    function getHomeworkDoneRelatedClassKeyCandidates(classKey) {
+        var cls = (classKey || "").toString();
+        var aliasKey = getHomeworkDoneCourseAliasKey(cls);
+        if (!aliasKey) return cls ? [cls] : [];
+        var match = cls.match(/^(\d{3,4})國([一二])自然超前/);
+        if (!match) return cls ? [cls] : [];
+        var gradeMap = { "一": 1, "二": 2 };
+        var year = parseInt(match[1], 10);
+        var grade = gradeMap[match[2]];
+        if (!year || !grade) return cls ? [cls] : [];
+        var cohortYear = year - grade;
+        var width = match[1].length;
+        function formatYear(value) {
+            return value.toString().padStart(width, "0");
+        }
+        return [
+            formatYear(cohortYear + 1) + "國一自然超前班",
+            formatYear(cohortYear + 2) + "國二自然超前班"
+        ];
+    }
+
     function getHomeworkDoneRelatedClassKeys(classKey, classNodeMap) {
         var keys = Object.keys(classNodeMap || {});
         var aliasKey = getHomeworkDoneCourseAliasKey(classKey);
         if (!aliasKey) return classKey ? [classKey] : [];
-        return keys.filter(function(key) {
-            return getHomeworkDoneCourseAliasKey(key) === aliasKey;
-        }).sort(function(a, b) {
-            return a.localeCompare(b, "zh-Hant");
+        var keySet = {};
+        keys.forEach(function(key) {
+            keySet[key] = true;
         });
+        var candidates = getHomeworkDoneRelatedClassKeyCandidates(classKey);
+        if (keys.length === 0) return candidates;
+        return candidates.filter(function(key) {
+            return keySet[key];
+        });
+    }
+
+    async function loadClassNodeMapByKeys(basePath, classKeys, childKey) {
+        var uniqueKeys = [];
+        var seen = {};
+        (classKeys || []).forEach(function(key) {
+            if (!key || seen[key]) return;
+            seen[key] = true;
+            uniqueKeys.push(key);
+        });
+        var snaps = await Promise.all(uniqueKeys.map(function(key) {
+            var path = basePath + "/" + key + (childKey ? "/" + childKey : "");
+            return db.ref(path).once("value").then(function(snap) {
+                return { key: key, value: snap.val() || {} };
+            });
+        }));
+        var result = {};
+        snaps.forEach(function(item) {
+            if (childKey) {
+                result[item.key] = {};
+                result[item.key][childKey] = item.value || {};
+            } else {
+                result[item.key] = item.value || {};
+            }
+        });
+        return result;
+    }
+
+    async function loadHomeworkAliasClassNodeMap(basePath, classKey, childKey) {
+        return loadClassNodeMapByKeys(
+            basePath,
+            getHomeworkDoneRelatedClassKeyCandidates(classKey),
+            childKey
+        );
     }
 
     function mergeHomeworkClassNode(classNodeMap, classKey) {
@@ -3319,7 +3378,8 @@
         getHomeworkDoneRelatedClassKeys(classKey, classNodeMap).forEach(function(key) {
             var classPosts = classNodeMap[key] || {};
             Object.keys(classPosts).forEach(function(postKey) {
-                merged[postKey] = Object.assign({ className: key }, classPosts[postKey] || {});
+                var mergedKey = merged[postKey] ? key + "__" + postKey : postKey;
+                merged[mergedKey] = Object.assign({ className: key }, classPosts[postKey] || {});
             });
         });
         return merged;
@@ -3592,9 +3652,15 @@
             result.grades = fullGradeList.sort((a, b) => a.colIndex - b.colIndex);
 
             // Fetch Posts
-            const snapP = await db.ref(`${BEAR_SUBJECT}/dailyPosts${hasHomeworkCohortAlias ? "" : "/" + safeC}`).once('value');
-            result.cohortDailyPostRoot = hasHomeworkCohortAlias ? (snapP.val() || {}) : null;
-            const postsObj = hasHomeworkCohortAlias ? mergeHomeworkClassNode(result.cohortDailyPostRoot, safeC) : (snapP.val() || {});
+            let postsObj = {};
+            if (hasHomeworkCohortAlias) {
+                result.cohortDailyPostRoot = await loadHomeworkAliasClassNodeMap(`${BEAR_SUBJECT}/dailyPosts`, safeC);
+                postsObj = mergeHomeworkClassNode(result.cohortDailyPostRoot, safeC);
+            } else {
+                const snapP = await db.ref(`${BEAR_SUBJECT}/dailyPosts/${safeC}`).once('value');
+                result.cohortDailyPostRoot = null;
+                postsObj = snapP.val() || {};
+            }
             let classPosts = [];
             let now = new Date();
             for (let rowId in postsObj) {
@@ -3645,8 +3711,7 @@
 
             // Fetch Feedbacks
             if (hasHomeworkCohortAlias) {
-                const feedbackRootSnap = await db.ref(`${BEAR_SUBJECT}/feedbacks`).once('value');
-                result.cohortFeedbackRoot = feedbackRootSnap.val() || {};
+                result.cohortFeedbackRoot = await loadHomeworkAliasClassNodeMap(`${BEAR_SUBJECT}/feedbacks`, safeC, foundUserKey);
                 result.feedbackHistory = buildFeedbackHistoryList(mergeFeedbackForStudent(result.cohortFeedbackRoot, safeC, foundUserKey));
             } else {
                 const snapF = await db.ref(`${BEAR_SUBJECT}/feedbacks/${safeC}/${foundUserKey}`).once('value');
@@ -3655,11 +3720,11 @@
             }
 
             try {
-                const snapHD = await db.ref(`${BEAR_SUBJECT}/homeworkDone${hasHomeworkCohortAlias ? "" : "/" + safeC + "/" + foundUserKey}`).once('value');
                 if (hasHomeworkCohortAlias) {
-                    result.cohortHomeworkDoneRoot = snapHD.val() || {};
+                    result.cohortHomeworkDoneRoot = await loadHomeworkAliasClassNodeMap(`${BEAR_SUBJECT}/homeworkDone`, safeC, foundUserKey);
                     result.homeworkDone = mergeHomeworkDoneForStudent(result.cohortHomeworkDoneRoot, safeC, foundUserKey);
                 } else {
+                    const snapHD = await db.ref(`${BEAR_SUBJECT}/homeworkDone/${safeC}/${foundUserKey}`).once('value');
                     result.cohortHomeworkDoneRoot = null;
                     result.homeworkDone = snapHD.val() || {};
                 }
@@ -3715,8 +3780,13 @@
            try {
                const safeC = safeKey(cls);
                const hasHomeworkCohortAlias = !!getHomeworkDoneCourseAliasKey(safeC);
-               const snap = await db.ref(`${BEAR_SUBJECT}/dailyPosts${hasHomeworkCohortAlias ? "" : "/" + safeC}`).once('value');
-               const obj = hasHomeworkCohortAlias ? mergeHomeworkClassNode(snap.val() || {}, safeC) : (snap.val() || {});
+               let obj = {};
+               if (hasHomeworkCohortAlias) {
+                   obj = mergeHomeworkClassNode(await loadHomeworkAliasClassNodeMap(`${BEAR_SUBJECT}/dailyPosts`, safeC), safeC);
+               } else {
+                   const snap = await db.ref(`${BEAR_SUBJECT}/dailyPosts/${safeC}`).once('value');
+                   obj = snap.val() || {};
+               }
                let arr = [];
                for(let k in obj) { let p = obj[k]; p.rowIndex = k; arr.push(p); }
                arr.sort((a,b) => new Date(b.date) - new Date(a.date));
@@ -5034,6 +5104,7 @@
                     const safeC = result.className.replace(/[.#$[\]]/g, '-');
                     const studentKey = result.foundUserKey || result.studentName.replace(/[.#$[\]]/g, '-');
                     const hasHomeworkCohortAlias = !!getHomeworkDoneCourseAliasKey(safeC);
+                    const homeworkAliasClassKeys = hasHomeworkCohortAlias ? getHomeworkDoneRelatedClassKeyCandidates(safeC) : [safeC];
                     result.foundUserKey = studentKey;
 
                     // 1. 棒卡數監聽
@@ -5042,37 +5113,41 @@
                     });
 
                     // 2. 留言回報監聽 (包含審核狀態與老師回覆)
-                    watchRealtimeValue(BEAR_SUBJECT + '/feedbacks/' + safeC + '/' + studentKey, function(snap) {
-                        const fbsObj = snap.val() || {};
-                        if (hasHomeworkCohortAlias) {
-                            if (!gData.cohortFeedbackRoot) gData.cohortFeedbackRoot = {};
-                            if (!gData.cohortFeedbackRoot[safeC]) gData.cohortFeedbackRoot[safeC] = {};
-                            gData.cohortFeedbackRoot[safeC][studentKey] = fbsObj;
-                            gData.feedbackHistory = buildFeedbackHistoryList(mergeFeedbackForStudent(gData.cohortFeedbackRoot, safeC, studentKey));
-                        } else {
-                            gData.feedbackHistory = buildFeedbackHistoryList(fbsObj);
-                        }
-                        // 重新渲染聯絡簿區塊，確保狀態即時更新
-                        renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
-                        // 同步重新渲染近期分數區塊，讓待審核狀態即時顯示在成績卡片上
-                        if (gData.grades) {
-                            renderOldGradeCards(gData.grades);
-                        }
+                    homeworkAliasClassKeys.forEach(function(classKey) {
+                        watchRealtimeValue(BEAR_SUBJECT + '/feedbacks/' + classKey + '/' + studentKey, function(snap) {
+                            const fbsObj = snap.val() || {};
+                            if (hasHomeworkCohortAlias) {
+                                if (!gData.cohortFeedbackRoot) gData.cohortFeedbackRoot = {};
+                                if (!gData.cohortFeedbackRoot[classKey]) gData.cohortFeedbackRoot[classKey] = {};
+                                gData.cohortFeedbackRoot[classKey][studentKey] = fbsObj;
+                                gData.feedbackHistory = buildFeedbackHistoryList(mergeFeedbackForStudent(gData.cohortFeedbackRoot, safeC, studentKey));
+                            } else {
+                                gData.feedbackHistory = buildFeedbackHistoryList(fbsObj);
+                            }
+                            // 重新渲染聯絡簿區塊，確保狀態即時更新
+                            renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
+                            // 同步重新渲染近期分數區塊，讓待審核狀態即時顯示在成績卡片上
+                            if (gData.grades) {
+                                renderOldGradeCards(gData.grades);
+                            }
+                        });
                     });
 
                     try {
-                        watchRealtimeValue(BEAR_SUBJECT + '/homeworkDone/' + safeC + '/' + studentKey, function(snap) {
-                            if (hasHomeworkCohortAlias) {
-                                if (!gData.cohortHomeworkDoneRoot) gData.cohortHomeworkDoneRoot = {};
-                                if (!gData.cohortHomeworkDoneRoot[safeC]) gData.cohortHomeworkDoneRoot[safeC] = {};
-                                gData.cohortHomeworkDoneRoot[safeC][studentKey] = snap.val() || {};
-                                gData.homeworkDone = mergeHomeworkDoneForStudent(gData.cohortHomeworkDoneRoot, safeC, studentKey);
-                            } else {
-                                gData.homeworkDone = snap.val() || {};
-                            }
-                            renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
-                        }, function(error) {
-                            console.warn("HomeworkDone realtime watch skipped:", error);
+                        homeworkAliasClassKeys.forEach(function(classKey) {
+                            watchRealtimeValue(BEAR_SUBJECT + '/homeworkDone/' + classKey + '/' + studentKey, function(snap) {
+                                if (hasHomeworkCohortAlias) {
+                                    if (!gData.cohortHomeworkDoneRoot) gData.cohortHomeworkDoneRoot = {};
+                                    if (!gData.cohortHomeworkDoneRoot[classKey]) gData.cohortHomeworkDoneRoot[classKey] = {};
+                                    gData.cohortHomeworkDoneRoot[classKey][studentKey] = snap.val() || {};
+                                    gData.homeworkDone = mergeHomeworkDoneForStudent(gData.cohortHomeworkDoneRoot, safeC, studentKey);
+                                } else {
+                                    gData.homeworkDone = snap.val() || {};
+                                }
+                                renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
+                            }, function(error) {
+                                console.warn("HomeworkDone realtime watch skipped:", error);
+                            });
                         });
                     } catch (homeworkDoneWatchErr) {
                         console.warn("HomeworkDone realtime watch skipped:", homeworkDoneWatchErr);
@@ -5178,13 +5253,7 @@
                         }
                     });
 
-                    // 5. 聯絡簿內容監聽
-                    watchRealtimeValue(BEAR_SUBJECT + '/dailyPosts/' + safeC, function(snap) {
-                        if (hasHomeworkCohortAlias) {
-                            if (!gData.cohortDailyPostRoot) gData.cohortDailyPostRoot = {};
-                            gData.cohortDailyPostRoot[safeC] = snap.val() || {};
-                        }
-                        const postsObj = hasHomeworkCohortAlias ? mergeHomeworkClassNode(gData.cohortDailyPostRoot || {}, safeC) : (snap.val() || {});
+                    function rebuildDailyPostsFromScopedData(postsObj) {
                         let classPosts = [];
                         let now = new Date();
                         for (let rowId in postsObj) {
@@ -5202,6 +5271,19 @@
                         
                         remapDailyPostGrades(); // 從 grades 陣列進行映射
                         renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
+                    }
+
+                    // 5. 聯絡簿內容監聽
+                    homeworkAliasClassKeys.forEach(function(classKey) {
+                        watchRealtimeValue(BEAR_SUBJECT + '/dailyPosts/' + classKey, function(snap) {
+                            if (hasHomeworkCohortAlias) {
+                                if (!gData.cohortDailyPostRoot) gData.cohortDailyPostRoot = {};
+                                gData.cohortDailyPostRoot[classKey] = snap.val() || {};
+                                rebuildDailyPostsFromScopedData(mergeHomeworkClassNode(gData.cohortDailyPostRoot || {}, safeC));
+                            } else {
+                                rebuildDailyPostsFromScopedData(snap.val() || {});
+                            }
+                        });
                     });
 
                     function remapDailyPostGrades() {
@@ -6830,15 +6912,43 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var safeC = safeKey(cls);
             var snapS = await db.ref(BEAR_SUBJECT + '/students/' + safeC).once('value');
             var kids = snapS.val() || {};
+            var hasHomeworkCohortAlias = !!getHomeworkDoneCourseAliasKey(safeC);
             var pendingList = [];
 
             if (stuName === 'all') {
-                var snapF = await db.ref(BEAR_SUBJECT + '/feedbacks/' + safeC).once('value');
-                var allFbs = snapF.val() || {};
-                
-                for (var sKey in allFbs) {
-                    var fbs = allFbs[sKey];
-                    var sName = kids[sKey] ? kids[sKey].name : '未知';
+                var feedbackClassNodeMap = hasHomeworkCohortAlias
+                    ? await loadHomeworkAliasClassNodeMap(BEAR_SUBJECT + '/feedbacks', safeC)
+                    : await loadClassNodeMapByKeys(BEAR_SUBJECT + '/feedbacks', [safeC]);
+                getHomeworkDoneRelatedClassKeys(safeC, feedbackClassNodeMap).forEach(function(sourceClassKey) {
+                    var allFbs = feedbackClassNodeMap[sourceClassKey] || {};
+                    for (var sKey in allFbs) {
+                        var fbs = allFbs[sKey];
+                        var sName = kids[sKey] ? kids[sKey].name : '未知';
+                        for (var fid in fbs) {
+                            var fb = fbs[fid];
+                            if (fb.type === '棒卡申請') {
+                                var d = {};
+                                try { d = JSON.parse(fb.content); } catch(e) { d = { reason: fb.content, count: '?', status: '待審核' }; }
+                                var statusFilter = document.getElementById('stickerStatusFilter') ? document.getElementById('stickerStatusFilter').value : 'all';
+                                var currentStatus = d.status || '待審核';
+                                if (statusFilter === 'all' || currentStatus === statusFilter) {
+                                    // timeForGas: 將斜線換成橫線，符合 GAS Sheets 時間格式
+                                    var timeForGas = (fb.time || '').replace(/\//g, '-');
+                                    pendingList.push({ fbKey: fid, stuKey: sKey, reason: d.reason, count: d.count, status: currentStatus, time: fb.time, timeForGas: timeForGas, safeC: sourceClassKey, stuName: sName, cls: hasHomeworkCohortAlias ? sourceClassKey : cls });
+                                }
+                            }
+                        }
+                    }
+                });
+            } else {
+                var stuKey = '';
+                for (var k in kids) { if (kids[k] && kids[k].name === stuName) { stuKey = k; break; } }
+                if (!stuKey) { alert('找不到學生'); return; }
+                var studentFeedbackClassNodeMap = hasHomeworkCohortAlias
+                    ? await loadHomeworkAliasClassNodeMap(BEAR_SUBJECT + '/feedbacks', safeC, stuKey)
+                    : await loadClassNodeMapByKeys(BEAR_SUBJECT + '/feedbacks', [safeC], stuKey);
+                getHomeworkDoneRelatedClassKeys(safeC, studentFeedbackClassNodeMap).forEach(function(sourceClassKey) {
+                    var fbs = ((studentFeedbackClassNodeMap[sourceClassKey] || {})[stuKey]) || {};
                     for (var fid in fbs) {
                         var fb = fbs[fid];
                         if (fb.type === '棒卡申請') {
@@ -6847,33 +6957,12 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                             var statusFilter = document.getElementById('stickerStatusFilter') ? document.getElementById('stickerStatusFilter').value : 'all';
                             var currentStatus = d.status || '待審核';
                             if (statusFilter === 'all' || currentStatus === statusFilter) {
-                                // timeForGas: 將斜線換成橫線，符合 GAS Sheets 時間格式
                                 var timeForGas = (fb.time || '').replace(/\//g, '-');
-                                pendingList.push({ fbKey: fid, stuKey: sKey, reason: d.reason, count: d.count, status: currentStatus, time: fb.time, timeForGas: timeForGas, safeC: safeC, stuName: sName, cls: cls });
+                                pendingList.push({ fbKey: fid, stuKey: stuKey, reason: d.reason, count: d.count, status: currentStatus, time: fb.time, timeForGas: timeForGas, safeC: sourceClassKey, stuName: stuName, cls: hasHomeworkCohortAlias ? sourceClassKey : cls });
                             }
                         }
                     }
-                }
-            } else {
-                var stuKey = '';
-                for (var k in kids) { if (kids[k] && kids[k].name === stuName) { stuKey = k; break; } }
-                if (!stuKey) { alert('找不到學生'); return; }
-                var snapF = await db.ref(BEAR_SUBJECT + '/feedbacks/' + safeC + '/' + stuKey).once('value');
-                var fbs = snapF.val() || {};
-
-                for (var fid in fbs) {
-                    var fb = fbs[fid];
-                    if (fb.type === '棒卡申請') {
-                        var d = {};
-                        try { d = JSON.parse(fb.content); } catch(e) { d = { reason: fb.content, count: '?', status: '待審核' }; }
-                        var statusFilter = document.getElementById('stickerStatusFilter') ? document.getElementById('stickerStatusFilter').value : 'all';
-                        var currentStatus = d.status || '待審核';
-                        if (statusFilter === 'all' || currentStatus === statusFilter) {
-                            var timeForGas = (fb.time || '').replace(/\//g, '-');
-                            pendingList.push({ fbKey: fid, stuKey: stuKey, reason: d.reason, count: d.count, status: currentStatus, time: fb.time, timeForGas: timeForGas, safeC: safeC, stuName: stuName, cls: cls });
-                        }
-                    }
-                }
+                });
             }
 
             // 按時間排序（新→舊）
@@ -8513,8 +8602,15 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             dateSel.innerHTML = '<option value="" disabled selected>載入中...</option>';
             dateSel.disabled = true;
             try {
-                var snap = await db.ref(BEAR_SUBJECT + '/dailyPosts/' + safeKey(cls)).once('value');
-                var postsObj = snap.val() || {};
+                var safeC = safeKey(cls);
+                var hasHomeworkCohortAlias = !!getHomeworkDoneCourseAliasKey(safeC);
+                var postsObj = {};
+                if (hasHomeworkCohortAlias) {
+                    postsObj = mergeHomeworkClassNode(await loadHomeworkAliasClassNodeMap(BEAR_SUBJECT + '/dailyPosts', safeC), safeC);
+                } else {
+                    var snap = await db.ref(BEAR_SUBJECT + '/dailyPosts/' + safeC).once('value');
+                    postsObj = snap.val() || {};
+                }
                 var now = new Date();
                 var posts = Object.keys(postsObj).map(function(key) {
                     var post = postsObj[key] || {};
@@ -8689,30 +8785,38 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var rawList = [];
 
             if (stuName === 'all') {
-                var snapF = await db.ref(BEAR_SUBJECT + '/feedbacks' + (hasHomeworkCohortAlias ? '' : '/' + safeC)).once('value');
-                var allFbs = hasHomeworkCohortAlias ? mergeFeedbackClassNode(snapF.val() || {}, safeC) : (snapF.val() || {});
-                for (var sKey in allFbs) {
-                    var fbs = allFbs[sKey];
-                    var sName = kids[sKey] ? kids[sKey].name : '未知';
-                    for (var fid in fbs) {
-                        var fb = fbs[fid];
-                        var fType = fb.type || '學生留言';
-                        if (fType.indexOf('棒卡') > -1) continue; 
-                        rawList.push({ fbKey: fid, stuKey: sKey, type: fType, content: fb.content, time: fb.time, date: fb.targetDate || fb.time.substring(0,10).replace(/-/g,'/'), cls: cls, stuName: sName, safeC: safeC, targetExamColIndex: fb.targetExamColIndex || "", targetExamTitle: fb.targetExamTitle || "" });
+                var feedbackClassNodeMap = hasHomeworkCohortAlias
+                    ? await loadHomeworkAliasClassNodeMap(BEAR_SUBJECT + '/feedbacks', safeC)
+                    : await loadClassNodeMapByKeys(BEAR_SUBJECT + '/feedbacks', [safeC]);
+                getHomeworkDoneRelatedClassKeys(safeC, feedbackClassNodeMap).forEach(function(sourceClassKey) {
+                    var allFbs = feedbackClassNodeMap[sourceClassKey] || {};
+                    for (var sKey in allFbs) {
+                        var fbs = allFbs[sKey];
+                        var sName = kids[sKey] ? kids[sKey].name : '未知';
+                        for (var fid in fbs) {
+                            var fb = fbs[fid];
+                            var fType = fb.type || '學生留言';
+                            if (fType.indexOf('棒卡') > -1) continue;
+                            rawList.push({ fbKey: fid, stuKey: sKey, type: fType, content: fb.content, time: fb.time, date: fb.targetDate || fb.time.substring(0,10).replace(/-/g,'/'), cls: hasHomeworkCohortAlias ? sourceClassKey : cls, stuName: sName, safeC: sourceClassKey, targetExamColIndex: fb.targetExamColIndex || "", targetExamTitle: fb.targetExamTitle || "" });
+                        }
                     }
-                }
+                });
             } else {
                 var stuKey = '';
                 for (var k in kids) { if (kids[k] && kids[k].name === stuName) { stuKey = k; break; } }
                 if (!stuKey) return;
-                var snapF = await db.ref(BEAR_SUBJECT + '/feedbacks' + (hasHomeworkCohortAlias ? '' : '/' + safeC + '/' + stuKey)).once('value');
-                var fbs = hasHomeworkCohortAlias ? mergeFeedbackForStudent(snapF.val() || {}, safeC, stuKey) : (snapF.val() || {});
-                for (var fid in fbs) {
-                    var fb = fbs[fid];
-                    var fType = fb.type || '學生留言';
-                    if (fType.indexOf('棒卡') > -1) continue;
-                    rawList.push({ fbKey: fid, stuKey: stuKey, type: fType, content: fb.content, time: fb.time, date: fb.targetDate || fb.time.substring(0,10).replace(/-/g,'/'), cls: cls, stuName: stuName, safeC: safeC, targetExamColIndex: fb.targetExamColIndex || "", targetExamTitle: fb.targetExamTitle || "" });
-                }
+                var studentFeedbackClassNodeMap = hasHomeworkCohortAlias
+                    ? await loadHomeworkAliasClassNodeMap(BEAR_SUBJECT + '/feedbacks', safeC, stuKey)
+                    : await loadClassNodeMapByKeys(BEAR_SUBJECT + '/feedbacks', [safeC], stuKey);
+                getHomeworkDoneRelatedClassKeys(safeC, studentFeedbackClassNodeMap).forEach(function(sourceClassKey) {
+                    var fbs = ((studentFeedbackClassNodeMap[sourceClassKey] || {})[stuKey]) || {};
+                    for (var fid in fbs) {
+                        var fb = fbs[fid];
+                        var fType = fb.type || '學生留言';
+                        if (fType.indexOf('棒卡') > -1) continue;
+                        rawList.push({ fbKey: fid, stuKey: stuKey, type: fType, content: fb.content, time: fb.time, date: fb.targetDate || fb.time.substring(0,10).replace(/-/g,'/'), cls: hasHomeworkCohortAlias ? sourceClassKey : cls, stuName: stuName, safeC: sourceClassKey, targetExamColIndex: fb.targetExamColIndex || "", targetExamTitle: fb.targetExamTitle || "" });
+                    }
+                });
             }
 
             // --- 智慧狀態判定引擎：最新覆蓋法則 ---
@@ -9194,18 +9298,21 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 const db = firebase.database();
 	                var allStudents = {};
 	                var allGrades = {};
-	                var allFeedbacks = {};
-	                var targetClassKey = targetClass && targetClass !== "all" ? safeKey(targetClass) : targetClass;
-	                if (targetClassKey && targetClassKey !== "all") {
-	                    var scopedSnaps = await Promise.all([
-	                        db.ref(BEAR_SUBJECT + '/students/' + targetClassKey).once('value'),
-	                        db.ref(BEAR_SUBJECT + '/grades/' + targetClassKey).once('value'),
-	                        db.ref(BEAR_SUBJECT + '/feedbacks/' + targetClassKey).once('value')
-	                    ]);
-	                    allStudents[targetClassKey] = scopedSnaps[0].val() || {};
-	                    allGrades[targetClassKey] = scopedSnaps[1].val() || {};
-	                    allFeedbacks[targetClassKey] = scopedSnaps[2].val() || {};
-	                } else {
+		                var allFeedbacks = {};
+		                var targetClassKey = targetClass && targetClass !== "all" ? safeKey(targetClass) : targetClass;
+		                if (targetClassKey && targetClassKey !== "all") {
+                            var hasHomeworkCohortAlias = !!getHomeworkDoneCourseAliasKey(targetClassKey);
+		                    var scopedSnaps = await Promise.all([
+		                        db.ref(BEAR_SUBJECT + '/students/' + targetClassKey).once('value'),
+		                        db.ref(BEAR_SUBJECT + '/grades/' + targetClassKey).once('value'),
+		                        hasHomeworkCohortAlias
+                                    ? loadHomeworkAliasClassNodeMap(BEAR_SUBJECT + '/feedbacks', targetClassKey)
+                                    : db.ref(BEAR_SUBJECT + '/feedbacks/' + targetClassKey).once('value')
+		                    ]);
+		                    allStudents[targetClassKey] = scopedSnaps[0].val() || {};
+		                    allGrades[targetClassKey] = scopedSnaps[1].val() || {};
+		                    allFeedbacks[targetClassKey] = hasHomeworkCohortAlias ? mergeFeedbackClassNode(scopedSnaps[2], targetClassKey) : (scopedSnaps[2].val() || {});
+		                } else {
 	                    var rootSnaps = await Promise.all([
 	                        db.ref(BEAR_SUBJECT + '/students').once('value'),
 	                        db.ref(BEAR_SUBJECT + '/grades').once('value'),
