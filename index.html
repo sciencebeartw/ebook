@@ -3455,11 +3455,292 @@
         return null;
     }
 
-    function getTransferDateKey(value) {
+    function getTransferDateKey(value, fallbackYear) {
         var text = (value || "").toString().trim().replace(/\//g, "-");
-        var match = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+        var match = text.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+        if (match) return Number(match[1]) * 10000 + Number(match[2]) * 100 + Number(match[3]);
+        if (!fallbackYear) return null;
+        match = text.match(/(^|[^0-9])(\d{1,2})-(\d{1,2})([^0-9]|$)/);
         if (!match) return null;
-        return Number(match[1]) * 10000 + Number(match[2]) * 100 + Number(match[3]);
+        return Number(fallbackYear) * 10000 + Number(match[2]) * 100 + Number(match[3]);
+    }
+
+    function getTransferFallbackYear(transferIndex) {
+        var list = listActiveIncomingTransfers(transferIndex);
+        for (var i = 0; i < list.length; i++) {
+            var text = (list[i].effectiveDate || "").toString();
+            var match = text.match(/(\d{4})/);
+            if (match) return Number(match[1]);
+        }
+        return new Date().getFullYear();
+    }
+
+    function getTransferClassNameForKey(classKey, currentClassKey, transferIndex, currentClassName) {
+        if (classKey === currentClassKey) return currentClassName;
+        var transfer = getTransferBySourceClassKey(transferIndex, classKey);
+        return (transfer && transfer.fromClassName) || currentClassName;
+    }
+
+    function shouldIncludeTransferGrade(classKey, currentClassKey, grade, transferIndex) {
+        var fallbackYear = getTransferFallbackYear(transferIndex);
+        var gradeDateKey = getTransferDateKey(grade && grade.date, fallbackYear);
+        if (!gradeDateKey) return true;
+        if (classKey === currentClassKey) {
+            return true;
+        }
+        var transfer = getTransferBySourceClassKey(transferIndex, classKey);
+        var sourceEffectiveKey = transfer ? getTransferDateKey(transfer.effectiveDate) : null;
+        return !sourceEffectiveKey || gradeDateKey < sourceEffectiveKey;
+    }
+
+    function getTransferGradePresentation(classKey, currentClassKey, grade, transferIndex, currentClassName, className) {
+        var fallbackYear = getTransferFallbackYear(transferIndex);
+        var gradeDateKey = getTransferDateKey(grade && grade.date, fallbackYear);
+        if (classKey === currentClassKey) {
+            var incoming = getIncomingTransferForCurrentClass(transferIndex, currentClassKey);
+            var currentEffectiveKey = incoming ? getTransferDateKey(incoming.effectiveDate) : null;
+            if (incoming && currentEffectiveKey && gradeDateKey && gradeDateKey < currentEffectiveKey) {
+                return {
+                    className: incoming.fromClassName || currentClassName,
+                    sourceClassKey: incoming.fromClassKey || classKey,
+                    sourceClassName: incoming.fromClassName || currentClassName,
+                    isTransferFormerClass: true,
+                    storedClassKey: classKey
+                };
+            }
+            return {
+                className: currentClassName || className,
+                sourceClassKey: classKey,
+                sourceClassName: currentClassName || className,
+                isTransferFormerClass: false,
+                storedClassKey: classKey
+            };
+        }
+        var transfer = getTransferBySourceClassKey(transferIndex, classKey);
+        return {
+            className: (transfer && transfer.fromClassName) || className || currentClassName,
+            sourceClassKey: classKey,
+            sourceClassName: (transfer && transfer.fromClassName) || className || currentClassName,
+            isTransferFormerClass: !!transfer,
+            storedClassKey: classKey
+        };
+    }
+
+    function buildGradeListFromExams(examsObj, options) {
+        options = options || {};
+        var classKey = options.classKey || "";
+        var currentClassKey = options.currentClassKey || classKey;
+        var transferIndex = options.transferIndex || {};
+        var className = options.className || options.currentClassName || "";
+        var fullGradeList = [];
+        for (let col in (examsObj || {})) {
+            const rawData = examsObj[col] || {};
+            const eData = Object.assign({}, rawData, {
+                dist: Array.isArray(rawData.dist) ? rawData.dist.slice() : rawData.dist,
+                labels: Array.isArray(rawData.labels) ? rawData.labels.slice() : rawData.labels
+            });
+            if (!shouldIncludeTransferGrade(classKey, currentClassKey, eData, transferIndex)) continue;
+            var presentation = getTransferGradePresentation(classKey, currentClassKey, eData, transferIndex, options.currentClassName || className, className);
+            let studentScoreNum = NaN;
+            if (eData.score) {
+                const sMatch = eData.score.toString().match(/(\d+(\.\d+)?)/);
+                if (sMatch) studentScoreNum = parseFloat(sMatch[0]);
+            }
+            let currentUnit = "分";
+            const isHomework = ((eData.date || "") + (eData.examName || "")).indexOf("作業") > -1;
+
+            let rawMaxForUnit = 100;
+            if (typeof eData.distMax === "number") rawMaxForUnit = eData.distMax;
+            else if (eData.dist && eData.dist.length > 0 && !(eData.dist.length === 5 && eData.labels)) rawMaxForUnit = Math.max(...eData.dist);
+            if (isHomework && rawMaxForUnit <= 60) currentUnit = "題";
+            if (eData.score === "尚未繳交") currentUnit = "";
+
+            let makeupThreshold = 0;
+            if (eData.note && eData.note !== "無詳細備註") {
+                const thresholdMatch = eData.note.match(/(\d+)/);
+                if (thresholdMatch) makeupThreshold = parseInt(thresholdMatch[0]);
+            }
+
+            let myBucketIndex = -1;
+            let rangeLabels = ["0~20","20~40","40~60","60~80","80~100"];
+            if (eData.dist && eData.dist.length > 0) {
+                if (eData.dist.length === 5 && eData.labels) {
+                    rangeLabels = eData.labels;
+                    myBucketIndex = typeof eData.myBucket === "number" ? eData.myBucket : -1;
+                    eData.total = eData.total || eData.dist.reduce((sum, n) => sum + (parseInt(n) || 0), 0);
+                } else {
+                    const total = eData.dist.length;
+                    const rawMax = Math.max(...eData.dist);
+                    const rawMin = Math.min(...eData.dist);
+                    let maxS = 100; let minS = rawMin;
+                    if (isHomework && rawMax < 90) maxS = rawMax;
+                    let gap = maxS - minS; if (gap === 0) gap = 1; let step = gap / 5;
+                    for (let b = 0; b < 5; b++) {
+                        rangeLabels[b] = Math.round(minS + (b * step)) + " ~ " + Math.round(minS + ((b + 1) * step));
+                    }
+
+                    if (!isNaN(studentScoreNum)) {
+                        let sIdx = Math.floor((studentScoreNum - minS) / step);
+                        if (sIdx >= 5) sIdx = 4; if (sIdx < 0) sIdx = 0;
+                        myBucketIndex = sIdx;
+                    }
+                    const buckets = [0,0,0,0,0];
+                    eData.dist.forEach(v => {
+                        let idx = Math.floor((v - minS) / step);
+                        if (idx >= 5) idx = 4; if (idx < 0) idx = 0;
+                        buckets[idx]++;
+                    });
+                    eData.dist = buckets;
+                    eData.total = total;
+                }
+            } else {
+                eData.dist = [0,0,0,0,0]; eData.total = 0;
+            }
+
+            const isMissing = isNaN(studentScoreNum) && (eData.score || "").indexOf("尚未繳交") === -1;
+
+            fullGradeList.push({
+                className: presentation.className,
+                sourceClassKey: presentation.sourceClassKey,
+                sourceClassName: presentation.sourceClassName,
+                storedClassKey: presentation.storedClassKey,
+                isTransferFormerClass: presentation.isTransferFormerClass,
+                date: eData.date,
+                dateKey: getTransferDateKey(eData.date, getTransferFallbackYear(transferIndex)) || 0,
+                exam: eData.examName,
+                note: eData.note,
+                makeupThreshold: makeupThreshold,
+                score: eData.score,
+                scoreNum: isNaN(studentScoreNum) ? null : studentScoreNum,
+                unit: currentUnit,
+                average: eData.average,
+                dist: eData.dist,
+                labels: rangeLabels,
+                myBucket: myBucketIndex,
+                total: eData.total,
+                isMissing: isMissing,
+                colIndex: parseInt(col.replace('col_','')),
+                cellColor: eData.cellColor
+            });
+        }
+        return fullGradeList;
+    }
+
+    function buildGradeListFromClassExamMap(classExamMap, classKeys, currentClassKey, transferIndex, currentClassName) {
+        var grades = [];
+        var trackedKeys = uniqueClassKeys(classKeys);
+        trackedKeys.forEach(function(classKey) {
+            var className = getTransferClassNameForKey(classKey, currentClassKey, transferIndex, currentClassName);
+            grades = grades.concat(buildGradeListFromExams(classExamMap[classKey] || {}, {
+                classKey: classKey,
+                currentClassKey: currentClassKey,
+                transferIndex: transferIndex,
+                className: className,
+                currentClassName: currentClassName
+            }));
+        });
+        return sortGradeListForDisplay(grades, trackedKeys.length > 1);
+    }
+
+    function sortGradeListForDisplay(grades, hasMultipleSources) {
+        return (grades || []).sort(function(a, b) {
+            if (hasMultipleSources) {
+                var dateDiff = (b.dateKey || 0) - (a.dateKey || 0);
+                if (dateDiff) return dateDiff;
+            }
+            return (a.colIndex || 0) - (b.colIndex || 0);
+        });
+    }
+
+    async function loadGradeExamMapByKeys(classKeys, studentKey) {
+        var snaps = await Promise.all(uniqueClassKeys(classKeys).map(function(classKey) {
+            return db.ref(`${BEAR_SUBJECT}/grades/${classKey}/${studentKey}/exams`).once("value").then(function(snap) {
+                return { key: classKey, value: snap.val() || {} };
+            });
+        }));
+        var result = {};
+        snaps.forEach(function(item) {
+            result[item.key] = item.value || {};
+        });
+        return result;
+    }
+
+    function isSameGradeSource(a, b) {
+        return ((a && a.sourceClassKey) || "") === ((b && b.sourceClassKey) || "");
+    }
+
+    function isGradeFromPostSource(grade, sourceClassKey) {
+        return !sourceClassKey || !grade || !grade.sourceClassKey || grade.sourceClassKey === sourceClassKey;
+    }
+
+    function parseEbookSimpleChineseNumber(text) {
+        text = (text || "").toString();
+        if (/^\d+$/.test(text)) return parseInt(text, 10);
+        var map = { "零": 0, "一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9 };
+        if (text === "十") return 10;
+        var tenIndex = text.indexOf("十");
+        if (tenIndex > -1) {
+            var left = text.substring(0, tenIndex);
+            var right = text.substring(tenIndex + 1);
+            return (left ? (map[left] || 0) : 1) * 10 + (right ? (map[right] || 0) : 0);
+        }
+        return map[text] || null;
+    }
+
+    function getEbookChapterNumber(value) {
+        var text = (value || "").toString();
+        var match = text.match(/第\s*([0-9一二三四五六七八九十]+)\s*章/);
+        return match ? parseEbookSimpleChineseNumber(match[1]) : null;
+    }
+
+    function getDailyPostExamMatches(postOrDate, grades, sourceClassKey) {
+        var post = postOrDate && typeof postOrDate === "object" ? postOrDate : null;
+        var postDate = post ? post.date : postOrDate;
+        var pDate = new Date(postDate);
+        var shortDate = (pDate.getMonth() + 1) + "/" + pDate.getDate();
+        var exactPostDate = (postDate || "").toString();
+        var regex = new RegExp("(^|[^0-9])" + shortDate.replace("/", "\\/") + "([^0-9]|$)", "g");
+        var dateMatches = (grades || []).filter(function(g) {
+            if (!isGradeFromPostSource(g, sourceClassKey)) return false;
+            if (!isDailyPostExamGrade(g)) return false;
+            if (g.date === shortDate || g.date === exactPostDate) return true;
+            regex.lastIndex = 0;
+            return regex.test(g.date || "");
+        });
+        if (dateMatches.length || !post) return dateMatches;
+
+        var postChapter = getEbookChapterNumber([
+            post.quiz || "",
+            post.makeup || "",
+            post.range || "",
+            post.progress || "",
+            post.title || "",
+            post.note || ""
+        ].join(" "));
+        if (!postChapter) return [];
+        var postYear = (exactPostDate.match(/(\d{4})/) || [])[1] || getTransferFallbackYear(gData && gData.studentTransferIndex);
+        var postDateKey = getTransferDateKey(exactPostDate, postYear);
+        var chapterMatches = (grades || []).filter(function(g) {
+            if (!isGradeFromPostSource(g, sourceClassKey)) return false;
+            if (!isDailyPostExamGrade(g)) return false;
+            if (getEbookChapterNumber(g.exam || g.examName || "") !== postChapter) return false;
+            var gradeDateKey = getTransferDateKey(g.date, postYear);
+            return !postDateKey || !gradeDateKey || gradeDateKey <= postDateKey;
+        }).sort(function(a, b) {
+            return (b.dateKey || 0) - (a.dateKey || 0);
+        });
+        if (!chapterMatches.length) return [];
+        var newestDateKey = chapterMatches[0].dateKey || 0;
+        return chapterMatches.filter(function(g) {
+            return (g.dateKey || 0) === newestDateKey;
+        });
+    }
+
+    function getRelatedHomeworkScoresForExam(exam, grades) {
+        if (!exam) return [];
+        return (grades || []).filter(function(g) {
+            return isSameGradeSource(g, exam) && g.exam === exam.exam && (g.date || "").indexOf("作業") > -1 && g.colIndex !== exam.colIndex;
+        });
     }
 
     function getIncomingTransferForCurrentClass(transferIndex, currentClassKey) {
@@ -3488,6 +3769,10 @@
 
     function getTrackedClassKeysForStudent(classKey, transferIndex) {
         return uniqueClassKeys(getHomeworkDoneRelatedClassKeyCandidates(classKey).concat(getTransferSourceClassKeys(transferIndex)));
+    }
+
+    function getTrackedGradeClassKeysForStudent(classKey, transferIndex) {
+        return uniqueClassKeys([classKey].concat(getTransferSourceClassKeys(transferIndex)));
     }
 
     function mergeDailyPostClassNodeByKeys(classNodeMap, classKeys, currentClassKey, transferIndex, currentClassName) {
@@ -3595,26 +3880,6 @@
         });
     }
 
-    function getDailyPostExamMatches(postDate, grades) {
-        var pDate = new Date(postDate);
-        var shortDate = (pDate.getMonth() + 1) + "/" + pDate.getDate();
-        var exactPostDate = (postDate || "").toString();
-        var regex = new RegExp("(^|[^0-9])" + shortDate.replace("/", "\\/") + "([^0-9]|$)", "g");
-        return (grades || []).filter(function(g) {
-            if (!isDailyPostExamGrade(g)) return false;
-            if (g.date === shortDate || g.date === exactPostDate) return true;
-            regex.lastIndex = 0;
-            return regex.test(g.date || "");
-        });
-    }
-
-    function getRelatedHomeworkScoresForExam(exam, grades) {
-        if (!exam) return [];
-        return (grades || []).filter(function(g) {
-            return g.exam === exam.exam && (g.date || "").indexOf("作業") > -1 && g.colIndex !== exam.colIndex;
-        });
-    }
-
     async function executeFirebaseRead(studentName, password, bypassPwd, targetClass) {
         let result = { found: false, className: "", studentName: "", dailyPost: [], grades: [], feedbackHistory: [], bulletins: [], stickers: 0, homeworkDone: {} };
         
@@ -3715,85 +3980,13 @@
             if (!result.found) return result;
             
             const safeC = safeKey(result.className);
-            const hasHomeworkCohortAlias = !!getHomeworkDoneCourseAliasKey(safeC);
-
-            // Fetch Grades
-            const snapG = await db.ref(`${BEAR_SUBJECT}/grades/${safeC}/${foundUserKey}/exams`).once('value');
-            const examsObj = snapG.val() || {};
-            let fullGradeList = [];
-            for (let col in examsObj) {
-                const eData = examsObj[col];
-                let studentScoreNum = NaN;
-                if (eData.score) {
-                    const sMatch = eData.score.toString().match(/(\d+(\.\d+)?)/);
-                    if (sMatch) studentScoreNum = parseFloat(sMatch[0]);
-                }
-                let currentUnit = "分";
-                const isP6Class = result.className.indexOf("小六") > -1;
-                const isHomework = (eData.date + eData.examName).indexOf("作業") > -1;
-                
-                let rawMaxForUnit = 100;
-                if (typeof eData.distMax === "number") rawMaxForUnit = eData.distMax;
-                else if (eData.dist && eData.dist.length > 0 && !(eData.dist.length === 5 && eData.labels)) rawMaxForUnit = Math.max(...eData.dist);
-                if (isHomework && rawMaxForUnit <= 60) currentUnit = "題";
-                if (eData.score === "尚未繳交") currentUnit = "";
-                
-                let makeupThreshold = 0;
-                if (eData.note && eData.note !== "無詳細備註") {
-                    const thresholdMatch = eData.note.match(/(\d+)/); 
-                    if (thresholdMatch) makeupThreshold = parseInt(thresholdMatch[0]); 
-                }
-
-                let myBucketIndex = -1;
-                let rangeLabels = ["0~20","20~40","40~60","60~80","80~100"];
-                if (eData.dist && eData.dist.length > 0) {
-                     if (eData.dist.length === 5 && eData.labels) {
-                         rangeLabels = eData.labels;
-                         myBucketIndex = typeof eData.myBucket === "number" ? eData.myBucket : -1;
-                         eData.total = eData.total || eData.dist.reduce((sum, n) => sum + (parseInt(n) || 0), 0);
-                     } else {
-                     const total = eData.dist.length;
-                     const rawMax = Math.max(...eData.dist);
-                     const rawMin = Math.min(...eData.dist);
-                     let maxS = 100; let minS = rawMin;
-                     if (isHomework && rawMax < 90) maxS = rawMax;
-                     let gap = maxS - minS; if(gap===0) gap=1; let step = gap/5;
-                     for(let b=0; b<5; b++) {
-                         rangeLabels[b] = Math.round(minS+(b*step)) + " ~ " + Math.round(minS+((b+1)*step));
-                     }
-                     
-                     if (!isNaN(studentScoreNum)) {
-                         let sIdx = Math.floor((studentScoreNum - minS) / step);
-                         if (sIdx >= 5) sIdx = 4; if (sIdx < 0) sIdx = 0;
-                         myBucketIndex = sIdx;
-                     }
-                     const buckets = [0,0,0,0,0];
-                     eData.dist.forEach(v => {
-                         let idx = Math.floor((v - minS) / step);
-                         if (idx >= 5) idx = 4; if (idx < 0) idx = 0;
-                         buckets[idx]++;
-                     });
-                     eData.dist = buckets;
-                     eData.total = total;
-                     }
-                } else {
-                     eData.dist = [0,0,0,0,0]; eData.total = 0;
-                }
-                
-                const isMissing = isNaN(studentScoreNum) && (eData.score || "").indexOf("尚未繳交") === -1;
-
-                fullGradeList.push({
-                   className: result.className, date: eData.date, exam: eData.examName, note: eData.note, 
-                   makeupThreshold: makeupThreshold, score: eData.score, scoreNum: isNaN(studentScoreNum) ? null : studentScoreNum,
-                   unit: currentUnit, average: eData.average, dist: eData.dist, labels: rangeLabels, myBucket: myBucketIndex,
-                   total: eData.total, isMissing: isMissing, colIndex: parseInt(col.replace('col_','')), cellColor: eData.cellColor
-                });
-            }
-            // Sort by colIndex ascending to EXACTLY match GAS for-loop iteration order (j=5 to length)
-            result.grades = fullGradeList.sort((a, b) => a.colIndex - b.colIndex);
-
             result.studentTransferIndex = await loadStudentTransferIndexForStudent(safeC, foundUserKey);
             result.trackedClassKeys = getTrackedClassKeysForStudent(safeC, result.studentTransferIndex);
+            result.trackedGradeClassKeys = getTrackedGradeClassKeysForStudent(safeC, result.studentTransferIndex);
+
+            // Fetch Grades. Transfer students read only their current class plus indexed source classes.
+            result.cohortGradeExamRoot = await loadGradeExamMapByKeys(result.trackedGradeClassKeys, foundUserKey);
+            result.grades = buildGradeListFromClassExamMap(result.cohortGradeExamRoot, result.trackedGradeClassKeys, safeC, result.studentTransferIndex, result.className);
 
             // Fetch Posts
             let postsObj = {};
@@ -3823,7 +4016,7 @@
                     makeup: pRow.makeup, quiz: pRow.quiz, range: pRow.range, note: pRow.note, examData: { main: null, others: [] }
                 };
                 
-                let todayExams = getDailyPostExamMatches(pRow.date, result.grades);
+                let todayExams = getDailyPostExamMatches(postObj, result.grades, postObj.sourceClassKey);
                 if (todayExams.length > 0) {
                     let todayMainExam = todayExams[0];
                     postObj.examData.main = todayMainExam;
@@ -5253,8 +5446,10 @@
                     const hasHomeworkCohortAlias = !!getHomeworkDoneCourseAliasKey(safeC);
                     const homeworkAliasClassKeys = hasHomeworkCohortAlias ? getHomeworkDoneRelatedClassKeyCandidates(safeC) : [safeC];
                     const trackedClassKeys = uniqueClassKeys(result.trackedClassKeys || homeworkAliasClassKeys);
+                    const trackedGradeClassKeys = uniqueClassKeys(result.trackedGradeClassKeys || getTrackedGradeClassKeysForStudent(safeC, result.studentTransferIndex || {}));
                     result.foundUserKey = studentKey;
                     result.trackedClassKeys = trackedClassKeys;
+                    result.trackedGradeClassKeys = trackedGradeClassKeys;
 
                     // 1. 棒卡數監聽
                     watchRealtimeValue(BEAR_SUBJECT + '/students/' + safeC + '/' + studentKey + '/stickers', function(snap) {
@@ -5333,73 +5528,29 @@
                         });
                     }
 
-                    // 4. 成績資料監聽 (近期成績更新)
-                    watchRealtimeValue(BEAR_SUBJECT + '/grades/' + safeC + '/' + studentKey + '/exams', function(snap) {
-                        if (!snap.exists()) return;
-                        const examsObj = snap.val() || {};
-                        let fullGradeList = [];
-                        for (let col in examsObj) {
-                            const eData = examsObj[col];
-                            let scNum = NaN;
-                            if (eData.score) {
-                                const m = eData.score.toString().match(/(\d+(\.\d+)?)/);
-                                if (m) scNum = parseFloat(m[0]);
-                            }
-                            let isP6 = result.className.indexOf("小六") > -1;
-                            let isHW = (eData.date + eData.examName).indexOf("作業") > -1;
-                            
-                            // Automatically infer unit
-                            let rawDistMax = 100;
-                            if (typeof eData.distMax === "number") rawDistMax = eData.distMax;
-                            else if (eData.dist && eData.dist.length > 0 && !(eData.dist.length === 5 && eData.labels)) rawDistMax = Math.max(...eData.dist);
-                            let unit = (isHW && rawDistMax <= 60) ? "題" : (eData.score === "尚未繳交" ? "" : "分");
-                            
-                            let threshold = 0;
-                            if (eData.note && eData.note !== "無詳細備註") {
-                                const tm = eData.note.match(/(\d+)/); 
-                                if (tm) threshold = parseInt(tm[0]); 
-                            }
-                            
-                            let myBucket = typeof eData.myBucket === "number" ? eData.myBucket : -1;
-                            let labels = eData.labels || ["0~20","20~40","40~60","60~80","80~100"];
-                            if (eData.dist && eData.dist.length > 0) {
-                                if (eData.dist.length !== 5) {
-                                    const rawDist = eData.dist;
-                                    const minS = Math.min(...rawDist); const rawMax = Math.max(...rawDist);
-                                    const maxS = (isHW && rawMax < 90) ? rawMax : 100;
-                                    let gap = (maxS - minS) || 1; let step = gap/5;
-                                    const buckets = [0,0,0,0,0];
-                                    rawDist.forEach(v => {
-                                        let idx = Math.floor((v - minS) / step);
-                                        if (idx >= 5) idx = 4; if (idx < 0) idx = 0;
-                                        buckets[idx]++;
-                                    });
-                                    for(let b=0; b<5; b++) labels[b] = Math.round(minS+(b*step)) + " ~ " + Math.round(minS+((b+1)*step));
-                                    if (!isNaN(scNum)) {
-                                        myBucket = Math.floor((scNum - minS) / step);
-                                        if (myBucket >= 5) myBucket = 4; if (myBucket < 0) myBucket = 0;
-                                    }
-                                    eData.dist = buckets;
-                                    eData.total = rawDist.length;
-                                } else if (typeof eData.total !== "number") {
-                                    eData.total = eData.dist.reduce((sum, n) => sum + (parseInt(n, 10) || 0), 0);
-                                }
-                            }
-                            fullGradeList.push({
-                                className: result.className, date: eData.date, exam: eData.examName, note: eData.note, 
-                                makeupThreshold: threshold, score: eData.score, scoreNum: isNaN(scNum) ? null : scNum,
-                                unit: unit, average: eData.average, dist: eData.dist, labels: labels, myBucket: myBucket,
-                                total: eData.total, colIndex: parseInt(col.replace('col_','')), cellColor: eData.cellColor
-                            });
-                        }
-                        gData.grades = fullGradeList.sort((a, b) => a.colIndex - b.colIndex);
+                    // 4. 成績資料監聽 (近期成績更新，含轉班前原班成績)
+                    function rebuildGradesFromScopedSources() {
+                        gData.grades = buildGradeListFromClassExamMap(
+                            gData.cohortGradeExamRoot || {},
+                            trackedGradeClassKeys,
+                            safeC,
+                            gData.studentTransferIndex || {},
+                            gData.className
+                        );
                         renderOldGradeCards(gData.grades);
-                        
+
                         // 當成績更新時，也必須重新映射給聯絡簿，否則聯絡簿會顯示舊的或遺失的成績 ref
                         if (gData.dailyPost) {
                             remapDailyPostGrades();
                             renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
                         }
+                    }
+                    trackedGradeClassKeys.forEach(function(classKey) {
+                        watchRealtimeValue(BEAR_SUBJECT + '/grades/' + classKey + '/' + studentKey + '/exams', function(snap) {
+                            if (!gData.cohortGradeExamRoot) gData.cohortGradeExamRoot = {};
+                            gData.cohortGradeExamRoot[classKey] = snap.val() || {};
+                            rebuildGradesFromScopedSources();
+                        });
                     });
 
                     function rebuildDailyPostsFromScopedData(postsObj) {
@@ -5445,7 +5596,7 @@
                             let pDate = new Date(postObj.date);
                             let shortDate = (pDate.getMonth() + 1) + "/" + pDate.getDate();
                             
-                            let todayExams = getDailyPostExamMatches(postObj.date, gData.grades);
+                            let todayExams = getDailyPostExamMatches(postObj, gData.grades, postObj.sourceClassKey);
                             if (todayExams.length > 0) {
                                 let todayMainExam = todayExams[0];
                                 postObj.examData.main = todayMainExam;
@@ -7000,9 +7151,10 @@ dist.forEach((val, idx) => {
 });
 chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
 
+                var classBadgeText = (item.isTransferFormerClass ? "轉班前紀錄｜" : "") + (item.className || "");
                 html += `
         <div class='score-card' onclick='toggleCard(this)'>
-            <div class='class-badge'>${item.className}</div>
+            <div class='class-badge'>${escapeHtml(classBadgeText)}</div>
             <div class='card-main'>
                 <div class='exam-info'><span class='exam-date'>${item.date}</span><span class='exam-name'>${item.exam}</span></div>
                 <div class='score-box'>${displayScore}${item.subNote || ""}${logic.statusHtml}<div class='avg-score'>班平均 ${item.average}</div></div>
