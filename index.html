@@ -3547,7 +3547,7 @@
                 if (sMatch) studentScoreNum = parseFloat(sMatch[0]);
             }
             let currentUnit = "分";
-            const isHomework = ((eData.date || "") + (eData.examName || "")).indexOf("作業") > -1;
+            const isHomework = isHomeworkColumnTitle((eData.date || "") + (eData.examName || ""));
 
             let rawMaxForUnit = 100;
             if (typeof eData.distMax === "number") rawMaxForUnit = eData.distMax;
@@ -3739,7 +3739,7 @@
     function getRelatedHomeworkScoresForExam(exam, grades) {
         if (!exam) return [];
         return (grades || []).filter(function(g) {
-            return isSameGradeSource(g, exam) && g.exam === exam.exam && (g.date || "").indexOf("作業") > -1 && g.colIndex !== exam.colIndex;
+            return isSameGradeSource(g, exam) && g.exam === exam.exam && isHomeworkColumnTitle(g.date || "") && g.colIndex !== exam.colIndex;
         });
     }
 
@@ -3871,13 +3871,28 @@
         return { name: "喵", fullName: "阿喵老師" };
     }
 
+    function isHomePracticeScoreTitle(title) {
+        return (title || "").toString().indexOf("回家練習卷") > -1;
+    }
+
+    function isHomeworkColumnTitle(title) {
+        var text = (title || "").toString();
+        return text.indexOf("作業") > -1 && !isHomePracticeScoreTitle(text);
+    }
+
+    function isExamScoreTitle(title) {
+        var text = (title || "").toString();
+        if (!text) return false;
+        if (isHomeworkColumnTitle(text)) return false;
+        return ["小考", "複習", "期中", "大考", "隨堂", "鑑定", "回家練習卷"].some(function(keyword) {
+            return text.indexOf(keyword) > -1;
+        });
+    }
+
     function isDailyPostExamGrade(grade) {
         if (!grade) return false;
         var title = ((grade.date || "") + " " + (grade.exam || grade.examName || "")).toString();
-        if (title.indexOf("作業") > -1) return false;
-        return ["小考", "複習", "期中", "大考", "隨堂", "鑑定"].some(function(keyword) {
-            return title.indexOf(keyword) > -1;
-        });
+        return isExamScoreTitle(title);
     }
 
     async function executeFirebaseRead(studentName, password, bypassPwd, targetClass) {
@@ -6090,7 +6105,7 @@
         function getLatestMakeupReportInfo(exam, feedbackHistory) {
             if (!feedbackHistory || feedbackHistory.length === 0) return null;
             var rawScore = (exam.score || "").toString();
-            var isHw = (exam.exam && exam.exam.indexOf("作業") > -1) || (exam.date && exam.date.indexOf("作業") > -1) || rawScore.indexOf("未交") > -1 || rawScore.indexOf("缺交") > -1 || rawScore.indexOf("缺繳") > -1;
+            var isHw = isHomeworkColumnTitle((exam.date || "") + (exam.exam || "")) || rawScore.indexOf("未交") > -1 || rawScore.indexOf("缺交") > -1 || rawScore.indexOf("缺繳") > -1;
             if (isHw) return null;
 
             var candidates = getExamDateCandidates(exam);
@@ -6175,7 +6190,7 @@
                     result.mainScore = overrideNum;
                     result.showReviewing = true;
                 } else {
-                    var isHw = (exam.exam && exam.exam.indexOf("作業") > -1) || (exam.date && exam.date.indexOf("作業") > -1) || rawScore.indexOf("未交") > -1 || rawScore.indexOf("缺交") > -1 || rawScore.indexOf("缺繳") > -1;
+                    var isHw = isHomeworkColumnTitle((exam.date || "") + (exam.exam || "")) || rawScore.indexOf("未交") > -1 || rawScore.indexOf("缺交") > -1 || rawScore.indexOf("缺繳") > -1;
                     if (rawScore.indexOf("尚未繳交") > -1) { result.mainScore = "尚未繳交"; result.mainClass = " text-grey-status"; }
                     else { result.mainScore = isHw ? "缺繳" : "缺考"; result.mainClass = " text-grey-status"; }
                 }
@@ -6699,7 +6714,7 @@
             if (!isNaN(parseFloat(logic.mainScore))) unitDisplay = "<span class='score-unit-big'>" + (exam.unit || "分") + "</span>";
             var scoreDisplay = "<span class='" + logic.mainClass + "'>" + logic.mainScore + "</span>" + unitDisplay;
             var standardHtml = "";
-            var isHomeworkExam = (exam.exam && exam.exam.indexOf("作業") > -1) || (exam.date && exam.date.indexOf("作業") > -1);
+            var isHomeworkExam = isHomeworkColumnTitle((exam.date || "") + (exam.exam || ""));
             if (exam.note && exam.note !== "" && !isHomeworkExam) {
                 standardHtml = "<div class='exam-standard-box'>" + SVG.target + " 補考標準：" + exam.note + "</div>";
             }
@@ -7149,7 +7164,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 <div class='score-box'>${displayScore}${item.subNote || ""}${logic.statusHtml}<div class='avg-score'>班平均 ${item.average}</div></div>
             </div>
             <div class='expand-area'>
-                ${(item.note && !((item.exam && item.exam.indexOf("作業") > -1) || (item.date && item.date.indexOf("作業") > -1))) ? "<div class='detail-box'>" + SVG.target + " 補考標準：" + item.note + "</div>" : ""}
+                ${(item.note && !isHomeworkColumnTitle((item.date || "") + (item.exam || ""))) ? "<div class='detail-box'>" + SVG.target + " 補考標準：" + item.note + "</div>" : ""}
                 <div class='chart-wrapper'>${chartHtml}</div>
             </div>
             <div class='click-hint'>▼</div>
@@ -8130,7 +8145,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         }
 
         function shouldShowGodMakeupReview(exam, logic) {
-            if (!exam || (exam.exam && exam.exam.indexOf("作業") > -1) || (exam.date && exam.date.indexOf("作業") > -1)) return false;
+            if (!exam || isHomeworkColumnTitle((exam.date || "") + (exam.exam || ""))) return false;
             if (logic && logic.showReviewing) return true;
             if (getMakeupColorInfo(exam.cellColor)) return true;
             if (logic && logic.effectiveNum !== null && exam.makeupThreshold > 0 && logic.effectiveNum < exam.makeupThreshold) return true;
@@ -8605,10 +8620,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         }
 
         function isMakeupExamTitle(title) {
-            if (!title || title.indexOf("作業") > -1) return false;
-            return ["小考", "複習", "期中", "大考", "隨堂", "鑑定"].some(function(keyword) {
-                return title.indexOf(keyword) > -1;
-            });
+            return isExamScoreTitle(title);
         }
 
         function getMakeupColorInfo(colorHex) {
@@ -8747,12 +8759,12 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 };
 
                 if (exams.length === 0) {
-                    examSelect.innerHTML = '<option value="" selected>找不到小考/複習/鑑定欄位</option>';
+                    examSelect.innerHTML = '<option value="" selected>找不到小考/複習/鑑定/回家練習卷欄位</option>';
                     listDiv.innerHTML = '<div style="color:#999; padding:10px;">這個班級目前沒有可登記的考試欄位。</div>';
                     return;
                 }
 
-                var opts = '<option value="" disabled selected>請選擇小考/鑑定考</option>';
+                var opts = '<option value="" disabled selected>請選擇分數欄位</option>';
                 exams.forEach(function(exam) {
                     var threshold = parseMakeupThreshold(exam.note);
                     var summary = getMakeupRowsForExam(studentsObj, gradesObj, exam.colIndex, threshold, exam);
@@ -9428,10 +9440,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         window.currentMissingHWRangeLabel = '最近 2 次作業';
 
         function isMakeupReminderExamTitle(title) {
-            if (!title || title.indexOf("作業") > -1) return false;
-            return ["小考", "複習", "期中", "大考", "隨堂", "鑑定"].some(function(keyword) {
-                return title.indexOf(keyword) > -1;
-            });
+            return isExamScoreTitle(title);
         }
 
         function normalizeMissingExamColIndex(value) {
@@ -9676,7 +9685,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     colKeys.forEach(function(colKey) {
                         var ex = examsObj[colKey];
                         var nameStr = (ex.date || "") + " " + (ex.examName || "");
-                        if (nameStr.indexOf("作業") > -1) {
+                        if (isHomeworkColumnTitle(nameStr)) {
                             homeworkCols.push({ id: colKey, title: nameStr.trim(), rawDate: ex.date || "" });
 	                        } else if (isMakeupReminderExamTitle(nameStr)) {
 	                            makeupExamCols.push({
