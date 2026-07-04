@@ -3455,6 +3455,37 @@
         return null;
     }
 
+    function getTransferDateKey(value) {
+        var text = (value || "").toString().trim().replace(/\//g, "-");
+        var match = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+        if (!match) return null;
+        return Number(match[1]) * 10000 + Number(match[2]) * 100 + Number(match[3]);
+    }
+
+    function getIncomingTransferForCurrentClass(transferIndex, currentClassKey) {
+        var list = listActiveIncomingTransfers(transferIndex).filter(function(item) {
+            return item.toClassKey === currentClassKey;
+        });
+        if (!list.length) return null;
+        list.sort(function(a, b) {
+            return (getTransferDateKey(a.effectiveDate) || 0) - (getTransferDateKey(b.effectiveDate) || 0);
+        });
+        return list[0];
+    }
+
+    function shouldIncludeTransferPost(classKey, currentClassKey, row, transferIndex) {
+        var postDateKey = getTransferDateKey(row && row.date);
+        if (!postDateKey) return true;
+        if (classKey === currentClassKey) {
+            var incoming = getIncomingTransferForCurrentClass(transferIndex, currentClassKey);
+            var currentEffectiveKey = incoming ? getTransferDateKey(incoming.effectiveDate) : null;
+            return !currentEffectiveKey || postDateKey >= currentEffectiveKey;
+        }
+        var transfer = getTransferBySourceClassKey(transferIndex, classKey);
+        var sourceEffectiveKey = transfer ? getTransferDateKey(transfer.effectiveDate) : null;
+        return !sourceEffectiveKey || postDateKey < sourceEffectiveKey;
+    }
+
     function getTrackedClassKeysForStudent(classKey, transferIndex) {
         return uniqueClassKeys(getHomeworkDoneRelatedClassKeyCandidates(classKey).concat(getTransferSourceClassKeys(transferIndex)));
     }
@@ -3466,6 +3497,7 @@
             var classPosts = classNodeMap[key] || {};
             Object.keys(classPosts).forEach(function(postKey) {
                 var row = classPosts[postKey] || {};
+                if (!shouldIncludeTransferPost(key, currentClassKey, row, transferIndex)) return;
                 var mergedKey = merged[postKey] ? key + "__" + postKey : postKey;
                 merged[mergedKey] = Object.assign({}, row, {
                     className: row.className || (transfer && transfer.fromClassName) || currentClassName,
@@ -6596,6 +6628,14 @@
             return "<div class='grade-section'><div class='main-exam-title'>" + examTitle + "</div><div class='main-exam-range'>" + exam.exam + "</div><div class='main-score'>" + scoreDisplay + "</div>" + logic.statusHtml + "<div class='score-sub'>班平均: " + exam.average + "</div>" + standardHtml + scoreReportHtml + chartHtml + refHwHtml + "</div>";
         }
 
+        function formatTransferScoreReportText(historyItem) {
+            var raw = (historyItem && historyItem.content !== undefined && historyItem.content !== null) ? historyItem.content.toString().trim() : "";
+            if (raw.charAt(0) === "'") raw = raw.substring(1).trim();
+            var scoreText = /^\d+(\.\d+)?$/.test(raw) ? (raw + "假") : raw;
+            var title = (historyItem && historyItem.targetExamTitle) ? historyItem.targetExamTitle.toString().trim() : "";
+            return (title ? (title + "｜") : "") + (scoreText || "已回報");
+        }
+
         function renderDailyPosts(posts, history) {
             window.adminModeReplyContext = {};
             window.adminModeStickerContext = {};
@@ -6779,7 +6819,7 @@
                     fields.push({ label: item.label, val: item.val, extra: extra });
                 });
                 fields = fields.concat(buildPostMakeupFields(post, buildPendingMakeupResultReportHtml(post, myHistory, examCards, latestPostDate)), [{ label: "下次考試範圍", val: post.range }, { label: "補充資訊", val: post.note }]);
-                fields.forEach(function (f) { contentHtml += renderPostInfoBlock(f); }); var historyHtml = ""; myHistory.forEach(function (h) { if (!isMakeupScoreReportType(h.type) && h.type !== FEEDBACK_TYPE_LABELS.makeupResult) { var displayType = (h.type === FEEDBACK_TYPE_LABELS.parent || h.type === FEEDBACK_TYPE_LABELS.parentStudent || h.type === FEEDBACK_TYPE_LABELS.student) ? "學生留言" : h.type; var isTeacher = (!isStudentSideFeedbackType(h.type));
+                fields.forEach(function (f) { contentHtml += renderPostInfoBlock(f); }); var historyHtml = ""; myHistory.forEach(function (h) { if ((!isMakeupScoreReportType(h.type) || h.isTransferFormerClass) && h.type !== FEEDBACK_TYPE_LABELS.makeupResult) { var displayType = (h.type === FEEDBACK_TYPE_LABELS.parent || h.type === FEEDBACK_TYPE_LABELS.parentStudent || h.type === FEEDBACK_TYPE_LABELS.student) ? "學生留言" : (isMakeupScoreReportType(h.type) ? "缺考分數回報" : h.type); var isTeacher = (!isStudentSideFeedbackType(h.type) && !isMakeupScoreReportType(h.type));
                         var avatarClass = isTeacher ? "avatar-teacher" : "avatar-student";
                         var bodyClass = isTeacher ? "teacher-body" : "";
                         var sName = (gData && gData.studentName) ? gData.studentName : "學";
@@ -6787,7 +6827,10 @@
                         var classInfo = getTeacherInfo(gData && gData.className ? gData.className : "");
                         var tName = classInfo.name;
                         var avatarChar = isTeacher ? tName : sChar;
-                        if (h.type === FEEDBACK_TYPE_LABELS.sticker) {
+                        if (isMakeupScoreReportType(h.type)) {
+                            var scoreReportText = formatTransferScoreReportText(h);
+                            historyHtml += "<div class='history-msg'><div class='history-msg-avatar avatar-student'>" + avatarChar + "</div><div class='history-msg-body' style='border-left:4px solid #ef4444; background:#fef2f2;'><div style='font-weight:900; color:#991b1b; margin-bottom:4px;'>" + SVG.edit + "缺考分數回報</div><div>" + escapeHtml(scoreReportText) + "</div><div class='history-msg-time'>" + h.time.substring(5, 16) + "</div></div></div>";
+                        } else if (h.type === FEEDBACK_TYPE_LABELS.sticker) {
                             var stickerData = {};
                             try { stickerData = JSON.parse(h.content); } catch(e) { stickerData = { reason: h.content, count: '?', status: "待審核" }; }
                             var statusLabel = stickerData.status || "待審核";
