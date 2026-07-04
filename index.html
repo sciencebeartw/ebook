@@ -6779,14 +6779,6 @@
             return "<div class='grade-section'><div class='main-exam-title'>" + examTitle + "</div><div class='main-exam-range'>" + exam.exam + "</div><div class='main-score'>" + scoreDisplay + "</div>" + logic.statusHtml + "<div class='score-sub'>班平均: " + exam.average + "</div>" + standardHtml + scoreReportHtml + chartHtml + refHwHtml + "</div>";
         }
 
-        function formatTransferScoreReportText(historyItem) {
-            var raw = (historyItem && historyItem.content !== undefined && historyItem.content !== null) ? historyItem.content.toString().trim() : "";
-            if (raw.charAt(0) === "'") raw = raw.substring(1).trim();
-            var scoreText = /^\d+(\.\d+)?$/.test(raw) ? (raw + "假") : raw;
-            var title = (historyItem && historyItem.targetExamTitle) ? historyItem.targetExamTitle.toString().trim() : "";
-            return (title ? (title + "｜") : "") + (scoreText || "已回報");
-        }
-
         function renderDailyPosts(posts, history) {
             window.adminModeReplyContext = {};
             window.adminModeStickerContext = {};
@@ -6970,7 +6962,7 @@
                     fields.push({ label: item.label, val: item.val, extra: extra });
                 });
                 fields = fields.concat(buildPostMakeupFields(post, buildPendingMakeupResultReportHtml(post, myHistory, examCards, latestPostDate)), [{ label: "下次考試範圍", val: post.range }, { label: "補充資訊", val: post.note }]);
-                fields.forEach(function (f) { contentHtml += renderPostInfoBlock(f); }); var historyHtml = ""; myHistory.forEach(function (h) { if ((!isMakeupScoreReportType(h.type) || h.isTransferFormerClass) && h.type !== FEEDBACK_TYPE_LABELS.makeupResult) { var displayType = (h.type === FEEDBACK_TYPE_LABELS.parent || h.type === FEEDBACK_TYPE_LABELS.parentStudent || h.type === FEEDBACK_TYPE_LABELS.student) ? "學生留言" : (isMakeupScoreReportType(h.type) ? "缺考分數回報" : h.type); var isTeacher = (!isStudentSideFeedbackType(h.type) && !isMakeupScoreReportType(h.type));
+                fields.forEach(function (f) { contentHtml += renderPostInfoBlock(f); }); var historyHtml = ""; myHistory.forEach(function (h) { if (!isMakeupScoreReportType(h.type) && h.type !== FEEDBACK_TYPE_LABELS.makeupResult) { var displayType = (h.type === FEEDBACK_TYPE_LABELS.parent || h.type === FEEDBACK_TYPE_LABELS.parentStudent || h.type === FEEDBACK_TYPE_LABELS.student) ? "學生留言" : h.type; var isTeacher = (!isStudentSideFeedbackType(h.type) && !isMakeupScoreReportType(h.type));
                         var avatarClass = isTeacher ? "avatar-teacher" : "avatar-student";
                         var bodyClass = isTeacher ? "teacher-body" : "";
                         var sName = (gData && gData.studentName) ? gData.studentName : "學";
@@ -6978,10 +6970,7 @@
                         var classInfo = getTeacherInfo(gData && gData.className ? gData.className : "");
                         var tName = classInfo.name;
                         var avatarChar = isTeacher ? tName : sChar;
-                        if (isMakeupScoreReportType(h.type)) {
-                            var scoreReportText = formatTransferScoreReportText(h);
-                            historyHtml += "<div class='history-msg'><div class='history-msg-avatar avatar-student'>" + avatarChar + "</div><div class='history-msg-body' style='border-left:4px solid #ef4444; background:#fef2f2;'><div style='font-weight:900; color:#991b1b; margin-bottom:4px;'>" + SVG.edit + "缺考分數回報</div><div>" + escapeHtml(scoreReportText) + "</div><div class='history-msg-time'>" + h.time.substring(5, 16) + "</div></div></div>";
-                        } else if (h.type === FEEDBACK_TYPE_LABELS.sticker) {
+                        if (h.type === FEEDBACK_TYPE_LABELS.sticker) {
                             var stickerData = {};
                             try { stickerData = JSON.parse(h.content); } catch(e) { stickerData = { reason: h.content, count: '?', status: "待審核" }; }
                             var statusLabel = stickerData.status || "待審核";
