@@ -6450,6 +6450,7 @@
 
         function getDailyPostExamLabel(exam) {
             var raw = ((exam && exam.date) || "") + " " + ((exam && exam.exam) || "");
+            if (raw.indexOf("回家練習卷") > -1) return "回家練習卷";
             if (raw.indexOf("複習") > -1) return "複習考";
             if (raw.indexOf("鑑定") > -1) return "鑑定考";
             if (raw.indexOf("隨堂") > -1) return "隨堂考";
