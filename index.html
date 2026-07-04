@@ -3393,10 +3393,107 @@
         return merged;
     }
 
+    function mergeHomeworkDoneForStudentByKeys(classNodeMap, classKeys, studentKey) {
+        var merged = {};
+        uniqueClassKeys(classKeys).forEach(function(key) {
+            Object.assign(merged, ((classNodeMap[key] || {})[studentKey]) || {});
+        });
+        return merged;
+    }
+
     function mergeFeedbackForStudent(classNodeMap, classKey, studentKey) {
         var merged = {};
         getHomeworkDoneRelatedClassKeys(classKey, classNodeMap).forEach(function(key) {
             Object.assign(merged, ((classNodeMap[key] || {})[studentKey]) || {});
+        });
+        return merged;
+    }
+
+    function uniqueClassKeys(keys) {
+        var result = [];
+        var seen = {};
+        (keys || []).forEach(function(key) {
+            if (!key || seen[key]) return;
+            seen[key] = true;
+            result.push(key);
+        });
+        return result;
+    }
+
+    function listActiveIncomingTransfers(transferIndex) {
+        return Object.keys(transferIndex || {}).map(function(id) {
+            var item = transferIndex[id] || {};
+            item.id = item.id || id;
+            return item;
+        }).filter(function(item) {
+            return item.status !== "deleted" && item.fromClassKey && item.toClassKey;
+        });
+    }
+
+    async function loadStudentTransferIndexForStudent(classKey, studentKey) {
+        if (!classKey || !studentKey) return {};
+        try {
+            var snap = await db.ref(`${BEAR_SUBJECT}/studentTransferIndex/${classKey}/${studentKey}`).once("value");
+            return snap.val() || {};
+        } catch (err) {
+            console.warn("Student transfer index read skipped:", err);
+            return {};
+        }
+    }
+
+    function getTransferSourceClassKeys(transferIndex) {
+        return uniqueClassKeys(listActiveIncomingTransfers(transferIndex).map(function(item) {
+            return item.fromClassKey;
+        }));
+    }
+
+    function getTransferBySourceClassKey(transferIndex, classKey) {
+        var list = listActiveIncomingTransfers(transferIndex);
+        for (var i = list.length - 1; i >= 0; i--) {
+            if (list[i].fromClassKey === classKey) return list[i];
+        }
+        return null;
+    }
+
+    function getTrackedClassKeysForStudent(classKey, transferIndex) {
+        return uniqueClassKeys(getHomeworkDoneRelatedClassKeyCandidates(classKey).concat(getTransferSourceClassKeys(transferIndex)));
+    }
+
+    function mergeDailyPostClassNodeByKeys(classNodeMap, classKeys, currentClassKey, transferIndex, currentClassName) {
+        var merged = {};
+        uniqueClassKeys(classKeys).forEach(function(key) {
+            var transfer = key === currentClassKey ? null : getTransferBySourceClassKey(transferIndex, key);
+            var classPosts = classNodeMap[key] || {};
+            Object.keys(classPosts).forEach(function(postKey) {
+                var row = classPosts[postKey] || {};
+                var mergedKey = merged[postKey] ? key + "__" + postKey : postKey;
+                merged[mergedKey] = Object.assign({}, row, {
+                    className: row.className || (transfer && transfer.fromClassName) || currentClassName,
+                    sourceClassKey: key,
+                    sourceClassName: (transfer && transfer.fromClassName) || row.className || currentClassName,
+                    isTransferFormerClass: !!transfer
+                });
+            });
+        });
+        return merged;
+    }
+
+    function mergeStudentChildNodeByKeys(classNodeMap, classKeys, studentKey, transferIndex, currentClassName, currentClassKey) {
+        var merged = {};
+        uniqueClassKeys(classKeys).forEach(function(key) {
+            var transfer = key === currentClassKey ? null : getTransferBySourceClassKey(transferIndex, key);
+            var rows = ((classNodeMap[key] || {})[studentKey]) || {};
+            Object.keys(rows).forEach(function(rowKey) {
+                var row = rows[rowKey] || {};
+                var mergedKey = merged[rowKey] ? key + "__" + rowKey : rowKey;
+                merged[mergedKey] = Object.assign({}, row, {
+                    sourceClassKey: key,
+                    sourceClassName: (transfer && transfer.fromClassName) || row.sourceClassName || currentClassName,
+                    currentClassName: (transfer && transfer.toClassName) || currentClassName,
+                    isTransferFormerClass: !!transfer,
+                    originalFeedbackKey: rowKey
+                });
+            });
         });
         return merged;
     }
@@ -3417,7 +3514,19 @@
         var list = [];
         for (let fbid in (fbsObj || {})) {
             const fb = fbsObj[fbid];
-            list.push({ time: fb.time, targetDate: fb.targetDate, type: fb.type, content: fb.content, fbKey: fbid, targetExamColIndex: fb.targetExamColIndex || "", targetExamTitle: fb.targetExamTitle || "" });
+            list.push({
+                time: fb.time,
+                targetDate: fb.targetDate,
+                type: fb.type,
+                content: fb.content,
+                fbKey: fb.originalFeedbackKey || fbid,
+                targetExamColIndex: fb.targetExamColIndex || "",
+                targetExamTitle: fb.targetExamTitle || "",
+                sourceClassKey: fb.sourceClassKey || "",
+                sourceClassName: fb.sourceClassName || "",
+                currentClassName: fb.currentClassName || "",
+                isTransferFormerClass: fb.isTransferFormerClass === true
+            });
         }
         return list.sort(function(a, b) {
             var tA = new Date(a.time).getTime() || 0;
@@ -3651,11 +3760,14 @@
             // Sort by colIndex ascending to EXACTLY match GAS for-loop iteration order (j=5 to length)
             result.grades = fullGradeList.sort((a, b) => a.colIndex - b.colIndex);
 
+            result.studentTransferIndex = await loadStudentTransferIndexForStudent(safeC, foundUserKey);
+            result.trackedClassKeys = getTrackedClassKeysForStudent(safeC, result.studentTransferIndex);
+
             // Fetch Posts
             let postsObj = {};
-            if (hasHomeworkCohortAlias) {
-                result.cohortDailyPostRoot = await loadHomeworkAliasClassNodeMap(`${BEAR_SUBJECT}/dailyPosts`, safeC);
-                postsObj = mergeHomeworkClassNode(result.cohortDailyPostRoot, safeC);
+            if (result.trackedClassKeys.length > 1) {
+                result.cohortDailyPostRoot = await loadClassNodeMapByKeys(`${BEAR_SUBJECT}/dailyPosts`, result.trackedClassKeys);
+                postsObj = mergeDailyPostClassNodeByKeys(result.cohortDailyPostRoot, result.trackedClassKeys, safeC, result.studentTransferIndex, result.className);
             } else {
                 const snapP = await db.ref(`${BEAR_SUBJECT}/dailyPosts/${safeC}`).once('value');
                 result.cohortDailyPostRoot = null;
@@ -3672,6 +3784,9 @@
                 
                 let postObj = {
                     className: pRow.className || result.className,
+                    sourceClassKey: pRow.sourceClassKey || safeC,
+                    sourceClassName: pRow.sourceClassName || pRow.className || result.className,
+                    isTransferFormerClass: pRow.isTransferFormerClass === true,
                     date: pRow.date, title: pRow.title, progress: pRow.progress, hw1: pRow.hw1, hw2: pRow.hw2,
                     makeup: pRow.makeup, quiz: pRow.quiz, range: pRow.range, note: pRow.note, examData: { main: null, others: [] }
                 };
@@ -3710,9 +3825,9 @@
             result.bulletins = bulls.reverse(); // Reverse to roughly match desc order
 
             // Fetch Feedbacks
-            if (hasHomeworkCohortAlias) {
-                result.cohortFeedbackRoot = await loadHomeworkAliasClassNodeMap(`${BEAR_SUBJECT}/feedbacks`, safeC, foundUserKey);
-                result.feedbackHistory = buildFeedbackHistoryList(mergeFeedbackForStudent(result.cohortFeedbackRoot, safeC, foundUserKey));
+            if (result.trackedClassKeys.length > 1) {
+                result.cohortFeedbackRoot = await loadClassNodeMapByKeys(`${BEAR_SUBJECT}/feedbacks`, result.trackedClassKeys, foundUserKey);
+                result.feedbackHistory = buildFeedbackHistoryList(mergeStudentChildNodeByKeys(result.cohortFeedbackRoot, result.trackedClassKeys, foundUserKey, result.studentTransferIndex, result.className, safeC));
             } else {
                 const snapF = await db.ref(`${BEAR_SUBJECT}/feedbacks/${safeC}/${foundUserKey}`).once('value');
                 result.cohortFeedbackRoot = null;
@@ -3720,9 +3835,9 @@
             }
 
             try {
-                if (hasHomeworkCohortAlias) {
-                    result.cohortHomeworkDoneRoot = await loadHomeworkAliasClassNodeMap(`${BEAR_SUBJECT}/homeworkDone`, safeC, foundUserKey);
-                    result.homeworkDone = mergeHomeworkDoneForStudent(result.cohortHomeworkDoneRoot, safeC, foundUserKey);
+                if (result.trackedClassKeys.length > 1) {
+                    result.cohortHomeworkDoneRoot = await loadClassNodeMapByKeys(`${BEAR_SUBJECT}/homeworkDone`, result.trackedClassKeys, foundUserKey);
+                    result.homeworkDone = mergeHomeworkDoneForStudentByKeys(result.cohortHomeworkDoneRoot, result.trackedClassKeys, foundUserKey);
                 } else {
                     const snapHD = await db.ref(`${BEAR_SUBJECT}/homeworkDone/${safeC}/${foundUserKey}`).once('value');
                     result.cohortHomeworkDoneRoot = null;
@@ -5105,7 +5220,9 @@
                     const studentKey = result.foundUserKey || result.studentName.replace(/[.#$[\]]/g, '-');
                     const hasHomeworkCohortAlias = !!getHomeworkDoneCourseAliasKey(safeC);
                     const homeworkAliasClassKeys = hasHomeworkCohortAlias ? getHomeworkDoneRelatedClassKeyCandidates(safeC) : [safeC];
+                    const trackedClassKeys = uniqueClassKeys(result.trackedClassKeys || homeworkAliasClassKeys);
                     result.foundUserKey = studentKey;
+                    result.trackedClassKeys = trackedClassKeys;
 
                     // 1. 棒卡數監聽
                     watchRealtimeValue(BEAR_SUBJECT + '/students/' + safeC + '/' + studentKey + '/stickers', function(snap) {
@@ -5113,14 +5230,14 @@
                     });
 
                     // 2. 留言回報監聽 (包含審核狀態與老師回覆)
-                    homeworkAliasClassKeys.forEach(function(classKey) {
+                    trackedClassKeys.forEach(function(classKey) {
                         watchRealtimeValue(BEAR_SUBJECT + '/feedbacks/' + classKey + '/' + studentKey, function(snap) {
                             const fbsObj = snap.val() || {};
-                            if (hasHomeworkCohortAlias) {
+                            if (trackedClassKeys.length > 1) {
                                 if (!gData.cohortFeedbackRoot) gData.cohortFeedbackRoot = {};
                                 if (!gData.cohortFeedbackRoot[classKey]) gData.cohortFeedbackRoot[classKey] = {};
                                 gData.cohortFeedbackRoot[classKey][studentKey] = fbsObj;
-                                gData.feedbackHistory = buildFeedbackHistoryList(mergeFeedbackForStudent(gData.cohortFeedbackRoot, safeC, studentKey));
+                                gData.feedbackHistory = buildFeedbackHistoryList(mergeStudentChildNodeByKeys(gData.cohortFeedbackRoot, trackedClassKeys, studentKey, gData.studentTransferIndex || {}, gData.className, safeC));
                             } else {
                                 gData.feedbackHistory = buildFeedbackHistoryList(fbsObj);
                             }
@@ -5134,13 +5251,13 @@
                     });
 
                     try {
-                        homeworkAliasClassKeys.forEach(function(classKey) {
+                        trackedClassKeys.forEach(function(classKey) {
                             watchRealtimeValue(BEAR_SUBJECT + '/homeworkDone/' + classKey + '/' + studentKey, function(snap) {
-                                if (hasHomeworkCohortAlias) {
+                                if (trackedClassKeys.length > 1) {
                                     if (!gData.cohortHomeworkDoneRoot) gData.cohortHomeworkDoneRoot = {};
                                     if (!gData.cohortHomeworkDoneRoot[classKey]) gData.cohortHomeworkDoneRoot[classKey] = {};
                                     gData.cohortHomeworkDoneRoot[classKey][studentKey] = snap.val() || {};
-                                    gData.homeworkDone = mergeHomeworkDoneForStudent(gData.cohortHomeworkDoneRoot, safeC, studentKey);
+                                    gData.homeworkDone = mergeHomeworkDoneForStudentByKeys(gData.cohortHomeworkDoneRoot, trackedClassKeys, studentKey);
                                 } else {
                                     gData.homeworkDone = snap.val() || {};
                                 }
@@ -5262,6 +5379,9 @@
                             if (postReserveDate && postReserveDate > now) continue;
                             let postObj = {
                                 className: pRow.className || result.className,
+                                sourceClassKey: pRow.sourceClassKey || safeC,
+                                sourceClassName: pRow.sourceClassName || pRow.className || result.className,
+                                isTransferFormerClass: pRow.isTransferFormerClass === true,
                                 date: pRow.date, title: pRow.title, progress: pRow.progress, hw1: pRow.hw1, hw2: pRow.hw2,
                                 makeup: pRow.makeup, quiz: pRow.quiz, range: pRow.range, note: pRow.note, examData: { main: null, others: [] }
                             };
@@ -5274,12 +5394,12 @@
                     }
 
                     // 5. 聯絡簿內容監聽
-                    homeworkAliasClassKeys.forEach(function(classKey) {
+                    trackedClassKeys.forEach(function(classKey) {
                         watchRealtimeValue(BEAR_SUBJECT + '/dailyPosts/' + classKey, function(snap) {
-                            if (hasHomeworkCohortAlias) {
+                            if (trackedClassKeys.length > 1) {
                                 if (!gData.cohortDailyPostRoot) gData.cohortDailyPostRoot = {};
                                 gData.cohortDailyPostRoot[classKey] = snap.val() || {};
-                                rebuildDailyPostsFromScopedData(mergeHomeworkClassNode(gData.cohortDailyPostRoot || {}, safeC));
+                                rebuildDailyPostsFromScopedData(mergeDailyPostClassNodeByKeys(gData.cohortDailyPostRoot || {}, trackedClassKeys, safeC, gData.studentTransferIndex || {}, gData.className));
                             } else {
                                 rebuildDailyPostsFromScopedData(snap.val() || {});
                             }
@@ -6103,6 +6223,7 @@
         function shouldShowHomeworkDoneButton(post) {
             return shouldUseHomeworkDoneFlowForClass(gData && gData.className) &&
                 !isAdminMode &&
+                !(post && post.isTransferFormerClass) &&
                 gData &&
                 !!getPostHomeworkText(post);
         }
@@ -6481,12 +6602,24 @@
             window.adminModeStickerAdjustmentContext = {};
             window.adminModeMakeupContext = {};
             window.adminModeDirectMessageContext = {};
+            function getPostScopedHistory(postData) {
+                var pDateShort = postData.date.substring(5).replace("-", "/");
+                var pDateFull = postData.date.replace(/-/g, "/");
+                var postSourceClassKey = postData.sourceClassKey || "";
+                return (history || []).filter(function(h) {
+                    var dateMatches = h.targetDate == pDateShort || h.targetDate == postData.date || h.targetDate == pDateFull;
+                    if (!dateMatches) return false;
+                    if (!postSourceClassKey || !h.sourceClassKey) return true;
+                    return h.sourceClassKey === postSourceClassKey;
+                }).sort(function(a, b) { return new Date(a.time) - new Date(b.time); });
+            }
             var container = document.getElementById('tab-content-0'); if (!posts || posts.length === 0) { container.innerHTML = "<div style='text-align:center; padding:30px; color:#999;'>目前沒有聯絡簿資料</div>"; return; } var latestStickerPostDate = posts[0] && posts[0].date; var latestPostDate = posts[0] && posts[0].date; var html = ""; posts.forEach(function (post) {
+                var myHistory = getPostScopedHistory(post);
                 var examCards = (post.examData && post.examData.exams && post.examData.exams.length)
                     ? post.examData.exams
                     : ((post.examData && post.examData.main) ? [{ main: post.examData.main, others: post.examData.others || [] }] : []);
                 var gradeHtml = examCards.map(function(item) {
-                    return buildDailyPostExamCard(post, item.main, item.others || [], history);
+                    return buildDailyPostExamCard(post, item.main, item.others || [], myHistory);
                 }).join("");
                 var contentHtml = "";
 
@@ -6645,8 +6778,8 @@
                     if (hwIdx === homeworkItems.length - 1) extra += buildHomeworkDoneButton(post);
                     fields.push({ label: item.label, val: item.val, extra: extra });
                 });
-                fields = fields.concat(buildPostMakeupFields(post, buildPendingMakeupResultReportHtml(post, history, examCards, latestPostDate)), [{ label: "下次考試範圍", val: post.range }, { label: "補充資訊", val: post.note }]);
-                fields.forEach(function (f) { contentHtml += renderPostInfoBlock(f); }); var pDateShort = post.date.substring(5).replace("-", "/"); var pDateFull = post.date.replace(/-/g, "/"); var myHistory = history.filter(function (h) { return h.targetDate == pDateShort || h.targetDate == post.date || h.targetDate == pDateFull; }); myHistory.sort(function(a,b) { return new Date(a.time) - new Date(b.time); }); var historyHtml = ""; myHistory.forEach(function (h) { if (!isMakeupScoreReportType(h.type) && h.type !== FEEDBACK_TYPE_LABELS.makeupResult) { var displayType = (h.type === FEEDBACK_TYPE_LABELS.parent || h.type === FEEDBACK_TYPE_LABELS.parentStudent || h.type === FEEDBACK_TYPE_LABELS.student) ? "學生留言" : h.type; var isTeacher = (!isStudentSideFeedbackType(h.type));
+                fields = fields.concat(buildPostMakeupFields(post, buildPendingMakeupResultReportHtml(post, myHistory, examCards, latestPostDate)), [{ label: "下次考試範圍", val: post.range }, { label: "補充資訊", val: post.note }]);
+                fields.forEach(function (f) { contentHtml += renderPostInfoBlock(f); }); var historyHtml = ""; myHistory.forEach(function (h) { if (!isMakeupScoreReportType(h.type) && h.type !== FEEDBACK_TYPE_LABELS.makeupResult) { var displayType = (h.type === FEEDBACK_TYPE_LABELS.parent || h.type === FEEDBACK_TYPE_LABELS.parentStudent || h.type === FEEDBACK_TYPE_LABELS.student) ? "學生留言" : h.type; var isTeacher = (!isStudentSideFeedbackType(h.type));
                         var avatarClass = isTeacher ? "avatar-teacher" : "avatar-student";
                         var bodyClass = isTeacher ? "teacher-body" : "";
                         var sName = (gData && gData.studentName) ? gData.studentName : "學";
@@ -6674,7 +6807,10 @@
                                 window.adminModeStickerContext[stickerContextKey] = {
                                     fbKey: h.fbKey,
                                     time: h.time || "",
-                                    count: parseInt(stickerData.count, 10) || 0
+                                    count: parseInt(stickerData.count, 10) || 0,
+                                    sourceClassName: h.sourceClassName || post.sourceClassName || gData.className,
+                                    sourceClassKey: h.sourceClassKey || post.sourceClassKey || "",
+                                    balanceClassName: h.currentClassName || gData.className
                                 };
                                 stickerReviewHtml = buildGodStickerReviewActions(stickerContextKey);
                             }
@@ -6688,7 +6824,9 @@
                                     fbKey: h.fbKey || "",
                                     targetDate: post.date,
                                     type: displayType,
-                                    content: h.content || ""
+                                    content: h.content || "",
+                                    sourceClassName: h.sourceClassName || post.sourceClassName || gData.className,
+                                    sourceClassKey: h.sourceClassKey || post.sourceClassKey || ""
                                 };
                                 adminReplyHtml = buildAdminReplyBox(contextKey);
                             }
@@ -6753,6 +6891,9 @@
         ${stickerStudentToolsHtml}
     `;
                 if (isAdminMode || isDashboardDraftPreviewMode) uploadHtml = "";
+                if (!isAdminMode && !isDashboardDraftPreviewMode && post.isTransferFormerClass) {
+                    uploadHtml = "<div class='sticker-hint' style='margin:10px 0;'>轉班前紀錄僅供查閱；新留言、作業上傳與棒卡申請請使用目前班級聯絡簿。</div>";
+                }
                 var adminDirectHtml = "";
                 if (canUseAdminModeReply()) {
                     var directContextKey = makeDomSafeId("direct_" + safeDateId);
@@ -6765,10 +6906,10 @@
                     window.adminModeStickerAdjustmentContext[adjustmentContextKey] = { targetDate: post.date };
                     godStickerAdjustmentHtml = buildGodStickerAdjustmentBox(adjustmentContextKey);
                 }
-                var studentInputHtml = (isAdminMode || isDashboardDraftPreviewMode) ? "" : "<div class='input-box'><input type='text' class='fb-input' id='input-" + safeDateId + "' placeholder='" + inputPlaceholder + "'><button class='fb-btn' onclick=\"sendFeedback('" + safeDateId + "', '" + post.date + "', '學生留言')\">送出</button></div>";
+                var studentInputHtml = (isAdminMode || isDashboardDraftPreviewMode || post.isTransferFormerClass) ? "" : "<div class='input-box'><input type='text' class='fb-input' id='input-" + safeDateId + "' placeholder='" + inputPlaceholder + "'><button class='fb-btn' onclick=\"sendFeedback('" + safeDateId + "', '" + post.date + "', '學生留言')\">送出</button></div>";
 
                 // ★★★ v3.9 修正：家長留言 -> 留言內容 ★★★
-                var feedbackHtml = "<div class='feedback-section'>" + uploadHtml + "<div class='section-title'>" + SVG.chat + "留言內容</div><div id='history-" + safeDateId + "'>" + historyHtml + "</div>" + godStickerAdjustmentHtml + adminDirectHtml + studentInputHtml + "</div>"; var headerTitle = post.date + (post.title ? " " + post.title : ""); html += "<div class='post-card-wrapper'><div class='post-card'><div class='post-header'><span>" + SVG.calendar + headerTitle + "</span></div>" + gradeHtml + "<div class='content-section'><div class='section-title'>" + SVG.megaphone + "聯絡事項</div>" + contentHtml + "</div>" + feedbackHtml + "</div></div>";
+                var feedbackHtml = "<div class='feedback-section'>" + uploadHtml + "<div class='section-title'>" + SVG.chat + "留言內容</div><div id='history-" + safeDateId + "'>" + historyHtml + "</div>" + godStickerAdjustmentHtml + adminDirectHtml + studentInputHtml + "</div>"; var headerTitle = post.date + (post.title ? " " + post.title : ""); var transferBadge = post.isTransferFormerClass ? "<span style='margin-left:8px; background:#fffbeb; color:#92400e; border:1px solid #fde68a; border-radius:999px; padding:2px 8px; font-size:0.78rem; font-weight:900;'>轉班前紀錄｜" + (post.sourceClassName || "原班") + "</span>" : ""; html += "<div class='post-card-wrapper'><div class='post-card'><div class='post-header'><span>" + SVG.calendar + headerTitle + transferBadge + "</span></div>" + gradeHtml + "<div class='content-section'><div class='section-title'>" + SVG.megaphone + "聯絡事項</div>" + contentHtml + "</div>" + feedbackHtml + "</div></div>";
 
             }); container.innerHTML = html;
 
@@ -8111,7 +8252,9 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     className: gData.className,
                     studentName: gData.studentName,
                     count: finalAction === '通過' ? context.count : 0,
-                    actionStr: finalAction
+                    actionStr: finalAction,
+                    sourceClassName: context.sourceClassName || gData.className,
+                    balanceClassName: context.balanceClassName || gData.className
                 });
                 if (btn) btn.innerText = finalAction === '通過' ? '已通過' : '已退回';
             } catch (err) {
@@ -8247,7 +8390,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     sessionId: ebookGodSessionId,
                     feedbackKey: context.fbKey,
                     targetDate: context.targetDate,
-                    replyContent: content
+                    replyContent: content,
+                    sourceClassName: context.sourceClassName || gData.className
                 });
                 if (result && result.data && result.data.expiresAt && ebookGodSessionInfo) {
                     ebookGodSessionInfo.expiresAt = result.data.expiresAt;
