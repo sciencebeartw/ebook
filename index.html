@@ -9,7 +9,7 @@
     
     <!-- PWA Settings -->
     <link rel="manifest" href="ebook.webmanifest">
-    <!-- Deploy marker: home-practice-score-label-20260704 -->
+    <!-- Deploy marker: home-practice-score-week-label-20260704 -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="山熊聯絡簿">
@@ -6458,6 +6458,11 @@
             return "小考";
         }
 
+        function getDailyPostExamTimePrefix(exam) {
+            var raw = ((exam && exam.date) || "") + " " + ((exam && exam.exam) || "");
+            return raw.indexOf("回家練習卷") > -1 ? "上週" : "今日";
+        }
+
         function parseEbookComparableDate(value, fallbackYear) {
             var raw = (value === undefined || value === null ? "" : value.toString()).trim();
             if (!raw) return null;
@@ -6724,7 +6729,7 @@
             var hasExamColIndex = exam.colIndex !== undefined && exam.colIndex !== null && exam.colIndex !== "";
             var scoreInputId = "score-in-" + safeDate + (hasExamColIndex ? ("-" + exam.colIndex) : "");
             if (logic.needsReport && !logic.showReviewing && !isAdminMode) {
-                scoreReportHtml = "<div class='score-report-section'><div style='font-weight:bold; color:#c0392b; margin-bottom:10px; font-size:1.35rem;'>" + SVG.edit + "回報今日" + getDailyPostExamLabel(exam) + "缺考分數</div><div class='input-box'><input type='number' class='score-input' id='" + scoreInputId + "' placeholder='輸入分數'><button class='score-btn' onclick=\"submitScoreReport('" + safeDate + "', '" + post.date + "', '" + (hasExamColIndex ? exam.colIndex : "") + "', '" + escapeInlineJs(exam.exam || "") + "')\">送出</button></div></div>";
+                scoreReportHtml = "<div class='score-report-section'><div style='font-weight:bold; color:#c0392b; margin-bottom:10px; font-size:1.35rem;'>" + SVG.edit + "回報" + getDailyPostExamTimePrefix(exam) + getDailyPostExamLabel(exam) + "缺考分數</div><div class='input-box'><input type='number' class='score-input' id='" + scoreInputId + "' placeholder='輸入分數'><button class='score-btn' onclick=\"submitScoreReport('" + safeDate + "', '" + post.date + "', '" + (hasExamColIndex ? exam.colIndex : "") + "', '" + escapeInlineJs(exam.exam || "") + "')\">送出</button></div></div>";
             }
             if (canUseAdminModeReview() && shouldShowGodMakeupReview(exam, logic)) {
                 var makeupContextKey = makeDomSafeId("makeup_" + safeDate + "_" + (exam.colIndex || 0));
@@ -6791,7 +6796,7 @@
                 refHwHtml += "</div>";
             }
 
-            var examTitle = "今日" + getDailyPostExamLabel(exam) + "成績";
+            var examTitle = getDailyPostExamTimePrefix(exam) + getDailyPostExamLabel(exam) + "成績";
 
             return "<div class='grade-section'><div class='main-exam-title'>" + examTitle + "</div><div class='main-exam-range'>" + exam.exam + "</div><div class='main-score'>" + scoreDisplay + "</div>" + logic.statusHtml + "<div class='score-sub'>班平均: " + exam.average + "</div>" + standardHtml + scoreReportHtml + chartHtml + refHwHtml + "</div>";
         }
