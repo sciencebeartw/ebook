@@ -3442,6 +3442,56 @@
         }
     }
 
+    function listActiveStudentEnrollments(enrollmentIndex) {
+        return Object.keys(enrollmentIndex || {}).map(function(id) {
+            var item = enrollmentIndex[id] || {};
+            item.id = item.id || id;
+            return item;
+        }).filter(function(item) {
+            return item.status !== "deleted" && item.classKey && item.enrollmentDate;
+        });
+    }
+
+    async function loadStudentEnrollmentIndexForStudent(classKey, studentKey) {
+        if (!classKey || !studentKey) return {};
+        try {
+            var snap = await db.ref(`${BEAR_SUBJECT}/studentEnrollmentIndex/${classKey}/${studentKey}`).once("value");
+            return snap.val() || {};
+        } catch (err) {
+            console.warn("Student enrollment index read skipped:", err);
+            return {};
+        }
+    }
+
+    function getStudentEnrollmentDateKey(enrollmentIndex, currentClassKey) {
+        var list = listActiveStudentEnrollments(enrollmentIndex).filter(function(item) {
+            return !currentClassKey || item.classKey === currentClassKey;
+        });
+        if (!list.length) return null;
+        var latest = null;
+        list.forEach(function(item) {
+            var key = getEbookComparableDateKey(parseEbookComparableDate(item.enrollmentDate));
+            if (key && (!latest || key > latest)) latest = key;
+        });
+        return latest;
+    }
+
+    function isOnOrAfterStudentEnrollmentDate(item, enrollmentIndex, currentClassKey) {
+        var enrollmentKey = getStudentEnrollmentDateKey(enrollmentIndex, currentClassKey);
+        if (!enrollmentKey) return true;
+        var fallbackYear = Math.floor(enrollmentKey / 10000);
+        var itemDateValue = item && item.date;
+        var itemKey = getEbookComparableDateKey(parseEbookComparableDate(itemDateValue, fallbackYear));
+        if (!itemKey) return true;
+        return itemKey >= enrollmentKey;
+    }
+
+    function filterItemsByStudentEnrollmentDate(items, enrollmentIndex, currentClassKey) {
+        return (items || []).filter(function(item) {
+            return isOnOrAfterStudentEnrollmentDate(item, enrollmentIndex, currentClassKey);
+        });
+    }
+
     function getTransferSourceClassKeys(transferIndex) {
         return uniqueClassKeys(listActiveIncomingTransfers(transferIndex).map(function(item) {
             return item.fromClassKey;
@@ -3997,12 +4047,17 @@
             
             const safeC = safeKey(result.className);
             result.studentTransferIndex = await loadStudentTransferIndexForStudent(safeC, foundUserKey);
+            result.studentEnrollmentIndex = await loadStudentEnrollmentIndexForStudent(safeC, foundUserKey);
             result.trackedClassKeys = getTrackedClassKeysForStudent(safeC, result.studentTransferIndex);
             result.trackedGradeClassKeys = getTrackedGradeClassKeysForStudent(safeC, result.studentTransferIndex);
 
             // Fetch Grades. Transfer students read only their current class plus indexed source classes.
             result.cohortGradeExamRoot = await loadGradeExamMapByKeys(result.trackedGradeClassKeys, foundUserKey);
-            result.grades = buildGradeListFromClassExamMap(result.cohortGradeExamRoot, result.trackedGradeClassKeys, safeC, result.studentTransferIndex, result.className);
+            result.grades = filterItemsByStudentEnrollmentDate(
+                buildGradeListFromClassExamMap(result.cohortGradeExamRoot, result.trackedGradeClassKeys, safeC, result.studentTransferIndex, result.className),
+                result.studentEnrollmentIndex,
+                safeC
+            );
 
             // Fetch Posts
             let postsObj = {};
@@ -4044,7 +4099,7 @@
                 classPosts.push(postObj);
             }
             classPosts.sort((a,b) => new Date(b.date) - new Date(a.date));
-            result.dailyPost = classPosts;
+            result.dailyPost = filterItemsByStudentEnrollmentDate(classPosts, result.studentEnrollmentIndex, safeC);
 
             // Fetch Bulletins
             const globalBulletinKey = safeKey("全校");
@@ -5466,6 +5521,8 @@
                     result.foundUserKey = studentKey;
                     result.trackedClassKeys = trackedClassKeys;
                     result.trackedGradeClassKeys = trackedGradeClassKeys;
+                    result.studentEnrollmentIndex = result.studentEnrollmentIndex || {};
+                    let enrollmentIndexSnapshotText = JSON.stringify(result.studentEnrollmentIndex || {});
 
                     // 1. 棒卡數監聽
                     watchRealtimeValue(BEAR_SUBJECT + '/students/' + safeC + '/' + studentKey + '/stickers', function(snap) {
@@ -5546,12 +5603,16 @@
 
                     // 4. 成績資料監聽 (近期成績更新，含轉班前原班成績)
                     function rebuildGradesFromScopedSources() {
-                        gData.grades = buildGradeListFromClassExamMap(
-                            gData.cohortGradeExamRoot || {},
-                            trackedGradeClassKeys,
-                            safeC,
-                            gData.studentTransferIndex || {},
-                            gData.className
+                        gData.grades = filterItemsByStudentEnrollmentDate(
+                            buildGradeListFromClassExamMap(
+                                gData.cohortGradeExamRoot || {},
+                                trackedGradeClassKeys,
+                                safeC,
+                                gData.studentTransferIndex || {},
+                                gData.className
+                            ),
+                            gData.studentEnrollmentIndex || {},
+                            safeC
                         );
                         renderOldGradeCards(gData.grades);
 
@@ -5569,7 +5630,9 @@
                         });
                     });
 
+                    const dailyPostSourceCache = { postsObj: null };
                     function rebuildDailyPostsFromScopedData(postsObj) {
+                        dailyPostSourceCache.postsObj = postsObj || {};
                         let classPosts = [];
                         let now = new Date();
                         for (let rowId in postsObj) {
@@ -5586,11 +5649,34 @@
                             };
                             classPosts.push(postObj);
                         }
-                        gData.dailyPost = classPosts.sort((a,b) => new Date(b.date) - new Date(a.date));
+                        gData.dailyPost = filterItemsByStudentEnrollmentDate(
+                            classPosts.sort((a,b) => new Date(b.date) - new Date(a.date)),
+                            gData.studentEnrollmentIndex || {},
+                            safeC
+                        );
                         
                         remapDailyPostGrades(); // 從 grades 陣列進行映射
                         renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
                     }
+
+                    function rebuildViewsForStudentEnrollmentIndex() {
+                        rebuildBulletinsFromScopedSources();
+                        rebuildGradesFromScopedSources();
+                        if (dailyPostSourceCache.postsObj) {
+                            rebuildDailyPostsFromScopedData(dailyPostSourceCache.postsObj);
+                        }
+                    }
+
+                    watchRealtimeValue(BEAR_SUBJECT + '/studentEnrollmentIndex/' + safeC + '/' + studentKey, function(snap) {
+                        var nextEnrollmentIndex = snap.val() || {};
+                        var nextEnrollmentText = JSON.stringify(nextEnrollmentIndex);
+                        var changed = nextEnrollmentText !== enrollmentIndexSnapshotText;
+                        enrollmentIndexSnapshotText = nextEnrollmentText;
+                        gData.studentEnrollmentIndex = nextEnrollmentIndex;
+                        if (changed) rebuildViewsForStudentEnrollmentIndex();
+                    }, function(error) {
+                        console.warn("Student enrollment index realtime watch skipped:", error);
+                    });
 
                     // 5. 聯絡簿內容監聽
                     trackedClassKeys.forEach(function(classKey) {
