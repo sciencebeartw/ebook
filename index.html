@@ -10,6 +10,7 @@
     <!-- PWA Settings -->
     <link rel="manifest" href="ebook.webmanifest">
     <!-- Deploy marker: home-practice-score-week-label-20260704 -->
+    <!-- Deploy marker: score-report-chapter-range-refresh-20260705 -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="山熊聯絡簿">
@@ -3903,6 +3904,42 @@
         });
     }
 
+    function appendLocalScoreReportFeedback(form, response) {
+        if (!gData || !form) return;
+        var localTime = (response && response.time) || formatNowTw();
+        var localItem = {
+            time: localTime,
+            targetDate: form.targetDate || "",
+            type: form.type || FEEDBACK_TYPE_LABELS.makeup,
+            content: form.content || "",
+            fbKey: "local_score_report_" + Date.now(),
+            targetExamColIndex: form.targetExamColIndex || "",
+            targetExamTitle: form.targetExamTitle || "",
+            sourceClassKey: "",
+            sourceClassName: "",
+            currentClassName: "",
+            isTransferFormerClass: false
+        };
+        var exists = (gData.feedbackHistory || []).some(function(item) {
+            return item &&
+                item.time === localItem.time &&
+                item.targetDate === localItem.targetDate &&
+                item.type === localItem.type &&
+                String(item.content || "") === String(localItem.content || "") &&
+                String(item.targetExamColIndex || "") === String(localItem.targetExamColIndex || "") &&
+                String(item.targetExamTitle || "") === String(localItem.targetExamTitle || "");
+        });
+        if (!exists) {
+            gData.feedbackHistory = (gData.feedbackHistory || []).concat([localItem]).sort(function(a, b) {
+                var tA = new Date(a.time).getTime() || 0;
+                var tB = new Date(b.time).getTime() || 0;
+                return tA - tB;
+            });
+        }
+        if (gData.dailyPost) renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
+        if (gData.grades) renderOldGradeCards(gData.grades);
+    }
+
     function normalizeLoginSecret(value) {
         return (value || "").toString().replace(/[\s-]/g, "").trim();
     }
@@ -6656,12 +6693,30 @@
             return (value === undefined || value === null ? "" : value.toString()).replace(/\s+/g, "");
         }
 
+        function getEbookExamLookupDateMatch(value) {
+            var raw = (value === undefined || value === null ? "" : value.toString());
+            var full = raw.match(/\d{4}[\/.-](\d{1,2})[\/.-](\d{1,2})/);
+            if (full) return full;
+            var shortPattern = /(\d{1,2})[\/.-](\d{1,2})/g;
+            var match;
+            while ((match = shortPattern.exec(raw)) !== null) {
+                var month = parseInt(match[1], 10);
+                var day = parseInt(match[2], 10);
+                if (isNaN(month) || isNaN(day) || month < 1 || month > 12 || day < 1 || day > 31) continue;
+                var before = raw.charAt(match.index - 1);
+                var after = raw.charAt(match.index + match[0].length);
+                if (match[0].indexOf("-") > -1 && (before === "第" || after === "章")) continue;
+                return match;
+            }
+            return null;
+        }
+
         function ebookExamLookupTextHasDate(value) {
-            return /(\d{1,2})[\/.-](\d{1,2})/.test((value || "").toString());
+            return !!getEbookExamLookupDateMatch(value);
         }
 
         function getEbookExamLookupDateCandidates(value) {
-            var match = (value || "").toString().match(/(\d{1,2})[\/.-](\d{1,2})/);
+            var match = getEbookExamLookupDateMatch(value);
             if (!match) return [];
             var month = parseInt(match[1], 10);
             var day = parseInt(match[2], 10);
@@ -6674,9 +6729,7 @@
         }
 
         function getEbookExamLookupDateKey(value) {
-            var raw = (value === undefined || value === null ? "" : value.toString());
-            var full = raw.match(/\d{4}[\/.-](\d{1,2})[\/.-](\d{1,2})/);
-            var match = full || raw.match(/(\d{1,2})[\/.-](\d{1,2})/);
+            var match = getEbookExamLookupDateMatch(value);
             if (!match) return "";
             var month = parseInt(match[1], 10);
             var day = parseInt(match[2], 10);
@@ -7781,7 +7834,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     btn.innerText = "送出"; btn.disabled = false;
                     return;
                 }
-                // 監聽器會處理數據更新，此處僅清理輸入
+                appendLocalScoreReportFeedback(form, res);
                 document.getElementById(inputId).value = "";
                 btn.innerText = "已送出"; btn.disabled = true;
                 swalAlert("已回報缺考分數", "分數已送出，等待老師回填大表。", "success");
