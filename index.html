@@ -6271,7 +6271,6 @@
                             if (fbTitle ? ebookFeedbackMatchesExam(fb, exam) : ebookFeedbackMatchesExamDate(fb, exam)) return buildReportFromFeedback(fb);
                             continue;
                         }
-                        if (fbTitle && ebookFeedbackMatchesExam(fb, exam)) return buildReportFromFeedback(fb);
                         continue;
                     }
                     if (exactFallbackReport) continue;
@@ -6752,9 +6751,9 @@
             if (fullTitle.indexOf(targetTitle) > -1) return true;
             if (ebookExamLookupTextHasDate(fb && fb.targetExamTitle)) {
                 var hasMatchingDate = ebookExamLookupDatesMatch(fb && fb.targetExamTitle, fullTitle);
-                return hasMatchingDate && !!(examName && targetTitle.indexOf(examName) > -1);
+                return hasMatchingDate && !!(examName && targetTitle === examName);
             }
-            return !!(examName && targetTitle.indexOf(examName) > -1);
+            return !!(examName && targetTitle === examName);
         }
 
         function ebookFeedbackMatchesExamDate(fb, exam) {
@@ -6774,6 +6773,9 @@
             for (var k = feedbackHistory.length - 1; k >= 0; k--) {
                 var fb = feedbackHistory[k] || {};
                 if (!isMakeupResultReportType(fb.type)) continue;
+                var fbExamCol = fb.targetExamColIndex;
+                var hasFbExamCol = fbExamCol !== undefined && fbExamCol !== null && fbExamCol !== "";
+                if (hasFbExamCol && String(fbExamCol) !== String(exam.colIndex)) continue;
                 if (normalizeEbookExamLookupText(fb.targetExamTitle)) {
                     if (!ebookFeedbackMatchesExam(fb, exam)) continue;
                 } else if (String(fb.targetExamColIndex || "") !== String(exam.colIndex)) {
@@ -7834,9 +7836,10 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     btn.innerText = "送出"; btn.disabled = false;
                     return;
                 }
+                var inputEl = document.getElementById(inputId);
+                if (inputEl) inputEl.value = "";
+                if (btn) { btn.innerText = "已送出"; btn.disabled = true; }
                 appendLocalScoreReportFeedback(form, res);
-                document.getElementById(inputId).value = "";
-                btn.innerText = "已送出"; btn.disabled = true;
                 swalAlert("已回報缺考分數", "分數已送出，等待老師回填大表。", "success");
             }).withFailureHandler(function (e) { 
                 swalAlert("回報失敗", friendlySubmitError(e), 'warning');
