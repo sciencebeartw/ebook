@@ -8319,6 +8319,13 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     "<div style='font-size:0.9rem; font-weight:900; color:" + scoreColor + "; margin-bottom:8px;'>" + escapeAdminHtml(scoreStatus) + "</div>" +
                     (scoreReview.status === "filled" ? "" : "<button type='button' class='admin-btn btn-green' style='width:100%; margin:0;' onclick=\"writeGodMakeupScore(this, '" + contextKey + "')\">回填 " + escapeAdminHtml(scoreReview.scoreValue) + "</button>") +
                     "</div>";
+            } else if (logic && logic.needsReport) {
+                scoreHtml = "<div style='background:#fff; border:1px solid #fecaca; border-radius:10px; padding:10px; margin-bottom:10px;'>" +
+                    "<div style='font-size:0.9rem; font-weight:900; color:#dc2626; margin-bottom:8px;'>老師直接回填缺考分數</div>" +
+                    "<div style='display:flex; gap:8px; align-items:center;'>" +
+                    "<input type='number' inputmode='decimal' step='0.1' min='0' max='100' id='god-direct-score-input-" + contextKey + "' placeholder='輸入分數' style='flex:1; min-width:0; height:44px; padding:8px 10px; border:2px solid #fecaca; border-radius:8px; font-size:1rem; font-weight:900; text-align:center;'>" +
+                    "<button type='button' class='admin-btn btn-green' style='height:44px; margin:0; white-space:nowrap;' onclick=\"writeGodDirectMakeupScore(this, '" + contextKey + "')\">回填</button>" +
+                    "</div></div>";
             }
             var buttons = MAKEUP_RESULT_COLORS.map(function(color) {
                 return "<button type='button' class='makeup-color-btn makeup-" + color.key + "' onclick=\"setGodMakeupResultColor(this, '" + contextKey + "', '" + color.hex + "')\">" +
@@ -8702,6 +8709,69 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     btn.disabled = false;
                     btn.innerText = originalText || ('回填 ' + finalScore);
                 }
+                if (status) {
+                    status.style.color = '#dc2626';
+                    status.innerText = '回填失敗：' + (err && err.message ? err.message : String(err));
+                }
+            }
+        }
+
+        async function writeGodDirectMakeupScore(btn, contextKey) {
+            if (!canUseAdminModeReview()) {
+                swalAlert('這個上帝視角連線不能回填缺考分數', '請回行政中心重新開啟學生畫面。', 'warning');
+                return;
+            }
+            var context = window.adminModeMakeupContext && window.adminModeMakeupContext[contextKey];
+            var status = document.getElementById('god-makeup-status-' + contextKey);
+            var input = document.getElementById('god-direct-score-input-' + contextKey);
+            var scoreText = input ? input.value.trim() : '';
+            if (!context || !context.targetDate || context.examColIndex === undefined || context.examColIndex === null || !context.title) {
+                swalAlert('找不到缺考欄位資料', '請重新整理後再試。', 'warning');
+                return;
+            }
+            if (!/^\d+(\.\d+)?$/.test(scoreText)) {
+                swalAlert('請輸入分數', '請輸入純數字，例如 95。', 'warning');
+                return;
+            }
+            var scoreNum = parseFloat(scoreText);
+            if (isNaN(scoreNum) || scoreNum < 0 || scoreNum > 100) {
+                swalAlert('分數超出範圍', '分數請填 0 到 100。', 'warning');
+                return;
+            }
+            var finalScore = scoreText + '假';
+            var ok = await swalConfirm('老師直接回填缺考分數', '確定要把 ' + gData.studentName + ' 這個缺考欄位寫回大表為「' + finalScore + '」嗎？');
+            if (!ok) return;
+
+            var row = btn ? btn.parentElement : null;
+            var controls = row ? row.querySelectorAll('button, input') : [];
+            controls.forEach(function(el) { el.disabled = true; });
+            var originalText = btn ? btn.innerText : '';
+            if (btn) btn.innerText = '回填中...';
+            if (status) {
+                status.style.color = '#64748b';
+                status.innerText = '正在回填缺考分數...';
+            }
+            try {
+                await runGodAdminAction('writeScoreGas', {
+                    className: gData.className,
+                    studentName: gData.studentName,
+                    targetDateStr: context.targetDate,
+                    scoreValue: finalScore,
+                    examColIndex: context.examColIndex,
+                    targetExamTitle: context.title || "",
+                    teacherDirectScoreWriteback: true
+                });
+                if (btn) {
+                    btn.innerText = '已回填';
+                    btn.style.background = '#64748b';
+                }
+                if (status) {
+                    status.style.color = '#16a34a';
+                    status.innerText = '已回填 ' + finalScore + '，等待雲端同步顯示。';
+                }
+            } catch (err) {
+                controls.forEach(function(el) { el.disabled = false; });
+                if (btn) btn.innerText = originalText || '回填';
                 if (status) {
                     status.style.color = '#dc2626';
                     status.innerText = '回填失敗：' + (err && err.message ? err.message : String(err));
