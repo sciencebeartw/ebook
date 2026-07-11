@@ -2386,6 +2386,48 @@
             color: #64748b;
         }
 
+        .god-direct-score-row {
+            display: grid;
+            grid-template-columns: minmax(140px, 1fr) auto;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .god-direct-score-input {
+            width: 100%;
+            min-width: 0;
+            height: 48px;
+            padding: 8px 12px;
+            border: 2px solid #fecaca;
+            border-radius: 10px;
+            box-sizing: border-box;
+            font-size: 1.2rem;
+            font-weight: 900;
+            text-align: center;
+            color: #991b1b;
+            background: #fff;
+        }
+
+        .god-direct-score-btn.admin-btn {
+            width: auto;
+            min-width: 96px;
+            height: 48px;
+            margin: 0;
+            padding: 0 18px;
+            white-space: nowrap;
+        }
+
+        @media (max-width: 600px) {
+            .god-direct-score-row {
+                grid-template-columns: minmax(0, 1fr) auto;
+            }
+
+            .god-direct-score-btn.admin-btn {
+                min-width: 88px;
+                padding: 0 14px;
+            }
+        }
+
         .quote-box {
             background-color: #f1f3f5;
             border-left: 4px solid #adb5bd;
@@ -3241,6 +3283,18 @@
       return (prefix || "ebook") + "_" + Array.prototype.map.call(random, function(value) {
         return Math.floor(Number(value) || 0).toString(36);
       }).join("");
+    }
+
+    function createStableEbookRequestId(prefix, parts) {
+      var value = (parts || []).map(function(part) { return String(part === undefined || part === null ? "" : part); }).join("\u001f");
+      var h1 = 0x811c9dc5;
+      var h2 = 0x9e3779b9;
+      for (var i = 0; i < value.length; i++) {
+        var code = value.charCodeAt(i);
+        h1 = Math.imul(h1 ^ code, 0x01000193);
+        h2 = Math.imul(h2 ^ code, 0x85ebca6b);
+      }
+      return (prefix || "ebook_stable") + "_" + (h1 >>> 0).toString(36) + (h2 >>> 0).toString(36);
     }
 
     function doPostAction(action, data, onSuccess, onErr) {
@@ -7007,6 +7061,15 @@
             return getEbookComparableDateKey(targetParts) === getEbookComparableDateKey(examParts);
         }
 
+        function isUniqueEbookFeedbackExamMatch(fb, exam) {
+            if (!fb || !exam || !ebookFeedbackMatchesExam(fb, exam)) return false;
+            var matches = (gData && Array.isArray(gData.grades) ? gData.grades : []).filter(function(candidate) {
+                return isExamScoreTitle(((candidate && candidate.date) || "") + " " + ((candidate && (candidate.exam || candidate.examName)) || "")) &&
+                    ebookFeedbackMatchesExam(fb, candidate);
+            });
+            return matches.length === 1 && String(matches[0].colIndex) === String(exam.colIndex);
+        }
+
         function getLatestMakeupResultReportInfo(exam, feedbackHistory) {
             if (!exam || exam.colIndex === undefined || exam.colIndex === null || !feedbackHistory || feedbackHistory.length === 0) return null;
             for (var k = feedbackHistory.length - 1; k >= 0; k--) {
@@ -7014,10 +7077,11 @@
                 if (!isMakeupResultReportType(fb.type)) continue;
                 var fbExamCol = fb.targetExamColIndex;
                 var hasFbExamCol = fbExamCol !== undefined && fbExamCol !== null && fbExamCol !== "";
-                if (hasFbExamCol && String(fbExamCol) !== String(exam.colIndex)) continue;
+                var sameStoredCol = hasFbExamCol && String(fbExamCol) === String(exam.colIndex);
+                if (hasFbExamCol && !sameStoredCol && !isUniqueEbookFeedbackExamMatch(fb, exam)) continue;
                 if (normalizeEbookExamLookupText(fb.targetExamTitle)) {
                     if (!ebookFeedbackMatchesExam(fb, exam)) continue;
-                } else if (String(fb.targetExamColIndex || "") !== String(exam.colIndex)) {
+                } else if (!sameStoredCol) {
                     continue;
                 } else if (!ebookFeedbackMatchesExamDate(fb, exam)) {
                     continue;
@@ -8211,6 +8275,16 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 targetExamColIndex: examColIndex,
                 targetExamTitle: examTitle || ""
             };
+            form.clientRequestId = createStableEbookRequestId("makeup_result", [
+                BEAR_SUBJECT,
+                form.className,
+                form.studentName,
+                form.targetDate,
+                form.type,
+                form.content,
+                form.targetExamColIndex,
+                form.targetExamTitle
+            ]);
             google.script.run.withSuccessHandler(function (res) {
                 if (!res || res.success !== true) {
                     swalAlert("回報失敗", getSubmitFailureMessage(res), 'warning');
@@ -8220,6 +8294,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 }
                 if (input) input.value = "";
                 if (btn) { btn.innerText = "已送出"; btn.disabled = true; }
+                appendLocalScoreReportFeedback(form, res);
                 swalAlert("已回報補考結果", "錯題數已送出，等待老師登記補考結果。", "success");
             }).withFailureHandler(function (e) {
                 swalAlert("回報失敗", friendlySubmitError(e), 'warning');
@@ -8657,9 +8732,9 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             } else if (logic && logic.needsReport) {
                 scoreHtml = "<div style='background:#fff; border:1px solid #fecaca; border-radius:10px; padding:10px; margin-bottom:10px;'>" +
                     "<div style='font-size:0.9rem; font-weight:900; color:#dc2626; margin-bottom:8px;'>老師直接回填缺考分數</div>" +
-                    "<div style='display:flex; gap:8px; align-items:center;'>" +
-                    "<input type='number' inputmode='decimal' step='0.1' min='0' max='100' id='god-direct-score-input-" + contextKey + "' placeholder='輸入分數' style='flex:1; min-width:0; height:44px; padding:8px 10px; border:2px solid #fecaca; border-radius:8px; font-size:1rem; font-weight:900; text-align:center;'>" +
-                    "<button type='button' class='admin-btn btn-green' style='height:44px; margin:0; white-space:nowrap;' onclick=\"writeGodDirectMakeupScore(this, '" + contextKey + "')\">回填</button>" +
+                    "<div class='god-direct-score-row'>" +
+                    "<input type='number' inputmode='decimal' step='0.1' min='0' max='100' class='god-direct-score-input' id='god-direct-score-input-" + contextKey + "' placeholder='輸入分數' aria-label='老師回填缺考分數'>" +
+                    "<button type='button' class='admin-btn btn-green god-direct-score-btn' onclick=\"writeGodDirectMakeupScore(this, '" + contextKey + "')\">回填</button>" +
                     "</div></div>";
             }
             var buttons = MAKEUP_RESULT_COLORS.map(function(color) {
