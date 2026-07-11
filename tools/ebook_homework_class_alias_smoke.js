@@ -24,6 +24,7 @@ vm.createContext(context);
 [
   'getHomeworkDoneCourseAliasKey',
   'getHomeworkDoneRelatedClassKeyCandidates',
+  'isFeedbackFromPostSource',
   'getHomeworkDoneRelatedClassKeys',
   'mergeHomeworkClassNode',
   'mergeHomeworkDoneForStudent',
@@ -46,6 +47,22 @@ if (context.getHomeworkDoneCourseAliasKey('115國一自然超前班') === contex
 }
 if (context.getHomeworkDoneCourseAliasKey('116國三自然超前班') !== '') {
   throw new Error('natural advanced is a two-year class; grade 9 must not be aliased');
+}
+
+if (!context.isFeedbackFromPostSource('115國二自然超前班', '114國一自然超前班')) {
+  throw new Error('feedback submitted after promotion should still attach to the old-grade post in the same cohort');
+}
+if (context.isFeedbackFromPostSource('115國一自然超前班', '114國一自然超前班')) {
+  throw new Error('feedback must not cross into a different natural-advanced cohort');
+}
+if (context.isFeedbackFromPostSource('115國二自然超前班', '115小六資優自然週六上午班')) {
+  throw new Error('feedback must not cross unrelated classes');
+}
+if (!context.isFeedbackFromPostSource('115國二自然超前班', '115國二自然超前班')) {
+  throw new Error('feedback should match an exact class source');
+}
+if (!context.isFeedbackFromPostSource('', '115國二自然超前班')) {
+  throw new Error('legacy feedback without source metadata should keep the previous date-only behavior');
 }
 
 assertDeepEqual(
