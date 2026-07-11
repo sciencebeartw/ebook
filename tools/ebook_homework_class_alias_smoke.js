@@ -24,8 +24,9 @@ vm.createContext(context);
 [
   'getHomeworkDoneCourseAliasKey',
   'getHomeworkDoneRelatedClassKeyCandidates',
-  'isFeedbackFromPostSource',
+  'isRecordFromPostSource',
   'getHomeworkDoneRelatedClassKeys',
+  'isGradeFromPostSource',
   'mergeHomeworkClassNode',
   'mergeHomeworkDoneForStudent',
   'mergeFeedbackForStudent',
@@ -49,20 +50,26 @@ if (context.getHomeworkDoneCourseAliasKey('116國三自然超前班') !== '') {
   throw new Error('natural advanced is a two-year class; grade 9 must not be aliased');
 }
 
-if (!context.isFeedbackFromPostSource('115國二自然超前班', '114國一自然超前班')) {
-  throw new Error('feedback submitted after promotion should still attach to the old-grade post in the same cohort');
+if (!context.isRecordFromPostSource('115國二自然超前班', '114國一自然超前班')) {
+  throw new Error('records synced after promotion should still attach to the old-grade post in the same cohort');
 }
-if (context.isFeedbackFromPostSource('115國一自然超前班', '114國一自然超前班')) {
-  throw new Error('feedback must not cross into a different natural-advanced cohort');
+if (context.isRecordFromPostSource('115國一自然超前班', '114國一自然超前班')) {
+  throw new Error('records must not cross into a different natural-advanced cohort');
 }
-if (context.isFeedbackFromPostSource('115國二自然超前班', '115小六資優自然週六上午班')) {
-  throw new Error('feedback must not cross unrelated classes');
+if (context.isRecordFromPostSource('115國二自然超前班', '115小六資優自然週六上午班')) {
+  throw new Error('records must not cross unrelated classes');
 }
-if (!context.isFeedbackFromPostSource('115國二自然超前班', '115國二自然超前班')) {
-  throw new Error('feedback should match an exact class source');
+if (!context.isRecordFromPostSource('115國二自然超前班', '115國二自然超前班')) {
+  throw new Error('records should match an exact class source');
 }
-if (!context.isFeedbackFromPostSource('', '115國二自然超前班')) {
-  throw new Error('legacy feedback without source metadata should keep the previous date-only behavior');
+if (!context.isRecordFromPostSource('', '115國二自然超前班')) {
+  throw new Error('legacy records without source metadata should keep the previous date-only behavior');
+}
+if (!context.isGradeFromPostSource({ sourceClassKey: '115國二自然超前班' }, '114國一自然超前班')) {
+  throw new Error('grades synced under the promoted class should render on old-grade posts in the same cohort');
+}
+if (context.isGradeFromPostSource({ sourceClassKey: '115國一自然超前班' }, '114國一自然超前班')) {
+  throw new Error('grades must not cross into a different natural-advanced cohort');
 }
 
 assertDeepEqual(

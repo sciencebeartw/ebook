@@ -3326,12 +3326,12 @@
         ];
     }
 
-    function isFeedbackFromPostSource(feedbackSourceClassKey, postSourceClassKey) {
-        if (!feedbackSourceClassKey || !postSourceClassKey) return true;
-        if (feedbackSourceClassKey === postSourceClassKey) return true;
-        var feedbackAliasKey = getHomeworkDoneCourseAliasKey(feedbackSourceClassKey);
+    function isRecordFromPostSource(recordSourceClassKey, postSourceClassKey) {
+        if (!recordSourceClassKey || !postSourceClassKey) return true;
+        if (recordSourceClassKey === postSourceClassKey) return true;
+        var recordAliasKey = getHomeworkDoneCourseAliasKey(recordSourceClassKey);
         var postAliasKey = getHomeworkDoneCourseAliasKey(postSourceClassKey);
-        return !!feedbackAliasKey && feedbackAliasKey === postAliasKey;
+        return !!recordAliasKey && recordAliasKey === postAliasKey;
     }
 
     function getHomeworkDoneRelatedClassKeys(classKey, classNodeMap) {
@@ -3730,7 +3730,7 @@
     }
 
     function isGradeFromPostSource(grade, sourceClassKey) {
-        return !sourceClassKey || !grade || !grade.sourceClassKey || grade.sourceClassKey === sourceClassKey;
+        return isRecordFromPostSource((grade && grade.sourceClassKey) || "", sourceClassKey);
     }
 
     function parseEbookSimpleChineseNumber(text) {
@@ -6963,7 +6963,7 @@
                 return (history || []).filter(function(h) {
                     var dateMatches = h.targetDate == pDateShort || h.targetDate == postData.date || h.targetDate == pDateFull;
                     if (!dateMatches) return false;
-                    return isFeedbackFromPostSource(h.sourceClassKey, postSourceClassKey);
+                    return isRecordFromPostSource(h.sourceClassKey, postSourceClassKey);
                 }).sort(function(a, b) { return new Date(a.time) - new Date(b.time); });
             }
             var container = document.getElementById('tab-content-0'); if (!posts || posts.length === 0) { container.innerHTML = "<div style='text-align:center; padding:30px; color:#999;'>目前沒有聯絡簿資料</div>"; return; } var latestStickerPostDate = posts[0] && posts[0].date; var latestPostDate = posts[0] && posts[0].date; var html = ""; posts.forEach(function (post) {
