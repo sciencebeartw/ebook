@@ -12,6 +12,7 @@
     <!-- Deploy marker: home-practice-score-week-label-20260704 -->
     <!-- Deploy marker: score-report-chapter-range-refresh-20260705 -->
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="山熊聯絡簿">
     <link rel="apple-touch-icon" href="ebook-touch-icon.png">
@@ -3205,15 +3206,22 @@
 
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-functions.js"></script>
   <script src="firebase-config.js"></script>
+  <script src="ebook_lifecycle_app.js?v=20260711_lifecycle_security_v2"></script>
 
   <!-- Webhook API & Firebase Polyfill (Replace google.script.run) -->
   <script>
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+    const ebookFirebaseApp = firebase.apps.some(function(app) { return app.name === "ebook"; })
+      ? firebase.app("ebook")
+      : firebase.initializeApp(firebaseConfig, "ebook");
+    const db = ebookFirebaseApp.database();
+    const ebookAuth = ebookFirebaseApp.auth();
+    const ebookFunctions = ebookFirebaseApp.functions();
+    const ebookStorage = ebookFirebaseApp.storage();
     const qParams = new URLSearchParams(window.location.search);
     const BEAR_SUBJECT = qParams.get('subject') ? '/' + qParams.get('subject') : '/science';
     let ebookGodSessionId = qParams.get('godSession') || '';
@@ -3223,30 +3231,36 @@
     let ebookGodSessionLastActivityAt = Date.now();
     let ebookGodSessionLastRenewAt = 0;
     let ebookGodSessionHeartbeatTimer = null;
+    let ebookAuthSessionInfo = null;
+    const pendingEbookRequestIds = {};
 
-    const SCRIPT_URLS = {
-      '/science': "https://script.google.com/macros/s/AKfycbz3ZwBnTp6gcf5TKzJnHni6oat0_jxsnhGkfXAR-Fu_NI3ZVMu4WrDjssayDUtJrQU/exec",
-      '/math': "https://script.google.com/macros/s/AKfycbw9XG4LAibiDKWHRPkNaRmYs_kgm0z3HtYsFhQhtmxwt7JmE3mf9oD91ulFea6pBNsylQ/exec"
-    };
-    const SCRIPT_URL = SCRIPT_URLS[BEAR_SUBJECT] || SCRIPT_URLS['/science'];
+    function createClientRequestId(prefix) {
+      var random = new Uint32Array(4);
+      if (window.crypto && window.crypto.getRandomValues) window.crypto.getRandomValues(random);
+      else random = [Date.now(), Math.random() * 1e9, Math.random() * 1e9, Math.random() * 1e9];
+      return (prefix || "ebook") + "_" + Array.prototype.map.call(random, function(value) {
+        return Math.floor(Number(value) || 0).toString(36);
+      }).join("");
+    }
+
     function doPostAction(action, data, onSuccess, onErr) {
       if (isDashboardDraftPreviewMode) {
         if (onErr) onErr(new Error("Dashboard 草稿預覽不允許寫入正式資料。"));
         return;
       }
       if (isStudentPreviewMode && action === "logAccess") return;
-      if(SCRIPT_URL.includes("請在此填入")) {
-         alert("⚠️ 錯誤：尚未填入 GAS Web App 網址在 index.html 內！");
-         if(onErr) onErr("No Web App URL");
-         return;
+      var payload = Object.assign({}, data || {});
+      var requestFingerprint = action + '|' + JSON.stringify(payload);
+      if (!payload.clientRequestId) {
+         payload.clientRequestId = pendingEbookRequestIds[requestFingerprint] || createClientRequestId(action);
+         pendingEbookRequestIds[requestFingerprint] = payload.clientRequestId;
       }
-      fetch(SCRIPT_URL, {
-         method: "POST",
-         headers: { "Content-Type": "text/plain" }, // Bypass CORS preflight
-         body: JSON.stringify({ action: action, data: data, adminPassword: "" })
+      ebookFunctions.httpsCallable("runEbookStudentAction")({ action: action, data: payload })
+      .then(function(callResult) {
+         var result = callResult && callResult.data ? callResult.data.result : null;
+         if (result && result.success === true) delete pendingEbookRequestIds[requestFingerprint];
+         if (onSuccess) onSuccess(result || { success: false, msg: "伺服器沒有回傳寫入結果" });
       })
-      .then(res => res.json())
-      .then(res => { if(onSuccess) onSuccess(res); })
       .catch(err => { console.error(err); if(onErr) onErr(err); });
     }
 
@@ -3446,8 +3460,8 @@
             var snap = await db.ref(`${BEAR_SUBJECT}/studentTransferIndex/${classKey}/${studentKey}`).once("value");
             return snap.val() || {};
         } catch (err) {
-            console.warn("Student transfer index read skipped:", err);
-            return {};
+            console.error("Student transfer index read failed:", err);
+            throw new Error("換班歷程讀取失敗，為避免漏掉舊留言或成績，請重新整理後再試");
         }
     }
 
@@ -3467,37 +3481,115 @@
             var snap = await db.ref(`${BEAR_SUBJECT}/studentEnrollmentIndex/${classKey}/${studentKey}`).once("value");
             return snap.val() || {};
         } catch (err) {
-            console.warn("Student enrollment index read skipped:", err);
-            return {};
+            console.error("Student enrollment index read failed:", err);
+            throw new Error("入班歷程讀取失敗，為避免顯示錯誤的舊資料，請重新整理後再試");
         }
     }
 
-    function getStudentEnrollmentDateKey(enrollmentIndex, currentClassKey) {
-        var list = listActiveStudentEnrollments(enrollmentIndex).filter(function(item) {
-            return !currentClassKey || item.classKey === currentClassKey;
-        });
-        if (!list.length) return null;
-        var latest = null;
-        list.forEach(function(item) {
-            var key = getEbookComparableDateKey(parseEbookComparableDate(item.enrollmentDate));
-            if (key && (!latest || key > latest)) latest = key;
-        });
-        return latest;
+    function getEbookSessionAllowedClassKeySet() {
+        var session = ebookAuthSessionInfo || ebookGodSessionInfo || {};
+        var raw = session.allowedClassKeys || [];
+        var keys = Array.isArray(raw)
+            ? raw
+            : Object.keys(raw || {}).filter(function(key) { return raw[key] === true; });
+        var allowed = {};
+        keys.forEach(function(key) { if (key) allowed[key] = true; });
+        if (session.safeClassKey) allowed[session.safeClassKey] = true;
+        if (session.className) allowed[safeKey(session.className)] = true;
+        return allowed;
     }
 
-    function isOnOrAfterStudentEnrollmentDate(item, enrollmentIndex, currentClassKey) {
-        var enrollmentKey = getStudentEnrollmentDateKey(enrollmentIndex, currentClassKey);
-        if (!enrollmentKey) return true;
-        var fallbackYear = Math.floor(enrollmentKey / 10000);
-        var itemDateValue = item && item.date;
-        var itemKey = getEbookComparableDateKey(parseEbookComparableDate(itemDateValue, fallbackYear));
-        if (!itemKey) return true;
-        return itemKey >= enrollmentKey;
+    async function loadStudentLifecycleIndexes(currentClassKey, studentKey) {
+        var transferIndex = {};
+        var queue = [currentClassKey];
+        var visited = {};
+        var reads = 0;
+        while (queue.length && reads < 8) {
+            var destinationClassKey = queue.shift();
+            if (!destinationClassKey || visited[destinationClassKey]) continue;
+            visited[destinationClassKey] = true;
+            reads += 1;
+            var node = await loadStudentTransferIndexForStudent(destinationClassKey, studentKey);
+            Object.keys(node || {}).forEach(function(id) {
+                var item = node[id] || {};
+                var mergedId = destinationClassKey + "__" + id;
+                transferIndex[mergedId] = Object.assign({ id: item.id || id }, item);
+                if (item.status !== "deleted" && item.studentKey === studentKey && item.toClassKey === destinationClassKey && item.fromClassKey && !visited[item.fromClassKey]) {
+                    queue.push(item.fromClassKey);
+                }
+            });
+        }
+
+        var chainResult = EbookLifecycleApp.buildTransferChain(transferIndex, currentClassKey, { maxDepth: 8 });
+        if (chainResult.ambiguities.length) {
+            throw new Error("這位學生同一天有多筆互相衝突的換班紀錄，請先回 Dashboard 整理後再開啟聯絡簿");
+        }
+        if (chainResult.truncated || queue.length) {
+            throw new Error("這位學生的換班鏈超過安全讀取上限，請先回 Dashboard 檢查換班紀錄");
+        }
+
+        var baseTrackedClassKeys = EbookLifecycleApp.getTrackedClassKeys(currentClassKey, chainResult, []);
+        var sessionAllowedClassKeys = getEbookSessionAllowedClassKeySet();
+        var trackedClassKeys = [];
+        baseTrackedClassKeys.forEach(function(baseClassKey) {
+            getHomeworkDoneRelatedClassKeyCandidates(baseClassKey).forEach(function(candidateClassKey) {
+                if (candidateClassKey === baseClassKey || sessionAllowedClassKeys[candidateClassKey] === true) {
+                    trackedClassKeys.push(candidateClassKey);
+                }
+            });
+        });
+        trackedClassKeys = uniqueClassKeys(trackedClassKeys);
+        var enrollmentIndex = {};
+        var enrollmentNodeMap = {};
+        var enrollmentSnaps = await Promise.all(trackedClassKeys.map(function(classKey) {
+            return loadStudentEnrollmentIndexForStudent(classKey, studentKey).then(function(value) {
+                return { classKey: classKey, value: value || {} };
+            });
+        }));
+        enrollmentSnaps.forEach(function(entry) {
+            enrollmentNodeMap[entry.classKey] = entry.value || {};
+            Object.keys(entry.value).forEach(function(id) {
+                enrollmentIndex[entry.classKey + "__" + id] = Object.assign({ id: id }, entry.value[id] || {});
+            });
+        });
+
+        var classNameByKey = {};
+        classNameByKey[currentClassKey] = currentClassKey;
+        chainResult.chain.forEach(function(item) {
+            classNameByKey[item.fromClassKey] = item.fromClassName || item.fromClassKey;
+            classNameByKey[item.toClassKey] = item.toClassName || classNameByKey[item.toClassKey] || item.toClassKey;
+        });
+        trackedClassKeys.forEach(function(classKey) {
+            if (!classNameByKey[classKey]) classNameByKey[classKey] = classKey;
+        });
+        return {
+            transferIndex: transferIndex,
+            transferChain: chainResult,
+            trackedClassKeys: trackedClassKeys,
+            trackedGradeClassKeys: trackedClassKeys.slice(),
+            enrollmentIndex: enrollmentIndex,
+            enrollmentNodeMap: enrollmentNodeMap,
+            classNameByKey: classNameByKey
+        };
     }
 
-    function filterItemsByStudentEnrollmentDate(items, enrollmentIndex, currentClassKey) {
+    function getStudentEnrollmentDateKey(enrollmentIndex, classKeys) {
+        var lowerBound = EbookLifecycleApp.mergeEnrollmentLowerBound(enrollmentIndex, {
+            classKeys: Array.isArray(classKeys) ? classKeys : (classKeys ? [classKeys] : [])
+        });
+        return lowerBound ? lowerBound.dateKey : null;
+    }
+
+    function isOnOrAfterStudentEnrollmentDate(item, enrollmentIndex, classKeys) {
+        if (!item || !item.date) return true;
+        return EbookLifecycleApp.isOnOrAfterEnrollmentLowerBound(item, enrollmentIndex, {
+            classKeys: Array.isArray(classKeys) ? classKeys : (classKeys ? [classKeys] : [])
+        });
+    }
+
+    function filterItemsByStudentEnrollmentDate(items, enrollmentIndex, classKeys) {
         return (items || []).filter(function(item) {
-            return isOnOrAfterStudentEnrollmentDate(item, enrollmentIndex, currentClassKey);
+            return isOnOrAfterStudentEnrollmentDate(item, enrollmentIndex, classKeys);
         });
     }
 
@@ -3516,13 +3608,10 @@
     }
 
     function getTransferDateKey(value, fallbackYear) {
-        var text = (value || "").toString().trim().replace(/\//g, "-");
-        var match = text.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
-        if (match) return Number(match[1]) * 10000 + Number(match[2]) * 100 + Number(match[3]);
-        if (!fallbackYear) return null;
-        match = text.match(/(^|[^0-9])(\d{1,2})-(\d{1,2})([^0-9]|$)/);
-        if (!match) return null;
-        return Number(fallbackYear) * 10000 + Number(match[2]) * 100 + Number(match[3]);
+        return EbookLifecycleApp.parseDateKey(value, {
+            fallbackYear: fallbackYear || 0,
+            preferFallbackYear: !!fallbackYear
+        });
     }
 
     function getTransferFallbackYear(transferIndex) {
@@ -3538,50 +3627,41 @@
     function getTransferClassNameForKey(classKey, currentClassKey, transferIndex, currentClassName) {
         if (classKey === currentClassKey) return currentClassName;
         var transfer = getTransferBySourceClassKey(transferIndex, classKey);
-        return (transfer && transfer.fromClassName) || currentClassName;
+        return (transfer && transfer.fromClassName) || classKey || currentClassName;
     }
 
-    function shouldIncludeTransferGrade(classKey, currentClassKey, grade, transferIndex) {
+    function shouldIncludeTransferGrade(classKey, currentClassKey, grade, transferIndex, transferChain) {
         var fallbackYear = getTransferFallbackYear(transferIndex);
         var gradeDateKey = getTransferDateKey(grade && grade.date, fallbackYear);
         if (!gradeDateKey) return true;
-        if (classKey === currentClassKey) {
-            return true;
-        }
-        var transfer = getTransferBySourceClassKey(transferIndex, classKey);
-        var sourceEffectiveKey = transfer ? getTransferDateKey(transfer.effectiveDate) : null;
-        return !sourceEffectiveKey || gradeDateKey < sourceEffectiveKey;
+        if (classKey === currentClassKey) return true;
+        var resolved = EbookLifecycleApp.resolveClassAtDate(
+            currentClassKey,
+            transferChain || EbookLifecycleApp.buildTransferChain(transferIndex || {}, currentClassKey, { maxDepth: 8 }),
+            gradeDateKey,
+            { fallbackClassKey: classKey }
+        );
+        var classAlias = getHomeworkDoneCourseAliasKey(classKey);
+        var resolvedAlias = getHomeworkDoneCourseAliasKey(resolved.classKey);
+        return resolved.classKey === classKey || (!!classAlias && classAlias === resolvedAlias);
     }
 
-    function getTransferGradePresentation(classKey, currentClassKey, grade, transferIndex, currentClassName, className) {
+    function getTransferGradePresentation(classKey, currentClassKey, grade, transferIndex, currentClassName, className, transferChain) {
         var fallbackYear = getTransferFallbackYear(transferIndex);
         var gradeDateKey = getTransferDateKey(grade && grade.date, fallbackYear);
-        if (classKey === currentClassKey) {
-            var incoming = getIncomingTransferForCurrentClass(transferIndex, currentClassKey);
-            var currentEffectiveKey = incoming ? getTransferDateKey(incoming.effectiveDate) : null;
-            if (incoming && currentEffectiveKey && gradeDateKey && gradeDateKey < currentEffectiveKey) {
-                return {
-                    className: incoming.fromClassName || currentClassName,
-                    sourceClassKey: incoming.fromClassKey || classKey,
-                    sourceClassName: incoming.fromClassName || currentClassName,
-                    isTransferFormerClass: true,
-                    storedClassKey: classKey
-                };
-            }
-            return {
-                className: currentClassName || className,
-                sourceClassKey: classKey,
-                sourceClassName: currentClassName || className,
-                isTransferFormerClass: false,
-                storedClassKey: classKey
-            };
-        }
-        var transfer = getTransferBySourceClassKey(transferIndex, classKey);
+        var chain = transferChain || EbookLifecycleApp.buildTransferChain(transferIndex || {}, currentClassKey, { maxDepth: 8 });
+        var resolved = gradeDateKey
+            ? EbookLifecycleApp.resolveClassAtDate(currentClassKey, chain, gradeDateKey, { fallbackClassKey: classKey })
+            : { classKey: classKey };
+        var presentationClassKey = resolved.classKey || classKey;
+        var presentationClassName = getTransferClassNameForKey(presentationClassKey, currentClassKey, transferIndex, currentClassName) || className || currentClassName;
+        var sameCohortAlias = !!getHomeworkDoneCourseAliasKey(presentationClassKey) &&
+            getHomeworkDoneCourseAliasKey(presentationClassKey) === getHomeworkDoneCourseAliasKey(currentClassKey);
         return {
-            className: (transfer && transfer.fromClassName) || className || currentClassName,
-            sourceClassKey: classKey,
-            sourceClassName: (transfer && transfer.fromClassName) || className || currentClassName,
-            isTransferFormerClass: !!transfer,
+            className: presentationClassName,
+            sourceClassKey: presentationClassKey,
+            sourceClassName: presentationClassName,
+            isTransferFormerClass: presentationClassKey !== currentClassKey && !sameCohortAlias,
             storedClassKey: classKey
         };
     }
@@ -3591,6 +3671,7 @@
         var classKey = options.classKey || "";
         var currentClassKey = options.currentClassKey || classKey;
         var transferIndex = options.transferIndex || {};
+        var transferChain = options.transferChain || EbookLifecycleApp.buildTransferChain(transferIndex, currentClassKey, { maxDepth: 8 });
         var className = options.className || options.currentClassName || "";
         var fullGradeList = [];
         for (let col in (examsObj || {})) {
@@ -3599,8 +3680,8 @@
                 dist: Array.isArray(rawData.dist) ? rawData.dist.slice() : rawData.dist,
                 labels: Array.isArray(rawData.labels) ? rawData.labels.slice() : rawData.labels
             });
-            if (!shouldIncludeTransferGrade(classKey, currentClassKey, eData, transferIndex)) continue;
-            var presentation = getTransferGradePresentation(classKey, currentClassKey, eData, transferIndex, options.currentClassName || className, className);
+            if (!shouldIncludeTransferGrade(classKey, currentClassKey, eData, transferIndex, transferChain)) continue;
+            var presentation = getTransferGradePresentation(classKey, currentClassKey, eData, transferIndex, options.currentClassName || className, className, transferChain);
             let studentScoreNum = NaN;
             if (eData.score) {
                 const sMatch = eData.score.toString().match(/(\d+(\.\d+)?)/);
@@ -3664,6 +3745,7 @@
                 sourceClassKey: presentation.sourceClassKey,
                 sourceClassName: presentation.sourceClassName,
                 storedClassKey: presentation.storedClassKey,
+                storedClassName: className || presentation.sourceClassName || currentClassName,
                 isTransferFormerClass: presentation.isTransferFormerClass,
                 date: eData.date,
                 dateKey: getTransferDateKey(eData.date, getTransferFallbackYear(transferIndex)) || 0,
@@ -3689,17 +3771,27 @@
     function buildGradeListFromClassExamMap(classExamMap, classKeys, currentClassKey, transferIndex, currentClassName) {
         var grades = [];
         var trackedKeys = uniqueClassKeys(classKeys);
+        var transferChain = EbookLifecycleApp.buildTransferChain(transferIndex || {}, currentClassKey, { maxDepth: 8 });
         trackedKeys.forEach(function(classKey) {
             var className = getTransferClassNameForKey(classKey, currentClassKey, transferIndex, currentClassName);
             grades = grades.concat(buildGradeListFromExams(classExamMap[classKey] || {}, {
                 classKey: classKey,
                 currentClassKey: currentClassKey,
                 transferIndex: transferIndex,
+                transferChain: transferChain,
                 className: className,
                 currentClassName: currentClassName
             }));
         });
-        return sortGradeListForDisplay(grades, trackedKeys.length > 1);
+        var deduped = {};
+        grades.forEach(function(grade) {
+            var identity = [grade.dateKey || grade.date || "", normalizeEbookExamLookupText(grade.exam || ""), grade.colIndex].join("|");
+            var existing = deduped[identity];
+            if (!existing || (grade.storedClassKey === grade.sourceClassKey && existing.storedClassKey !== existing.sourceClassKey)) {
+                deduped[identity] = grade;
+            }
+        });
+        return sortGradeListForDisplay(Object.keys(deduped).map(function(key) { return deduped[key]; }), trackedKeys.length > 1);
     }
 
     function sortGradeListForDisplay(grades, hasMultipleSources) {
@@ -3814,17 +3906,19 @@
         return list[0];
     }
 
-    function shouldIncludeTransferPost(classKey, currentClassKey, row, transferIndex) {
+    function shouldIncludeTransferPost(classKey, currentClassKey, row, transferIndex, transferChain) {
         var postDateKey = getTransferDateKey(row && row.date);
         if (!postDateKey) return true;
-        if (classKey === currentClassKey) {
-            var incoming = getIncomingTransferForCurrentClass(transferIndex, currentClassKey);
-            var currentEffectiveKey = incoming ? getTransferDateKey(incoming.effectiveDate) : null;
-            return !currentEffectiveKey || postDateKey >= currentEffectiveKey;
-        }
-        var transfer = getTransferBySourceClassKey(transferIndex, classKey);
-        var sourceEffectiveKey = transfer ? getTransferDateKey(transfer.effectiveDate) : null;
-        return !sourceEffectiveKey || postDateKey < sourceEffectiveKey;
+        var resolved = EbookLifecycleApp.resolveClassAtDate(
+            currentClassKey,
+            transferChain || EbookLifecycleApp.buildTransferChain(transferIndex || {}, currentClassKey, { maxDepth: 8 }),
+            postDateKey,
+            { fallbackClassKey: classKey }
+        );
+        if (resolved.classKey === classKey) return true;
+        var classAlias = getHomeworkDoneCourseAliasKey(classKey);
+        var resolvedAlias = getHomeworkDoneCourseAliasKey(resolved.classKey);
+        return !!classAlias && classAlias === resolvedAlias;
     }
 
     function getTrackedClassKeysForStudent(classKey, transferIndex) {
@@ -3835,39 +3929,65 @@
         return uniqueClassKeys([classKey].concat(getTransferSourceClassKeys(transferIndex)));
     }
 
-    function mergeDailyPostClassNodeByKeys(classNodeMap, classKeys, currentClassKey, transferIndex, currentClassName) {
+    function mergeDailyPostClassNodeByKeys(classNodeMap, classKeys, currentClassKey, transferIndex, currentClassName, transferChain) {
         var merged = {};
+        var chain = transferChain || EbookLifecycleApp.buildTransferChain(transferIndex || {}, currentClassKey, { maxDepth: 8 });
         uniqueClassKeys(classKeys).forEach(function(key) {
-            var transfer = key === currentClassKey ? null : getTransferBySourceClassKey(transferIndex, key);
             var classPosts = classNodeMap[key] || {};
             Object.keys(classPosts).forEach(function(postKey) {
                 var row = classPosts[postKey] || {};
-                if (!shouldIncludeTransferPost(key, currentClassKey, row, transferIndex)) return;
+                if (!shouldIncludeTransferPost(key, currentClassKey, row, transferIndex, chain)) return;
+                var dateKey = getTransferDateKey(row.date, getTransferFallbackYear(transferIndex));
+                var resolved = dateKey
+                    ? EbookLifecycleApp.resolveClassAtDate(currentClassKey, chain, dateKey, { fallbackClassKey: key })
+                    : { classKey: key };
+                var sourceClassKey = resolved.classKey || key;
+                var sourceClassName = getTransferClassNameForKey(sourceClassKey, currentClassKey, transferIndex, currentClassName) || row.className || currentClassName;
+                var sameCohortAlias = !!getHomeworkDoneCourseAliasKey(sourceClassKey) &&
+                    getHomeworkDoneCourseAliasKey(sourceClassKey) === getHomeworkDoneCourseAliasKey(currentClassKey);
                 var mergedKey = merged[postKey] ? key + "__" + postKey : postKey;
                 merged[mergedKey] = Object.assign({}, row, {
-                    className: row.className || (transfer && transfer.fromClassName) || currentClassName,
-                    sourceClassKey: key,
-                    sourceClassName: (transfer && transfer.fromClassName) || row.className || currentClassName,
-                    isTransferFormerClass: !!transfer
+                    className: row.className || sourceClassName,
+                    sourceClassKey: sourceClassKey,
+                    sourceClassName: sourceClassName,
+                    storedClassKey: key,
+                    storedClassName: row.className || key,
+                    isTransferFormerClass: sourceClassKey !== currentClassKey && !sameCohortAlias
                 });
             });
         });
         return merged;
     }
 
-    function mergeStudentChildNodeByKeys(classNodeMap, classKeys, studentKey, transferIndex, currentClassName, currentClassKey) {
+    function mergeStudentChildNodeByKeys(classNodeMap, classKeys, studentKey, transferIndex, currentClassName, currentClassKey, transferChain, classNameByKey) {
         var merged = {};
         uniqueClassKeys(classKeys).forEach(function(key) {
-            var transfer = key === currentClassKey ? null : getTransferBySourceClassKey(transferIndex, key);
             var rows = ((classNodeMap[key] || {})[studentKey]) || {};
             Object.keys(rows).forEach(function(rowKey) {
                 var row = rows[rowKey] || {};
                 var mergedKey = merged[rowKey] ? key + "__" + rowKey : rowKey;
+                var scope = EbookLifecycleApp.resolveFeedbackScope({
+                    feedback: row,
+                    storedClassKey: key,
+                    currentClassKey: currentClassKey,
+                    currentClassName: currentClassName,
+                    chain: transferChain || EbookLifecycleApp.buildTransferChain(transferIndex || {}, currentClassKey, { maxDepth: 8 }),
+                    classNameByKey: classNameByKey || {},
+                    isSameCohort: function(left, right) {
+                        var leftAlias = getHomeworkDoneCourseAliasKey(left);
+                        var rightAlias = getHomeworkDoneCourseAliasKey(right);
+                        return !!leftAlias && leftAlias === rightAlias;
+                    }
+                });
                 merged[mergedKey] = Object.assign({}, row, {
-                    sourceClassKey: key,
-                    sourceClassName: (transfer && transfer.fromClassName) || row.sourceClassName || currentClassName,
-                    currentClassName: (transfer && transfer.toClassName) || currentClassName,
-                    isTransferFormerClass: !!transfer,
+                    storedClassKey: scope.storedClassKey,
+                    storedClassName: scope.storedClassName || key,
+                    displayClassKey: scope.displayClassKey,
+                    displayClassName: scope.displayClassName,
+                    sourceClassKey: scope.sourceClassKey,
+                    sourceClassName: scope.sourceClassName,
+                    currentClassName: scope.currentClassName || currentClassName,
+                    isTransferFormerClass: scope.isTransferFormerClass,
                     originalFeedbackKey: rowKey
                 });
             });
@@ -3899,6 +4019,13 @@
                 fbKey: fb.originalFeedbackKey || fbid,
                 targetExamColIndex: fb.targetExamColIndex || "",
                 targetExamTitle: fb.targetExamTitle || "",
+                actorRole: fb.actorRole || "",
+                source: fb.source || "",
+                replyToFeedbackKey: fb.replyToFeedbackKey || "",
+                storedClassKey: fb.storedClassKey || fb.sourceClassKey || "",
+                storedClassName: fb.storedClassName || fb.sourceClassName || "",
+                displayClassKey: fb.displayClassKey || fb.sourceClassKey || "",
+                displayClassName: fb.displayClassName || fb.sourceClassName || "",
                 sourceClassKey: fb.sourceClassKey || "",
                 sourceClassName: fb.sourceClassName || "",
                 currentClassName: fb.currentClassName || "",
@@ -3991,7 +4118,7 @@
         return isExamScoreTitle(title);
     }
 
-    async function executeFirebaseRead(studentName, password, bypassPwd, targetClass) {
+    async function executeFirebaseRead(studentName, password, bypassPwd, targetClass, targetStudentKey) {
         let result = { found: false, className: "", studentName: "", dailyPost: [], grades: [], feedbackHistory: [], bulletins: [], stickers: 0, homeworkDone: {} };
         
         try {
@@ -4037,17 +4164,15 @@
                if (isLoginMatch(kid)) acceptStudentMatch(entry.className || kid.className || sClass, studentKey, kid);
             }
 
-            if (targetClass) {
+            if (targetClass && targetStudentKey) {
                 const sClass = safeKey(targetClass);
-                const snapClass = await db.ref(`${BEAR_SUBJECT}/students/${sClass}`).once('value');
-                const classKids = snapClass.val() || {};
-                for (let k in classKids) {
-                   const kid = classKids[k];
-                   if (isLoginMatch(kid)) {
-                       acceptStudentMatch(targetClass, k, kid);
-                       break;
-                   }
+                const snapKid = await db.ref(`${BEAR_SUBJECT}/students/${sClass}/${targetStudentKey}`).once('value');
+                const kid = snapKid.val();
+                if (kid && kid.name && kid.name.trim() === studentName.trim()) {
+                    acceptStudentMatch(targetClass, targetStudentKey, kid);
                 }
+            } else if (targetClass) {
+                throw new Error('缺少已驗證的學生識別碼，請重新登入');
             } else {
                 let indexedClasses = {};
                 let indexReadFailed = false;
@@ -4091,24 +4216,29 @@
             if (!result.found) return result;
             
             const safeC = safeKey(result.className);
-            result.studentTransferIndex = await loadStudentTransferIndexForStudent(safeC, foundUserKey);
-            result.studentEnrollmentIndex = await loadStudentEnrollmentIndexForStudent(safeC, foundUserKey);
-            result.trackedClassKeys = getTrackedClassKeysForStudent(safeC, result.studentTransferIndex);
-            result.trackedGradeClassKeys = getTrackedGradeClassKeysForStudent(safeC, result.studentTransferIndex);
+            const lifecycle = await loadStudentLifecycleIndexes(safeC, foundUserKey);
+            lifecycle.classNameByKey[safeC] = result.className;
+            result.studentTransferIndex = lifecycle.transferIndex;
+            result.studentTransferChain = lifecycle.transferChain;
+            result.studentEnrollmentIndex = lifecycle.enrollmentIndex;
+            result.studentEnrollmentNodeMap = lifecycle.enrollmentNodeMap;
+            result.classNameByKey = lifecycle.classNameByKey;
+            result.trackedClassKeys = lifecycle.trackedClassKeys;
+            result.trackedGradeClassKeys = lifecycle.trackedGradeClassKeys;
 
             // Fetch Grades. Transfer students read only their current class plus indexed source classes.
             result.cohortGradeExamRoot = await loadGradeExamMapByKeys(result.trackedGradeClassKeys, foundUserKey);
             result.grades = filterItemsByStudentEnrollmentDate(
                 buildGradeListFromClassExamMap(result.cohortGradeExamRoot, result.trackedGradeClassKeys, safeC, result.studentTransferIndex, result.className),
                 result.studentEnrollmentIndex,
-                safeC
+                result.trackedClassKeys
             );
 
             // Fetch Posts
             let postsObj = {};
             if (result.trackedClassKeys.length > 1) {
                 result.cohortDailyPostRoot = await loadClassNodeMapByKeys(`${BEAR_SUBJECT}/dailyPosts`, result.trackedClassKeys);
-                postsObj = mergeDailyPostClassNodeByKeys(result.cohortDailyPostRoot, result.trackedClassKeys, safeC, result.studentTransferIndex, result.className);
+                postsObj = mergeDailyPostClassNodeByKeys(result.cohortDailyPostRoot, result.trackedClassKeys, safeC, result.studentTransferIndex, result.className, result.studentTransferChain);
             } else {
                 const snapP = await db.ref(`${BEAR_SUBJECT}/dailyPosts/${safeC}`).once('value');
                 result.cohortDailyPostRoot = null;
@@ -4144,7 +4274,7 @@
                 classPosts.push(postObj);
             }
             classPosts.sort((a,b) => new Date(b.date) - new Date(a.date));
-            result.dailyPost = filterItemsByStudentEnrollmentDate(classPosts, result.studentEnrollmentIndex, safeC);
+            result.dailyPost = filterItemsByStudentEnrollmentDate(classPosts, result.studentEnrollmentIndex, result.trackedClassKeys);
 
             // Fetch Bulletins
             const globalBulletinKey = safeKey("全校");
@@ -4168,7 +4298,7 @@
             // Fetch Feedbacks
             if (result.trackedClassKeys.length > 1) {
                 result.cohortFeedbackRoot = await loadClassNodeMapByKeys(`${BEAR_SUBJECT}/feedbacks`, result.trackedClassKeys, foundUserKey);
-                result.feedbackHistory = buildFeedbackHistoryList(mergeStudentChildNodeByKeys(result.cohortFeedbackRoot, result.trackedClassKeys, foundUserKey, result.studentTransferIndex, result.className, safeC));
+                result.feedbackHistory = buildFeedbackHistoryList(mergeStudentChildNodeByKeys(result.cohortFeedbackRoot, result.trackedClassKeys, foundUserKey, result.studentTransferIndex, result.className, safeC, result.studentTransferChain, result.classNameByKey));
             } else {
                 const snapF = await db.ref(`${BEAR_SUBJECT}/feedbacks/${safeC}/${foundUserKey}`).once('value');
                 result.cohortFeedbackRoot = null;
@@ -4185,9 +4315,8 @@
                     result.homeworkDone = snapHD.val() || {};
                 }
             } catch (homeworkDoneErr) {
-                console.warn("HomeworkDone read skipped:", homeworkDoneErr);
-                result.cohortHomeworkDoneRoot = null;
-                result.homeworkDone = {};
+                console.error("HomeworkDone read failed:", homeworkDoneErr);
+                throw new Error("作業完成回報讀取失敗，為避免把已完成誤顯示為未完成，請重新整理後再試");
             }
 
             return result;
@@ -4200,7 +4329,19 @@
     function createApiMethods(onSuccess, onErr) {
       return {
         getStudentData: async function(u, p) {
-           try { const res = await executeFirebaseRead(u, p, false); if(onSuccess) onSuccess(res); } catch(e){ if(onErr) onErr(e); }
+           try {
+               const loginFn = ebookFunctions.httpsCallable('createEbookStudentSession');
+               const loginResult = await loginFn({ subjectKey: BEAR_SUBJECT.replace('/', ''), studentName: u, password: p });
+               const session = loginResult && loginResult.data ? loginResult.data : null;
+               if (!session || !session.firebaseCustomToken || !session.className || !session.studentKey) {
+                   throw new Error('登入服務沒有回傳完整的學生身分');
+               }
+               await ebookAuth.setPersistence(firebase.auth.Auth.Persistence.NONE);
+               await ebookAuth.signInWithCustomToken(session.firebaseCustomToken);
+               ebookAuthSessionInfo = session;
+               const res = await executeFirebaseRead(u, '', true, session.className, session.studentKey);
+               if(onSuccess) onSuccess(res);
+           } catch(e){ if(onErr) onErr(e); }
         },
         getStudentDataByAdmin: async function(cls, u, pwd) {
            try {
@@ -4210,7 +4351,18 @@
                    ebookGodSessionInfo.permissions &&
                    ebookGodSessionInfo.permissions.view === true;
                if (!allowGodSession) throw new Error('上帝視角連線未驗證，請從行政中心重新開啟');
-               const res = await executeFirebaseRead(u, pwd, true, cls);
+               const studentKey = (ebookGodSessionInfo && ebookGodSessionInfo.studentKey) || '';
+               const res = await executeFirebaseRead(u, pwd, true, cls, studentKey);
+               if(onSuccess) onSuccess(res);
+           } catch(e){ if(onErr) onErr(e); }
+        },
+        refreshStudentData: async function() {
+           try {
+               const session = ebookAuthSessionInfo || ebookGodSessionInfo;
+               if (!session || !session.className || !session.studentName || !session.studentKey || !ebookAuth.currentUser) {
+                   throw new Error('登入已失效，請重新登入');
+               }
+               const res = await executeFirebaseRead(session.studentName, '', true, session.className, session.studentKey);
                if(onSuccess) onSuccess(res);
            } catch(e){ if(onErr) onErr(e); }
         },
@@ -4261,7 +4413,7 @@
         },
         uploadFileToDrive: async function(data) {
            try {
-               const storageRef = firebase.storage().ref();
+               const storageRef = ebookStorage.ref();
                let cName = data.className || "預設";
                if (cName === "全校") cName = "預設";
                
@@ -5369,7 +5521,7 @@
         // 改採原生 fileRef.put(file) 二進制串流上傳
         function uploadToFirebase(file, path, onSuccess, onError) {
             try {
-                var storageRef = firebase.storage().ref();
+                var storageRef = ebookStorage.ref();
                 var fileRef = storageRef.child(path);
                 var safeName = file.name.replace(/[/\\?%*:|"<>]/g, '-');
                 
@@ -5387,7 +5539,7 @@
                 // 使用原生二進制上傳，最穩定且不吃前端記憶體
                 fileRef.put(file, metadata)
                     .then(function() { return fileRef.getDownloadURL(); })
-                    .then(function(url) { onSuccess({ success: true, url: url, name: safeName }); })
+                    .then(function(url) { onSuccess({ success: true, url: url, name: safeName, path: path }); })
                     .catch(function(err) { console.error('Firebase Storage Upload Error:', err); onError(err); });
             } catch(ex) { 
                 console.error('Upload Direct Exception:', ex); 
@@ -5568,6 +5720,17 @@
                     result.trackedGradeClassKeys = trackedGradeClassKeys;
                     result.studentEnrollmentIndex = result.studentEnrollmentIndex || {};
                     let enrollmentIndexSnapshotText = JSON.stringify(result.studentEnrollmentIndex || {});
+                    let lifecycleRealtimeWarningShown = false;
+                    function showLifecycleRealtimeWarning(label, error) {
+                        console.error(label + " realtime watch failed:", error);
+                        if (lifecycleRealtimeWarningShown) return;
+                        lifecycleRealtimeWarningShown = true;
+                        swalAlert(
+                            "學生歷程同步中斷",
+                            "換班或入班資料目前無法持續同步。畫面不會假裝資料完整，請重新整理後再試。",
+                            "warning"
+                        );
+                    }
 
                     // 1. 棒卡數監聽
                     watchRealtimeValue(BEAR_SUBJECT + '/students/' + safeC + '/' + studentKey + '/stickers', function(snap) {
@@ -5582,7 +5745,7 @@
                                 if (!gData.cohortFeedbackRoot) gData.cohortFeedbackRoot = {};
                                 if (!gData.cohortFeedbackRoot[classKey]) gData.cohortFeedbackRoot[classKey] = {};
                                 gData.cohortFeedbackRoot[classKey][studentKey] = fbsObj;
-                                gData.feedbackHistory = buildFeedbackHistoryList(mergeStudentChildNodeByKeys(gData.cohortFeedbackRoot, trackedClassKeys, studentKey, gData.studentTransferIndex || {}, gData.className, safeC));
+                                gData.feedbackHistory = buildFeedbackHistoryList(mergeStudentChildNodeByKeys(gData.cohortFeedbackRoot, trackedClassKeys, studentKey, gData.studentTransferIndex || {}, gData.className, safeC, gData.studentTransferChain, gData.classNameByKey));
                             } else {
                                 gData.feedbackHistory = buildFeedbackHistoryList(fbsObj);
                             }
@@ -5657,7 +5820,7 @@
                                 gData.className
                             ),
                             gData.studentEnrollmentIndex || {},
-                            safeC
+                            trackedClassKeys
                         );
                         renderOldGradeCards(gData.grades);
 
@@ -5697,7 +5860,7 @@
                         gData.dailyPost = filterItemsByStudentEnrollmentDate(
                             classPosts.sort((a,b) => new Date(b.date) - new Date(a.date)),
                             gData.studentEnrollmentIndex || {},
-                            safeC
+                            trackedClassKeys
                         );
                         
                         remapDailyPostGrades(); // 從 grades 陣列進行映射
@@ -5712,15 +5875,27 @@
                         }
                     }
 
-                    watchRealtimeValue(BEAR_SUBJECT + '/studentEnrollmentIndex/' + safeC + '/' + studentKey, function(snap) {
-                        var nextEnrollmentIndex = snap.val() || {};
-                        var nextEnrollmentText = JSON.stringify(nextEnrollmentIndex);
+                    function rebuildMergedEnrollmentIndex() {
+                        var merged = {};
+                        Object.keys(gData.studentEnrollmentNodeMap || {}).forEach(function(classKey) {
+                            Object.keys(gData.studentEnrollmentNodeMap[classKey] || {}).forEach(function(id) {
+                                merged[classKey + '__' + id] = Object.assign({ id: id }, gData.studentEnrollmentNodeMap[classKey][id] || {});
+                            });
+                        });
+                        var nextEnrollmentText = JSON.stringify(merged);
                         var changed = nextEnrollmentText !== enrollmentIndexSnapshotText;
                         enrollmentIndexSnapshotText = nextEnrollmentText;
-                        gData.studentEnrollmentIndex = nextEnrollmentIndex;
+                        gData.studentEnrollmentIndex = merged;
                         if (changed) rebuildViewsForStudentEnrollmentIndex();
-                    }, function(error) {
-                        console.warn("Student enrollment index realtime watch skipped:", error);
+                    }
+                    gData.studentEnrollmentNodeMap = gData.studentEnrollmentNodeMap || {};
+                    trackedClassKeys.forEach(function(classKey) {
+                        watchRealtimeValue(BEAR_SUBJECT + '/studentEnrollmentIndex/' + classKey + '/' + studentKey, function(snap) {
+                            gData.studentEnrollmentNodeMap[classKey] = snap.val() || {};
+                            rebuildMergedEnrollmentIndex();
+                        }, function(error) {
+                            showLifecycleRealtimeWarning("Student enrollment index", error);
+                        });
                     });
 
                     // 5. 聯絡簿內容監聽
@@ -5729,7 +5904,7 @@
                             if (trackedClassKeys.length > 1) {
                                 if (!gData.cohortDailyPostRoot) gData.cohortDailyPostRoot = {};
                                 gData.cohortDailyPostRoot[classKey] = snap.val() || {};
-                                rebuildDailyPostsFromScopedData(mergeDailyPostClassNodeByKeys(gData.cohortDailyPostRoot || {}, trackedClassKeys, safeC, gData.studentTransferIndex || {}, gData.className));
+                                rebuildDailyPostsFromScopedData(mergeDailyPostClassNodeByKeys(gData.cohortDailyPostRoot || {}, trackedClassKeys, safeC, gData.studentTransferIndex || {}, gData.className, gData.studentTransferChain));
                             } else {
                                 rebuildDailyPostsFromScopedData(snap.val() || {});
                             }
@@ -5817,11 +5992,13 @@
         }
         function exitGodMode() {
             clearRealtimeListeners();
+            ebookAuth.signOut().catch(function() {});
             document.getElementById('full-loader').style.display = 'none';
             isAdminMode = false;
             isStudentPreviewMode = false;
             ebookGodSessionId = "";
             ebookGodSessionInfo = null;
+            ebookAuthSessionInfo = null;
             document.getElementById('appContainer').classList.remove('admin-mode-border');
             document.getElementById('godModeExitBtn').style.display = 'none';
             document.getElementById('main-screen').style.display = 'none';
@@ -6181,6 +6358,8 @@
         function doLogout() {
             clearRealtimeListeners();
             if (isAdminMode) exitGodMode();
+            ebookAuth.signOut().catch(function() {});
+            ebookAuthSessionInfo = null;
             gData = null; gPass = "";
             document.getElementById('sName').value = ""; document.getElementById('sPass').value = ""; document.getElementById('loginMsg').innerText = "";
             document.getElementById('tab-content-0').innerHTML = ""; document.getElementById('tab-content-1').innerHTML = ""; document.getElementById('tab-content-2').innerHTML = "";
@@ -6188,10 +6367,15 @@
             document.getElementById('login-screen').style.display = 'flex'; document.getElementById('backTopBtn').style.display = 'none';
         }
         function doRefresh() {
-            if (!gData || !gPass) return;
+            if (!gData || (!gPass && !ebookAuth.currentUser)) return;
             document.getElementById('full-loader').style.display = 'flex';
-            if (isAdminMode) google.script.run.withSuccessHandler(function (result) { enterStudentView(result, "admin_view"); alert("資料已更新！"); }).getStudentDataByAdmin(gData.className, gData.studentName, gPass);
-            else google.script.run.withSuccessHandler(function (result) { loginSuccess(result, gPass); alert("資料已更新！"); }).getStudentData(gData.studentName, gPass);
+            google.script.run.withSuccessHandler(function (result) {
+                enterStudentView(result, isStudentPreviewMode ? "student_preview" : (isAdminMode ? "god_session" : gPass));
+                alert("資料已更新！");
+            }).withFailureHandler(function(err) {
+                document.getElementById('full-loader').style.display = 'none';
+                swalAlert("更新失敗", (err && err.message) || "登入已失效，請重新登入。", "warning");
+            }).refreshStudentData();
         }
         function switchTab(idx) {
             if (idx === 2) {
@@ -6257,6 +6441,8 @@
                     targetDate: fb.targetDate || "",
                     targetExamColIndex: fb.targetExamColIndex || "",
                     targetExamTitle: fb.targetExamTitle || "",
+                    storedClassKey: fb.storedClassKey || fb.sourceClassKey || "",
+                    storedClassName: fb.storedClassName || fb.sourceClassName || "",
                     content: fb.content || "",
                     reportedScoreText: reportedText,
                     reportedScoreNum: reportedNum,
@@ -6266,7 +6452,7 @@
                 };
             }
 
-            var exactFallbackReport = null;
+            var legacyFallbackReports = [];
             for (var k = feedbackHistory.length - 1; k >= 0; k--) {
                 var fb = feedbackHistory[k];
                 if (isMakeupScoreReportType(fb.type)) {
@@ -6281,12 +6467,16 @@
                         }
                         continue;
                     }
-                    if (exactFallbackReport) continue;
                     var matchesDate = ebookExamLookupDatesMatch(fbTarget, exam && exam.date);
-                    if (matchesDate) exactFallbackReport = buildReportFromFeedback(fb);
+                    if (matchesDate) legacyFallbackReports.push(buildReportFromFeedback(fb));
                 }
             }
-            return exactFallbackReport;
+            if (!legacyFallbackReports.length) return null;
+            var sameDateScoreExams = (gData && gData.grades ? gData.grades : []).filter(function(candidate) {
+                return isExamScoreTitle(((candidate && candidate.date) || "") + " " + ((candidate && (candidate.exam || candidate.examName)) || "")) &&
+                    ebookExamLookupDatesMatch(candidate && candidate.date, exam && exam.date);
+            });
+            return sameDateScoreExams.length === 1 ? legacyFallbackReports[0] : null;
         }
 
         function getDisplayLogic(exam, feedbackHistory) {
@@ -6345,7 +6535,19 @@
         var isUploading = false;
         var currentUploadDate = "";
         var uploadBatchUrls = [];
+        var uploadBatchPaths = [];
         var uploadBatchSkipped = [];
+
+        function cleanupStudentUploadBatch() {
+            var paths = uploadBatchPaths.slice();
+            uploadBatchPaths = [];
+            uploadBatchUrls = [];
+            return Promise.all(paths.map(function(path) {
+                return ebookStorage.ref(path).delete().catch(function(err) {
+                    console.warn('清理未完成作業附件失敗:', path, err);
+                });
+            }));
+        }
 
         function formatUploadSize(bytes) {
             var size = Number(bytes || 0);
@@ -6410,6 +6612,7 @@
             currentUploadDate = dateStr;
             uploadQueue = acceptedFiles;
             uploadBatchUrls = [];
+            uploadBatchPaths = [];
             uploadBatchSkipped = oversizedFiles.map(function(file) { return file.name; });
             isUploading = true;
             if (inputToClear) inputToClear.value = "";
@@ -6465,6 +6668,7 @@
                     isUploading = false;
                     currentUploadDate = "";
                     uploadBatchUrls = [];
+                    uploadBatchPaths = [];
                     uploadBatchSkipped = [];
                     if (sd) sd.innerText = '';
                     var msg = '✅ 已上傳 ' + uploadedCount + ' 個檔案，並合併成一則留言！';
@@ -6473,6 +6677,7 @@
                 }, function() {
                     isUploading = false;
                     currentUploadDate = "";
+                    cleanupStudentUploadBatch();
                     if (sd) sd.innerText = '';
                 }, true);
                 return;
@@ -6488,7 +6693,10 @@
                 return;
             }
 
-            if (statusDiv) statusDiv.innerHTML = SVG.hourglass + ' 正在上傳：' + file.name + '...';
+            if (statusDiv) {
+                statusDiv.innerHTML = SVG.hourglass;
+                statusDiv.appendChild(document.createTextNode(' 正在上傳：' + file.name + '...'));
+            }
 
             // 檔名格式：YYYYMMDD_班級_姓名_原始檔名
             var today = new Date();
@@ -6497,11 +6705,21 @@
             var stu = (gData && gData.studentName) ? gData.studentName : '未知學生';
             var safeName = (datePrefix + '_' + cls + '_' + stu + '_' + file.name).replace(/[/\\?%*:|"<>]/g, '-');
             var timestamp = new Date().getTime();
-            var path = 'uploads/' + cls + '/學生作業/' + timestamp + '_' + safeName;
+            var authUid = ebookAuth.currentUser && ebookAuth.currentUser.uid;
+            if (!authUid) {
+                if (statusDiv) statusDiv.innerText = '';
+                uploadBatchSkipped.push(file.name);
+                swalAlert("登入已失效", "請重新登入後再上傳作業。", "warning");
+                processUploadQueue(dateStr);
+                return;
+            }
+            var subjectKey = BEAR_SUBJECT.replace('/', '');
+            var path = 'uploads/student/' + authUid + '/' + subjectKey + '/' + safeKey(dateStr) + '/' + timestamp + '_' + safeName;
 
             uploadToFirebase(file, path,
                 function(res) {
                     uploadBatchUrls.push(res.url);
+                    uploadBatchPaths.push(res.path || path);
                     processUploadQueue(dateStr);
                 },
                 function(err) {
@@ -6547,6 +6765,19 @@
 
         function getHomeworkDoneDateKey(targetDate) {
             return safeKey((targetDate || "").toString().replace(/-/g, "/"));
+        }
+
+        function resolveStudentActionSourceClassName(realDate) {
+            var sources = [];
+            (gData && gData.dailyPost || []).forEach(function(post) {
+                if (!post || post.date !== realDate || post.isTransferFormerClass) return;
+                var sourceName = (post.storedClassName || post.sourceClassName || post.className || gData.className || '').toString().trim();
+                if (sourceName && sources.indexOf(sourceName) === -1) sources.push(sourceName);
+            });
+            if (sources.length > 1) {
+                throw new Error('同一天有多個不同實體班級的聯絡簿，無法安全判定寫入位置，請聯絡老師。');
+            }
+            return sources[0] || (gData && gData.className) || '';
         }
 
         function shouldShowHomeworkDoneButton(post) {
@@ -6756,12 +6987,12 @@
             if (!ebookFeedbackMatchesExamDate(fb, exam)) return false;
             var examName = normalizeEbookExamLookupText(exam && (exam.exam || exam.examName || exam.title));
             var fullTitle = normalizeEbookExamLookupText(((exam && exam.date) || "") + " " + ((exam && (exam.exam || exam.examName || exam.title)) || ""));
-            if (fullTitle.indexOf(targetTitle) > -1) return true;
             if (ebookExamLookupTextHasDate(fb && fb.targetExamTitle)) {
                 var hasMatchingDate = ebookExamLookupDatesMatch(fb && fb.targetExamTitle, fullTitle);
-                return hasMatchingDate && !!(examName && targetTitle === examName);
+                var targetName = normalizeEbookExamLookupText((fb.targetExamTitle || "").toString().replace(/\d{1,4}[\/.-]\d{1,2}(?:[\/.-]\d{1,2})?/, ""));
+                return hasMatchingDate && !!(examName && targetName && targetName === examName);
             }
-            return !!(examName && targetTitle === examName);
+            return !!(examName && (targetTitle === examName || targetTitle === fullTitle));
         }
 
         function ebookFeedbackMatchesExamDate(fb, exam) {
@@ -6796,6 +7027,8 @@
                 return {
                     feedbackKey: fb.fbKey || "",
                     targetDate: fb.targetDate || "",
+                    storedClassKey: fb.storedClassKey || fb.sourceClassKey || "",
+                    storedClassName: fb.storedClassName || fb.sourceClassName || "",
                     content: fb.content || "",
                     reportedScoreText: reportDisplayText,
                     reportedResultText: reportDisplayText,
@@ -6882,7 +7115,7 @@
             }
             if (canUseAdminModeReview() && shouldShowGodMakeupReview(exam, logic)) {
                 var makeupContextKey = makeDomSafeId("makeup_" + safeDate + "_" + (exam.colIndex || 0));
-                window.adminModeMakeupContext[makeupContextKey] = { className: gData.className, studentName: gData.studentName, targetDate: post.date, examColIndex: exam.colIndex, title: exam.exam || "", currentColor: exam.cellColor || "", scoreReview: getLatestMakeupReportInfo(exam, history) };
+                window.adminModeMakeupContext[makeupContextKey] = { className: gData.className, studentName: gData.studentName, targetDate: post.date, sourceClassName: post.storedClassName || post.sourceClassName || gData.className, gradeClassName: exam.storedClassName || gData.className, gradeClassKey: exam.storedClassKey || "", examColIndex: exam.colIndex, title: exam.exam || "", currentColor: exam.cellColor || "", scoreReview: getLatestMakeupReportInfo(exam, history) };
                 scoreReportHtml += buildGodMakeupReviewBox(makeupContextKey, exam, logic);
             }
             var chartHtml = "";
@@ -6957,11 +7190,14 @@
             window.adminModeMakeupContext = {};
             window.adminModeDirectMessageContext = {};
             function getPostScopedHistory(postData) {
-                var pDateShort = postData.date.substring(5).replace("-", "/");
-                var pDateFull = postData.date.replace(/-/g, "/");
                 var postSourceClassKey = postData.sourceClassKey || "";
                 return (history || []).filter(function(h) {
-                    var dateMatches = h.targetDate == pDateShort || h.targetDate == postData.date || h.targetDate == pDateFull;
+                    var dateMatches = EbookLifecycleApp.isFeedbackOnPostDate(
+                        h,
+                        postData.date,
+                        gData && gData.studentTransferChain,
+                        { anchorDateKeys: [] }
+                    );
                     if (!dateMatches) return false;
                     return isRecordFromPostSource(h.sourceClassKey, postSourceClassKey);
                 }).sort(function(a, b) { return new Date(a.time) - new Date(b.time); });
@@ -7144,6 +7380,8 @@
                             var stickerData = {};
                             try { stickerData = JSON.parse(h.content); } catch(e) { stickerData = { reason: h.content, count: '?', status: "待審核" }; }
                             var statusLabel = stickerData.status || "待審核";
+                            var safeStatusLabel = escapeHtml(statusLabel);
+                            var safeStickerReason = escapeHtml(stickerData.reason || "");
                             var statusKind = getStickerReviewStatusKind(statusLabel);
                             var statusClass = statusKind === "approved" ? "approved" : (statusKind === "rejected" ? "rejected" : "");
                             
@@ -7161,14 +7399,14 @@
                                     fbKey: h.fbKey,
                                     time: h.time || "",
                                     count: parseInt(stickerData.count, 10) || 0,
-                                    sourceClassName: h.sourceClassName || post.sourceClassName || gData.className,
-                                    sourceClassKey: h.sourceClassKey || post.sourceClassKey || "",
+                                    sourceClassName: h.storedClassName || h.sourceClassName || post.storedClassName || post.sourceClassName || gData.className,
+                                    sourceClassKey: h.storedClassKey || h.sourceClassKey || post.sourceClassKey || "",
                                     balanceClassName: h.currentClassName || gData.className
                                 };
                                 stickerReviewHtml = buildGodStickerReviewActions(stickerContextKey);
                             }
                             
-                            historyHtml += "<div class='history-msg'><div class='history-msg-avatar " + stickerAvatarClass + "'>" + stickerAvatarChar + "</div><div class='history-msg-body " + bodyCls + "'><span>" + icon + stickerData.reason + "</span><span class='" + badgeCls + "'>" + formatStickerCountText(stickerData.count) + "</span><br><span class='sticker-status " + statusClass + "'>" + (statusKind === "approved" ? SVG.check : (statusKind === "rejected" ? SVG.cross : SVG.hourglass)) + statusLabel + "</span><div class='history-msg-time'>" + h.time.substring(5, 16) + "</div>" + stickerReviewHtml + "</div></div>";
+                            historyHtml += "<div class='history-msg'><div class='history-msg-avatar " + stickerAvatarClass + "'>" + escapeHtml(stickerAvatarChar) + "</div><div class='history-msg-body " + bodyCls + "'><span>" + icon + safeStickerReason + "</span><span class='" + badgeCls + "'>" + escapeHtml(formatStickerCountText(stickerData.count)) + "</span><br><span class='sticker-status " + statusClass + "'>" + (statusKind === "approved" ? SVG.check : (statusKind === "rejected" ? SVG.cross : SVG.hourglass)) + safeStatusLabel + "</span><div class='history-msg-time'>" + escapeHtml((h.time || "").substring(5, 16)) + "</div>" + stickerReviewHtml + "</div></div>";
                         } else {
                             var adminReplyHtml = "";
                             if (canUseAdminModeReply() && !isTeacher) {
@@ -7178,12 +7416,14 @@
                                     targetDate: post.date,
                                     type: displayType,
                                     content: h.content || "",
-                                    sourceClassName: h.sourceClassName || post.sourceClassName || gData.className,
+                                    storedClassName: h.storedClassName || h.sourceClassName || post.storedClassName || post.sourceClassName || gData.className,
+                                    storedClassKey: h.storedClassKey || h.sourceClassKey || post.sourceClassKey || "",
+                                    sourceClassName: h.sourceClassName || post.storedClassName || post.sourceClassName || gData.className,
                                     sourceClassKey: h.sourceClassKey || post.sourceClassKey || ""
                                 };
                                 adminReplyHtml = buildAdminReplyBox(contextKey);
                             }
-                            historyHtml += "<div class='history-msg'><div class='history-msg-avatar " + avatarClass + "'>" + avatarChar + "</div><div class='history-msg-body " + bodyClass + "'>" + parseBtn(h.content) + "<div class='history-msg-time'>" + h.time.substring(5, 16) + "</div>" + adminReplyHtml + "</div></div>";
+                            historyHtml += "<div class='history-msg'><div class='history-msg-avatar " + avatarClass + "'>" + escapeHtml(avatarChar) + "</div><div class='history-msg-body " + bodyClass + "'>" + parseBtn(h.content) + "<div class='history-msg-time'>" + escapeHtml((h.time || "").substring(5, 16)) + "</div>" + adminReplyHtml + "</div></div>";
                         } }}); var inputPlaceholder = "留言給老師..."; var safeDateId = post.date.replace(/\//g, '-');
 
                 var isLatestStickerPost = post.date === latestStickerPostDate;
@@ -7250,19 +7490,19 @@
                 var adminDirectHtml = "";
                 if (canUseAdminModeReply()) {
                     var directContextKey = makeDomSafeId("direct_" + safeDateId);
-                    window.adminModeDirectMessageContext[directContextKey] = { targetDate: post.date };
+                    window.adminModeDirectMessageContext[directContextKey] = { targetDate: post.date, sourceClassName: post.storedClassName || post.sourceClassName || post.className || gData.className, sourceClassKey: post.storedClassKey || post.sourceClassKey || "" };
                     adminDirectHtml = buildAdminDirectMessageBox(directContextKey);
                 }
                 var godStickerAdjustmentHtml = "";
                 if (canUseAdminModeReview()) {
                     var adjustmentContextKey = makeDomSafeId("adjust_" + safeDateId);
-                    window.adminModeStickerAdjustmentContext[adjustmentContextKey] = { targetDate: post.date };
+                    window.adminModeStickerAdjustmentContext[adjustmentContextKey] = { targetDate: post.date, sourceClassName: post.storedClassName || post.sourceClassName || post.className || gData.className, sourceClassKey: post.storedClassKey || post.sourceClassKey || "" };
                     godStickerAdjustmentHtml = buildGodStickerAdjustmentBox(adjustmentContextKey);
                 }
                 var studentInputHtml = (isAdminMode || isDashboardDraftPreviewMode || post.isTransferFormerClass) ? "" : "<div class='input-box'><input type='text' class='fb-input' id='input-" + safeDateId + "' placeholder='" + inputPlaceholder + "'><button class='fb-btn' onclick=\"sendFeedback('" + safeDateId + "', '" + post.date + "', '學生留言')\">送出</button></div>";
 
                 // ★★★ v3.9 修正：家長留言 -> 留言內容 ★★★
-                var feedbackHtml = "<div class='feedback-section'>" + uploadHtml + "<div class='section-title'>" + SVG.chat + "留言內容</div><div id='history-" + safeDateId + "'>" + historyHtml + "</div>" + godStickerAdjustmentHtml + adminDirectHtml + studentInputHtml + "</div>"; var headerTitle = post.date + (post.title ? " " + post.title : ""); var transferBadge = post.isTransferFormerClass ? "<span style='margin-left:8px; background:#fffbeb; color:#92400e; border:1px solid #fde68a; border-radius:999px; padding:2px 8px; font-size:0.78rem; font-weight:900;'>轉班前紀錄｜" + (post.sourceClassName || "原班") + "</span>" : ""; html += "<div class='post-card-wrapper'><div class='post-card'><div class='post-header'><span>" + SVG.calendar + headerTitle + transferBadge + "</span></div>" + gradeHtml + "<div class='content-section'><div class='section-title'>" + SVG.megaphone + "聯絡事項</div>" + contentHtml + "</div>" + feedbackHtml + "</div></div>";
+                var feedbackHtml = "<div class='feedback-section'>" + uploadHtml + "<div class='section-title'>" + SVG.chat + "留言內容</div><div id='history-" + safeDateId + "'>" + historyHtml + "</div>" + godStickerAdjustmentHtml + adminDirectHtml + studentInputHtml + "</div>"; var headerTitle = escapeHtml(post.date + (post.title ? " " + post.title : "")); var transferBadge = post.isTransferFormerClass ? "<span style='margin-left:8px; background:#fffbeb; color:#92400e; border:1px solid #fde68a; border-radius:999px; padding:2px 8px; font-size:0.78rem; font-weight:900;'>轉班前紀錄｜" + escapeHtml(post.sourceClassName || "原班") + "</span>" : ""; html += "<div class='post-card-wrapper'><div class='post-card'><div class='post-header'><span>" + SVG.calendar + headerTitle + transferBadge + "</span></div>" + gradeHtml + "<div class='content-section'><div class='section-title'>" + SVG.megaphone + "聯絡事項</div>" + contentHtml + "</div>" + feedbackHtml + "</div></div>";
 
             }); container.innerHTML = html;
 
@@ -7283,7 +7523,7 @@
 
         function renderOldGradeCards(grades) {
             var container = document.getElementById('tab-content-1'); if (!grades || grades.length === 0) { container.innerHTML = "<p style='color:#666; padding:10px;'>目前尚無成績紀錄。</p>"; return; } var html = ""; grades.forEach(function (item) {
-                var logic = getDisplayLogic(item, gData ? gData.feedbackHistory : []); var unitDisplay = ""; if (!isNaN(parseFloat(logic.mainScore))) unitDisplay = "<span class='score-unit'>" + item.unit + "</span>"; var displayScore = "<div class='score-val" + logic.mainClass + "'>" + logic.mainScore + unitDisplay + "</div>"; var chartHtml = ""; 
+                var logic = getDisplayLogic(item, gData ? gData.feedbackHistory : []); var unitDisplay = ""; if (!isNaN(parseFloat(logic.mainScore))) unitDisplay = "<span class='score-unit'>" + escapeHtml(item.unit) + "</span>"; var displayScore = "<div class='score-val" + logic.mainClass + "'>" + escapeHtml(logic.mainScore) + unitDisplay + "</div>"; var chartHtml = "";
 var dist = item.dist || [0,0,0,0,0];
 var labels = item.labels || ["0~20","20~40","40~60","60~80","80~100"];
 var maxVal = Math.max(...dist);
@@ -7306,7 +7546,7 @@ dist.forEach((val, idx) => {
     }
     
     var h = (val / maxVal * 100) + '%';
-    barCols += `<div class="v2-bar-col"><div class="v2-bar-fill" data-val="${val}" style="--target-height: ${h}; background: ${fillGrad}; ${boxShad}"></div><div class="v2-bar-label">${lbl}</div></div>`;
+    barCols += `<div class="v2-bar-col"><div class="v2-bar-fill" data-val="${Number(val) || 0}" style="--target-height: ${h}; background: ${fillGrad}; ${boxShad}"></div><div class="v2-bar-label">${escapeHtml(lbl)}</div></div>`;
 });
 chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
 
@@ -7315,11 +7555,11 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         <div class='score-card' onclick='toggleCard(this)'>
             <div class='class-badge'>${escapeHtml(classBadgeText)}</div>
             <div class='card-main'>
-                <div class='exam-info'><span class='exam-date'>${item.date}</span><span class='exam-name'>${item.exam}</span></div>
-                <div class='score-box'>${displayScore}${item.subNote || ""}${logic.statusHtml}<div class='avg-score'>班平均 ${item.average}</div></div>
+                <div class='exam-info'><span class='exam-date'>${escapeHtml(item.date)}</span><span class='exam-name'>${escapeHtml(item.exam)}</span></div>
+                <div class='score-box'>${displayScore}${item.subNote || ""}${logic.statusHtml}<div class='avg-score'>班平均 ${escapeHtml(item.average)}</div></div>
             </div>
             <div class='expand-area'>
-                ${(item.note && !isHomeworkColumnTitle((item.date || "") + (item.exam || ""))) ? "<div class='detail-box'>" + SVG.target + " 補考標準：" + item.note + "</div>" : ""}
+                ${(item.note && !isHomeworkColumnTitle((item.date || "") + (item.exam || ""))) ? "<div class='detail-box'>" + SVG.target + " 補考標準：" + escapeHtml(item.note) + "</div>" : ""}
                 <div class='chart-wrapper'>${chartHtml}</div>
             </div>
             <div class='click-hint'>▼</div>
@@ -7349,6 +7589,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         function renderSidebarStickers(feedbacks, studentName, className) {
             var list = feedbacks.filter(function(h) { return h.type === '棒卡申請'; });
             if (list.length === 0) return '<div style="color:#999; font-size:0.9rem; padding:8px 0;">尚無棒卡申請</div>';
+            window.sidebarStickerActions = [];
             var html = '';
             list.forEach(function(h) {
                 var data = {};
@@ -7364,16 +7605,32 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 var itemBg = isPenalty ? (statusKind === 'pending' ? '#fef2f2' : statusBg) : statusBg;
 
                 var fbKey = h.fbKey || '';
+                var count = Number(data.count);
+                if (!Number.isFinite(count)) count = 0;
+                var actionIndex = window.sidebarStickerActions.length;
+                window.sidebarStickerActions.push({ fbKey: fbKey, className: className, studentName: studentName, count: count, time: h.time || '' });
                 html += "<div style='background:" + itemBg + "; border-radius:12px; padding:10px 12px; margin-bottom:10px; border:" + (isPenalty ? "1px dashed #fca5a5" : "none") + ";'>" +
-                    "<div style='font-weight:700; color:#1e293b; font-size:1rem;'>" + icon + data.reason + " <span style='color:" + countColor + "; font-weight:900;'>" + formatStickerCountText(data.count) + "</span></div>" +
-                    "<div style='font-size:0.85rem; color:#64748b; margin-top:2px;'>" + h.time.substring(5, 16) + " ｜ <span style='background:" + statusBg + "; color:" + statusColor + "; font-weight:700; padding:1px 8px; border-radius:10px;'>" + status + "</span></div>" +
+                    "<div style='font-weight:700; color:#1e293b; font-size:1rem;'>" + icon + escapeHtml(data.reason || '') + " <span style='color:" + countColor + "; font-weight:900;'>" + escapeHtml(formatStickerCountText(data.count)) + "</span></div>" +
+                    "<div style='font-size:0.85rem; color:#64748b; margin-top:2px;'>" + escapeHtml((h.time || '').substring(5, 16)) + " ｜ <span style='background:" + statusBg + "; color:" + statusColor + "; font-weight:700; padding:1px 8px; border-radius:10px;'>" + escapeHtml(status) + "</span></div>" +
                     (status === '待審核' ? "<div style='display:flex; gap:8px; margin-top:8px;'>" +
-                        "<button onclick=\"approveStickerApply(this, '" + fbKey + "','" + className + "','" + studentName + "'," + data.count + ",'" + h.time + "');\" style='flex:1; background:linear-gradient(135deg, var(--primary-light), var(--primary)); color:white; border:none; border-radius:20px; padding:6px; font-weight:700; cursor:pointer;'>✓ 通過</button>" +
-                        "<button onclick=\"rejectStickerApply(this, '" + fbKey + "','" + className + "','" + studentName + "','" + h.time + "');\" style='flex:1; background:#fee2e2; color:#dc2626; border:none; border-radius:20px; padding:6px; font-weight:700; cursor:pointer;'>✗ 退回</button>" +
+                        "<button onclick=\"approveSidebarSticker(this," + actionIndex + ")\" style='flex:1; background:linear-gradient(135deg, var(--primary-light), var(--primary)); color:white; border:none; border-radius:20px; padding:6px; font-weight:700; cursor:pointer;'>✓ 通過</button>" +
+                        "<button onclick=\"rejectSidebarSticker(this," + actionIndex + ")\" style='flex:1; background:#fee2e2; color:#dc2626; border:none; border-radius:20px; padding:6px; font-weight:700; cursor:pointer;'>✗ 退回</button>" +
                     "</div>" : '') +
                     "</div>";
             });
             return html;
+        }
+
+        function approveSidebarSticker(button, index) {
+            var item = (window.sidebarStickerActions || [])[index];
+            if (!item) return;
+            return approveStickerApply(button, item.fbKey, item.className, item.studentName, item.count, item.time);
+        }
+
+        function rejectSidebarSticker(button, index) {
+            var item = (window.sidebarStickerActions || [])[index];
+            if (!item) return;
+            return rejectStickerApply(button, item.fbKey, item.className, item.studentName, item.time);
         }
 
 
@@ -7472,7 +7729,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var listDiv = document.getElementById('stickerReviewList');
             if (pendingList.length === 0) { listDiv.innerHTML = '<div style="color:#999; padding:10px;">無棒卡申請記錄</div>'; return; }
             var html = '';
-            pendingList.forEach(function(item) {
+            pendingList.forEach(function(item, itemIndex) {
                 var isPenalty = parseInt(item.count) < 0;
                 var statusKind = getStickerReviewStatusKind(item.status);
                 var statusBg = statusKind === 'approved' ? '#dcfce7' : (statusKind === 'rejected' ? '#fee2e2' : '#fef9c3');
@@ -7482,16 +7739,30 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 var itemBg = isPenalty ? (statusKind === 'pending' ? '#fef2f2' : statusBg) : statusBg;
 
                 html += '<div style="background:' + itemBg + '; border-radius:12px; padding:12px; margin-bottom:10px; border:' + (isPenalty ? '1px dashed #fca5a5' : 'none') + ';">' +
-                    '<div style="font-weight:700; font-size:1.05rem;"><span style="color:#2563eb;">[' + item.stuName + ']</span> ' + icon + item.reason + ' <span style="color:' + countColor + ';">' + formatStickerCountText(item.count) + '</span></div>' +
-                    '<div style="font-size:0.85rem; color:#64748b; margin:4px 0;">' + item.time.substring(5, 16) + ' ｜ <b style="color:' + statusColor + '">' + item.status + '</b></div>' +
+                    '<div style="font-weight:700; font-size:1.05rem;"><span style="color:#2563eb;">[' + escapeHtml(item.stuName) + ']</span> ' + icon + escapeHtml(item.reason || '') + ' <span style="color:' + countColor + ';">' + escapeHtml(formatStickerCountText(item.count)) + '</span></div>' +
+                    '<div style="font-size:0.85rem; color:#64748b; margin:4px 0;">' + escapeHtml((item.time || '').substring(5, 16)) + ' ｜ <b style="color:' + statusColor + '">' + escapeHtml(item.status) + '</b></div>' +
                     (item.status === '待審核' ?
                         '<div style="display:flex; gap:8px; margin-top:8px;">' +
-                        '<button onclick="approveStickerApply(this, \'' + item.fbKey + '\',\'' + item.cls + '\',\'' + item.stuName + '\',' + item.count + ',\'' + item.time + '\')" style="flex:1; background:linear-gradient(135deg, var(--primary-light), var(--primary)); color:white; border:none; border-radius:20px; padding:8px; font-weight:700; cursor:pointer; font-size:1rem;">✓ 通過</button>' +
-                        '<button onclick="rejectStickerApply(this, \'' + item.fbKey + '\',\'' + item.cls + '\',\'' + item.stuName + '\',\'' + item.time + '\')" style="flex:1; background:#fee2e2; color:#dc2626; border:none; border-radius:20px; padding:8px; font-weight:700; cursor:pointer; font-size:1rem;">✗ 退回</button>' +
+                        '<button onclick="approvePendingStickerAtIndex(this,' + itemIndex + ')" style="flex:1; background:linear-gradient(135deg, var(--primary-light), var(--primary)); color:white; border:none; border-radius:20px; padding:8px; font-weight:700; cursor:pointer; font-size:1rem;">✓ 通過</button>' +
+                        '<button onclick="rejectPendingStickerAtIndex(this,' + itemIndex + ')" style="flex:1; background:#fee2e2; color:#dc2626; border:none; border-radius:20px; padding:8px; font-weight:700; cursor:pointer; font-size:1rem;">✗ 退回</button>' +
                         '</div>' : '') +
                     '</div>';
             });
             listDiv.innerHTML = html;
+        }
+
+        function approvePendingStickerAtIndex(button, index) {
+            var item = (window.currentPendingStickers || [])[index];
+            if (!item) return;
+            var count = Number(item.count);
+            if (!Number.isFinite(count)) return;
+            return approveStickerApply(button, item.fbKey, item.cls, item.stuName, count, item.time);
+        }
+
+        function rejectPendingStickerAtIndex(button, index) {
+            var item = (window.currentPendingStickers || [])[index];
+            if (!item) return;
+            return rejectStickerApply(button, item.fbKey, item.cls, item.stuName, item.time);
         }
 
         async function approveAllStickers() {
@@ -7655,7 +7926,15 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             submitBtn.disabled = true;
 
             var content = JSON.stringify({ reason: reason, count: count, status: "待審核" });
-            var form = { className: gData.className, studentName: gData.studentName, targetDate: realDate, type: '棒卡申請', content: content };
+            var form;
+            try {
+                form = { className: gData.className, sourceClassName: resolveStudentActionSourceClassName(realDate), studentName: gData.studentName, targetDate: realDate, type: '棒卡申請', content: content };
+            } catch (sourceErr) {
+                swalAlert('無法送出棒卡申請', sourceErr.message || String(sourceErr), 'warning');
+                submitBtn.innerText = "送出申請";
+                submitBtn.disabled = false;
+                return;
+            }
             google.script.run.withSuccessHandler(function(res) {
                 if (!res || res.success !== true) {
                     swalAlert('棒卡申請送出失敗', getSubmitFailureMessage(res), 'warning');
@@ -7679,8 +7958,16 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             if (!gData || !gData.className || !gData.studentName) return;
             if (!(await confirmStudentPreviewAction("回報作業完成"))) return;
             if (!shouldUseHomeworkDoneFlowForClass(gData.className)) return;
+            var sourceClassName;
+            try {
+                sourceClassName = resolveStudentActionSourceClassName(realDate);
+            } catch (sourceErr) {
+                swalAlert('無法回報作業完成', sourceErr.message || String(sourceErr), 'warning');
+                return;
+            }
             var post = (gData.dailyPost || []).find(function(item) {
-                return item && item.date === realDate;
+                return item && item.date === realDate && !item.isTransferFormerClass &&
+                    ((item.sourceClassName || item.className || gData.className) === sourceClassName);
             });
             var homeworkText = getPostHomeworkText(post || {});
             if (!homeworkText) {
@@ -7696,6 +7983,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             if (hint) hint.innerText = "正在寫入作業完成回報...";
             var form = {
                 className: (post && post.className) || gData.className,
+                sourceClassName: sourceClassName,
                 studentName: gData.studentName,
                 targetDate: realDate,
                 homeworkText: homeworkText
@@ -7773,7 +8061,14 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
 
             var content = JSON.stringify({ reason: reason, count: count, status: "待審核" });
             // 送出型態一樣使用 '棒卡申請' 以相容後台邏輯，但 count 為負數
-            var form = { className: gData.className, studentName: gData.studentName, targetDate: realDate, type: '棒卡申請', content: content };
+            var form;
+            try {
+                form = { className: gData.className, sourceClassName: resolveStudentActionSourceClassName(realDate), studentName: gData.studentName, targetDate: realDate, type: '棒卡申請', content: content };
+            } catch (sourceErr) {
+                swalAlert('無法送出反省申報', sourceErr.message || String(sourceErr), 'warning');
+                if(submitBtn) { submitBtn.innerText = "送出反省"; submitBtn.disabled = false; }
+                return;
+            }
             
             google.script.run.withSuccessHandler(function(res) {
                 if (!res || res.success !== true) {
@@ -7800,7 +8095,15 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var btn = document.querySelector("#" + inputId + " + button");
             if (btn && !contentOverride) { btn.innerText = "傳送中..."; btn.disabled = true; }
 
-            var form = { className: gData.className, studentName: gData.studentName, targetDate: realDate, type: type, content: val };
+            var form;
+            try {
+                form = { className: gData.className, sourceClassName: resolveStudentActionSourceClassName(realDate), studentName: gData.studentName, targetDate: realDate, type: type, content: val };
+            } catch (sourceErr) {
+                swalAlert('無法送出', sourceErr.message || String(sourceErr), 'warning');
+                if (btn) { btn.innerText = "送出"; btn.disabled = false; }
+                if (failureCallback) failureCallback(sourceErr);
+                return;
+            }
 
             google.script.run.withSuccessHandler(function (res) {
                 if (!res || res.success !== true) {
@@ -7832,7 +8135,14 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             if (!val) return; 
             var btn = document.querySelector("#" + inputId + " + button"); 
             btn.innerText = "送出..."; btn.disabled = true; 
-            var form = { className: gData.className, studentName: gData.studentName, targetDate: realDate, type: FEEDBACK_TYPE_LABELS.makeup, content: val };
+            var form;
+            try {
+                form = { className: gData.className, sourceClassName: resolveStudentActionSourceClassName(realDate), studentName: gData.studentName, targetDate: realDate, type: FEEDBACK_TYPE_LABELS.makeup, content: val };
+            } catch (sourceErr) {
+                swalAlert('無法回報缺考分數', sourceErr.message || String(sourceErr), 'warning');
+                btn.innerText = "送出"; btn.disabled = false;
+                return;
+            }
             if (hasExamColIndex) {
                 form.targetExamColIndex = examColIndex;
                 form.targetExamTitle = examTitle || "";
@@ -7936,11 +8246,12 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     btn.disabled = false;
                     btn.innerText = originalText;
                     if (res.success) { 
-                        alert("✅ 修改成功！下次登入請使用新密碼。"); 
+                        alert("✅ 修改成功！請使用新密碼重新登入。");
                         closePwdModal(); 
                         // 清空欄位
                         document.getElementById('oldP').value = "";
                         document.getElementById('newP').value = "";
+                        doLogout();
                     } 
                     else { alert("❌ " + res.msg); } 
                 })
@@ -8082,7 +8393,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 return;
             }
             
-            var stickyId = 'sticky_' + (sticky.id || sticky.time.replace(/[: /]/g, '_'));
+            var stickyId = 'sticky_' + makeDomSafeId(sticky.id || (sticky.time || '').replace(/[: /]/g, '_'));
             if (!isDashboardDraftPreviewMode && localStorage.getItem(stickyId) === 'dismissed') { container.innerHTML = ''; return; }
             
             // 4. 內容處理：如果沒內容就只顯示標題，避免出現多餘的冒號
@@ -8100,9 +8411,16 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                             <div class="sticky-notice-text">${displayContentHtml}</div>
                         </div>
                     </div>
-                    <div class="sticky-notice-close" onclick="event.stopPropagation(); dismissStickyNotice('${stickyId}')">✕</div>
+                    <div class="sticky-notice-close" id="active-sticky-close">✕</div>
                 </div>
             `;
+            var closeButton = document.getElementById('active-sticky-close');
+            if (closeButton) {
+                closeButton.addEventListener('click', function(event) {
+                    event.stopPropagation();
+                    dismissStickyNotice(stickyId);
+                });
+            }
             
             // 啟動捲動檢測
             setTimeout(function() {
@@ -8179,9 +8497,13 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
 
         function escapeInlineJs(str) {
             return (str === undefined || str === null ? "" : str.toString())
+                .replace(/&/g, "&amp;")
+                .replace(/"/g, "&quot;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
                 .replace(/\\/g, "\\\\")
                 .replace(/'/g, "\\'")
-                .replace(/\n/g, " ");
+                .replace(/[\r\n]/g, " ");
         }
 
         function makeDomSafeId(str) {
@@ -8214,7 +8536,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         }
 
         function getGodSessionCallable(name) {
-            return firebase.functions().httpsCallable(name);
+            return ebookFunctions.httpsCallable(name);
         }
 
         function markEbookGodSessionActivity() {
@@ -8226,8 +8548,14 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var now = Date.now();
             if (!force && now - ebookGodSessionLastRenewAt < 30000) return ebookGodSessionInfo;
             var fn = getGodSessionCallable('getEbookGodSession');
-            var result = await fn({ sessionId: ebookGodSessionId });
+            var needsFirebaseToken = !!force;
+            var result = await fn({ sessionId: ebookGodSessionId, includeFirebaseToken: needsFirebaseToken });
             ebookGodSessionInfo = result && result.data ? result.data : null;
+            if (ebookGodSessionInfo && ebookGodSessionInfo.firebaseCustomToken) {
+                await ebookAuth.setPersistence(firebase.auth.Auth.Persistence.NONE);
+                await ebookAuth.signInWithCustomToken(ebookGodSessionInfo.firebaseCustomToken);
+            }
+            ebookAuthSessionInfo = ebookGodSessionInfo;
             ebookGodSessionLastRenewAt = now;
             return ebookGodSessionInfo;
         }
@@ -8383,11 +8711,14 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 btn.innerText = '傳送中';
             }
             try {
+                context.clientRequestId = context.clientRequestId || createClientRequestId('god_direct');
                 var fn = getGodSessionCallable('sendEbookGodDirectMessage');
                 var result = await fn({
                     sessionId: ebookGodSessionId,
                     targetDate: context.targetDate,
-                    content: content
+                    sourceClassName: context.sourceClassName || context.className || gData.className,
+                    content: content,
+                    clientRequestId: context.clientRequestId
                 });
                 if (result && result.data && result.data.expiresAt && ebookGodSessionInfo) {
                     ebookGodSessionInfo.expiresAt = result.data.expiresAt;
@@ -8522,10 +8853,14 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             if (btn) btn.innerText = '處理中';
             if (status) status.textContent = '寫入中...';
             try {
+                context.requestId = context.requestId || createClientRequestId('sticker_adjust');
                 await runGodAdminAction('writeStickerAdjustmentGas', {
                     className: gData.className,
                     studentName: gData.studentName,
                     targetDate: context.targetDate,
+                    sourceClassName: context.sourceClassName || gData.className,
+                    balanceClassName: gData.className,
+                    requestId: context.requestId,
                     reason: adjustment.reason,
                     count: adjustment.count
                 });
@@ -8648,6 +8983,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 await runGodAdminAction('writeMakeupResultColorGas', {
                     className: gData.className,
                     studentName: gData.studentName,
+                    gradeClassName: context.gradeClassName || gData.className,
+                    sourceClassName: context.sourceClassName || gData.className,
                     examColIndex: context.examColIndex,
                     targetDateStr: context.targetDate || "",
                     targetExamTitle: context.title || "",
@@ -8696,6 +9033,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     className: gData.className,
                     studentName: gData.studentName,
                     targetDateStr: context.targetDate,
+                    sourceClassName: context.scoreReview.storedClassName || context.sourceClassName || gData.className,
+                    gradeClassName: context.gradeClassName || gData.className,
                     scoreValue: finalScore
                 };
                 if (context.examColIndex !== undefined && context.examColIndex !== null && context.examColIndex !== "") {
@@ -8763,6 +9102,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     className: gData.className,
                     studentName: gData.studentName,
                     targetDateStr: context.targetDate,
+                    gradeClassName: context.gradeClassName || gData.className,
+                    sourceClassName: context.sourceClassName || gData.className,
                     scoreValue: finalScore,
                     examColIndex: context.examColIndex,
                     targetExamTitle: context.title || "",
@@ -8810,13 +9151,15 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }
 
             try {
+                context.clientRequestId = context.clientRequestId || createClientRequestId('god_reply');
                 var fn = getGodSessionCallable('sendEbookGodReply');
                 var result = await fn({
                     sessionId: ebookGodSessionId,
                     feedbackKey: context.fbKey,
                     targetDate: context.targetDate,
                     replyContent: content,
-                    sourceClassName: context.sourceClassName || gData.className
+                    sourceClassName: context.storedClassName || context.sourceClassName || gData.className,
+                    clientRequestId: context.clientRequestId
                 });
                 if (result && result.data && result.data.expiresAt && ebookGodSessionInfo) {
                     ebookGodSessionInfo.expiresAt = result.data.expiresAt;
@@ -9450,7 +9793,6 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                         if (requireTitle && !examMatchesFeedbackTitle(candidate)) continue;
                         matches.push(withResolvedExam(colKey, candidate));
                     }
-                    if (requireTitle) return matches[0] || null;
                     return matches.length === 1 ? matches[0] : null;
                 }
                 if (targetCol !== "") {
@@ -9541,6 +9883,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 if (isMakeupResult) {
                     displayContent = getMakeupResultReportContentHtml(item.content);
                 } else {
+                    displayContent = escapeHtml(displayContent);
                     displayContent = displayContent.replace(/\[quote:([^\]]+)\](.*?)\[\/quote\]/gi, function(match, qtype, qContent) {
                         return "<div style='background:#e2e8f0; padding:6px 10px; border-left:3px solid #94a3b8; margin-bottom:6px; font-size:0.85rem; color:#475569;'><b>" + qtype + "</b>: " + qContent + "</div>";
                     });
@@ -9552,23 +9895,23 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     var flagColor = (item.statusFlag.indexOf('未回填') > -1 || item.statusFlag.indexOf('待登記') > -1) ? '#ef4444' : (item.statusFlag.indexOf('需更新') > -1 ? '#f59e0b' : '#64748b');
                     var sheetInfo = isScoreReport ? (item.sheetScore ? "大表: " + item.sheetScore : "大表: 空白") : (item.sheetColor ? "已填顏色: " + item.sheetColor : "尚未填顏色");
                     statusTagHtml = '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">' +
-                                    '<span style="display:inline-block; background:#e2e8f0; padding:3px 10px; border-radius:12px; font-size:0.8rem; font-weight:bold; color:#475569;" id="fb-type-'+idx+'">' + getAdminFeedbackTypeDisplayLabel(item.type) + '</span>' +
-                                    '<span style="font-size:0.85rem; font-weight:bold; color:' + flagColor + ';">' + item.statusFlag + ' <span style="font-size:0.75rem; color:#94a3b8;">[' + sheetInfo + ']</span></span>' +
+                                    '<span style="display:inline-block; background:#e2e8f0; padding:3px 10px; border-radius:12px; font-size:0.8rem; font-weight:bold; color:#475569;" id="fb-type-'+idx+'">' + escapeHtml(getAdminFeedbackTypeDisplayLabel(item.type)) + '</span>' +
+                                    '<span style="font-size:0.85rem; font-weight:bold; color:' + flagColor + ';">' + escapeHtml(item.statusFlag) + ' <span style="font-size:0.75rem; color:#94a3b8;">[' + escapeHtml(sheetInfo) + ']</span></span>' +
                                     '</div>';
                 } else {
-                    statusTagHtml = '<div style="margin-bottom:6px;"><span style="display:inline-block; background:#e2e8f0; padding:3px 10px; border-radius:12px; font-size:0.8rem; font-weight:bold; color:#475569;" id="fb-type-'+idx+'">' + getAdminFeedbackTypeDisplayLabel(item.type) + '</span></div>';
+                    statusTagHtml = '<div style="margin-bottom:6px;"><span style="display:inline-block; background:#e2e8f0; padding:3px 10px; border-radius:12px; font-size:0.8rem; font-weight:bold; color:#475569;" id="fb-type-'+idx+'">' + escapeHtml(getAdminFeedbackTypeDisplayLabel(item.type)) + '</span></div>';
                 }
 
                 let tInfo = getTeacherInfo(item.cls);
                 html += '<div style="background:' + bg + '; border-radius:12px; border-left:5px solid ' + accent + '; padding:12px; margin-bottom:10px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">' +
                     '<div style="font-size:0.85rem; color:#64748b; margin-bottom:4px; display:flex; justify-content:space-between;">' +
-                    '<span>📅 ' + item.date + '</span><span>' + item.time.substring(5, 16) + '</span></div>' +
-                    '<div style="font-weight:700; font-size:1.1rem; color:#1e293b; margin-bottom:4px;"><span style="color:#2563eb;">[' + item.stuName + ']</span></div>' +
+                    '<span>📅 ' + escapeHtml(item.date) + '</span><span>' + escapeHtml((item.time || '').substring(5, 16)) + '</span></div>' +
+                    '<div style="font-weight:700; font-size:1.1rem; color:#1e293b; margin-bottom:4px;"><span style="color:#2563eb;">[' + escapeHtml(item.stuName) + ']</span></div>' +
                     statusTagHtml +
                     '<div style="font-size:1rem; color:#334155; word-break:break-all; line-height:1.4; margin-bottom:10px;" id="fb-content-'+idx+'">' + displayContent + '</div>' +
                     '<div style="display:flex; gap:6px;">' +
                     '<input type="text" id="fb-reply-'+idx+'" placeholder="輸入' + tInfo.name + '老師回覆..." style="flex:1; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.95rem;">' +
-                    '<button onclick="sendAdminReply('+idx+', \'' + item.safeC + '\', \'' + item.stuKey + '\', \'' + item.date + '\', \'' + item.cls + '\', \'' + item.stuName + '\')" style="background:#3b82f6; color:white; border:none; border-radius:6px; padding:8px 14px; font-weight:700; cursor:pointer; flex-shrink:0;">立即回覆</button>' +
+                    '<button onclick="sendAdminReply('+idx+', \'' + escapeInlineJs(item.safeC) + '\', \'' + escapeInlineJs(item.stuKey) + '\', \'' + escapeInlineJs(item.date) + '\', \'' + escapeInlineJs(item.cls) + '\', \'' + escapeInlineJs(item.stuName) + '\')" style="background:#3b82f6; color:white; border:none; border-radius:6px; padding:8px 14px; font-weight:700; cursor:pointer; flex-shrink:0;">立即回覆</button>' +
                     (isScoreReport && item.statusFlag !== "✅ 已回填" && item.statusFlag !== "🌚 已作廢" ? '<button id="btn-score-'+idx+'" onclick="autoWriteScore('+idx+', \'' + escapeInlineJs(item.cls) + '\', \'' + escapeInlineJs(item.stuName) + '\', \'' + escapeInlineJs(item.date) + '\', \'' + escapeInlineJs(item.resolvedExamColIndex || item.targetExamColIndex || "") + '\', \'' + escapeInlineJs(item.resolvedExamTitle || item.targetExamTitle || "") + '\')" style="background:#10b981; color:white; border:none; border-radius:6px; padding:8px 14px; font-weight:700; cursor:pointer; flex-shrink:0;">📝 自動填入</button>' : '') +
                     '</div>' +
                 '</div>';
@@ -9623,7 +9966,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             
             const { value: finalScore } = await Swal.fire({
                 title: '寫入成績確認',
-                html: '即將寫入 <b>' + stuName + '</b> 在 <b>' + targetDate + '</b> 的考試欄位。<br><br>系統已萃取出分數，您可以修改要寫入的值：',
+                html: '即將寫入 <b>' + escapeHtml(stuName) + '</b> 在 <b>' + escapeHtml(targetDate) + '</b> 的考試欄位。<br><br>系統已萃取出分數，您可以修改要寫入的值：',
                 input: 'text',
                 inputValue: extractedScore,
                 showCancelButton: true,
@@ -9858,7 +10201,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             try {
                 var missingList = [];
                 // 1. 讀取 Firebase 快取資料
-                const db = firebase.database();
+                const db = ebookFirebaseApp.database();
 	                var allStudents = {};
 	                var allGrades = {};
 		                var allFeedbacks = {};

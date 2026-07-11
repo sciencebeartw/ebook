@@ -19,7 +19,7 @@ function extractFunction(name) {
   throw new Error(`Could not extract function ${name}`);
 }
 
-const context = {};
+const context = { EbookLifecycleApp: require('../ebook_lifecycle_app.js') };
 vm.createContext(context);
 [
   'parseEbookComparableDate',
