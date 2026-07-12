@@ -2163,6 +2163,36 @@
             opacity: 0.72;
         }
 
+        /* 送出中的按鈕保留文字與尺寸，避免家長誤以為畫面卡住。 */
+        .ebook-submit-loading {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 3px;
+            min-width: 2.15em;
+            vertical-align: middle;
+        }
+
+        .ebook-submit-loading-dot {
+            width: 0.32em;
+            height: 0.32em;
+            border-radius: 999px;
+            background: currentColor;
+            animation: ebook-submit-dot-bounce 0.9s ease-in-out infinite;
+        }
+
+        .ebook-submit-loading-dot:nth-child(2) { animation-delay: 0.15s; }
+        .ebook-submit-loading-dot:nth-child(3) { animation-delay: 0.3s; }
+
+        @keyframes ebook-submit-dot-bounce {
+            0%, 65%, 100% { transform: translateY(0); opacity: 0.45; }
+            32% { transform: translateY(-0.28em); opacity: 1; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .ebook-submit-loading-dot { animation: none; opacity: 0.8; }
+        }
+
         .makeup-wrong-count-hint {
             color: #9a3412;
             font-size: 0.9rem;
@@ -3333,6 +3363,39 @@
 
     function getSubmitFailureMessage(res, fallback) {
       return (res && res.msg) ? res.msg : (fallback || "Google Sheet 寫入或 Firebase 同步失敗，請稍後再試。");
+    }
+
+    // ★★★ 學生端送出按鈕回饋 ★★★
+    // 全部送出流程共用：文字仍可讀、三點動畫提示正在處理，並防止重複送出。
+    function setEbookSubmitLoading(btn, label) {
+      if (!btn) return;
+      if (!btn.dataset.ebookSubmitLabel) btn.dataset.ebookSubmitLabel = (btn.textContent || "送出").trim();
+      btn.disabled = true;
+      btn.classList.add("ebook-submit-pending");
+      btn.setAttribute("aria-busy", "true");
+      btn.textContent = "";
+      var text = document.createElement("span");
+      text.textContent = label || "送出中";
+      var dots = document.createElement("span");
+      dots.className = "ebook-submit-loading";
+      dots.setAttribute("aria-hidden", "true");
+      for (var i = 0; i < 3; i++) {
+        var dot = document.createElement("span");
+        dot.className = "ebook-submit-loading-dot";
+        dots.appendChild(dot);
+      }
+      btn.appendChild(text);
+      btn.appendChild(dots);
+    }
+
+    function clearEbookSubmitLoading(btn, label, keepDisabled) {
+      if (!btn) return;
+      var nextLabel = label || btn.dataset.ebookSubmitLabel || "送出";
+      btn.textContent = nextLabel;
+      btn.classList.remove("ebook-submit-pending");
+      btn.removeAttribute("aria-busy");
+      delete btn.dataset.ebookSubmitLabel;
+      btn.disabled = keepDisabled === true;
     }
 
     function confirmStudentPreviewAction(actionLabel) {
@@ -8025,8 +8088,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             if (!reason || reason === '__placeholder__') { alert('請選擇或填寫得棒名目！'); return; }
             if (!count || count < 5) { alert('最少申請 5 棒！'); return; }
             
-            submitBtn.innerText = "傳送中...";
-            submitBtn.disabled = true;
+            setEbookSubmitLoading(submitBtn, "送出中");
 
             var content = JSON.stringify({ reason: reason, count: count, status: "待審核" });
             var form;
@@ -8034,26 +8096,25 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 form = { className: gData.className, sourceClassName: resolveStudentActionSourceClassName(realDate), studentName: gData.studentName, targetDate: realDate, type: '棒卡申請', content: content };
             } catch (sourceErr) {
                 swalAlert('無法送出棒卡申請', sourceErr.message || String(sourceErr), 'warning');
-                submitBtn.innerText = "送出申請";
-                submitBtn.disabled = false;
+                clearEbookSubmitLoading(submitBtn, "送出申請");
                 return;
             }
             google.script.run.withSuccessHandler(function(res) {
                 if (!res || res.success !== true) {
                     swalAlert('棒卡申請送出失敗', getSubmitFailureMessage(res), 'warning');
-                    if (submitBtn) { submitBtn.innerText = "送出申請"; submitBtn.disabled = false; }
+                    clearEbookSubmitLoading(submitBtn, "送出申請");
                     return;
                 }
                 // 不需要手動寫入 Firebase，因為 GAS 的 submitFeedback 內部會觸發單筆 feedback 同步
                 // 且 Firebase .on('value') 監聽器會處理即時更新
                 if (selEl) { selEl.selectedIndex = 0; }
                 if (customEl) { customEl.value = ''; customEl.style.display = 'none'; }
-                if (submitBtn) { submitBtn.innerText = "送出申請"; submitBtn.disabled = false; }
+                clearEbookSubmitLoading(submitBtn, "送出申請");
                 
                 alert("棒卡申請已送出！請等待老師審核。");
             }).withFailureHandler(function(e) {
                 swalAlert('棒卡申請送出失敗', friendlySubmitError(e), 'warning');
-                if (submitBtn) { submitBtn.innerText = "送出申請"; submitBtn.disabled = false; }
+                clearEbookSubmitLoading(submitBtn, "送出申請");
             }).submitFeedback(form);
         }
 
@@ -8160,7 +8221,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             
             if (!confirm("確定要送出此改進申報？送出後將於審核通過扣除棒數。")) return;
             
-            if(submitBtn) { submitBtn.innerText = "傳送中..."; submitBtn.disabled = true; }
+            setEbookSubmitLoading(submitBtn, "送出中");
 
             var content = JSON.stringify({ reason: reason, count: count, status: "待審核" });
             // 送出型態一樣使用 '棒卡申請' 以相容後台邏輯，但 count 為負數
@@ -8169,23 +8230,23 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 form = { className: gData.className, sourceClassName: resolveStudentActionSourceClassName(realDate), studentName: gData.studentName, targetDate: realDate, type: '棒卡申請', content: content };
             } catch (sourceErr) {
                 swalAlert('無法送出反省申報', sourceErr.message || String(sourceErr), 'warning');
-                if(submitBtn) { submitBtn.innerText = "送出反省"; submitBtn.disabled = false; }
+                clearEbookSubmitLoading(submitBtn, "送出反省");
                 return;
             }
             
             google.script.run.withSuccessHandler(function(res) {
                 if (!res || res.success !== true) {
                     swalAlert('申報送出失敗', getSubmitFailureMessage(res), 'warning');
-                    if(submitBtn) { submitBtn.innerText = "送出反省"; submitBtn.disabled = false; }
+                    clearEbookSubmitLoading(submitBtn, "送出反省");
                     return;
                 }
                 if (selEl) { selEl.selectedIndex = 0; }
                 if (customEl) { customEl.value = ''; customEl.style.display = 'none'; }
-                if(submitBtn) { submitBtn.innerText = "送出反省"; submitBtn.disabled = false; }
+                clearEbookSubmitLoading(submitBtn, "送出反省");
                 alert("改進申報已送出！勇敢面對是成長的開始。");
             }).withFailureHandler(function(e) {
                 swalAlert('申報送出失敗', friendlySubmitError(e), 'warning');
-                if(submitBtn) { submitBtn.innerText = "送出反省"; submitBtn.disabled = false; }
+                clearEbookSubmitLoading(submitBtn, "送出反省");
             }).submitFeedback(form);
         }
 
@@ -8196,14 +8257,14 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             if (!val) return;
 
             var btn = document.querySelector("#" + inputId + " + button");
-            if (btn && !contentOverride) { btn.innerText = "傳送中..."; btn.disabled = true; }
+            if (btn && !contentOverride) setEbookSubmitLoading(btn, "送出中");
 
             var form;
             try {
                 form = { className: gData.className, sourceClassName: resolveStudentActionSourceClassName(realDate), studentName: gData.studentName, targetDate: realDate, type: type, content: val };
             } catch (sourceErr) {
                 swalAlert('無法送出', sourceErr.message || String(sourceErr), 'warning');
-                if (btn) { btn.innerText = "送出"; btn.disabled = false; }
+                clearEbookSubmitLoading(btn, "送出");
                 if (failureCallback) failureCallback(sourceErr);
                 return;
             }
@@ -8211,7 +8272,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             google.script.run.withSuccessHandler(function (res) {
                 if (!res || res.success !== true) {
                     swalAlert("送出失敗", getSubmitFailureMessage(res), 'warning');
-                    if (btn) { btn.innerText = "送出"; btn.disabled = false; }
+                    clearEbookSubmitLoading(btn, "送出");
                     if (failureCallback) failureCallback(res);
                     return;
                 }
@@ -8219,13 +8280,13 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 if (!contentOverride) {
                     var el = document.getElementById(inputId);
                     if (el) el.value = "";
-                    if (btn) { btn.innerText = "送出"; btn.disabled = false; }
+                    clearEbookSubmitLoading(btn, "送出");
                     alert("已送出！");
                 }
                 if (callback) callback();
             }).withFailureHandler(function (e) {
                 swalAlert("送出失敗", friendlySubmitError(e), 'warning');
-                if (btn) { btn.innerText = "送出"; btn.disabled = false; }
+                clearEbookSubmitLoading(btn, "送出");
                 if (failureCallback) failureCallback(e);
             }).submitFeedback(form);
         }
@@ -8237,13 +8298,13 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var val = document.getElementById(inputId).value; 
             if (!val) return; 
             var btn = document.querySelector("#" + inputId + " + button"); 
-            btn.innerText = "送出..."; btn.disabled = true; 
+            setEbookSubmitLoading(btn, "送出中");
             var form;
             try {
                 form = { className: gData.className, sourceClassName: resolveStudentActionSourceClassName(realDate), studentName: gData.studentName, targetDate: realDate, type: FEEDBACK_TYPE_LABELS.makeup, content: val };
             } catch (sourceErr) {
                 swalAlert('無法回報缺考分數', sourceErr.message || String(sourceErr), 'warning');
-                btn.innerText = "送出"; btn.disabled = false;
+                clearEbookSubmitLoading(btn, "送出");
                 return;
             }
             if (hasExamColIndex) {
@@ -8253,17 +8314,17 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             google.script.run.withSuccessHandler(function (res) { 
                 if (!res || res.success !== true) {
                     swalAlert("回報失敗", getSubmitFailureMessage(res), 'warning');
-                    btn.innerText = "送出"; btn.disabled = false;
+                    clearEbookSubmitLoading(btn, "送出");
                     return;
                 }
                 var inputEl = document.getElementById(inputId);
                 if (inputEl) inputEl.value = "";
-                if (btn) { btn.innerText = "已送出"; btn.disabled = true; }
+                clearEbookSubmitLoading(btn, "已送出", true);
                 appendLocalScoreReportFeedback(form, res);
                 swalAlert("已回報缺考分數", "分數已送出，等待老師回填大表。", "success");
             }).withFailureHandler(function (e) { 
                 swalAlert("回報失敗", friendlySubmitError(e), 'warning');
-                btn.innerText = "送出"; btn.disabled = false; 
+                clearEbookSubmitLoading(btn, "送出");
             }).submitFeedback(form); 
         }
 
@@ -8303,7 +8364,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 return;
             }
             var btn = submitButtonId ? document.getElementById(submitButtonId) : (input ? input.nextElementSibling : null);
-            if (btn) { btn.innerText = "送出..."; }
+            setEbookSubmitLoading(btn, "送出中");
             setMakeupWrongCountWidgetDisabled(input, true);
             var currentExam = (gData.grades || []).find(function(item) {
                 return item && String(item.colIndex) === String(examColIndex);
@@ -8335,17 +8396,17 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 if (!res || res.success !== true) {
                     swalAlert("回報失敗", getSubmitFailureMessage(res), 'warning');
                     setMakeupWrongCountWidgetDisabled(input, false);
-                    if (btn) { btn.innerText = "送出錯題數"; }
+                    clearEbookSubmitLoading(btn, "送出錯題數");
                     return;
                 }
                 if (input) input.value = "";
-                if (btn) { btn.innerText = "已送出"; btn.disabled = true; }
+                clearEbookSubmitLoading(btn, "已送出", true);
                 appendLocalScoreReportFeedback(form, res);
                 swalAlert("已回報補考結果", "錯題數已送出，等待老師登記補考結果。", "success");
             }).withFailureHandler(function (e) {
                 swalAlert("回報失敗", friendlySubmitError(e), 'warning');
                 setMakeupWrongCountWidgetDisabled(input, false);
-                if (btn) { btn.innerText = "送出錯題數"; }
+                clearEbookSubmitLoading(btn, "送出錯題數");
             }).submitFeedback(form);
         }
         function openPwdModal() { document.getElementById('pwdModal').style.display = 'flex'; }
