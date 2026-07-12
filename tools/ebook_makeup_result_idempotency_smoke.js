@@ -88,4 +88,9 @@ const shiftedStableFeedback = [{
 assert(stableIdContext.getLatestMakeupResultReportInfo(stableExam, shiftedStableFeedback), "matching exam IDs must survive column and title drift");
 assert.strictEqual(stableIdContext.getLatestMakeupResultReportInfo(stableExam, [{ ...shiftedStableFeedback[0], targetExamId: "exam_87654321-4321-4abc-8def-ba0987654321" }]), null, "different exam IDs must never hide the form");
 
+const dailyPostRenderer = extractFunction(html, "renderDailyPosts");
+assert(dailyPostRenderer.includes("function getPostSourceHistory(postData)"), "pending makeup reports must have a same-source, cross-date history view");
+assert(dailyPostRenderer.includes("buildPendingMakeupResultReportHtml(post, sourceHistory"), "a prior-date makeup report must hide the latest-post input form");
+assert(!dailyPostRenderer.includes("buildPendingMakeupResultReportHtml(post, myHistory"), "pending makeup reports must not be limited to the latest post date");
+
 console.log("ebook makeup result idempotency/UI smoke passed");

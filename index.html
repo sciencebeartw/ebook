@@ -7297,8 +7297,16 @@
                     return isRecordFromPostSource(h.sourceClassKey, postSourceClassKey);
                 }).sort(function(a, b) { return new Date(a.time) - new Date(b.time); });
             }
+            function getPostSourceHistory(postData) {
+                var postSourceClassKey = postData.sourceClassKey || "";
+                return (history || []).filter(function(h) {
+                    return isRecordFromPostSource(h.sourceClassKey, postSourceClassKey);
+                }).sort(function(a, b) { return new Date(a.time) - new Date(b.time); });
+            }
             var container = document.getElementById('tab-content-0'); if (!posts || posts.length === 0) { container.innerHTML = "<div style='text-align:center; padding:30px; color:#999;'>目前沒有聯絡簿資料</div>"; return; } var latestStickerPostDate = posts[0] && posts[0].date; var latestPostDate = posts[0] && posts[0].date; var html = ""; posts.forEach(function (post) {
                 var myHistory = getPostScopedHistory(post);
+                // 上次補考可能屬於更早的聯絡簿日期；只限制同一來源班級，不可限制成目前 post 日期。
+                var sourceHistory = getPostSourceHistory(post);
                 var examCards = (post.examData && post.examData.exams && post.examData.exams.length)
                     ? post.examData.exams
                     : ((post.examData && post.examData.main) ? [{ main: post.examData.main, others: post.examData.others || [] }] : []);
@@ -7462,7 +7470,7 @@
                     if (hwIdx === homeworkItems.length - 1) extra += buildHomeworkDoneButton(post);
                     fields.push({ label: item.label, val: item.val, extra: extra });
                 });
-                fields = fields.concat(buildPostMakeupFields(post, buildPendingMakeupResultReportHtml(post, myHistory, examCards, latestPostDate)), [{ label: "下次考試範圍", val: post.range }, { label: "補充資訊", val: post.note }]);
+                fields = fields.concat(buildPostMakeupFields(post, buildPendingMakeupResultReportHtml(post, sourceHistory, examCards, latestPostDate)), [{ label: "下次考試範圍", val: post.range }, { label: "補充資訊", val: post.note }]);
                 fields.forEach(function (f) { contentHtml += renderPostInfoBlock(f); }); var historyHtml = ""; myHistory.forEach(function (h) { if (!isMakeupScoreReportType(h.type) && h.type !== FEEDBACK_TYPE_LABELS.makeupResult) { var displayType = (h.type === FEEDBACK_TYPE_LABELS.parent || h.type === FEEDBACK_TYPE_LABELS.parentStudent || h.type === FEEDBACK_TYPE_LABELS.student) ? "學生留言" : h.type; var isTeacher = (!isStudentSideFeedbackType(h.type) && !isMakeupScoreReportType(h.type));
                         var avatarClass = isTeacher ? "avatar-teacher" : "avatar-student";
                         var bodyClass = isTeacher ? "teacher-body" : "";
