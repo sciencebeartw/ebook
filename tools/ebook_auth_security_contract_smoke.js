@@ -276,7 +276,7 @@ checkIncludes(stickerReviewUi, 'sourceClassName: context.sourceClassName', 'god 
 const stickerAdjustmentUi = extractFunction(html, 'writeGodStickerAdjustment');
 checkIncludes(stickerAdjustmentUi, 'sourceClassName: context.sourceClassName', 'god sticker adjustment must target the post source class');
 const makeupColorUi = extractFunction(html, 'setGodMakeupResultColor');
-checkIncludes(makeupColorUi, 'sourceClassName: context.sourceClassName', 'god makeup color must target the historical exam source class');
+checkIncludes(makeupColorUi, 'sourceClassName: (colorReview && colorReview.storedClassName) || context.sourceClassName', 'god makeup color must target the verified result feedback source class');
 const makeupScoreUi = extractFunction(html, 'writeGodMakeupScore');
 checkIncludes(makeupScoreUi, 'context.scoreReview.storedClassName || context.sourceClassName', 'god reported-score writeback must prefer stored feedback class');
 const directMakeupScoreUi = extractFunction(html, 'writeGodDirectMakeupScore');

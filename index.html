@@ -7054,6 +7054,9 @@
                 return {
                     feedbackKey: fb.fbKey || "",
                     targetDate: fb.targetDate || "",
+                    targetExamColIndex: fb.targetExamColIndex || "",
+                    targetExamTitle: fb.targetExamTitle || "",
+                    targetExamId: typeof normalizeEbookFeedbackExamId === 'function' ? normalizeEbookFeedbackExamId(fb.targetExamId) : '',
                     storedClassKey: fb.storedClassKey || fb.sourceClassKey || "",
                     storedClassName: fb.storedClassName || fb.sourceClassName || "",
                     content: fb.content || "",
@@ -7142,7 +7145,7 @@
             }
             if (canUseAdminModeReview() && shouldShowGodMakeupReview(exam, logic)) {
                 var makeupContextKey = makeDomSafeId("makeup_" + safeDate + "_" + (exam.colIndex || 0));
-                window.adminModeMakeupContext[makeupContextKey] = { className: gData.className, studentName: gData.studentName, targetDate: post.date, sourceClassName: post.storedClassName || post.sourceClassName || gData.className, gradeClassName: exam.storedClassName || gData.className, gradeClassKey: exam.storedClassKey || "", examColIndex: exam.colIndex, title: exam.exam || "", currentColor: exam.cellColor || "", scoreReview: getLatestMakeupReportInfo(exam, history) };
+                window.adminModeMakeupContext[makeupContextKey] = { className: gData.className, studentName: gData.studentName, targetDate: post.date, sourceClassName: post.storedClassName || post.sourceClassName || gData.className, gradeClassName: exam.storedClassName || gData.className, gradeClassKey: exam.storedClassKey || "", examColIndex: exam.colIndex, title: exam.exam || "", currentColor: exam.cellColor || "", scoreReview: getLatestMakeupReportInfo(exam, history), resultReview: getLatestMakeupResultReportInfo(exam, history) };
                 scoreReportHtml += buildGodMakeupReviewBox(makeupContextKey, exam, logic);
             }
             var chartHtml = "";
@@ -9019,14 +9022,23 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 status.innerText = '登記中...';
             }
             try {
+                var colorReview = context.resultReview || null;
                 await runGodAdminAction('writeMakeupResultColorGas', {
                     className: gData.className,
                     studentName: gData.studentName,
                     gradeClassName: context.gradeClassName || gData.className,
-                    sourceClassName: context.sourceClassName || gData.className,
+                    sourceClassName: (colorReview && colorReview.storedClassName) || context.sourceClassName || gData.className,
                     examColIndex: context.examColIndex,
                     targetDateStr: context.targetDate || "",
                     targetExamTitle: context.title || "",
+                    targetExamId: colorReview ? (colorReview.targetExamId || "") : "",
+                    feedbackId: colorReview ? (colorReview.feedbackKey || "") : "",
+                    studentKey: gData.studentKey || gData.studentName,
+                    clientRequestId: colorReview && colorReview.feedbackKey
+                        ? colorReview.feedbackKey
+                        : createClientRequestId('direct-makeup-color'),
+                    sourceSurface: "ebook_god_review",
+                    teacherDirectColorWriteback: !(colorReview && colorReview.feedbackKey),
                     colorHex: colorHex
                 });
                 if (status) {
@@ -9074,7 +9086,12 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     targetDateStr: context.targetDate,
                     sourceClassName: context.scoreReview.storedClassName || context.sourceClassName || gData.className,
                     gradeClassName: context.gradeClassName || gData.className,
-                    scoreValue: finalScore
+                    scoreValue: finalScore,
+                    targetExamId: context.scoreReview.targetExamId || "",
+                    feedbackId: context.scoreReview.feedbackKey || "",
+                    studentKey: gData.studentKey || gData.studentName,
+                    clientRequestId: context.scoreReview.feedbackKey || createClientRequestId('makeup-score'),
+                    sourceSurface: "ebook_god_review"
                 };
                 if (context.examColIndex !== undefined && context.examColIndex !== null && context.examColIndex !== "") {
                     payload.examColIndex = context.examColIndex;
@@ -9146,7 +9163,10 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     scoreValue: finalScore,
                     examColIndex: context.examColIndex,
                     targetExamTitle: context.title || "",
-                    teacherDirectScoreWriteback: true
+                    teacherDirectScoreWriteback: true,
+                    studentKey: gData.studentKey || gData.studentName,
+                    clientRequestId: createClientRequestId('direct-makeup-score'),
+                    sourceSurface: "ebook_god_review"
                 });
                 if (btn) {
                     btn.innerText = '已回填';
@@ -10038,7 +10058,12 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 }).withFailureHandler(function(err) {
                     Swal.close();
                     swalAlert('❌ 系統連線錯誤', err.toString(), 'error');
-                }).writeScoreGas(gPass, clsName, stuName, targetDate, finalScore, targetExamColIndex, targetExamTitle || "");
+                }).writeScoreGas(gPass, clsName, stuName, targetDate, finalScore, targetExamColIndex, targetExamTitle || "", {
+                    teacherDirectScoreWriteback: true,
+                    studentKey: stuName,
+                    requestId: createClientRequestId('legacy-direct-score'),
+                    sourceSurface: "ebook_legacy_admin"
+                });
             }
         };
 
