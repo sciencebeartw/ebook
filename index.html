@@ -3880,26 +3880,6 @@
         return isRecordFromPostSource((grade && grade.sourceClassKey) || "", sourceClassKey);
     }
 
-    function parseEbookSimpleChineseNumber(text) {
-        text = (text || "").toString();
-        if (/^\d+$/.test(text)) return parseInt(text, 10);
-        var map = { "零": 0, "一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9 };
-        if (text === "十") return 10;
-        var tenIndex = text.indexOf("十");
-        if (tenIndex > -1) {
-            var left = text.substring(0, tenIndex);
-            var right = text.substring(tenIndex + 1);
-            return (left ? (map[left] || 0) : 1) * 10 + (right ? (map[right] || 0) : 0);
-        }
-        return map[text] || null;
-    }
-
-    function getEbookChapterNumber(value) {
-        var text = (value || "").toString();
-        var match = text.match(/第\s*([0-9一二三四五六七八九十]+)\s*章/);
-        return match ? parseEbookSimpleChineseNumber(match[1]) : null;
-    }
-
     function getDailyPostExamMatches(postOrDate, grades, sourceClassKey) {
         var post = postOrDate && typeof postOrDate === "object" ? postOrDate : null;
         var postDate = post ? post.date : postOrDate;
@@ -3907,39 +3887,12 @@
         var shortDate = (pDate.getMonth() + 1) + "/" + pDate.getDate();
         var exactPostDate = (postDate || "").toString();
         var regex = new RegExp("(^|[^0-9])" + shortDate.replace("/", "\\/") + "([^0-9]|$)", "g");
-        var dateMatches = (grades || []).filter(function(g) {
+        return (grades || []).filter(function(g) {
             if (!isGradeFromPostSource(g, sourceClassKey)) return false;
             if (!isDailyPostExamGrade(g)) return false;
             if (g.date === shortDate || g.date === exactPostDate) return true;
             regex.lastIndex = 0;
             return regex.test(g.date || "");
-        });
-        if (dateMatches.length || !post) return dateMatches;
-
-        var postChapter = getEbookChapterNumber([
-            post.quiz || "",
-            post.makeup || "",
-            post.range || "",
-            post.progress || "",
-            post.title || "",
-            post.note || ""
-        ].join(" "));
-        if (!postChapter) return [];
-        var postYear = (exactPostDate.match(/(\d{4})/) || [])[1] || getTransferFallbackYear(gData && gData.studentTransferIndex);
-        var postDateKey = getTransferDateKey(exactPostDate, postYear);
-        var chapterMatches = (grades || []).filter(function(g) {
-            if (!isGradeFromPostSource(g, sourceClassKey)) return false;
-            if (!isDailyPostExamGrade(g)) return false;
-            if (getEbookChapterNumber(g.exam || g.examName || "") !== postChapter) return false;
-            var gradeDateKey = getTransferDateKey(g.date, postYear);
-            return !postDateKey || !gradeDateKey || gradeDateKey <= postDateKey;
-        }).sort(function(a, b) {
-            return (b.dateKey || 0) - (a.dateKey || 0);
-        });
-        if (!chapterMatches.length) return [];
-        var newestDateKey = chapterMatches[0].dateKey || 0;
-        return chapterMatches.filter(function(g) {
-            return (g.dateKey || 0) === newestDateKey;
         });
     }
 
@@ -8292,6 +8245,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 form.targetDate,
                 form.type,
                 form.content,
+                form.targetExamId || "",
                 form.targetExamColIndex,
                 form.targetExamTitle
             ]);
@@ -9816,11 +9770,12 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             // --- 智慧狀態判定引擎：最新覆蓋法則 ---
             var groups = {};
             function getMakeupGroupKey(item) {
+                var targetExamId = typeof normalizeEbookFeedbackExamId === 'function' ? normalizeEbookFeedbackExamId(item && item.targetExamId) : '';
                 var targetTitle = normalizeEbookExamLookupText(item.targetExamTitle);
                 var targetCol = (item.targetExamColIndex !== undefined && item.targetExamColIndex !== null) ? item.targetExamColIndex.toString() : "";
                 var titleDates = getEbookExamLookupDateCandidates(item && item.targetExamTitle);
                 var targetDate = titleDates.length ? titleDates[0] : normalizeEbookExamLookupText(item.date);
-                return (item.type || "") + '_' + item.stuKey + '_' + targetDate + '_' + (targetTitle || (targetCol !== "" ? ('col_' + targetCol) : ''));
+                return (item.type || "") + '_' + item.stuKey + '_' + (targetExamId || (targetDate + '_' + (targetTitle || (targetCol !== "" ? ('col_' + targetCol) : ''))));
             }
 
             rawList.forEach(function(item) {
