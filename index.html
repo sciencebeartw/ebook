@@ -3823,6 +3823,7 @@
                 date: eData.date,
                 dateKey: getTransferDateKey(eData.date, getTransferFallbackYear(transferIndex)) || 0,
                 exam: eData.examName,
+                examId: (options.examIdByColKey || {})[col] || "",
                 note: eData.note,
                 makeupThreshold: makeupThreshold,
                 score: eData.score,
@@ -3841,7 +3842,7 @@
         return fullGradeList;
     }
 
-    function buildGradeListFromClassExamMap(classExamMap, classKeys, currentClassKey, transferIndex, currentClassName) {
+    function buildGradeListFromClassExamMap(classExamMap, classKeys, currentClassKey, transferIndex, currentClassName, examIdByClassColKey) {
         var grades = [];
         var trackedKeys = uniqueClassKeys(classKeys);
         var transferChain = EbookLifecycleApp.buildTransferChain(transferIndex || {}, currentClassKey, { maxDepth: 8 });
@@ -3853,7 +3854,8 @@
                 transferIndex: transferIndex,
                 transferChain: transferChain,
                 className: className,
-                currentClassName: currentClassName
+                currentClassName: currentClassName,
+                examIdByColKey: (examIdByClassColKey || {})[classKey] || {}
             }));
         });
         var deduped = {};
@@ -3886,6 +3888,29 @@
         var result = {};
         snaps.forEach(function(item) {
             result[item.key] = item.value || {};
+        });
+        return result;
+    }
+
+    async function loadExamIdByClassColKey(classKeys) {
+        var helper = window.BearExamIdentity;
+        if (!helper || typeof helper.normalizeCatalog !== "function") {
+            throw new Error("examID helper 尚未載入，請重新整理後再試");
+        }
+        var snaps = await Promise.all(uniqueClassKeys(classKeys).map(function(classKey) {
+            return db.ref(`${BEAR_SUBJECT}/meta/examCatalog/${classKey}`).once("value").then(function(snap) {
+                return { key: classKey, value: snap.val() || {} };
+            });
+        }));
+        var result = {};
+        snaps.forEach(function(item) {
+            var catalog = helper.normalizeCatalog(item.value || {});
+            if (!catalog.success) throw new Error("考試身分目錄不完整，請通知老師檢查 examID");
+            result[item.key] = {};
+            Object.keys(catalog.entries || {}).forEach(function(examId) {
+                var entry = catalog.entries[examId] || {};
+                if (entry.colKey) result[item.key][entry.colKey] = examId;
+            });
         });
         return result;
     }
@@ -4261,9 +4286,14 @@
             result.trackedGradeClassKeys = lifecycle.trackedGradeClassKeys;
 
             // Fetch Grades. Transfer students read only their current class plus indexed source classes.
-            result.cohortGradeExamRoot = await loadGradeExamMapByKeys(result.trackedGradeClassKeys, foundUserKey);
+            var gradeSources = await Promise.all([
+                loadGradeExamMapByKeys(result.trackedGradeClassKeys, foundUserKey),
+                loadExamIdByClassColKey(result.trackedGradeClassKeys)
+            ]);
+            result.cohortGradeExamRoot = gradeSources[0];
+            result.examIdByClassColKey = gradeSources[1];
             result.grades = filterItemsByStudentEnrollmentDate(
-                buildGradeListFromClassExamMap(result.cohortGradeExamRoot, result.trackedGradeClassKeys, safeC, result.studentTransferIndex, result.className),
+                buildGradeListFromClassExamMap(result.cohortGradeExamRoot, result.trackedGradeClassKeys, safeC, result.studentTransferIndex, result.className, result.examIdByClassColKey),
                 result.studentEnrollmentIndex,
                 result.trackedClassKeys
             );
@@ -5851,7 +5881,8 @@
                                 trackedGradeClassKeys,
                                 safeC,
                                 gData.studentTransferIndex || {},
-                                gData.className
+                                gData.className,
+                                gData.examIdByClassColKey || {}
                             ),
                             gData.studentEnrollmentIndex || {},
                             trackedClassKeys
