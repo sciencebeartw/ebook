@@ -27,6 +27,7 @@ vm.createContext(context);
   'listActiveStudentEnrollments',
   'getStudentEnrollmentDateKey',
   'isOnOrAfterStudentEnrollmentDate',
+  'isStudentEnrollmentDate',
   'filterItemsByStudentEnrollmentDate'
 ].forEach((name) => vm.runInContext(extractFunction(name), context));
 
@@ -59,6 +60,18 @@ if (context.isOnOrAfterStudentEnrollmentDate({ date: '2026/07/03' }, enrollmentI
 
 if (context.isOnOrAfterStudentEnrollmentDate({ date: '2026/07/04' }, enrollmentIndex, '115小六資優自然週六上午班') !== true) {
   throw new Error('records on enrollment date should remain visible');
+}
+
+if (context.isStudentEnrollmentDate({ date: '7/4小考' }, enrollmentIndex, '115小六資優自然週六上午班') !== true) {
+  throw new Error('the enrollment-day exam must be marked for exemption');
+}
+if (context.isStudentEnrollmentDate({ date: '7/5小考' }, enrollmentIndex, '115小六資優自然週六上午班') !== false) {
+  throw new Error('exemption must apply only on the enrollment date');
+}
+
+const displayLogicSource = extractFunction('getDisplayLogic');
+if (!displayLogicSource.includes('isCurrentStudentEnrollmentDate(exam)') || !displayLogicSource.includes('result.mainScore = "免試"')) {
+  throw new Error('enrollment-day grade cards must display 免試 before absence/makeup logic');
 }
 
 const filtered = context.filterItemsByStudentEnrollmentDate([

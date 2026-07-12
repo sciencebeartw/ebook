@@ -3642,6 +3642,24 @@
         });
     }
 
+    function isStudentEnrollmentDate(item, enrollmentIndex, classKeys) {
+        if (!item || !item.date) return false;
+        var enrollmentDateKey = getStudentEnrollmentDateKey(enrollmentIndex, classKeys);
+        if (!enrollmentDateKey) return false;
+        var itemDateKey = EbookLifecycleApp.parseDateKey(item.date, {
+            fallbackYear: Math.floor(enrollmentDateKey / 10000)
+        });
+        return !!itemDateKey && itemDateKey === enrollmentDateKey;
+    }
+
+    function isCurrentStudentEnrollmentDate(item) {
+        return !!gData && isStudentEnrollmentDate(
+            item,
+            gData.studentEnrollmentIndex || {},
+            gData.trackedClassKeys || safeKey(gData.className || '')
+        );
+    }
+
     function filterItemsByStudentEnrollmentDate(items, enrollmentIndex, classKeys) {
         return (items || []).filter(function(item) {
             return isOnOrAfterStudentEnrollmentDate(item, enrollmentIndex, classKeys);
@@ -6501,6 +6519,12 @@
             var sheetNum = exam.scoreNum;
             var myColor = (exam.cellColor || "").toLowerCase();
             var result = { mainScore: "", mainClass: "", statusHtml: "", effectiveNum: null, showReviewing: false, needsReport: false };
+            if (isCurrentStudentEnrollmentDate(exam)) {
+                result.mainScore = "免試";
+                result.mainClass = " text-grey-status";
+                result.isEnrollmentExempt = true;
+                return result;
+            }
             
             var overrideNum = getFeedbackOverrideNum(exam, feedbackHistory);
             
