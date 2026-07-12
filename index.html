@@ -3253,6 +3253,7 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-functions.js"></script>
   <script src="firebase-config.js"></script>
+  <script src="exam_identity_app.js?v=20260712_exam_identity_phase1"></script>
   <script src="ebook_lifecycle_app.js?v=20260711_lifecycle_security_v2"></script>
 
   <!-- Webhook API & Firebase Polyfill (Replace google.script.run) -->
@@ -4061,6 +4062,12 @@
         return merged;
     }
 
+    function normalizeEbookFeedbackExamId(value) {
+        return window.BearExamIdentity && typeof window.BearExamIdentity.normalizeExamId === 'function'
+            ? window.BearExamIdentity.normalizeExamId(value)
+            : '';
+    }
+
     function buildFeedbackHistoryList(fbsObj) {
         var list = [];
         for (let fbid in (fbsObj || {})) {
@@ -4073,6 +4080,7 @@
                 fbKey: fb.originalFeedbackKey || fbid,
                 targetExamColIndex: fb.targetExamColIndex || "",
                 targetExamTitle: fb.targetExamTitle || "",
+                targetExamId: typeof normalizeEbookFeedbackExamId === 'function' ? normalizeEbookFeedbackExamId(fb.targetExamId) : '',
                 actorRole: fb.actorRole || "",
                 source: fb.source || "",
                 replyToFeedbackKey: fb.replyToFeedbackKey || "",
@@ -4104,6 +4112,7 @@
             fbKey: "local_score_report_" + Date.now(),
             targetExamColIndex: form.targetExamColIndex || "",
             targetExamTitle: form.targetExamTitle || "",
+            targetExamId: typeof normalizeEbookFeedbackExamId === 'function' ? normalizeEbookFeedbackExamId(form.targetExamId) : '',
             sourceClassKey: "",
             sourceClassName: "",
             currentClassName: "",
@@ -6495,6 +6504,7 @@
                     targetDate: fb.targetDate || "",
                     targetExamColIndex: fb.targetExamColIndex || "",
                     targetExamTitle: fb.targetExamTitle || "",
+                    targetExamId: typeof normalizeEbookFeedbackExamId === 'function' ? normalizeEbookFeedbackExamId(fb.targetExamId) : '',
                     storedClassKey: fb.storedClassKey || fb.sourceClassKey || "",
                     storedClassName: fb.storedClassName || fb.sourceClassName || "",
                     content: fb.content || "",
@@ -9781,7 +9791,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                             var fb = fbs[fid];
                             var fType = fb.type || '學生留言';
                             if (fType.indexOf('棒卡') > -1) continue;
-                            rawList.push({ fbKey: fid, stuKey: sKey, type: fType, content: fb.content, time: fb.time, date: fb.targetDate || fb.time.substring(0,10).replace(/-/g,'/'), cls: hasHomeworkCohortAlias ? sourceClassKey : cls, stuName: sName, safeC: sourceClassKey, targetExamColIndex: fb.targetExamColIndex || "", targetExamTitle: fb.targetExamTitle || "" });
+                            rawList.push({ fbKey: fid, stuKey: sKey, type: fType, content: fb.content, time: fb.time, date: fb.targetDate || fb.time.substring(0,10).replace(/-/g,'/'), cls: hasHomeworkCohortAlias ? sourceClassKey : cls, stuName: sName, safeC: sourceClassKey, targetExamColIndex: fb.targetExamColIndex || "", targetExamTitle: fb.targetExamTitle || "", targetExamId: typeof normalizeEbookFeedbackExamId === 'function' ? normalizeEbookFeedbackExamId(fb.targetExamId) : '' });
                         }
                     }
                 });
@@ -9798,7 +9808,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                         var fb = fbs[fid];
                         var fType = fb.type || '學生留言';
                         if (fType.indexOf('棒卡') > -1) continue;
-                        rawList.push({ fbKey: fid, stuKey: stuKey, type: fType, content: fb.content, time: fb.time, date: fb.targetDate || fb.time.substring(0,10).replace(/-/g,'/'), cls: hasHomeworkCohortAlias ? sourceClassKey : cls, stuName: stuName, safeC: sourceClassKey, targetExamColIndex: fb.targetExamColIndex || "", targetExamTitle: fb.targetExamTitle || "" });
+                        rawList.push({ fbKey: fid, stuKey: stuKey, type: fType, content: fb.content, time: fb.time, date: fb.targetDate || fb.time.substring(0,10).replace(/-/g,'/'), cls: hasHomeworkCohortAlias ? sourceClassKey : cls, stuName: stuName, safeC: sourceClassKey, targetExamColIndex: fb.targetExamColIndex || "", targetExamTitle: fb.targetExamTitle || "", targetExamId: typeof normalizeEbookFeedbackExamId === 'function' ? normalizeEbookFeedbackExamId(fb.targetExamId) : '' });
                     }
                 });
             }
