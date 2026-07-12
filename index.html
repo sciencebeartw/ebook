@@ -7035,19 +7035,29 @@
 
         function getLatestMakeupResultReportInfo(exam, feedbackHistory) {
             if (!exam || exam.colIndex === undefined || exam.colIndex === null || !feedbackHistory || feedbackHistory.length === 0) return null;
+            var examId = typeof normalizeEbookFeedbackExamId === 'function'
+                ? normalizeEbookFeedbackExamId(exam.examId || exam.targetExamId)
+                : '';
             for (var k = feedbackHistory.length - 1; k >= 0; k--) {
                 var fb = feedbackHistory[k] || {};
                 if (!isMakeupResultReportType(fb.type)) continue;
-                var fbExamCol = fb.targetExamColIndex;
-                var hasFbExamCol = fbExamCol !== undefined && fbExamCol !== null && fbExamCol !== "";
-                var sameStoredCol = hasFbExamCol && String(fbExamCol) === String(exam.colIndex);
-                if (hasFbExamCol && !sameStoredCol && !isUniqueEbookFeedbackExamMatch(fb, exam)) continue;
-                if (normalizeEbookExamLookupText(fb.targetExamTitle)) {
-                    if (!ebookFeedbackMatchesExam(fb, exam)) continue;
-                } else if (!sameStoredCol) {
-                    continue;
-                } else if (!ebookFeedbackMatchesExamDate(fb, exam)) {
-                    continue;
+                var feedbackExamId = typeof normalizeEbookFeedbackExamId === 'function'
+                    ? normalizeEbookFeedbackExamId(fb.targetExamId)
+                    : '';
+                var sameStableExamId = !!examId && !!feedbackExamId && examId === feedbackExamId;
+                if (examId && feedbackExamId && !sameStableExamId) continue;
+                if (!sameStableExamId) {
+                    var fbExamCol = fb.targetExamColIndex;
+                    var hasFbExamCol = fbExamCol !== undefined && fbExamCol !== null && fbExamCol !== "";
+                    var sameStoredCol = hasFbExamCol && String(fbExamCol) === String(exam.colIndex);
+                    if (hasFbExamCol && !sameStoredCol && !isUniqueEbookFeedbackExamMatch(fb, exam)) continue;
+                    if (normalizeEbookExamLookupText(fb.targetExamTitle)) {
+                        if (!ebookFeedbackMatchesExam(fb, exam)) continue;
+                    } else if (!sameStoredCol) {
+                        continue;
+                    } else if (!ebookFeedbackMatchesExamDate(fb, exam)) {
+                        continue;
+                    }
                 }
                 var match = (fb.content || "").toString().match(/(\d+(\.\d+)?)/);
                 var reportDisplayText = getMakeupResultReportDisplayText(fb.content);
@@ -8232,6 +8242,9 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var btn = submitButtonId ? document.getElementById(submitButtonId) : (input ? input.nextElementSibling : null);
             if (btn) { btn.innerText = "送出..."; }
             setMakeupWrongCountWidgetDisabled(input, true);
+            var currentExam = (gData.grades || []).find(function(item) {
+                return item && String(item.colIndex) === String(examColIndex);
+            }) || {};
             var form = {
                 className: gData.className,
                 studentName: gData.studentName,
@@ -8239,7 +8252,10 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 type: FEEDBACK_TYPE_LABELS.makeupResult,
                 content: "錯 " + wrongCount + " 題",
                 targetExamColIndex: examColIndex,
-                targetExamTitle: examTitle || ""
+                targetExamTitle: examTitle || "",
+                targetExamId: typeof normalizeEbookFeedbackExamId === 'function'
+                    ? normalizeEbookFeedbackExamId(currentExam.examId || currentExam.targetExamId)
+                    : ''
             };
             form.clientRequestId = createStableEbookRequestId("makeup_result", [
                 BEAR_SUBJECT,

@@ -38,6 +38,7 @@ assert(first.length <= 128, "stable request id must fit the GAS metadata limit")
 const submit = extractFunction(html, "submitMakeupResultReport");
 assert(submit.includes('createStableEbookRequestId("makeup_result"'), "makeup result submissions must use the stable idempotency key");
 assert(submit.includes('form.targetExamId || ""'), "stable makeup request IDs must include targetExamId when available");
+assert(submit.includes("currentExam.examId || currentExam.targetExamId"), "makeup result submissions must carry the current stable exam ID");
 assert(submit.includes("appendLocalScoreReportFeedback(form, res)"), "successful makeup result submission must immediately update local history and hide the form");
 assert(html.includes("class='god-direct-score-input'"), "God view direct score field must use its width-safe class");
 assert(html.includes("class='admin-btn btn-green god-direct-score-btn'"), "God view direct score button must not inherit full-width admin button sizing");
@@ -60,6 +61,31 @@ assert.strictEqual(driftContext.isUniqueEbookFeedbackExamMatch(driftedReport, dr
 driftContext.gData.grades.push({ colIndex: 8, date: "7/4小考", exam: "力與平衡、摩擦力木" });
 assert.strictEqual(driftContext.isUniqueEbookFeedbackExamMatch(driftedReport, driftContext.gData.grades[0]), false, "duplicate exact headers must fail closed instead of hiding the wrong report");
 const reportLookup = extractFunction(html, "getLatestMakeupResultReportInfo");
+assert(reportLookup.includes("sameStableExamId"), "makeup result history must prefer stable exam ID matching");
+assert(reportLookup.includes("examId && feedbackExamId && !sameStableExamId"), "different stable exam IDs must fail closed");
 assert(reportLookup.includes("!sameStoredCol && !isUniqueEbookFeedbackExamMatch(fb, exam)"), "makeup result history must repair a stale column only through a unique exact match");
+
+const stableIdContext = {
+  normalizeEbookFeedbackExamId: value => /^exam_/.test(value || "") ? value : "",
+  isMakeupResultReportType: type => type === "補考結果回報",
+  isUniqueEbookFeedbackExamMatch: () => false,
+  normalizeEbookExamLookupText: value => String(value || "").trim(),
+  ebookFeedbackMatchesExam: () => false,
+  ebookFeedbackMatchesExamDate: () => false,
+  getMakeupResultReportDisplayText: value => value,
+  isMakeupResultWrongCountContent: () => true,
+};
+vm.createContext(stableIdContext);
+vm.runInContext(reportLookup, stableIdContext);
+const stableExam = { colIndex: 12, examId: baseParts[6], date: "6/21小考", exam: "生物第8章前半" };
+const shiftedStableFeedback = [{
+  type: "補考結果回報",
+  targetExamId: baseParts[6],
+  targetExamColIndex: "11",
+  targetExamTitle: "已位移的舊標題",
+  content: "錯 4 題",
+}];
+assert(stableIdContext.getLatestMakeupResultReportInfo(stableExam, shiftedStableFeedback), "matching exam IDs must survive column and title drift");
+assert.strictEqual(stableIdContext.getLatestMakeupResultReportInfo(stableExam, [{ ...shiftedStableFeedback[0], targetExamId: "exam_87654321-4321-4abc-8def-ba0987654321" }]), null, "different exam IDs must never hide the form");
 
 console.log("ebook makeup result idempotency/UI smoke passed");
