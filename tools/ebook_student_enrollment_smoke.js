@@ -28,7 +28,12 @@ vm.createContext(context);
   'getStudentEnrollmentDateKey',
   'isOnOrAfterStudentEnrollmentDate',
   'isStudentEnrollmentDate',
-  'filterItemsByStudentEnrollmentDate'
+  'isCurrentStudentEnrollmentDate',
+  'filterItemsByStudentEnrollmentDate',
+  'isHomePracticeScoreTitle',
+  'isHomeworkColumnTitle',
+  'isHomeworkMissingScore',
+  'isCurrentStudentEnrollmentExemptExam'
 ].forEach((name) => vm.runInContext(extractFunction(name), context));
 
 const enrollmentIndex = {
@@ -69,9 +74,82 @@ if (context.isStudentEnrollmentDate({ date: '7/5小考' }, enrollmentIndex, '115
   throw new Error('exemption must apply only on the enrollment date');
 }
 
-const displayLogicSource = extractFunction('getDisplayLogic');
-if (!displayLogicSource.includes('isCurrentStudentEnrollmentDate(exam)') || !displayLogicSource.includes('result.mainScore = "免試"')) {
-  throw new Error('enrollment-day grade cards must display 免試 before absence/makeup logic');
+context.gData = {
+  className: '115小六資優自然週六上午班',
+  trackedClassKeys: ['115小六資優自然週六上午班'],
+  studentEnrollmentIndex: enrollmentIndex,
+};
+context.getFeedbackOverrideNum = () => null;
+vm.runInContext(extractFunction('getDisplayLogic'), context);
+
+const enrollmentQuiz = context.getDisplayLogic({
+  date: '7/4小考',
+  exam: '生物第1-8章複習考',
+  score: '',
+  scoreNum: null,
+}, []);
+if (enrollmentQuiz.mainScore !== '免試' || !enrollmentQuiz.isEnrollmentExempt) {
+  throw new Error('the enrollment-day quiz must display 免試');
+}
+
+const enrollmentHomeworkMissing = context.getDisplayLogic({
+  date: '7/4作業',
+  exam: '理化第1章',
+  score: '尚未繳交',
+  scoreNum: null,
+}, []);
+if (enrollmentHomeworkMissing.mainScore !== '未繳' || enrollmentHomeworkMissing.isEnrollmentExempt || enrollmentHomeworkMissing.needsReport) {
+  throw new Error('missing enrollment-day homework must display 未繳 without exam exemption or score report');
+}
+if (!['#N/A', '尚未繳交', '未交', '缺繳'].every((score) => context.isHomeworkMissingScore(score))) {
+  throw new Error('all supported missing-homework values must normalize to 未繳');
+}
+
+const enrollmentHomeworkScore = context.getDisplayLogic({
+  date: '7/4作業',
+  exam: '理化第1章',
+  score: '42',
+  scoreNum: 42,
+}, []);
+if (enrollmentHomeworkScore.mainScore !== 42 || enrollmentHomeworkScore.isEnrollmentExempt) {
+  throw new Error('submitted enrollment-day homework must keep its actual score');
+}
+
+const enrollmentEntranceAssessment = context.getDisplayLogic({
+  date: '7/4鑑定考',
+  exam: '入班鑑定考',
+  score: '60',
+  scoreNum: 60,
+}, []);
+if (enrollmentEntranceAssessment.mainScore !== 60 || enrollmentEntranceAssessment.isEnrollmentExempt) {
+  throw new Error('the entrance assessment must keep its actual score');
+}
+
+[
+  { date: '7/4複習考', exam: '生物第1-8章複習考' },
+  { date: '7/4鑑定考', exam: '自然能力鑑定考' },
+  { date: '7/4段考', exam: '第一階段考試' },
+].forEach((exam) => {
+  const result = context.getDisplayLogic(Object.assign({ score: '88', scoreNum: 88 }, exam), []);
+  if (result.mainScore !== '免試' || !result.isEnrollmentExempt) {
+    throw new Error(`all enrollment-day exams except the entrance assessment must display 免試: ${exam.date}`);
+  }
+});
+
+if (context.isCurrentStudentEnrollmentExemptExam({
+  date: '7/4作業', exam: '理化第1章', score: '尚未繳交',
+})) {
+  throw new Error('enrollment-day homework must never be exempt');
+}
+
+const laterQuiz = context.getDisplayLogic({
+  date: '7/5小考',
+  exam: '生物第1-8章複習考',
+  score: '',
+  scoreNum: null,
+}, []);
+if (laterQuiz.mainScore !== '缺考' || laterQuiz.isEnrollmentExempt) {
+  throw new Error('quiz exemption must not extend beyond the enrollment date');
 }
 
 const filtered = context.filterItemsByStudentEnrollmentDate([

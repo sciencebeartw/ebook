@@ -4225,6 +4225,11 @@
         return text.indexOf("作業") > -1 && !isHomePracticeScoreTitle(text);
     }
 
+    function isHomeworkMissingScore(score) {
+        var text = (score || "").toString().trim();
+        return text === "#N/A" || /未交|未繳|缺交|缺繳/.test(text);
+    }
+
     function isExamScoreTitle(title) {
         var text = (title || "").toString();
         if (!text) return false;
@@ -4232,6 +4237,13 @@
         return ["小考", "複習", "期中", "大考", "隨堂", "鑑定", "回家練習卷"].some(function(keyword) {
             return text.indexOf(keyword) > -1;
         });
+    }
+
+    function isCurrentStudentEnrollmentExemptExam(item) {
+        if (!item || !isCurrentStudentEnrollmentDate(item)) return false;
+        var title = ((item.date || "") + " " + (item.exam || item.examName || "")).toString();
+        if (isHomeworkColumnTitle(title) || isHomeworkMissingScore(item.score)) return false;
+        return title.replace(/\s/g, "").indexOf("入班鑑定") === -1;
     }
 
     function isDailyPostExamGrade(grade) {
@@ -6549,7 +6561,7 @@
         function getLatestMakeupReportInfo(exam, feedbackHistory) {
             if (!feedbackHistory || feedbackHistory.length === 0) return null;
             var rawScore = (exam.score || "").toString();
-            var isHw = isHomeworkColumnTitle((exam.date || "") + (exam.exam || "")) || rawScore.indexOf("未交") > -1 || rawScore.indexOf("缺交") > -1 || rawScore.indexOf("缺繳") > -1;
+            var isHw = isHomeworkColumnTitle((exam.date || "") + (exam.exam || "")) || isHomeworkMissingScore(rawScore);
             if (isHw) return null;
 
             var candidates = getExamDateCandidates(exam);
@@ -6612,8 +6624,9 @@
             var rawScore = (exam.score || "").toString();
             var sheetNum = exam.scoreNum;
             var myColor = (exam.cellColor || "").toLowerCase();
+            var isHw = isHomeworkColumnTitle((exam.date || "") + (exam.exam || "")) || isHomeworkMissingScore(rawScore);
             var result = { mainScore: "", mainClass: "", statusHtml: "", effectiveNum: null, showReviewing: false, needsReport: false };
-            if (isCurrentStudentEnrollmentDate(exam)) {
+            if (isCurrentStudentEnrollmentExemptExam(exam)) {
                 result.mainScore = "免試";
                 result.mainClass = " text-grey-status";
                 result.isEnrollmentExempt = true;
@@ -6640,15 +6653,14 @@
                 if (exam.myBucket === 4) result.mainClass = " score-green";
                 else if (exam.myBucket <= 1 && exam.myBucket >= 0) result.mainClass = " score-red";
             } else {
-                result.needsReport = true;
+                result.needsReport = !isHw;
                 if (overrideNum !== null) {
                     result.effectiveNum = overrideNum;
                     result.mainScore = overrideNum;
                     result.showReviewing = true;
                 } else {
-                    var isHw = isHomeworkColumnTitle((exam.date || "") + (exam.exam || "")) || rawScore.indexOf("未交") > -1 || rawScore.indexOf("缺交") > -1 || rawScore.indexOf("缺繳") > -1;
-                    if (rawScore.indexOf("尚未繳交") > -1) { result.mainScore = "尚未繳交"; result.mainClass = " text-grey-status"; }
-                    else { result.mainScore = isHw ? "缺繳" : "缺考"; result.mainClass = " text-grey-status"; }
+                    result.mainScore = isHw ? "未繳" : "缺考";
+                    result.mainClass = " text-grey-status";
                 }
             }
             if (result.showReviewing) result.statusHtml += "<div class='reviewing-tag'>(待審核)</div>";
@@ -7321,7 +7333,7 @@
                 others.forEach(function (o) {
                     var sDisplay = o.score;
                     var hwColorClass = "";
-                    if (sDisplay == "#N/A") sDisplay = "<span class='text-red' style='font-size:1rem'>尚未繳交</span>";
+                    if (isHomeworkMissingScore(sDisplay)) sDisplay = "<span class='text-red' style='font-size:1rem'>未繳</span>";
                     else {
                         var m = sDisplay.match(/(\d+(\.\d+)?)/);
                         if (m) {
