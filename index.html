@@ -3140,11 +3140,14 @@
             background: white;
             width: 100%;
             max-width: 380px;
+            max-height: calc(100vh - 48px);
             border-radius: 24px;
             overflow: hidden;
             border-top: 6px solid #ef4444;
             box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
             animation: popIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: flex;
+            flex-direction: column;
         }
         @keyframes popIn {
             from { transform: scale(0.8); opacity: 0; }
@@ -3166,10 +3169,28 @@
             text-align: center;
             max-height: 55vh;
             overflow-y: auto;
+            min-height: 0;
         }
         .emergency-footer {
             padding: 0 20px 24px;
             text-align: center;
+            display: grid;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+        .emergency-expiry {
+            padding: 10px 14px;
+            border-radius: 12px;
+            background: #fff7ed;
+            color: #9a3412;
+            font-size: 1rem;
+            font-weight: 800;
+            line-height: 1.45;
+        }
+        .emergency-reminder-note {
+            color: #64748b;
+            font-size: 0.9rem;
+            line-height: 1.45;
         }
         .emergency-btn {
             background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
@@ -3184,10 +3205,59 @@
             box-shadow: 0 8px 20px rgba(239, 68, 68, 0.35);
             transition: all 0.2s;
             letter-spacing: 2px;
+            min-height: 52px;
         }
         .emergency-btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 12px 24px rgba(239, 68, 68, 0.5);
+        }
+        .emergency-btn:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .emergency-btn-secondary {
+            background: white;
+            color: #b91c1c;
+            border: 2px solid #fecaca;
+            box-shadow: none;
+            letter-spacing: 0;
+            font-size: 1.05rem;
+        }
+        .emergency-btn-secondary:hover {
+            background: #fff1f2;
+            box-shadow: none;
+        }
+
+        @media (max-width: 600px) {
+            .emergency-modal {
+                padding: 12px;
+            }
+            .emergency-box {
+                max-height: calc(100dvh - 24px);
+                border-radius: 20px;
+            }
+            .emergency-header {
+                padding: 20px 16px 8px;
+                font-size: 1.4rem;
+            }
+            .emergency-body {
+                padding: 12px 18px 18px;
+                font-size: 1.15rem;
+            }
+            .emergency-footer {
+                padding: 0 14px 16px;
+            }
+            .emergency-btn {
+                min-height: 48px;
+                padding: 12px 16px;
+                font-size: 1.05rem;
+                letter-spacing: 0;
+            }
+            .emergency-btn-secondary {
+                font-size: 1rem;
+            }
         }
     
         /* V2 Vertical Bar Chart for index.html */
@@ -4752,12 +4822,15 @@
         </div>
 
         <!-- 緊急彈窗 -->
-        <div id="emergencyModal" class="emergency-modal">
+        <div id="emergencyModal" class="emergency-modal" role="dialog" aria-modal="true" aria-labelledby="emergencyTitle" aria-describedby="emergencyContent emergencyExpiresAt">
             <div class="emergency-box">
                 <div class="emergency-header" id="emergencyTitle">⚠️ 緊急公告</div>
                 <div class="emergency-body" id="emergencyContent"></div>
                 <div class="emergency-footer">
-                    <button class="emergency-btn" onclick="closeEmergencyModal()">我已閱讀</button>
+                    <div class="emergency-expiry" id="emergencyExpiresAt"></div>
+                    <button type="button" class="emergency-btn" onclick="closeEmergencyModal()">知道了，下次仍提醒</button>
+                    <button type="button" class="emergency-btn emergency-btn-secondary" id="emergencyDismissUntilExpiryBtn" onclick="dismissEmergencyUntilExpiry()">有效期間內不再顯示</button>
+                    <div class="emergency-reminder-note">若未選擇「不再顯示」，下次重新進入聯絡簿仍會提醒。</div>
                 </div>
             </div>
         </div>
@@ -5423,6 +5496,8 @@
         };
 
         var gData = null, gPass = "", isAdminMode = false, currentEditingPost = null, currentPostMode = "create", currentFocusInput = null;
+        var emergencyShownIdentityForCurrentEntry = '';
+        var activeEmergencyAnnouncement = null;
         var currentEditingBulletin = null;
         var activeRealtimeListeners = [];
 
@@ -5829,6 +5904,8 @@
             document.getElementById('full-loader').style.display = 'none';
             clearRealtimeListeners();
             gData = result;
+            emergencyShownIdentityForCurrentEntry = '';
+            activeEmergencyAnnouncement = null;
             if (pass !== "admin_view" && pass !== "god_session" && pass !== "student_preview" && pass !== "dashboard_draft_preview") gPass = pass; // ★ 防止預覽模式覆蓋真正的密碼
 
             // ★ v4.0 登入記錄：fire-and-forget，不阻塞 UI
@@ -8636,37 +8713,101 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             if (container) container.innerHTML = '';
         }
 
+        function buildEmergencyDismissKey(emergency) {
+            var announcement = emergency || {};
+            var identityParts = [
+                'ebookEmergencyDismissed',
+                BEAR_SUBJECT || '',
+                (gData && gData.className) || announcement.className || '',
+                (gData && gData.studentName) || '',
+                announcement.id || announcement.time || announcement.title || '',
+                announcement.time || ''
+            ];
+            return identityParts.map(function(part) {
+                return encodeURIComponent((part || '').toString());
+            }).join(':');
+        }
+
+        function isEmergencyDismissedUntilExpiry(emergency) {
+            if (!emergency || isDashboardDraftPreviewMode) return false;
+            try {
+                var raw = localStorage.getItem(buildEmergencyDismissKey(emergency));
+                if (!raw) return false;
+                var record = JSON.parse(raw);
+                return !!(record && record.dismissed === true &&
+                    (record.expiresAt || '') === (emergency.expiresAt || ''));
+            } catch (error) {
+                return false;
+            }
+        }
+
+        function formatEmergencyExpiryText(value) {
+            var raw = (value || '').toString().trim();
+            if (!raw) return '本公告未設定有效期限';
+            return '本公告有效至 ' + raw.replace(/^(\d{4})-(\d{1,2})-(\d{1,2})/, '$1/$2/$3');
+        }
+
+        function hideEmergencyModal() {
+            var modal = document.getElementById('emergencyModal');
+            if (modal) modal.style.display = 'none';
+            activeEmergencyAnnouncement = null;
+        }
+
         function checkEmergency(list) {
             var modal = document.getElementById('emergencyModal');
             var activeList = isDashboardDraftPreviewMode ? (list || []) : (list || []).filter(function(b) { return isBulletinEffective(b); });
             if (activeList.length === 0) {
-                if (modal) modal.style.display = 'none';
+                hideEmergencyModal();
                 return;
             }
             var emergency = activeList.find(b => b.type === "緊急");
             if (emergency) {
-                var dismissKey = 'emergency_' + (emergency.id || emergency.time || emergency.title || '').toString().replace(/[^a-zA-Z0-9_-]/g, '_') + '_' + (emergency.time || '').toString().replace(/[^a-zA-Z0-9_-]/g, '_');
-                if (!isDashboardDraftPreviewMode && localStorage.getItem(dismissKey) === 'dismissed') {
-                    if (modal) modal.style.display = 'none';
+                var emergencyIdentity = buildEmergencyDismissKey(emergency);
+                if (emergencyShownIdentityForCurrentEntry === emergencyIdentity) return;
+                emergencyShownIdentityForCurrentEntry = emergencyIdentity;
+                if (isEmergencyDismissedUntilExpiry(emergency)) {
+                    hideEmergencyModal();
                     return;
                 }
+                activeEmergencyAnnouncement = emergency;
                 var emergencyTitle = document.getElementById('emergencyTitle');
                 if (emergencyTitle) emergencyTitle.textContent = '⚠️ ' + ((emergency.title || '緊急公告').toString().trim() || '緊急公告');
                 document.getElementById('emergencyContent').innerHTML = parseBtn(emergency.content);
+                var expiryLabel = document.getElementById('emergencyExpiresAt');
+                if (expiryLabel) expiryLabel.textContent = formatEmergencyExpiryText(emergency.expiresAt);
+                var dismissButton = document.getElementById('emergencyDismissUntilExpiryBtn');
+                if (dismissButton) {
+                    dismissButton.disabled = !emergency.expiresAt;
+                    dismissButton.title = emergency.expiresAt ? '' : '此公告未設定有效期限，無法使用這個選項';
+                }
                 if (modal) {
-                    modal.dataset.dismissKey = dismissKey;
                     modal.style.display = 'flex';
                 }
-            } else if (modal) {
-                modal.style.display = 'none';
+            } else {
+                hideEmergencyModal();
             }
         }
 
         function closeEmergencyModal() {
-            var modal = document.getElementById('emergencyModal');
-            if (!modal) return;
-            if (modal.dataset.dismissKey) localStorage.setItem(modal.dataset.dismissKey, 'dismissed');
-            modal.style.display = 'none';
+            hideEmergencyModal();
+        }
+
+        function dismissEmergencyUntilExpiry() {
+            var emergency = activeEmergencyAnnouncement;
+            if (!emergency || !emergency.expiresAt || isDashboardDraftPreviewMode) {
+                hideEmergencyModal();
+                return;
+            }
+            try {
+                localStorage.setItem(buildEmergencyDismissKey(emergency), JSON.stringify({
+                    dismissed: true,
+                    expiresAt: emergency.expiresAt || '',
+                    dismissedAt: new Date().toISOString()
+                }));
+            } catch (error) {
+                console.warn('[eBook] 無法儲存緊急公告不再顯示設定：', error);
+            }
+            hideEmergencyModal();
         }
 
 
