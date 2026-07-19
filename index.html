@@ -778,6 +778,10 @@
             pointer-events: none;
         }
 
+        .admin-mode-border .float-line-container .line-btn {
+            display: none;
+        }
+
         .admin-exit-btn {
             position: fixed;
             bottom: 100px;
@@ -1978,6 +1982,82 @@
             margin: 15px 0;
             border-radius: 12px;
             border: 2px dashed #e74c3c;
+        }
+
+        .god-score-edit-box {
+            margin: 14px 0 0;
+            padding: 12px;
+            border: 1px solid #bfdbfe;
+            border-radius: 12px;
+            background: #eff6ff;
+            text-align: left;
+        }
+
+        .god-score-edit-title {
+            margin-bottom: 8px;
+            color: #1d4ed8;
+            font-size: 0.92rem;
+            font-weight: 900;
+        }
+
+        .god-score-edit-row {
+            display: flex;
+            gap: 8px;
+            align-items: stretch;
+        }
+
+        .god-score-edit-input,
+        .god-score-edit-btn {
+            min-height: 44px;
+            box-sizing: border-box;
+            border-radius: 9px;
+            font-size: 1rem;
+        }
+
+        .god-score-edit-input {
+            flex: 1 1 120px;
+            min-width: 0;
+            padding: 9px 11px;
+            border: 1px solid #93c5fd;
+            background: #fff;
+            color: #1e293b;
+            font-weight: 800;
+        }
+
+        .god-score-edit-btn {
+            flex: 0 0 auto;
+            min-width: 112px;
+            padding: 9px 14px;
+            border: 0;
+            background: #2563eb;
+            color: #fff;
+            font-weight: 900;
+            cursor: pointer;
+        }
+
+        .god-score-edit-btn:disabled,
+        .god-score-edit-input:disabled {
+            opacity: 0.65;
+            cursor: wait;
+        }
+
+        .god-score-edit-status {
+            min-height: 1.35em;
+            margin-top: 7px;
+            color: #64748b;
+            font-size: 0.86rem;
+            font-weight: 800;
+            line-height: 1.35;
+        }
+
+        @media (max-width: 520px) {
+            .god-score-edit-row {
+                flex-direction: column;
+            }
+
+            .god-score-edit-btn {
+                width: 100%;
+            }
         }
 
         .makeup-result-report-section {
@@ -7360,6 +7440,20 @@
             if (logic.needsReport && !logic.showReviewing && !isAdminMode) {
                 scoreReportHtml = "<div class='score-report-section'><div style='font-weight:bold; color:#c0392b; margin-bottom:10px; font-size:1.35rem;'>" + SVG.edit + "回報" + getDailyPostExamTimePrefix(exam) + getDailyPostExamLabel(exam) + "缺考分數</div><div class='input-box'><input type='number' class='score-input' id='" + scoreInputId + "' placeholder='輸入分數'><button class='score-btn' onclick=\"submitScoreReport('" + safeDate + "', '" + post.date + "', '" + (hasExamColIndex ? exam.colIndex : "") + "', '" + escapeInlineJs(exam.exam || "") + "')\">送出</button></div></div>";
             }
+            var editableScore = getGodEditableScore(exam);
+            if (canUseAdminModeReview() && hasExamColIndex && !isHomeworkExam && editableScore) {
+                var scoreEditContextKey = makeDomSafeId("score_edit_" + safeDate + "_" + exam.colIndex);
+                window.adminModeScoreEditContext[scoreEditContextKey] = {
+                    targetDate: post.date,
+                    sourceClassName: post.storedClassName || post.sourceClassName || gData.className,
+                    gradeClassName: exam.storedClassName || gData.className,
+                    examColIndex: exam.colIndex,
+                    title: exam.exam || "",
+                    targetExamId: exam.examId || exam.targetExamId || "",
+                    currentScore: editableScore
+                };
+                scoreReportHtml += buildGodScoreEditBox(scoreEditContextKey);
+            }
             if (canUseAdminModeReview() && shouldShowGodMakeupReview(exam, logic)) {
                 var makeupContextKey = makeDomSafeId("makeup_" + safeDate + "_" + (exam.colIndex || 0));
                 window.adminModeMakeupContext[makeupContextKey] = { className: gData.className, studentName: gData.studentName, targetDate: post.date, sourceClassName: post.storedClassName || post.sourceClassName || gData.className, gradeClassName: exam.storedClassName || gData.className, gradeClassKey: exam.storedClassKey || "", examColIndex: exam.colIndex, title: exam.exam || "", currentColor: exam.cellColor || "", scoreReview: getLatestMakeupReportInfo(exam, history), resultReview: getLatestMakeupResultReportInfo(exam, history) };
@@ -7435,6 +7529,7 @@
             window.adminModeStickerContext = {};
             window.adminModeStickerAdjustmentContext = {};
             window.adminModeMakeupContext = {};
+            window.adminModeScoreEditContext = window.adminModeScoreEditContext || {};
             window.adminModeDirectMessageContext = {};
             function getPostScopedHistory(postData) {
                 var postSourceClassKey = postData.sourceClassKey || "";
@@ -7777,6 +7872,7 @@
         }
 
         function renderOldGradeCards(grades) {
+            window.adminModeScoreEditContext = window.adminModeScoreEditContext || {};
             var container = document.getElementById('tab-content-1'); if (!grades || grades.length === 0) { container.innerHTML = "<p style='color:#666; padding:10px;'>目前尚無成績紀錄。</p>"; return; } var html = ""; grades.forEach(function (item) {
                 var logic = getDisplayLogic(item, gData ? gData.feedbackHistory : []); var unitDisplay = ""; if (!isNaN(parseFloat(logic.mainScore))) unitDisplay = "<span class='score-unit'>" + escapeHtml(item.unit) + "</span>"; var displayScore = "<div class='score-val" + logic.mainClass + "'>" + escapeHtml(logic.mainScore) + unitDisplay + "</div>"; var chartHtml = "";
 var dist = item.dist || [0,0,0,0,0];
@@ -7805,6 +7901,23 @@ dist.forEach((val, idx) => {
 });
 chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
 
+                var oldScoreEditHtml = "";
+                var editableOldScore = getGodEditableScore(item);
+                var hasOldExamColIndex = item.colIndex !== undefined && item.colIndex !== null && item.colIndex !== "";
+                if (canUseAdminModeReview() && hasOldExamColIndex && !isHomeworkColumnTitle((item.date || "") + (item.exam || "")) && editableOldScore) {
+                    var oldScoreEditContextKey = makeDomSafeId("old_score_edit_" + (item.date || "") + "_" + item.colIndex);
+                    window.adminModeScoreEditContext[oldScoreEditContextKey] = {
+                        targetDate: item.date || "",
+                        sourceClassName: item.storedClassName || item.className || gData.className,
+                        gradeClassName: item.storedClassName || item.className || gData.className,
+                        examColIndex: item.colIndex,
+                        title: item.exam || "",
+                        targetExamId: item.examId || item.targetExamId || "",
+                        currentScore: editableOldScore
+                    };
+                    oldScoreEditHtml = buildGodScoreEditBox(oldScoreEditContextKey);
+                }
+
                 var classBadgeText = (item.isTransferFormerClass ? "轉班前紀錄｜" : "") + (item.className || "");
                 html += `
         <div class='score-card' onclick='toggleCard(this)'>
@@ -7815,6 +7928,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             </div>
             <div class='expand-area'>
                 ${(item.note && !isHomeworkColumnTitle((item.date || "") + (item.exam || ""))) ? "<div class='detail-box'>" + SVG.target + " 補考標準：" + escapeHtml(item.note) + "</div>" : ""}
+                ${oldScoreEditHtml}
                 <div class='chart-wrapper'>${chartHtml}</div>
             </div>
             <div class='click-hint'>▼</div>
@@ -8963,6 +9077,26 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 "</div></div>";
         }
 
+        function getGodEditableScore(exam) {
+            var raw = exam && exam.score !== undefined && exam.score !== null ? String(exam.score).trim() : '';
+            if (!/^\d+(\.\d+)?(假)?$/.test(raw)) return '';
+            var scoreNumber = parseFloat(raw);
+            return Number.isFinite(scoreNumber) && scoreNumber >= 0 && scoreNumber <= 100 ? raw : '';
+        }
+
+        function buildGodScoreEditBox(contextKey) {
+            var context = window.adminModeScoreEditContext && window.adminModeScoreEditContext[contextKey];
+            if (!context) return '';
+            return "<div class='god-score-edit-box'>" +
+                "<div class='god-score-edit-title'>老師修改分數｜目前 " + escapeAdminHtml(context.currentScore) + "</div>" +
+                "<div class='god-score-edit-row'>" +
+                "<input type='text' inputmode='decimal' class='god-score-edit-input' id='god-score-edit-input-" + contextKey + "' value='" + escapeAdminHtml(context.currentScore) + "' aria-label='修改分數' autocomplete='off'>" +
+                "<button type='button' class='god-score-edit-btn' onclick=\"writeGodScoreCorrection(this, '" + contextKey + "')\">修改分數</button>" +
+                "</div>" +
+                "<div class='god-score-edit-status' id='god-score-edit-status-" + contextKey + "'></div>" +
+                "</div>";
+        }
+
         function shouldShowGodMakeupReview(exam, logic) {
             if (!exam || isHomeworkColumnTitle((exam.date || "") + (exam.exam || ""))) return false;
             if (logic && logic.showReviewing) return true;
@@ -9021,6 +9155,107 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 ebookGodSessionInfo.expiresAt = result.data.expiresAt;
             }
             return result && result.data ? result.data : {};
+        }
+
+        async function writeGodScoreCorrection(btn, contextKey) {
+            if (!canUseAdminModeReview()) {
+                swalAlert('這個老師視角連線不能修改分數', '請回行政中心重新開啟學生畫面。', 'warning');
+                return;
+            }
+            var context = window.adminModeScoreEditContext && window.adminModeScoreEditContext[contextKey];
+            var input = document.getElementById('god-score-edit-input-' + contextKey);
+            var status = document.getElementById('god-score-edit-status-' + contextKey);
+            var nextScore = input ? input.value.trim() : '';
+            if (!context || !context.targetDate || context.examColIndex === undefined || context.examColIndex === null || !context.title) {
+                swalAlert('找不到考試欄位資料', '請重新整理後再試。', 'warning');
+                return;
+            }
+            if (!/^\d+(\.\d+)?(假)?$/.test(nextScore)) {
+                swalAlert('分數格式不正確', '請輸入 0 到 100 的數字；缺考補登可保留「假」，例如 85假。', 'warning');
+                return;
+            }
+            var scoreNumber = parseFloat(nextScore);
+            if (!Number.isFinite(scoreNumber) || scoreNumber < 0 || scoreNumber > 100) {
+                swalAlert('分數超出範圍', '分數請填 0 到 100。', 'warning');
+                return;
+            }
+            if (nextScore === context.currentScore) {
+                if (status) {
+                    status.style.color = '#64748b';
+                    status.innerText = '分數沒有變更。';
+                }
+                return;
+            }
+
+            var confirmText = gData.studentName + '｜' + context.targetDate + '｜' + context.title +
+                '\n\n原分數：' + context.currentScore + '\n新分數：' + nextScore +
+                '\n\n確定要覆寫 Google Sheet 的這一格嗎？';
+            var ok = await swalConfirm('確認修改分數', confirmText);
+            if (!ok) return;
+
+            var row = btn ? btn.parentElement : null;
+            var controls = row ? row.querySelectorAll('button, input') : [];
+            controls.forEach(function(el) { el.disabled = true; });
+            var originalText = btn ? btn.innerText : '';
+            if (btn) btn.innerText = '修改中...';
+            if (status) {
+                status.style.color = '#64748b';
+                status.innerText = '正在比對原分數並寫入單一儲存格...';
+            }
+            try {
+                var requestId = createStableEbookRequestId('god-score-edit', [
+                    BEAR_SUBJECT,
+                    context.gradeClassName || gData.className,
+                    gData.studentKey || gData.studentName,
+                    context.targetDate,
+                    context.examColIndex,
+                    context.currentScore,
+                    nextScore
+                ]);
+                var actionResult = await runGodAdminAction('writeScoreGas', {
+                    className: gData.className,
+                    studentName: gData.studentName,
+                    targetDateStr: context.targetDate,
+                    gradeClassName: context.gradeClassName || gData.className,
+                    sourceClassName: context.sourceClassName || gData.className,
+                    scoreValue: nextScore,
+                    expectedCurrentScore: context.currentScore,
+                    examColIndex: context.examColIndex,
+                    targetExamTitle: context.title,
+                    targetExamId: context.targetExamId || '',
+                    teacherDirectScoreWriteback: true,
+                    teacherScoreCorrection: true,
+                    studentKey: gData.studentKey || gData.studentName,
+                    clientRequestId: requestId,
+                    sourceSurface: 'ebook_god_score_correction'
+                });
+                context.currentScore = nextScore;
+                if (input) input.value = nextScore;
+                var box = btn ? btn.closest('.grade-section') : null;
+                var scoreNode = box ? box.querySelector('.main-score > span:first-child') : null;
+                if (scoreNode) scoreNode.textContent = nextScore;
+                var title = btn && btn.closest('.god-score-edit-box') ? btn.closest('.god-score-edit-box').querySelector('.god-score-edit-title') : null;
+                if (title) title.textContent = '老師修改分數｜目前 ' + nextScore;
+                if (status) {
+                    var gasResult = actionResult && actionResult.result ? actionResult.result : {};
+                    var isReplay = gasResult.idempotentReplay === true;
+                    var firebaseSynced = gasResult.firebaseSynced === true;
+                    status.style.color = (isReplay || firebaseSynced) ? '#16a34a' : '#b45309';
+                    status.innerText = isReplay
+                        ? '已確認先前的修改完成，分數為 ' + nextScore + '。'
+                        : (firebaseSynced
+                            ? '已修改為 ' + nextScore + '，並完成單欄雲端同步。'
+                            : '已修改 Google Sheet 為 ' + nextScore + '；雲端單欄同步待補。');
+                }
+            } catch (err) {
+                if (status) {
+                    status.style.color = '#dc2626';
+                    status.innerText = '修改失敗：' + (err && err.message ? err.message : String(err));
+                }
+            } finally {
+                controls.forEach(function(el) { el.disabled = false; });
+                if (btn) btn.innerText = originalText || '修改分數';
+            }
         }
 
         async function sendAdminModeDirectMessage(contextKey) {

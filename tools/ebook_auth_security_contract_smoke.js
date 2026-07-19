@@ -281,6 +281,14 @@ const makeupScoreUi = extractFunction(html, 'writeGodMakeupScore');
 checkIncludes(makeupScoreUi, 'context.scoreReview.storedClassName || context.sourceClassName', 'god reported-score writeback must prefer stored feedback class');
 const directMakeupScoreUi = extractFunction(html, 'writeGodDirectMakeupScore');
 checkIncludes(directMakeupScoreUi, 'sourceClassName: context.sourceClassName', 'god direct score writeback must target the historical exam source class');
+const scoreCorrectionUi = extractFunction(html, 'writeGodScoreCorrection');
+checkIncludes(scoreCorrectionUi, 'teacherScoreCorrection: true', 'god score correction must use the explicit correction contract');
+checkIncludes(scoreCorrectionUi, 'expectedCurrentScore: context.currentScore', 'god score correction must send the score value that was originally displayed');
+checkIncludes(scoreCorrectionUi, 'createStableEbookRequestId', 'god score correction retries must retain a deterministic idempotency key');
+const scoreWriteTargetFn = extractFunction(functionsSource, 'assertEbookScoreWriteTarget');
+checkIncludes(scoreWriteTargetFn, 'payload.teacherScoreCorrection === true', 'score write target validation must distinguish corrections from absence writeback');
+checkIncludes(scoreWriteTargetFn, 'rawScore !== expectedCurrentScore', 'score correction must reject stale overwrite attempts');
+checkIncludes(scoreWriteTargetFn, 'correctionNumber > 100', 'score correction must enforce the 0 to 100 range server-side');
 
 function checkStableGodUi(functionSource, label) {
   check(!/clientRequestId:\s*createClientRequestId\(/.test(functionSource), `${label} must not generate a fresh ID for every retry`);
