@@ -39,7 +39,7 @@
         "理化第13章": 44,
         "地科第1章": 37,
         "地科第2章": 46,
-        "地科第3章": 40
+        "地科第3章": 39
     });
 
     var CHAPTER_NUMBERS = Object.freeze({
@@ -63,7 +63,7 @@
     }
 
     return Object.freeze({
-        version: "20260718-form-quiz-metadata-v1",
+        version: "20260720-textbook-question-count-v2",
         scores: FULL_SCORES,
         normalizeRangeLabel: normalizeRangeLabel,
         getFullScore: getFullScore
