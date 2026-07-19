@@ -152,6 +152,76 @@ if (laterQuiz.mainScore !== '缺考' || laterQuiz.isEnrollmentExempt) {
   throw new Error('quiz exemption must not extend beyond the enrollment date');
 }
 
+context.getFeedbackOverrideNum = () => 88;
+const teacherCorrectedAbsence = context.getDisplayLogic({
+  date: '7/5小考',
+  exam: '生物第1-8章複習考',
+  score: '91假',
+  scoreNum: 91,
+}, []);
+if (teacherCorrectedAbsence.mainScore !== 91 || teacherCorrectedAbsence.effectiveNum !== 91 || teacherCorrectedAbsence.showReviewing) {
+  throw new Error('a numeric absence score in the Sheet must remain authoritative when an older student report differs');
+}
+if (!teacherCorrectedAbsence.teacherCorrected || teacherCorrectedAbsence.reportedScoreNum !== 88 || !teacherCorrectedAbsence.statusHtml.includes('老師已更正：原回報 88 分')) {
+  throw new Error('the student card must explain that the teacher corrected the earlier report');
+}
+
+const pendingAbsence = context.getDisplayLogic({
+  date: '7/5小考',
+  exam: '生物第1-8章複習考',
+  score: '假',
+  scoreNum: null,
+}, []);
+if (pendingAbsence.mainScore !== 88 || !pendingAbsence.showReviewing || !pendingAbsence.statusHtml.includes('待審核')) {
+  throw new Error('a report must remain pending while the Sheet still has no numeric absence score');
+}
+
+context.getFeedbackOverrideNum = () => 91;
+const matchingAbsence = context.getDisplayLogic({
+  date: '7/5小考',
+  exam: '生物第1-8章複習考',
+  score: '91假',
+  scoreNum: 91,
+}, []);
+if (matchingAbsence.teacherCorrected || matchingAbsence.showReviewing || !matchingAbsence.statusHtml.includes('請假回報')) {
+  throw new Error('a matching Sheet score must remain an ordinary completed absence writeback');
+}
+
+context.window = {
+  adminModeMakeupContext: {
+    corrected: {
+      scoreReview: {
+        status: 'teacher_corrected',
+        sheetScore: '91假',
+        reportedScoreText: '88',
+        scoreValue: '88假',
+      },
+    },
+    pending: {
+      scoreReview: {
+        status: 'unfilled',
+        sheetScore: '假',
+        reportedScoreText: '88',
+        scoreValue: '88假',
+      },
+    },
+  },
+};
+context.escapeAdminHtml = value => String(value);
+context.getMakeupColorInfo = () => null;
+context.MAKEUP_RESULT_COLORS = [];
+vm.runInContext(extractFunction('buildGodMakeupReviewBox'), context);
+
+const correctedReviewHtml = context.buildGodMakeupReviewBox('corrected', { cellColor: '' }, { showReviewing: false });
+if (!correctedReviewHtml.includes('老師已更正：大表 91假｜學生原回報 88') || correctedReviewHtml.includes('writeGodMakeupScore')) {
+  throw new Error('teacher view must show the correction audit without offering to overwrite the Sheet with the older report');
+}
+
+const pendingReviewHtml = context.buildGodMakeupReviewBox('pending', { cellColor: '' }, { showReviewing: true });
+if (!pendingReviewHtml.includes('writeGodMakeupScore') || !pendingReviewHtml.includes('回填 88假')) {
+  throw new Error('teacher view must keep the writeback button for a truly unfilled report');
+}
+
 const filtered = context.filterItemsByStudentEnrollmentDate([
   { date: '2026/07/03', title: '入班前' },
   { date: '2026/07/04', title: '入班日' },
