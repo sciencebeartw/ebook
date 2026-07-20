@@ -33,8 +33,24 @@ vm.createContext(context);
   'isHomePracticeScoreTitle',
   'isHomeworkColumnTitle',
   'isHomeworkMissingScore',
-  'isCurrentStudentEnrollmentExemptExam'
+  'isCurrentStudentEnrollmentExemptExam',
+  'getAbsenceScoreReviewStatus'
 ].forEach((name) => vm.runInContext(extractFunction(name), context));
+
+const absenceScoreReviewCases = [
+  { sheetScore: '假', reportedScore: '80', expected: 'unfilled', label: 'pure absence marker remains pending' },
+  { sheetScore: '80假', reportedScore: '80', expected: 'filled', label: 'matching writeback is completed' },
+  { sheetScore: '80.0假', reportedScore: '80', expected: 'filled', label: 'numerically equivalent writeback is completed' },
+  { sheetScore: '85假', reportedScore: '80', expected: 'teacher_corrected', label: 'only a differing numeric score is teacher-corrected' },
+];
+absenceScoreReviewCases.forEach(({ sheetScore, reportedScore, expected, label }) => {
+  if (context.getAbsenceScoreReviewStatus(sheetScore, reportedScore) !== expected) {
+    throw new Error(`absence score review state mismatch: ${label}`);
+  }
+});
+if (!html.includes('getAbsenceScoreReviewStatus(sScore, rScore)')) {
+  throw new Error('legacy teacher feedback review must use the same absence score state machine');
+}
 
 const enrollmentIndex = {
   enroll_1: {

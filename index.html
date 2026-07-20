@@ -6708,6 +6708,14 @@
             return report ? report.reportedScoreNum : null;
         }
 
+        function getAbsenceScoreReviewStatus(sheetScore, reportedScoreText) {
+            var rawScore = sheetScore === undefined || sheetScore === null ? "" : String(sheetScore).trim();
+            var reportedMatch = String(reportedScoreText === undefined || reportedScoreText === null ? "" : reportedScoreText).match(/(\d+(\.\d+)?)/);
+            var sheetMatch = rawScore.match(/(\d+(\.\d+)?)/);
+            if (!rawScore || rawScore.indexOf("假") === -1 || !sheetMatch || !reportedMatch) return "unfilled";
+            return Number(sheetMatch[0]) === Number(reportedMatch[0]) ? "filled" : "teacher_corrected";
+        }
+
         function getExamDateCandidates(exam) {
             var dateStr = (exam && exam.date ? exam.date : "").toString();
             var candidates = [];
@@ -6736,13 +6744,8 @@
                 var match = fb.content.match(/(\d+(\.\d+)?)/);
                 if (!match) return null;
                 var reportedNum = parseFloat(match[0]);
-                var sheetMatch = rawScore.match(/(\d+(\.\d+)?)/);
-                var sheetNumText = sheetMatch ? sheetMatch[0] : "";
                 var reportedText = match[0];
-                var status = "";
-                if (!rawScore || rawScore.indexOf("假") === -1) status = "unfilled";
-                else if (sheetNumText === reportedText) status = "filled";
-                else status = "teacher_corrected";
+                var status = getAbsenceScoreReviewStatus(rawScore, reportedText);
                 return {
                     feedbackKey: fb.fbKey || "",
                     targetDate: fb.targetDate || "",
@@ -10450,16 +10453,13 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                             var rMatch = item.content.match(/(\d+(\.\d+)?)/);
                             var rScore = rMatch ? rMatch[0] : "";
 
-                            if (!sScore || sScore.indexOf("假") === -1) {
+                            var absenceReviewStatus = getAbsenceScoreReviewStatus(sScore, rScore);
+                            if (absenceReviewStatus === "unfilled") {
                                 item.statusFlag = "🔴 未回填";
+                            } else if (absenceReviewStatus === "filled") {
+                                item.statusFlag = "✅ 已回填";
                             } else {
-                                var sMatch = sScore.match(/(\d+(\.\d+)?)/);
-                                var sNum = sMatch ? sMatch[0] : "";
-                                if (sNum === rScore && rScore !== "") {
-                                    item.statusFlag = "✅ 已回填";
-                                } else {
-                                    item.statusFlag = "✅ 老師已更正";
-                                }
+                                item.statusFlag = "✅ 老師已更正";
                             }
                         }
                     }
