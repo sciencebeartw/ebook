@@ -5959,13 +5959,22 @@
             );
         }
 
+        function getStudentLoginFailureMessage(error) {
+            var message = (error && error.message ? error.message : error || "登入服務暫時無法使用").toString();
+            if (message.indexOf("此班級目前未開放電子聯絡簿") > -1) {
+                return "此班級目前未開放電子聯絡簿。";
+            }
+            return "連線錯誤：" + message;
+        }
+
         function doLogin() {
             var name = document.getElementById('sName').value; var pass = document.getElementById('sPass').value;
             if (!name || !pass) { document.getElementById('loginMsg').innerText = "請輸入完整資訊"; return; }
             document.getElementById('loader-login').style.display = 'block';
             document.getElementById('loginMsg').innerText = "";
             google.script.run.withSuccessHandler(function (result) { loginSuccess(result, pass); }).withFailureHandler(function (e) {
-                document.getElementById('loader-login').style.display = 'none'; document.getElementById('loginMsg').innerText = "連線錯誤：" + e.message;
+                document.getElementById('loader-login').style.display = 'none';
+                document.getElementById('loginMsg').innerText = getStudentLoginFailureMessage(e);
             }).getStudentData(name, pass);
         }
         function loginSuccess(result, pass) {
