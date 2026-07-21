@@ -84,6 +84,10 @@ function extractFunction(name) {
 assert.match(html, /知道了，下次仍提醒/, 'the default action must keep future reminders enabled');
 assert.match(html, /有效期間內不再顯示/, 'the explicit opt-out action must be visible');
 assert.match(html, /本公告有效至/, 'the popup must display its effective-until label');
+assert.match(html, /id="emergencyDismissUntilExpiryBtn"[\s\S]*id="emergencyExpiresAt"[\s\S]*<\/button>/,
+  'the effective-until label must be rendered inside the compact opt-out button');
+assert.match(html, /為避免忘記重要訊息[^<]*下次重新進入聯絡簿時仍會提醒/,
+  'the reminder explanation must state why the popup appears again');
 
 const storage = new Map();
 const elements = {

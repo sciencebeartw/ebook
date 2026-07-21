@@ -3258,15 +3258,6 @@
             gap: 10px;
             flex-shrink: 0;
         }
-        .emergency-expiry {
-            padding: 10px 14px;
-            border-radius: 12px;
-            background: #fff7ed;
-            color: #9a3412;
-            font-size: 1rem;
-            font-weight: 800;
-            line-height: 1.45;
-        }
         .emergency-reminder-note {
             color: #64748b;
             font-size: 0.9rem;
@@ -3303,7 +3294,26 @@
             border: 2px solid #fecaca;
             box-shadow: none;
             letter-spacing: 0;
-            font-size: 1.05rem;
+            width: auto;
+            max-width: 100%;
+            min-height: 44px;
+            padding: 8px 18px;
+            justify-self: center;
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
+        }
+        .emergency-dismiss-label {
+            font-size: 0.98rem;
+            line-height: 1.25;
+        }
+        .emergency-dismiss-expiry {
+            color: #9a3412;
+            font-size: 0.78rem;
+            font-weight: 700;
+            line-height: 1.25;
         }
         .emergency-btn-secondary:hover {
             background: #fff1f2;
@@ -3336,7 +3346,14 @@
                 letter-spacing: 0;
             }
             .emergency-btn-secondary {
-                font-size: 1rem;
+                min-height: 44px;
+                padding: 8px 14px;
+            }
+            .emergency-dismiss-label {
+                font-size: 0.95rem;
+            }
+            .emergency-dismiss-expiry {
+                font-size: 0.76rem;
             }
         }
     
@@ -4908,10 +4925,12 @@
                 <div class="emergency-header" id="emergencyTitle">⚠️ 緊急公告</div>
                 <div class="emergency-body" id="emergencyContent"></div>
                 <div class="emergency-footer">
-                    <div class="emergency-expiry" id="emergencyExpiresAt"></div>
                     <button type="button" class="emergency-btn" onclick="closeEmergencyModal()">知道了，下次仍提醒</button>
-                    <button type="button" class="emergency-btn emergency-btn-secondary" id="emergencyDismissUntilExpiryBtn" onclick="dismissEmergencyUntilExpiry()">有效期間內不再顯示</button>
-                    <div class="emergency-reminder-note">若未選擇「不再顯示」，下次重新進入聯絡簿仍會提醒。</div>
+                    <button type="button" class="emergency-btn emergency-btn-secondary" id="emergencyDismissUntilExpiryBtn" onclick="dismissEmergencyUntilExpiry()">
+                        <span class="emergency-dismiss-label">有效期間內不再顯示</span>
+                        <span class="emergency-dismiss-expiry" id="emergencyExpiresAt"></span>
+                    </button>
+                    <div class="emergency-reminder-note">為避免忘記重要訊息，若未選擇「不再顯示」，下次重新進入聯絡簿時仍會提醒。</div>
                 </div>
             </div>
         </div>
