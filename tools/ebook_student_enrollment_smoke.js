@@ -35,8 +35,8 @@ vm.createContext(context);
   'isHomeworkMissingScore',
   'isCurrentStudentEnrollmentExemptExam',
   'getAbsenceScoreReviewStatus',
-  'isMathAdvancedAssessmentGrade',
-  'getMathAdvancedAssessmentStandard'
+  'isMathAdvancedGuidanceExam',
+  'getMathAdvancedGuidanceStandard'
 ].forEach((name) => vm.runInContext(extractFunction(name), context));
 
 const absenceScoreReviewCases = [
