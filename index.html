@@ -4000,8 +4000,19 @@
             if (isHomework && rawMaxForUnit <= 60) currentUnit = "題";
             if (eData.score === "尚未繳交") currentUnit = "";
 
+            const mathGuidanceGrade = {
+                className: presentation.className,
+                sourceClassName: presentation.sourceClassName,
+                storedClassName: className || presentation.sourceClassName || options.currentClassName || "",
+                date: eData.date,
+                exam: eData.examName,
+                note: eData.note,
+                score: eData.score
+            };
+            const isMathAdvancedAssessment = isMathAdvancedAssessmentGrade(mathGuidanceGrade);
+            const mathGuidanceStandard = getMathAdvancedAssessmentStandard(mathGuidanceGrade);
             let makeupThreshold = 0;
-            if (eData.note && eData.note !== "無詳細備註") {
+            if (!isMathAdvancedAssessment && eData.note && eData.note !== "無詳細備註") {
                 const thresholdMatch = eData.note.match(/(\d+)/);
                 if (thresholdMatch) makeupThreshold = parseInt(thresholdMatch[0]);
             }
@@ -4057,6 +4068,8 @@
                 examId: (options.examIdByColKey || {})[col] || "",
                 note: eData.note,
                 makeupThreshold: makeupThreshold,
+                guidanceThreshold: mathGuidanceStandard ? mathGuidanceStandard.guidanceThreshold : 0,
+                fullScore: mathGuidanceStandard ? mathGuidanceStandard.fullScore : null,
                 score: eData.score,
                 scoreNum: isNaN(studentScoreNum) ? null : studentScoreNum,
                 unit: currentUnit,
@@ -6814,6 +6827,9 @@
             var sheetNum = exam.scoreNum;
             var myColor = (exam.cellColor || "").toLowerCase();
             var isHw = isHomeworkColumnTitle((exam.date || "") + (exam.exam || "")) || isHomeworkMissingScore(rawScore);
+            var mathGuidanceStandard = getMathAdvancedAssessmentStandard(exam);
+            var guidanceThreshold = Number(exam.guidanceThreshold || (mathGuidanceStandard && mathGuidanceStandard.guidanceThreshold) || 0);
+            var isMathGuidanceExam = isMathAdvancedAssessmentGrade(exam);
             var result = { mainScore: "", mainClass: "", statusHtml: "", effectiveNum: null, showReviewing: false, needsReport: false };
             if (isCurrentStudentEnrollmentExemptExam(exam)) {
                 result.mainScore = "免試";
@@ -6852,13 +6868,15 @@
                 }
             }
             if (result.showReviewing) result.statusHtml += "<div class='reviewing-tag'>(待審核)</div>";
-            if (myColor) {
+            if (myColor && !isMathGuidanceExam) {
                 if (myColor === "#00ff00") result.statusHtml += "<div class='makeup-status-tag status-green'>" + SVG.thumbsUp + "補考結果：觀念理解良好</div>";
                 else if (myColor === "#ffff00") result.statusHtml += "<div class='makeup-status-tag status-yellow'>" + SVG.smile + "補考結果：觀念大致理解</div>";
                 else if (myColor === "#ff9900") result.statusHtml += "<div class='makeup-status-tag status-orange'>" + SVG.meh + "補考結果：觀念不太理解</div>";
                 else if (myColor === "#ff0000") result.statusHtml += "<div class='makeup-status-tag status-red'>" + SVG.frown + "補考結果：觀念必須加強</div>";
             }
-            if (result.statusHtml.indexOf("補考結果") === -1 && result.effectiveNum !== null && exam.makeupThreshold > 0) {
+            if (isMathGuidanceExam && guidanceThreshold > 0 && result.effectiveNum !== null && result.effectiveNum < guidanceThreshold) {
+                result.statusHtml += "<div class='makeup-status-tag status-warning'>" + SVG.alert + "未達標需輔導</div>";
+            } else if (!isMathGuidanceExam && result.statusHtml.indexOf("補考結果") === -1 && result.effectiveNum !== null && exam.makeupThreshold > 0) {
                 if (result.effectiveNum < exam.makeupThreshold) result.statusHtml += "<div class='makeup-status-tag status-warning'>" + SVG.alert + "未達標需補考</div>";
             }
             return result;
@@ -7070,6 +7088,32 @@
             return (className || "").toString().indexOf("資優自然") > -1;
         }
 
+        function isMathAdvancedAssessmentGrade(grade) {
+            if (BEAR_SUBJECT !== "/math" || !grade) return false;
+            var classNames = [grade.className, grade.storedClassName, grade.sourceClassName].filter(function(className) {
+                return !!(className || "").toString().trim();
+            });
+            if (!classNames.length && gData && gData.className) classNames.push(gData.className);
+            var isMathAdvancedClass = classNames.some(function(className) {
+                return (className || "").toString().indexOf("數學超前") > -1;
+            });
+            var examTitle = ((grade.date || "") + " " + (grade.exam || grade.examName || "")).toString();
+            return isMathAdvancedClass && examTitle.indexOf("鑑定考") > -1;
+        }
+
+        function getMathAdvancedAssessmentStandard(grade) {
+            if (!isMathAdvancedAssessmentGrade(grade)) return null;
+            var note = (grade.note || "").toString();
+            var fullScoreMatch = note.match(/滿\s*分\s*[：:]?\s*(\d+(?:\.\d+)?)\s*分?/);
+            var guidanceMatch = note.match(/輔\s*導\s*標\s*準\s*[：:]?\s*(\d+(?:\.\d+)?)\s*分?/);
+            var fullScore = fullScoreMatch ? Number(fullScoreMatch[1]) : null;
+            var guidanceThreshold = guidanceMatch ? Number(guidanceMatch[1]) : 0;
+            var scoreMatch = String(grade.score === undefined || grade.score === null ? "" : grade.score).match(/(\d+(?:\.\d+)?)/);
+            if (!Number.isFinite(fullScore) || fullScore <= 0 || (scoreMatch && Number(scoreMatch[1]) > fullScore)) fullScore = null;
+            if (!Number.isFinite(guidanceThreshold) || guidanceThreshold <= 0) guidanceThreshold = 0;
+            return fullScore || guidanceThreshold ? { fullScore: fullScore, guidanceThreshold: guidanceThreshold } : null;
+        }
+
         function getGiftedScienceHomeworkFullScore(grade) {
             if (BEAR_SUBJECT !== "/science" || !grade || !window.BearGiftedHomeworkFullScores) return null;
             var className = grade.className || grade.storedClassName || grade.sourceClassName || (gData && gData.className) || "";
@@ -7082,6 +7126,8 @@
         }
 
         function getGradeScoreUnitText(grade, fallbackUnit) {
+            var mathStandard = getMathAdvancedAssessmentStandard(grade);
+            if (mathStandard && mathStandard.fullScore) return "／" + mathStandard.fullScore + " 分";
             var fullScore = getGiftedScienceHomeworkFullScore(grade);
             return fullScore ? ("／" + fullScore + " 題") : (fallbackUnit || "");
         }
@@ -7478,8 +7524,13 @@
             var scoreDisplay = "<span class='" + logic.mainClass + "'>" + logic.mainScore + "</span>" + unitDisplay;
             var standardHtml = "";
             var isHomeworkExam = isHomeworkColumnTitle((exam.date || "") + (exam.exam || ""));
-            if (exam.note && exam.note !== "" && !isHomeworkExam) {
-                standardHtml = "<div class='exam-standard-box'>" + SVG.target + " 補考標準：" + exam.note + "</div>";
+            var mathGuidanceStandard = getMathAdvancedAssessmentStandard(exam);
+            if (isMathAdvancedAssessmentGrade(exam)) {
+                if (mathGuidanceStandard && mathGuidanceStandard.guidanceThreshold > 0) {
+                    standardHtml = "<div class='exam-standard-box'>" + SVG.target + " 輔導標準：" + escapeHtml(mathGuidanceStandard.guidanceThreshold) + "分</div>";
+                }
+            } else if (exam.note && exam.note !== "" && !isHomeworkExam) {
+                standardHtml = "<div class='exam-standard-box'>" + SVG.target + " 補考標準：" + escapeHtml(exam.note) + "</div>";
             }
             var safeDate = post.date.replace(/\//g, '-');
             var hasExamColIndex = exam.colIndex !== undefined && exam.colIndex !== null && exam.colIndex !== "";
@@ -7966,6 +8017,11 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 }
 
                 var classBadgeText = (item.isTransferFormerClass ? "轉班前紀錄｜" : "") + (item.className || "");
+                var isMathAdvancedAssessment = isMathAdvancedAssessmentGrade(item);
+                var mathGuidanceStandard = getMathAdvancedAssessmentStandard(item);
+                var oldStandardHtml = isMathAdvancedAssessment
+                    ? ((mathGuidanceStandard && mathGuidanceStandard.guidanceThreshold > 0) ? "<div class='detail-box'>" + SVG.target + " 輔導標準：" + escapeHtml(mathGuidanceStandard.guidanceThreshold) + "分</div>" : "")
+                    : ((item.note && !isHomeworkColumnTitle((item.date || "") + (item.exam || ""))) ? "<div class='detail-box'>" + SVG.target + " 補考標準：" + escapeHtml(item.note) + "</div>" : "");
                 html += `
         <div class='score-card' onclick='toggleCard(this)'>
             <div class='class-badge'>${escapeHtml(classBadgeText)}</div>
@@ -7974,7 +8030,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 <div class='score-box'>${displayScore}${item.subNote || ""}${logic.statusHtml}<div class='avg-score'>班平均 ${escapeHtml(item.average)}</div></div>
             </div>
             <div class='expand-area'>
-                ${(item.note && !isHomeworkColumnTitle((item.date || "") + (item.exam || ""))) ? "<div class='detail-box'>" + SVG.target + " 補考標準：" + escapeHtml(item.note) + "</div>" : ""}
+                ${oldStandardHtml}
                 ${oldScoreEditHtml}
                 <div class='chart-wrapper'>${chartHtml}</div>
             </div>
@@ -9146,6 +9202,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
 
         function shouldShowGodMakeupReview(exam, logic) {
             if (!exam || isHomeworkColumnTitle((exam.date || "") + (exam.exam || ""))) return false;
+            if (isMathAdvancedAssessmentGrade(exam)) return false;
             if (logic && logic.showReviewing) return true;
             if (getMakeupColorInfo(exam.cellColor)) return true;
             if (logic && logic.effectiveNum !== null && exam.makeupThreshold > 0 && logic.effectiveNum < exam.makeupThreshold) return true;
@@ -9937,6 +9994,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                         if (isNaN(colIndex)) return;
                         var title = ((exam.date || "") + " " + (exam.examName || "")).trim();
                         if (!isMakeupExamTitle(title)) return;
+                        if (isMathAdvancedAssessmentGrade({ className: cls, date: exam.date, exam: exam.examName, note: exam.note })) return;
                         if (!examMap[colIndex]) {
                             examMap[colIndex] = {
                                 colIndex: colIndex,

@@ -19,7 +19,7 @@ function extractFunction(name) {
   throw new Error(`Could not extract function ${name}`);
 }
 
-const context = { EbookLifecycleApp: require('../ebook_lifecycle_app.js') };
+const context = { EbookLifecycleApp: require('../ebook_lifecycle_app.js'), BEAR_SUBJECT: '/science' };
 vm.createContext(context);
 [
   'parseEbookComparableDate',
@@ -34,7 +34,9 @@ vm.createContext(context);
   'isHomeworkColumnTitle',
   'isHomeworkMissingScore',
   'isCurrentStudentEnrollmentExemptExam',
-  'getAbsenceScoreReviewStatus'
+  'getAbsenceScoreReviewStatus',
+  'isMathAdvancedAssessmentGrade',
+  'getMathAdvancedAssessmentStandard'
 ].forEach((name) => vm.runInContext(extractFunction(name), context));
 
 const absenceScoreReviewCases = [
