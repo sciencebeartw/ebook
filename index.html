@@ -3970,6 +3970,105 @@
         };
     }
 
+    function getTransferGradeCatalogKind(value) {
+        return normalizeEbookExamLookupText(value || "")
+            .toLowerCase()
+            .replace(/\d{4}[\/.-]\d{1,2}[\/.-]\d{1,2}/g, "")
+            .replace(/\d{1,2}[\/.-]\d{1,2}/g, "");
+    }
+
+    function getTransferGradeDateDistanceDays(leftValue, rightValue, fallbackYear) {
+        var leftKey = getTransferDateKey(leftValue, fallbackYear);
+        var rightKey = getTransferDateKey(rightValue, fallbackYear);
+        if (!leftKey || !rightKey) return null;
+        function toUtcDate(key) {
+            var text = String(key);
+            return Date.UTC(Number(text.slice(0, 4)), Number(text.slice(4, 6)) - 1, Number(text.slice(6, 8)));
+        }
+        return Math.abs(toUtcDate(leftKey) - toUtcDate(rightKey)) / 86400000;
+    }
+
+    function isTransferGradeCompatibleAssessmentKinds(leftKind, rightKind) {
+        if (!leftKind || !rightKind || leftKind === rightKind) return false;
+        return leftKind.indexOf("作業") === -1 && rightKind.indexOf("作業") === -1;
+    }
+
+    // 換班後整列搬到新班時，成績值仍存放在新班橫列，但「轉班前紀錄」必須顯示原班考試日。
+    // 優先只採用唯一同標題、同類型且日期仍落在原班生命週期內的欄位；
+    // 僅為「小考／複習考」命名不一致的既有歷史資料，才退一步接受相差兩日內的唯一非作業候選。
+    // 原始儲存日期、examID 與欄號會另外保留，避免顯示修正影響老師端寫回。
+    function resolveTransferGradeDisplayIdentity(options) {
+        options = options || {};
+        var grade = options.grade || {};
+        var storedClassKey = options.storedClassKey || "";
+        var currentClassKey = options.currentClassKey || storedClassKey;
+        var presentation = options.presentation || {};
+        var colKey = options.colKey || "";
+        var examIdByColKey = options.examIdByColKey || {};
+        var storedExamId = examIdByColKey[colKey] || "";
+        var fallback = {
+            date: grade.date || "",
+            examId: storedExamId,
+            storedDate: grade.date || "",
+            storedExamId: storedExamId,
+            sourceColKey: colKey,
+            mapped: false
+        };
+        var sourceClassKey = presentation.sourceClassKey || storedClassKey;
+        if (!presentation.isTransferFormerClass || !sourceClassKey || sourceClassKey === storedClassKey) return fallback;
+
+        var catalogs = options.examCatalogEntriesByClassKey || {};
+        var storedEntries = catalogs[storedClassKey] || {};
+        var sourceEntries = catalogs[sourceClassKey] || {};
+        var storedEntry = storedExamId ? storedEntries[storedExamId] : null;
+        if (!storedExamId || !storedEntry) return fallback;
+        var gradeTitle = normalizeEbookExamLookupText(grade.examName || "").toLowerCase();
+        var storedTitle = normalizeEbookExamLookupText(storedEntry && storedEntry.title || "").toLowerCase();
+        if (gradeTitle && storedTitle && gradeTitle !== storedTitle) return fallback;
+        var titleKey = gradeTitle || storedTitle;
+        var kindKey = getTransferGradeCatalogKind(storedEntry && storedEntry.date || grade.date || "");
+        if (!titleKey || !kindKey) return fallback;
+
+        var fallbackYear = getTransferFallbackYear(options.transferIndex || {});
+        var chain = options.transferChain || EbookLifecycleApp.buildTransferChain(options.transferIndex || {}, currentClassKey, { maxDepth: 8 });
+        var exactKindCandidates = [];
+        var compatibleAssessmentCandidates = [];
+        Object.keys(sourceEntries).forEach(function(examId) {
+            var entry = sourceEntries[examId] || {};
+            if (normalizeEbookExamLookupText(entry.title || "").toLowerCase() !== titleKey) return;
+            var candidateDateKey = getTransferDateKey(entry.date, fallbackYear);
+            if (!candidateDateKey) return;
+            var resolved = EbookLifecycleApp.resolveClassAtDate(currentClassKey, chain, candidateDateKey, { fallbackClassKey: sourceClassKey });
+            var resolvedAlias = getHomeworkDoneCourseAliasKey(resolved.classKey);
+            var sourceAlias = getHomeworkDoneCourseAliasKey(sourceClassKey);
+            if (resolved.classKey !== sourceClassKey && !(sourceAlias && sourceAlias === resolvedAlias)) return;
+            var candidate = {
+                date: entry.date || "",
+                examId: entry.examId || examId,
+                sourceColKey: entry.colKey || ""
+            };
+            var entryKind = getTransferGradeCatalogKind(entry.date || "");
+            if (entryKind === kindKey) {
+                exactKindCandidates.push(candidate);
+                return;
+            }
+            var distanceDays = getTransferGradeDateDistanceDays(entry.date, storedEntry.date || grade.date, fallbackYear);
+            if (isTransferGradeCompatibleAssessmentKinds(entryKind, kindKey) && distanceDays !== null && distanceDays <= 2) {
+                compatibleAssessmentCandidates.push(candidate);
+            }
+        });
+        var candidates = exactKindCandidates.length ? exactKindCandidates : compatibleAssessmentCandidates;
+        if (candidates.length !== 1) return fallback;
+        return {
+            date: candidates[0].date,
+            examId: candidates[0].examId,
+            storedDate: grade.date || "",
+            storedExamId: storedExamId,
+            sourceColKey: candidates[0].sourceColKey,
+            mapped: true
+        };
+    }
+
     function buildGradeListFromExams(examsObj, options) {
         options = options || {};
         var classKey = options.classKey || "";
@@ -3986,13 +4085,24 @@
             });
             if (!shouldIncludeTransferGrade(classKey, currentClassKey, eData, transferIndex, transferChain)) continue;
             var presentation = getTransferGradePresentation(classKey, currentClassKey, eData, transferIndex, options.currentClassName || className, className, transferChain);
+            var displayIdentity = resolveTransferGradeDisplayIdentity({
+                grade: eData,
+                storedClassKey: classKey,
+                currentClassKey: currentClassKey,
+                presentation: presentation,
+                colKey: col,
+                examIdByColKey: options.examIdByColKey || {},
+                examCatalogEntriesByClassKey: options.examCatalogEntriesByClassKey || {},
+                transferIndex: transferIndex,
+                transferChain: transferChain
+            });
             let studentScoreNum = NaN;
             if (eData.score) {
                 const sMatch = eData.score.toString().match(/(\d+(\.\d+)?)/);
                 if (sMatch) studentScoreNum = parseFloat(sMatch[0]);
             }
             let currentUnit = "分";
-            const isHomework = isHomeworkColumnTitle((eData.date || "") + (eData.examName || ""));
+            const isHomework = isHomeworkColumnTitle((displayIdentity.date || eData.date || "") + (eData.examName || ""));
 
             let rawMaxForUnit = 100;
             if (typeof eData.distMax === "number") rawMaxForUnit = eData.distMax;
@@ -4004,7 +4114,7 @@
                 className: presentation.className,
                 sourceClassName: presentation.sourceClassName,
                 storedClassName: className || presentation.sourceClassName || options.currentClassName || "",
-                date: eData.date,
+                date: displayIdentity.date || eData.date,
                 exam: eData.examName,
                 note: eData.note,
                 score: eData.score
@@ -4062,10 +4172,14 @@
                 storedClassKey: presentation.storedClassKey,
                 storedClassName: className || presentation.sourceClassName || currentClassName,
                 isTransferFormerClass: presentation.isTransferFormerClass,
-                date: eData.date,
-                dateKey: getTransferDateKey(eData.date, getTransferFallbackYear(transferIndex)) || 0,
+                date: displayIdentity.date || eData.date,
+                storedDate: displayIdentity.storedDate || eData.date,
+                dateKey: getTransferDateKey(displayIdentity.date || eData.date, getTransferFallbackYear(transferIndex)) || 0,
                 exam: eData.examName,
-                examId: (options.examIdByColKey || {})[col] || "",
+                examId: displayIdentity.examId || "",
+                storedExamId: displayIdentity.storedExamId || "",
+                displaySourceColKey: displayIdentity.sourceColKey || "",
+                hasMappedTransferDisplayDate: displayIdentity.mapped === true,
                 note: eData.note,
                 makeupThreshold: makeupThreshold,
                 guidanceThreshold: mathGuidanceStandard ? mathGuidanceStandard.guidanceThreshold : 0,
@@ -4086,7 +4200,7 @@
         return fullGradeList;
     }
 
-    function buildGradeListFromClassExamMap(classExamMap, classKeys, currentClassKey, transferIndex, currentClassName, examIdByClassColKey) {
+    function buildGradeListFromClassExamMap(classExamMap, classKeys, currentClassKey, transferIndex, currentClassName, examIdByClassColKey, examCatalogEntriesByClassKey) {
         var grades = [];
         var trackedKeys = uniqueClassKeys(classKeys);
         var transferChain = EbookLifecycleApp.buildTransferChain(transferIndex || {}, currentClassKey, { maxDepth: 8 });
@@ -4099,12 +4213,15 @@
                 transferChain: transferChain,
                 className: className,
                 currentClassName: currentClassName,
-                examIdByColKey: (examIdByClassColKey || {})[classKey] || {}
+                examIdByColKey: (examIdByClassColKey || {})[classKey] || {},
+                examCatalogEntriesByClassKey: examCatalogEntriesByClassKey || {}
             }));
         });
         var deduped = {};
         grades.forEach(function(grade) {
-            var identity = [grade.dateKey || grade.date || "", normalizeEbookExamLookupText(grade.exam || ""), grade.colIndex].join("|");
+            var identity = grade.examId
+                ? [grade.sourceClassKey || "", grade.examId].join("|")
+                : [grade.dateKey || grade.date || "", normalizeEbookExamLookupText(grade.exam || ""), grade.colIndex].join("|");
             var existing = deduped[identity];
             if (!existing || (grade.storedClassKey === grade.sourceClassKey && existing.storedClassKey !== existing.sourceClassKey)) {
                 deduped[identity] = grade;
@@ -4136,7 +4253,7 @@
         return result;
     }
 
-    async function loadExamIdByClassColKey(classKeys) {
+    async function loadExamIdByClassColKey(classKeys, catalogEntriesByClassKey) {
         var helper = window.BearExamIdentity;
         if (!helper || typeof helper.normalizeCatalog !== "function") {
             throw new Error("examID helper 尚未載入，請重新整理後再試");
@@ -4151,6 +4268,9 @@
             var catalog = helper.normalizeCatalog(item.value || {});
             if (!catalog.success) throw new Error("考試身分目錄不完整，請通知老師檢查 examID");
             result[item.key] = {};
+            if (catalogEntriesByClassKey && typeof catalogEntriesByClassKey === "object") {
+                catalogEntriesByClassKey[item.key] = catalog.entries || {};
+            }
             Object.keys(catalog.entries || {}).forEach(function(examId) {
                 var entry = catalog.entries[examId] || {};
                 if (entry.colKey) result[item.key][entry.colKey] = examId;
@@ -4542,14 +4662,15 @@
             result.trackedGradeClassKeys = lifecycle.trackedGradeClassKeys;
 
             // Fetch Grades. Transfer students read only their current class plus indexed source classes.
+            result.examCatalogEntriesByClassKey = {};
             var gradeSources = await Promise.all([
                 loadGradeExamMapByKeys(result.trackedGradeClassKeys, foundUserKey),
-                loadExamIdByClassColKey(result.trackedGradeClassKeys)
+                loadExamIdByClassColKey(result.trackedGradeClassKeys, result.examCatalogEntriesByClassKey)
             ]);
             result.cohortGradeExamRoot = gradeSources[0];
             result.examIdByClassColKey = gradeSources[1];
             result.grades = filterItemsByStudentEnrollmentDate(
-                buildGradeListFromClassExamMap(result.cohortGradeExamRoot, result.trackedGradeClassKeys, safeC, result.studentTransferIndex, result.className, result.examIdByClassColKey),
+                buildGradeListFromClassExamMap(result.cohortGradeExamRoot, result.trackedGradeClassKeys, safeC, result.studentTransferIndex, result.className, result.examIdByClassColKey, result.examCatalogEntriesByClassKey),
                 result.studentEnrollmentIndex,
                 result.trackedClassKeys
             );
@@ -6156,7 +6277,8 @@
                                 safeC,
                                 gData.studentTransferIndex || {},
                                 gData.className,
-                                gData.examIdByClassColKey || {}
+                                gData.examIdByClassColKey || {},
+                                gData.examCatalogEntriesByClassKey || {}
                             ),
                             gData.studentEnrollmentIndex || {},
                             trackedClassKeys
@@ -7549,7 +7671,7 @@
                     gradeClassName: exam.storedClassName || gData.className,
                     examColIndex: exam.colIndex,
                     title: exam.exam || "",
-                    targetExamId: exam.examId || exam.targetExamId || "",
+                    targetExamId: exam.storedExamId || exam.examId || exam.targetExamId || "",
                     currentScore: editableScore
                 };
                 scoreReportHtml += buildGodScoreEditBox(scoreEditContextKey);
@@ -8007,12 +8129,12 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 if (canUseAdminModeReview() && hasOldExamColIndex && !isHomeworkColumnTitle((item.date || "") + (item.exam || "")) && editableOldScore) {
                     var oldScoreEditContextKey = makeDomSafeId("old_score_edit_" + (item.date || "") + "_" + item.colIndex);
                     window.adminModeScoreEditContext[oldScoreEditContextKey] = {
-                        targetDate: item.date || "",
+                        targetDate: item.storedDate || item.date || "",
                         sourceClassName: item.storedClassName || item.className || gData.className,
                         gradeClassName: item.storedClassName || item.className || gData.className,
                         examColIndex: item.colIndex,
                         title: item.exam || "",
-                        targetExamId: item.examId || item.targetExamId || "",
+                        targetExamId: item.storedExamId || item.examId || item.targetExamId || "",
                         currentScore: editableOldScore
                     };
                     oldScoreEditHtml = buildGodScoreEditBox(oldScoreEditContextKey);
