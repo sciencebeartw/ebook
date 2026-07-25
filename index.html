@@ -1728,37 +1728,62 @@
         }
 
         .info-block {
-            margin-bottom: 20px;
+            --info-accent: #4abf64;
+            --info-soft: #effcf2;
+            --info-border: #bbefc5;
+            --info-title: #27813c;
+            margin-bottom: 24px;
         }
 
         .info-label {
-            font-size: 1.25rem;
-            color: #2c3e50;
-            font-weight: 700;
-            margin-bottom: 8px;
-            display: block;
+            width: fit-content;
+            max-width: 100%;
+            min-height: 34px;
+            padding: 5px 12px;
+            border: 1px solid var(--info-border);
+            border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+            box-sizing: border-box;
+            background: var(--info-soft);
+            color: var(--info-title);
+            font-size: 1.08rem;
+            font-weight: 950;
+            line-height: 1.35;
+            letter-spacing: 0.02em;
+            margin-bottom: 9px;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
         }
 
         .info-content {
             font-size: 1.15rem;
             color: #555;
             line-height: 1.6;
-            padding-left: 5px;
+            padding-left: 4px;
             word-wrap: break-word;
         }
 
+        .info-kind-quiz { --info-accent: #3b82f6; --info-soft: #eff6ff; --info-border: #bfdbfe; --info-title: #1d4ed8; }
+        .info-kind-homework { --info-accent: #f59e0b; --info-soft: #fff8e8; --info-border: #fde3a7; --info-title: #9a5a00; }
+        .info-kind-makeup { --info-accent: #e87979; --info-soft: #fff1f2; --info-border: #fecdd3; --info-title: #b43f50; }
+        .info-kind-range { --info-accent: #8b5cf6; --info-soft: #f5f3ff; --info-border: #ddd6fe; --info-title: #6d45c8; }
+        .info-kind-note { --info-accent: #64748b; --info-soft: #f1f5f9; --info-border: #cbd5e1; --info-title: #475569; }
+
         .info-label-note {
-            display: inline-block;
-            margin-left: 10px;
+            display: block;
+            margin: -3px 0 9px 4px;
             color: #64748b;
-            font-size: 0.92rem;
-            font-weight: 850;
+            font-size: 0.9rem;
+            font-weight: 750;
             line-height: 1.4;
-            vertical-align: middle;
         }
 
         .info-subsection {
-            margin: 8px 0 14px;
+            margin: 10px 0 15px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            background: rgba(248, 250, 252, 0.82);
+            border: 1px solid #e2e8f0;
         }
 
         .info-subsection:last-child {
@@ -1766,17 +1791,32 @@
         }
 
         .info-subtitle {
-            display: block;
-            color: #334155;
-            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            color: #475569;
+            font-size: 0.92rem;
             font-weight: 950;
-            margin: 2px 0 6px;
+            letter-spacing: 0.03em;
+            margin: 0 0 7px;
+        }
+
+        .info-subtitle::before {
+            content: '';
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            flex: 0 0 auto;
+            background: var(--info-accent);
         }
 
         @media (max-width: 600px) {
+            .info-block { margin-bottom: 21px; }
+            .info-label { font-size: 1rem; }
+            .info-content { font-size: 1.06rem; padding-left: 2px; }
             .info-label-note {
                 display: block;
-                margin: 3px 0 0;
+                margin: -2px 0 8px 2px;
             }
         }
 
@@ -3258,11 +3298,6 @@
             gap: 10px;
             flex-shrink: 0;
         }
-        .emergency-reminder-note {
-            color: #64748b;
-            font-size: 0.9rem;
-            line-height: 1.45;
-        }
         .emergency-btn {
             background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
             color: white;
@@ -3288,10 +3323,11 @@
             transform: none;
             box-shadow: none;
         }
-        .emergency-btn-secondary {
+        .emergency-expiry-notice {
             background: white;
             color: #b91c1c;
             border: 2px solid #fecaca;
+            border-radius: 50px;
             box-shadow: none;
             letter-spacing: 0;
             width: auto;
@@ -3304,20 +3340,17 @@
             align-items: center;
             justify-content: center;
             gap: 2px;
+            cursor: default;
         }
-        .emergency-dismiss-label {
+        .emergency-expiry-label {
             font-size: 0.98rem;
             line-height: 1.25;
         }
-        .emergency-dismiss-expiry {
+        .emergency-expiry-text {
             color: #9a3412;
             font-size: 0.78rem;
             font-weight: 700;
             line-height: 1.25;
-        }
-        .emergency-btn-secondary:hover {
-            background: #fff1f2;
-            box-shadow: none;
         }
 
         @media (max-width: 600px) {
@@ -3345,14 +3378,14 @@
                 font-size: 1.05rem;
                 letter-spacing: 0;
             }
-            .emergency-btn-secondary {
+            .emergency-expiry-notice {
                 min-height: 44px;
                 padding: 8px 14px;
             }
-            .emergency-dismiss-label {
+            .emergency-expiry-label {
                 font-size: 0.95rem;
             }
-            .emergency-dismiss-expiry {
+            .emergency-expiry-text {
                 font-size: 0.76rem;
             }
         }
@@ -5059,12 +5092,11 @@
                 <div class="emergency-header" id="emergencyTitle">⚠️ 緊急公告</div>
                 <div class="emergency-body" id="emergencyContent"></div>
                 <div class="emergency-footer">
-                    <button type="button" class="emergency-btn" onclick="closeEmergencyModal()">知道了，下次仍提醒</button>
-                    <button type="button" class="emergency-btn emergency-btn-secondary" id="emergencyDismissUntilExpiryBtn" onclick="dismissEmergencyUntilExpiry()">
-                        <span class="emergency-dismiss-label">有效期間內不再顯示</span>
-                        <span class="emergency-dismiss-expiry" id="emergencyExpiresAt"></span>
-                    </button>
-                    <div class="emergency-reminder-note">為避免忘記重要訊息，若未選擇「不再顯示」，下次重新進入聯絡簿時仍會提醒。</div>
+                    <button type="button" class="emergency-btn" onclick="closeEmergencyModal()">知道了，關閉公告</button>
+                    <div class="emergency-expiry-notice" role="note" aria-label="公告顯示期限">
+                        <span class="emergency-expiry-label">公告顯示期限</span>
+                        <span class="emergency-expiry-text" id="emergencyExpiresAt"></span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -7906,13 +7938,20 @@
                     if (extraHtml) parts.push(extraHtml);
                     return parts.join("");
                 }
-                function getFieldLabelHtml(label, labelNote) {
-                    return label + (labelNote ? "<span class='info-label-note'>" + labelNote + "</span>" : "");
+                function getPostInfoKind(label) {
+                    var text = (label || '').toString();
+                    if (/補考/.test(text)) return 'makeup';
+                    if (/考卷|小考|隨堂|鑑定|複習考/.test(text)) return 'quiz';
+                    if (/作業/.test(text)) return 'homework';
+                    if (/範圍/.test(text)) return 'range';
+                    if (/補充|備註/.test(text)) return 'note';
+                    return 'progress';
                 }
                 function renderPostInfoBlock(f) {
                     if (!f.val && !f.extra) return "";
-                    var labelHtml = getFieldLabelHtml(f.label, f.labelNote || "");
-                    return "<div class='info-block'><span class='info-label'>" + labelHtml + "</span><div class='info-content'>" + parseBtn(f.val || "") + (f.extra || "") + "</div></div>";
+                    var kind = getPostInfoKind(f.label);
+                    var noteHtml = f.labelNote ? "<span class='info-label-note'>" + f.labelNote + "</span>" : "";
+                    return "<section class='info-block info-kind-" + kind + "'><div class='info-label'>" + f.label + "</div>" + noteHtml + "<div class='info-content'>" + parseBtn(f.val || "") + (f.extra || "") + "</div></section>";
                 }
                 function buildPostMakeupFields(postData, extraHtml) {
                     var lines = splitPostMultiLinkValue(postData.makeup || "");
@@ -9054,10 +9093,10 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             if (container) container.innerHTML = '';
         }
 
-        function buildEmergencyDismissKey(emergency) {
+        function buildEmergencyIdentity(emergency) {
             var announcement = emergency || {};
             var identityParts = [
-                'ebookEmergencyDismissed',
+                'ebookEmergencyEntry',
                 BEAR_SUBJECT || '',
                 (gData && gData.className) || announcement.className || '',
                 (gData && gData.studentName) || '',
@@ -9067,19 +9106,6 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             return identityParts.map(function(part) {
                 return encodeURIComponent((part || '').toString());
             }).join(':');
-        }
-
-        function isEmergencyDismissedUntilExpiry(emergency) {
-            if (!emergency || isDashboardDraftPreviewMode) return false;
-            try {
-                var raw = localStorage.getItem(buildEmergencyDismissKey(emergency));
-                if (!raw) return false;
-                var record = JSON.parse(raw);
-                return !!(record && record.dismissed === true &&
-                    (record.expiresAt || '') === (emergency.expiresAt || ''));
-            } catch (error) {
-                return false;
-            }
         }
 
         function formatEmergencyExpiryText(value) {
@@ -9103,24 +9129,15 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }
             var emergency = activeList.find(b => b.type === "緊急");
             if (emergency) {
-                var emergencyIdentity = buildEmergencyDismissKey(emergency);
+                var emergencyIdentity = buildEmergencyIdentity(emergency);
                 if (emergencyShownIdentityForCurrentEntry === emergencyIdentity) return;
                 emergencyShownIdentityForCurrentEntry = emergencyIdentity;
-                if (isEmergencyDismissedUntilExpiry(emergency)) {
-                    hideEmergencyModal();
-                    return;
-                }
                 activeEmergencyAnnouncement = emergency;
                 var emergencyTitle = document.getElementById('emergencyTitle');
                 if (emergencyTitle) emergencyTitle.textContent = '⚠️ ' + ((emergency.title || '緊急公告').toString().trim() || '緊急公告');
                 document.getElementById('emergencyContent').innerHTML = parseBtn(emergency.content);
                 var expiryLabel = document.getElementById('emergencyExpiresAt');
                 if (expiryLabel) expiryLabel.textContent = formatEmergencyExpiryText(emergency.expiresAt);
-                var dismissButton = document.getElementById('emergencyDismissUntilExpiryBtn');
-                if (dismissButton) {
-                    dismissButton.disabled = !emergency.expiresAt;
-                    dismissButton.title = emergency.expiresAt ? '' : '此公告未設定有效期限，無法使用這個選項';
-                }
                 if (modal) {
                     modal.style.display = 'flex';
                 }
@@ -9132,26 +9149,6 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         function closeEmergencyModal() {
             hideEmergencyModal();
         }
-
-        function dismissEmergencyUntilExpiry() {
-            var emergency = activeEmergencyAnnouncement;
-            if (!emergency || !emergency.expiresAt || isDashboardDraftPreviewMode) {
-                hideEmergencyModal();
-                return;
-            }
-            try {
-                localStorage.setItem(buildEmergencyDismissKey(emergency), JSON.stringify({
-                    dismissed: true,
-                    expiresAt: emergency.expiresAt || '',
-                    dismissedAt: new Date().toISOString()
-                }));
-            } catch (error) {
-                console.warn('[eBook] 無法儲存緊急公告不再顯示設定：', error);
-            }
-            hideEmergencyModal();
-        }
-
-
 
         var currentMakeupExamData = null;
         var currentMakeupRows = [];

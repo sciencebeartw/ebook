@@ -81,13 +81,12 @@ function extractFunction(name) {
   throw new Error(`Unterminated function ${name}`);
 }
 
-assert.match(html, /知道了，下次仍提醒/, 'the default action must keep future reminders enabled');
-assert.match(html, /有效期間內不再顯示/, 'the explicit opt-out action must be visible');
+assert.match(html, /知道了，關閉公告/, 'the popup must provide one clear close action');
+assert.doesNotMatch(html, /不再顯示/, 'students must not be offered a persistent opt-out');
+assert.doesNotMatch(html, /dismissEmergencyUntilExpiry/, 'the persistent opt-out handler must be removed');
 assert.match(html, /本公告有效至/, 'the popup must display its effective-until label');
-assert.match(html, /id="emergencyDismissUntilExpiryBtn"[\s\S]*id="emergencyExpiresAt"[\s\S]*<\/button>/,
-  'the effective-until label must be rendered inside the compact opt-out button');
-assert.match(html, /為避免忘記重要訊息[^<]*下次重新進入聯絡簿時仍會提醒/,
-  'the reminder explanation must state why the popup appears again');
+assert.match(html, /class="emergency-expiry-notice"[\s\S]*id="emergencyExpiresAt"[\s\S]*<\/div>/,
+  'the effective-until label must remain in a compact non-interactive notice');
 
 const storage = new Map();
 const elements = {
@@ -95,7 +94,6 @@ const elements = {
   emergencyTitle: { textContent: '' },
   emergencyContent: { innerHTML: '' },
   emergencyExpiresAt: { textContent: '' },
-  emergencyDismissUntilExpiryBtn: { disabled: false, title: '' },
 };
 const context = {
   BEAR_SUBJECT: '/science',
@@ -116,13 +114,11 @@ vm.createContext(context);
 [
   'parseLocalDateTimeValue',
   'isBulletinEffective',
-  'buildEmergencyDismissKey',
-  'isEmergencyDismissedUntilExpiry',
+  'buildEmergencyIdentity',
   'formatEmergencyExpiryText',
   'hideEmergencyModal',
   'checkEmergency',
   'closeEmergencyModal',
-  'dismissEmergencyUntilExpiry',
 ].forEach(name => vm.runInContext(extractFunction(name), context));
 
 const emergency = {
@@ -140,45 +136,45 @@ context.checkEmergency([emergency]);
 assert.equal(elements.emergencyModal.style.display, 'flex', 'an active emergency must open on entry');
 assert.equal(elements.emergencyTitle.textContent, '⚠️ 下次鑑定考');
 assert.equal(elements.emergencyExpiresAt.textContent, '本公告有效至 2099/07/18 14:00');
-assert.equal(elements.emergencyDismissUntilExpiryBtn.disabled, false);
 
 context.closeEmergencyModal();
 assert.equal(elements.emergencyModal.style.display, 'none');
 assert.equal(storage.size, 0, 'the default close action must not persist a dismissal');
 
-context.emergencyShownIdentityForCurrentEntry = '';
 context.checkEmergency([emergency]);
-assert.equal(elements.emergencyModal.style.display, 'flex', 'the next entry must remind again after the default action');
-context.dismissEmergencyUntilExpiry();
-assert.equal(elements.emergencyModal.style.display, 'none');
-assert.equal(storage.size, 1, 'the explicit opt-out must persist exactly one scoped dismissal');
+assert.equal(elements.emergencyModal.style.display, 'none', 'the same live app entry must not immediately reopen the popup');
 
-const firstStudentKey = context.buildEmergencyDismissKey(emergency);
-assert.ok(storage.has(firstStudentKey), 'the persisted dismissal must use the active student scope');
 context.emergencyShownIdentityForCurrentEntry = '';
 context.checkEmergency([emergency]);
-assert.equal(elements.emergencyModal.style.display, 'none', 'the same student must stay opted out during the same expiry');
+assert.equal(elements.emergencyModal.style.display, 'flex', 'the next entry must always remind again');
+context.closeEmergencyModal();
+
+const firstStudentKey = context.buildEmergencyIdentity(emergency);
+storage.set(firstStudentKey, JSON.stringify({ dismissed: true, expiresAt: emergency.expiresAt }));
+context.emergencyShownIdentityForCurrentEntry = '';
+context.checkEmergency([emergency]);
+assert.equal(elements.emergencyModal.style.display, 'flex', 'legacy dismissal records must no longer suppress the popup');
+context.closeEmergencyModal();
 
 context.gData = { className: '115國一自然超前班', studentName: '學生乙' };
 context.emergencyShownIdentityForCurrentEntry = '';
 context.checkEmergency([emergency]);
 assert.equal(elements.emergencyModal.style.display, 'flex', 'a different student on the same browser must still see the notice');
-assert.notEqual(context.buildEmergencyDismissKey(emergency), firstStudentKey, 'dismissal keys must differ by student');
+assert.notEqual(context.buildEmergencyIdentity(emergency), firstStudentKey, 'entry identities must differ by student');
 context.closeEmergencyModal();
 
 context.gData = { className: '115國一自然超前班', studentName: '學生甲' };
 context.emergencyShownIdentityForCurrentEntry = '';
 const extendedEmergency = Object.assign({}, emergency, { expiresAt: '2099-07-19 14:00' });
 context.checkEmergency([extendedEmergency]);
-assert.equal(elements.emergencyModal.style.display, 'flex', 'changing the effective-until time must invalidate the old opt-out');
+assert.equal(elements.emergencyModal.style.display, 'flex', 'an updated announcement must still display');
 context.closeEmergencyModal();
 
 context.isDashboardDraftPreviewMode = true;
 context.emergencyShownIdentityForCurrentEntry = '';
-const storageSizeBeforeDraft = storage.size;
 context.checkEmergency([emergency]);
 assert.equal(elements.emergencyModal.style.display, 'flex', 'Dashboard draft preview must always show the emergency popup');
-context.dismissEmergencyUntilExpiry();
-assert.equal(storage.size, storageSizeBeforeDraft, 'Dashboard draft preview must never persist an opt-out');
+context.closeEmergencyModal();
+assert.equal(storage.size, 1, 'viewing or closing the popup must never add dismissal storage');
 
 console.log('ebook emergency bulletin smoke passed');

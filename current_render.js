@@ -72,10 +72,20 @@ function renderDailyPosts(posts, history) {
                     { label: "下週範圍", val: post.range }, 
                     { label: "補充資訊", val: post.note }
                 ]; 
+
+                function getPostInfoKind(label) {
+                    var text = (label || '').toString();
+                    if (/補考/.test(text)) return 'makeup';
+                    if (/考卷|小考|隨堂|鑑定|複習考/.test(text)) return 'quiz';
+                    if (/作業/.test(text)) return 'homework';
+                    if (/範圍/.test(text)) return 'range';
+                    if (/補充|備註/.test(text)) return 'note';
+                    return 'progress';
+                }
                 
                 var feedDescInner = "";
                 fields.forEach(function (f) { 
-                    if (f.val) feedDescInner += `<strong>${f.label}：</strong>${parseBtn(f.val)}<br>`; 
+                    if (f.val) feedDescInner += `<section class="info-block info-kind-${getPostInfoKind(f.label)}"><div class="info-label">${f.label}</div><div class="info-content">${parseBtn(f.val)}</div></section>`;
                 }); 
 
                 var pDateShort = post.date.substring(5).replace("-", "/"); var pDateFull = post.date.replace(/-/g, "/"); 
