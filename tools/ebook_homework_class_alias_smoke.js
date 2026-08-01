@@ -31,7 +31,8 @@ vm.createContext(context);
   'mergeHomeworkDoneForStudent',
   'mergeFeedbackForStudent',
   'mergeFeedbackClassNode',
-  'buildFeedbackHistoryList'
+  'buildFeedbackHistoryList',
+  'getStudentActionPostSourceClassName'
 ].forEach((name) => vm.runInContext(extractFunction(name), context));
 
 function assertDeepEqual(actual, expected, label) {
@@ -70,6 +71,25 @@ if (!context.isGradeFromPostSource({ sourceClassKey: '115國二自然超前班' 
 }
 if (context.isGradeFromPostSource({ sourceClassKey: '115國一自然超前班' }, '114國一自然超前班')) {
   throw new Error('grades must not cross into a different natural-advanced cohort');
+}
+
+if (context.getStudentActionPostSourceClassName({
+  storedClassName: '114國一自然超前班',
+  className: '114國一自然超前班',
+  sourceClassName: '115國二自然超前班'
+}, '115國二自然超前班') !== '114國一自然超前班') {
+  throw new Error('promoted-class actions must validate against the stored old-class daily post');
+}
+if (context.getStudentActionPostSourceClassName({
+  className: '115國二自然超前班',
+  sourceClassName: '115國二自然超前班'
+}, '115國二自然超前班') !== '115國二自然超前班') {
+  throw new Error('current-class actions should keep using the current class');
+}
+
+if (!html.includes('storedClassKey: pRow.storedClassKey || pRow.sourceClassKey || safeC') ||
+    !html.includes('storedClassName: pRow.storedClassName || pRow.className || result.className')) {
+  throw new Error('rendered daily posts must preserve their stored Firebase class source');
 }
 
 assertDeepEqual(

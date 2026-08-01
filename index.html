@@ -4732,6 +4732,8 @@
                     className: pRow.className || result.className,
                     sourceClassKey: pRow.sourceClassKey || safeC,
                     sourceClassName: pRow.sourceClassName || pRow.className || result.className,
+                    storedClassKey: pRow.storedClassKey || pRow.sourceClassKey || safeC,
+                    storedClassName: pRow.storedClassName || pRow.className || result.className,
                     isTransferFormerClass: pRow.isTransferFormerClass === true,
                     date: pRow.date, title: pRow.title, progress: pRow.progress, hw1: pRow.hw1, hw2: pRow.hw2,
                     makeup: pRow.makeup, quiz: pRow.quiz, range: pRow.range, note: pRow.note,
@@ -7367,11 +7369,22 @@
             return safeKey((targetDate || "").toString().replace(/-/g, "/"));
         }
 
+        function getStudentActionPostSourceClassName(post, currentClassName) {
+            if (!post) return (currentClassName || "").toString().trim();
+            return (
+                post.storedClassName ||
+                post.className ||
+                post.sourceClassName ||
+                currentClassName ||
+                ""
+            ).toString().trim();
+        }
+
         function resolveStudentActionSourceClassName(realDate) {
             var sources = [];
             (gData && gData.dailyPost || []).forEach(function(post) {
                 if (!post || post.date !== realDate || post.isTransferFormerClass) return;
-                var sourceName = (post.storedClassName || post.sourceClassName || post.className || gData.className || '').toString().trim();
+                var sourceName = getStudentActionPostSourceClassName(post, gData && gData.className);
                 if (sourceName && sources.indexOf(sourceName) === -1) sources.push(sourceName);
             });
             if (sources.length > 1) {
@@ -8675,7 +8688,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }
             var post = (gData.dailyPost || []).find(function(item) {
                 return item && item.date === realDate && !item.isTransferFormerClass &&
-                    ((item.sourceClassName || item.className || gData.className) === sourceClassName);
+                    getStudentActionPostSourceClassName(item, gData.className) === sourceClassName;
             });
             if (!shouldUseHomeworkDoneFlowForPost(post, gData.className)) return;
             var homeworkText = getPostHomeworkText(post || {});
