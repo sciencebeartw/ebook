@@ -45,6 +45,11 @@ assert(submit.includes("appendLocalScoreReportFeedback(form, res)"), "successful
 assert(html.includes("class='god-direct-score-input'"), "God view direct score field must use its width-safe class");
 assert(html.includes("class='admin-btn btn-green god-direct-score-btn'"), "God view direct score button must not inherit full-width admin button sizing");
 assert(html.includes("grid-template-columns: minmax(140px, 1fr) auto"), "desktop score controls must reserve readable input width");
+const scoreSubmit = extractFunction(html, "submitScoreReport");
+assert(scoreSubmit.includes("form.targetExamId = normalizeEbookFeedbackExamId"), "absence score reports must submit the stable ExamID when the grade carries one");
+const scoreHistoryLookup = extractFunction(html, "getLatestMakeupReportInfo");
+assert(scoreHistoryLookup.includes("examId === feedbackExamId"), "absence score history must prefer stable ExamID over mutable headers");
+assert(scoreHistoryLookup.includes("if (feedbackExamId) continue"), "a feedback with a different ExamID must not fall back to legacy matching");
 
 const driftContext = {
   gData: {

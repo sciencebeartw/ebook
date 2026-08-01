@@ -6931,6 +6931,9 @@
             var rawScore = (exam.score || "").toString();
             var isHw = isHomeworkColumnTitle((exam.date || "") + (exam.exam || "")) || isHomeworkMissingScore(rawScore);
             if (isHw) return null;
+            var examId = typeof normalizeEbookFeedbackExamId === 'function'
+                ? normalizeEbookFeedbackExamId(exam.examId || exam.targetExamId)
+                : '';
 
             var candidates = getExamDateCandidates(exam);
             function buildReportFromFeedback(fb) {
@@ -6960,6 +6963,16 @@
             for (var k = feedbackHistory.length - 1; k >= 0; k--) {
                 var fb = feedbackHistory[k];
                 if (isMakeupScoreReportType(fb.type)) {
+                    var feedbackExamId = typeof normalizeEbookFeedbackExamId === 'function'
+                        ? normalizeEbookFeedbackExamId(fb.targetExamId)
+                        : '';
+                    if (examId && feedbackExamId) {
+                        if (examId === feedbackExamId) return buildReportFromFeedback(fb);
+                        continue;
+                    }
+                    // 有 ID 的回報不可降級用舊欄號／標題去命中一個沒有相同 ID 的考試；
+                    // 只有真正沒有 ID 的歷史回報才保留 legacy 唯一比對。
+                    if (feedbackExamId) continue;
                     var fbTarget = (fb.targetDate || "").toString();
                     var fbTitle = (fb.targetExamTitle || "").toString().trim();
                     var fbExamCol = fb.targetExamColIndex;
@@ -7774,7 +7787,7 @@
             }
             if (canUseAdminModeReview() && shouldShowGodMakeupReview(exam, logic)) {
                 var makeupContextKey = makeDomSafeId("makeup_" + safeDate + "_" + (exam.colIndex || 0));
-                window.adminModeMakeupContext[makeupContextKey] = { className: gData.className, studentName: gData.studentName, targetDate: post.date, sourceClassName: post.storedClassName || post.sourceClassName || gData.className, gradeClassName: exam.storedClassName || gData.className, gradeClassKey: exam.storedClassKey || "", examColIndex: exam.colIndex, title: exam.exam || "", currentColor: exam.cellColor || "", scoreReview: getLatestMakeupReportInfo(exam, history), resultReview: getLatestMakeupResultReportInfo(exam, history) };
+                window.adminModeMakeupContext[makeupContextKey] = { className: gData.className, studentName: gData.studentName, targetDate: post.date, sourceClassName: post.storedClassName || post.sourceClassName || gData.className, gradeClassName: exam.storedClassName || gData.className, gradeClassKey: exam.storedClassKey || "", examColIndex: exam.colIndex, title: exam.exam || "", targetExamId: exam.storedExamId || exam.examId || exam.targetExamId || "", currentColor: exam.cellColor || "", scoreReview: getLatestMakeupReportInfo(exam, history), resultReview: getLatestMakeupResultReportInfo(exam, history) };
                 scoreReportHtml += buildGodMakeupReviewBox(makeupContextKey, exam, logic);
             }
             var chartHtml = "";
@@ -8869,6 +8882,10 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             if (hasExamColIndex) {
                 form.targetExamColIndex = examColIndex;
                 form.targetExamTitle = examTitle || "";
+                var currentExam = (gData.grades || []).find(function(item) {
+                    return item && String(item.colIndex) === String(examColIndex);
+                }) || {};
+                form.targetExamId = normalizeEbookFeedbackExamId(currentExam.storedExamId || currentExam.examId || currentExam.targetExamId || "");
             }
             google.script.run.withSuccessHandler(function (res) { 
                 if (!res || res.success !== true) {
@@ -9546,6 +9563,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     examColIndex: context.examColIndex,
                     targetExamTitle: context.title,
                     targetExamId: context.targetExamId || '',
+                    sourceExamId: context.targetExamId || '',
+                    writeExamId: context.targetExamId || '',
                     teacherDirectScoreWriteback: true,
                     teacherScoreCorrection: true,
                     studentKey: gData.studentKey || gData.studentName,
@@ -9874,6 +9893,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }
             try {
                 var colorReview = context.resultReview || null;
+                var sourceExamId = colorReview ? (colorReview.targetExamId || "") : (context.targetExamId || "");
                 await runGodAdminAction('writeMakeupResultColorGas', {
                     className: gData.className,
                     studentName: gData.studentName,
@@ -9882,7 +9902,9 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     examColIndex: context.examColIndex,
                     targetDateStr: context.targetDate || "",
                     targetExamTitle: context.title || "",
-                    targetExamId: colorReview ? (colorReview.targetExamId || "") : "",
+                    targetExamId: context.targetExamId || sourceExamId,
+                    sourceExamId: sourceExamId,
+                    writeExamId: context.targetExamId || sourceExamId,
                     feedbackId: colorReview ? (colorReview.feedbackKey || "") : "",
                     studentKey: gData.studentKey || gData.studentName,
                     clientRequestId: colorReview && colorReview.feedbackKey
@@ -9939,6 +9961,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     gradeClassName: context.gradeClassName || gData.className,
                     scoreValue: finalScore,
                     targetExamId: context.scoreReview.targetExamId || "",
+                    sourceExamId: context.scoreReview.targetExamId || "",
+                    writeExamId: context.targetExamId || context.scoreReview.targetExamId || "",
                     feedbackId: context.scoreReview.feedbackKey || "",
                     studentKey: gData.studentKey || gData.studentName,
                     clientRequestId: context.scoreReview.feedbackKey || createClientRequestId('makeup-score'),
@@ -10014,6 +10038,9 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     scoreValue: finalScore,
                     examColIndex: context.examColIndex,
                     targetExamTitle: context.title || "",
+                    targetExamId: context.targetExamId || "",
+                    sourceExamId: context.targetExamId || "",
+                    writeExamId: context.targetExamId || "",
                     teacherDirectScoreWriteback: true,
                     studentKey: gData.studentKey || gData.studentName,
                     clientRequestId: createClientRequestId('direct-makeup-score'),
@@ -10934,9 +10961,17 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         function hasSubmittedMakeupReport(feedbackRoot, stuKey, examColIndex, acceptedTypes, targetExam) {
             var feedbacks = feedbackRoot && feedbackRoot[stuKey] ? feedbackRoot[stuKey] : {};
             var targetCol = normalizeMissingExamColIndex(examColIndex);
+            var targetExamId = typeof normalizeEbookFeedbackExamId === 'function'
+                ? normalizeEbookFeedbackExamId(targetExam && (targetExam.examId || targetExam.targetExamId))
+                : '';
             return Object.keys(feedbacks || {}).some(function(fbKey) {
                 var fb = feedbacks[fbKey] || {};
                 if (acceptedTypes.indexOf(fb.type || "") === -1) return false;
+                var feedbackExamId = typeof normalizeEbookFeedbackExamId === 'function'
+                    ? normalizeEbookFeedbackExamId(fb.targetExamId)
+                    : '';
+                if (targetExamId && feedbackExamId) return targetExamId === feedbackExamId;
+                if (feedbackExamId) return false;
                 var fbCol = normalizeMissingExamColIndex(fb.targetExamColIndex);
                 if (targetCol && fbCol === targetCol) {
                     return targetExam ? ebookFeedbackMatchesExam(fb, targetExam) : true;
