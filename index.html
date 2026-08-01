@@ -8922,6 +8922,13 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 swalAlert("錯題數不合理", "請確認錯題數是否填錯。", "warning");
                 return;
             }
+            var sourceClassName;
+            try {
+                sourceClassName = resolveStudentActionSourceClassName(realDate);
+            } catch (sourceErr) {
+                swalAlert("無法回報補考結果", sourceErr.message || String(sourceErr), "warning");
+                return;
+            }
             var btn = submitButtonId ? document.getElementById(submitButtonId) : (input ? input.nextElementSibling : null);
             setEbookSubmitLoading(btn, "送出中");
             setMakeupWrongCountWidgetDisabled(input, true);
@@ -8930,6 +8937,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }) || {};
             var form = {
                 className: gData.className,
+                sourceClassName: sourceClassName,
                 studentName: gData.studentName,
                 targetDate: realDate,
                 type: FEEDBACK_TYPE_LABELS.makeupResult,

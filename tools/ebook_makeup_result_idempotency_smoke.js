@@ -37,6 +37,8 @@ assert(first.length <= 128, "stable request id must fit the GAS metadata limit")
 
 const submit = extractFunction(html, "submitMakeupResultReport");
 assert(submit.includes('createStableEbookRequestId("makeup_result"'), "makeup result submissions must use the stable idempotency key");
+assert(submit.includes("sourceClassName = resolveStudentActionSourceClassName(realDate)"), "makeup result submissions must validate the displayed post source class");
+assert(submit.includes("sourceClassName: sourceClassName"), "makeup result submissions must send the displayed post source class");
 assert(submit.includes('form.targetExamId || ""'), "stable makeup request IDs must include targetExamId when available");
 assert(submit.includes("currentExam.examId || currentExam.targetExamId"), "makeup result submissions must carry the current stable exam ID");
 assert(submit.includes("appendLocalScoreReportFeedback(form, res)"), "successful makeup result submission must immediately update local history and hide the form");
