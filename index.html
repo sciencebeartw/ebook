@@ -2386,6 +2386,93 @@
             display: flex;
             gap: 10px;
             margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .feedback-composer-main {
+            display: flex;
+            gap: 8px;
+            width: 100%;
+            min-width: 0;
+        }
+
+        .feedback-attachment-picker {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 44px;
+            min-height: 44px;
+            padding: 0 12px;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 999px;
+            background: #fff;
+            color: #475569;
+            font-size: 1.05rem;
+            font-weight: 900;
+            cursor: pointer;
+            flex: 0 0 auto;
+        }
+
+        .feedback-attachment-picker:hover {
+            border-color: var(--primary);
+            color: var(--primary-dark);
+        }
+
+        .feedback-attachment-picker input[type="file"] {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .feedback-attachment-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            width: 100%;
+        }
+
+        .feedback-attachment-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            max-width: 100%;
+            min-height: 34px;
+            padding: 5px 8px 5px 10px;
+            border: 1px solid #bfdbfe;
+            border-radius: 999px;
+            background: #eff6ff;
+            color: #1d4ed8;
+            font-size: 0.86rem;
+            font-weight: 800;
+        }
+
+        .feedback-attachment-chip-name {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .feedback-attachment-remove {
+            width: 26px;
+            height: 26px;
+            border: 0;
+            border-radius: 50%;
+            background: rgba(37, 99, 235, 0.12);
+            color: #1d4ed8;
+            font-size: 1rem;
+            font-weight: 900;
+            cursor: pointer;
+        }
+
+        .feedback-attachment-status {
+            width: 100%;
+            min-height: 1.2em;
+            color: #64748b;
+            font-size: 0.86rem;
+            font-weight: 700;
         }
 
         .score-input {
@@ -2413,6 +2500,7 @@
 
         .fb-input {
             flex: 1;
+            min-width: 0;
             padding: 12px 18px;
             border: 1.5px solid #e2e8f0;
             border-radius: 25px;
@@ -2463,6 +2551,7 @@
         .admin-reply-row {
             display: flex;
             gap: 8px;
+            flex-wrap: wrap;
         }
 
         .admin-reply-row input {
@@ -2484,6 +2573,13 @@
             font-weight: 900;
             cursor: pointer;
             white-space: nowrap;
+        }
+
+        .admin-reply-row .feedback-attachment-picker {
+            min-height: 40px;
+            min-width: 40px;
+            padding: 0 10px;
+            border-color: #93c5fd;
         }
 
         .god-review-actions {
@@ -2512,6 +2608,23 @@
         .admin-reply-row button:disabled {
             opacity: 0.55;
             cursor: wait;
+        }
+
+        @media (max-width: 600px) {
+            .admin-reply-row input {
+                flex: 1 0 100%;
+                width: 100%;
+                min-height: 44px;
+            }
+
+            .admin-reply-row button,
+            .admin-reply-row .feedback-attachment-picker {
+                min-height: 44px;
+            }
+
+            .admin-reply-row button {
+                flex: 1;
+            }
         }
 
         .god-makeup-review-box {
@@ -2610,6 +2723,41 @@
             background: #ecfdf5;
             border-color: #10b981;
             box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.16);
+        }
+
+        .student-upload-draft {
+            display: grid;
+            gap: 9px;
+            margin-top: 12px;
+            text-align: left;
+        }
+
+        .student-upload-note-input {
+            width: 100%;
+            min-height: 72px;
+            box-sizing: border-box;
+            resize: vertical;
+            padding: 10px 12px;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 10px;
+            background: #fff;
+            color: #334155;
+            font: inherit;
+        }
+
+        .student-upload-submit {
+            min-height: 44px;
+            border: 0;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+            color: #fff;
+            font-weight: 900;
+            cursor: pointer;
+        }
+
+        .student-upload-submit:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
         }
 
         .upload-title {
@@ -7065,6 +7213,14 @@
         var uploadBatchUrls = [];
         var uploadBatchPaths = [];
         var uploadBatchSkipped = [];
+        var uploadBatchAttachments = [];
+        var uploadBatchNote = "";
+        var studentHomeworkUploadDrafts = {};
+        var studentFeedbackAttachmentDrafts = {};
+        var adminReplyAttachmentDrafts = {};
+        var adminDirectAttachmentDrafts = {};
+        var FEEDBACK_ATTACHMENT_MAX_FILES = 5;
+        var isFeedbackAttachmentUploading = false;
 
         function cleanupStudentUploadBatch() {
             var paths = uploadBatchPaths.slice();
@@ -7094,10 +7250,114 @@
 
         function handleStudentUpload(input, dateStr) {
             if (input.files.length === 0) return;
-            startStudentUpload(Array.from(input.files), dateStr, input);
+            stageStudentHomeworkFiles(Array.from(input.files), dateStr, input);
         }
 
-        async function startStudentUpload(files, dateStr, inputToClear) {
+        function getSafeDateId(dateStr) {
+            return (dateStr || "").replace(/\//g, '-');
+        }
+
+        function getFileDraftIdentity(file) {
+            return [file && file.name, file && file.size, file && file.lastModified].join('\u001f');
+        }
+
+        function validateAttachmentFiles(files, maxBytes) {
+            var accepted = [];
+            var oversized = [];
+            (files || []).forEach(function(file) {
+                if (!file) return;
+                if (file.size > maxBytes) oversized.push(file);
+                else accepted.push(file);
+            });
+            if (oversized.length) {
+                swalAlert(
+                    "檔案過大",
+                    "有 " + oversized.length + " 個檔案超過 " + formatUploadSize(maxBytes) + "，已先略過：\n" +
+                    oversized.slice(0, 5).map(function(file) {
+                        return "・" + file.name + "（" + formatUploadSize(file.size) + "）";
+                    }).join("\n"),
+                    "warning"
+                );
+            }
+            return accepted;
+        }
+
+        function mergeDraftFiles(existing, incoming, maxFiles) {
+            var seen = {};
+            return (existing || []).concat(incoming || []).filter(function(file) {
+                var identity = getFileDraftIdentity(file);
+                if (!identity || seen[identity]) return false;
+                seen[identity] = true;
+                return true;
+            }).slice(0, maxFiles);
+        }
+
+        function renderAttachmentDraftList(containerId, files, removeHandlerName, contextKey) {
+            var container = document.getElementById(containerId);
+            if (!container) return;
+            container.innerHTML = (files || []).map(function(file, index) {
+                return "<span class='feedback-attachment-chip'><span class='feedback-attachment-chip-name'>📎 " + escapeHtml(file.name || "附件") + "</span>" +
+                    "<button type='button' class='feedback-attachment-remove' aria-label='移除附件' onclick=\"" + removeHandlerName + "('" + escapeInlineJs(contextKey) + "', " + index + ")\">×</button></span>";
+            }).join("");
+        }
+
+        function stageStudentHomeworkFiles(files, dateStr, inputToClear) {
+            if (isUploading) {
+                swalAlert("正在上傳中", "請等目前的附件送出完成後再選擇下一批。", "info");
+                if (inputToClear) inputToClear.value = "";
+                return;
+            }
+            var accepted = validateAttachmentFiles(files, STUDENT_UPLOAD_MAX_BYTES);
+            var key = getSafeDateId(dateStr);
+            var draft = studentHomeworkUploadDrafts[key] || { files: [] };
+            var merged = mergeDraftFiles(draft.files, accepted, 10);
+            if ((draft.files || []).length + accepted.length > 10) {
+                swalAlert("檔案太多", "一次最多只能送出 10 個檔案。", "warning");
+            }
+            draft.files = merged;
+            studentHomeworkUploadDrafts[key] = draft;
+            if (inputToClear) inputToClear.value = "";
+            renderStudentHomeworkDraft(dateStr);
+        }
+
+        function renderStudentHomeworkDraft(dateStr) {
+            var key = getSafeDateId(dateStr);
+            var draft = studentHomeworkUploadDrafts[key] || { files: [] };
+            renderAttachmentDraftList('homework-upload-files-' + key, draft.files, 'removeStudentHomeworkFile', dateStr);
+            var noteInput = document.getElementById('homework-upload-note-' + key);
+            if (noteInput && document.activeElement !== noteInput) noteInput.value = draft.note || '';
+            var btn = document.getElementById('homework-upload-submit-' + key);
+            if (btn) btn.disabled = !draft.files.length || isUploading;
+        }
+
+        function updateStudentHomeworkNote(dateStr, value) {
+            var key = getSafeDateId(dateStr);
+            var draft = studentHomeworkUploadDrafts[key] || { files: [] };
+            draft.note = String(value || '');
+            studentHomeworkUploadDrafts[key] = draft;
+        }
+
+        function removeStudentHomeworkFile(dateStr, index) {
+            var key = getSafeDateId(dateStr);
+            var draft = studentHomeworkUploadDrafts[key] || { files: [] };
+            draft.files.splice(index, 1);
+            studentHomeworkUploadDrafts[key] = draft;
+            renderStudentHomeworkDraft(dateStr);
+        }
+
+        function submitStudentHomeworkUpload(dateStr) {
+            var key = getSafeDateId(dateStr);
+            var draft = studentHomeworkUploadDrafts[key] || { files: [] };
+            var noteInput = document.getElementById('homework-upload-note-' + key);
+            var note = noteInput ? noteInput.value.trim() : '';
+            if (!draft.files.length) {
+                swalAlert("請先選擇檔案", "選好作業或筆記後，再按送出。", "warning");
+                return;
+            }
+            startStudentUpload(draft.files.slice(), dateStr, null, note);
+        }
+
+        async function startStudentUpload(files, dateStr, inputToClear, note) {
             if (!files || files.length === 0) return;
             if (!(await confirmStudentPreviewAction("上傳作業"))) {
                 if (inputToClear) inputToClear.value = "";
@@ -7142,8 +7402,11 @@
             uploadBatchUrls = [];
             uploadBatchPaths = [];
             uploadBatchSkipped = oversizedFiles.map(function(file) { return file.name; });
+            uploadBatchAttachments = [];
+            uploadBatchNote = (note || "").toString().trim();
             isUploading = true;
             if (inputToClear) inputToClear.value = "";
+            renderStudentHomeworkDraft(dateStr);
             processUploadQueue(dateStr);
         }
 
@@ -7168,7 +7431,7 @@
             if (event.currentTarget) event.currentTarget.classList.remove('is-dragover');
             var files = event.dataTransfer && event.dataTransfer.files;
             if (!files || files.length === 0) return;
-            startStudentUpload(Array.from(files), dateStr, null);
+            stageStudentHomeworkFiles(Array.from(files), dateStr, null);
         }
 
         // ★★★ v3.9 學生作業上傳佇列 → Firebase Storage ★★★
@@ -7186,9 +7449,13 @@
                 }
 
                 if (sd) sd.innerHTML = SVG.hourglass + ' 正在寫入留言...';
-                var content = uploadBatchUrls.map(function(url) {
-                    return '[附件]' + url;
-                }).join('\n');
+                var contentParts = [];
+                if (uploadBatchNote) contentParts.push(uploadBatchNote);
+                uploadBatchAttachments.forEach(function(item) {
+                    var displayName = (item.name || '附件').toString().replace(/[\r\n\[\]]/g, '-').slice(0, 120);
+                    contentParts.push('📎 ' + displayName + '\n[附件]' + item.url);
+                });
+                var content = contentParts.join('\n');
                 var uploadedCount = uploadBatchUrls.length;
                 var skippedCount = uploadBatchSkipped.length;
 
@@ -7198,6 +7465,13 @@
                     uploadBatchUrls = [];
                     uploadBatchPaths = [];
                     uploadBatchSkipped = [];
+                    uploadBatchAttachments = [];
+                    uploadBatchNote = "";
+                    var draftKey = getSafeDateId(dateStr);
+                    studentHomeworkUploadDrafts[draftKey] = { files: [] };
+                    var noteInput = document.getElementById('homework-upload-note-' + draftKey);
+                    if (noteInput) noteInput.value = '';
+                    renderStudentHomeworkDraft(dateStr);
                     if (sd) sd.innerText = '';
                     var msg = '✅ 已上傳 ' + uploadedCount + ' 個檔案，並合併成一則留言！';
                     if (skippedCount > 0) msg += '\n另有 ' + skippedCount + ' 個檔案未成功上傳。';
@@ -7206,6 +7480,7 @@
                     isUploading = false;
                     currentUploadDate = "";
                     cleanupStudentUploadBatch();
+                    renderStudentHomeworkDraft(dateStr);
                     if (sd) sd.innerText = '';
                 }, true);
                 return;
@@ -7248,6 +7523,7 @@
                 function(res) {
                     uploadBatchUrls.push(res.url);
                     uploadBatchPaths.push(res.path || path);
+                    uploadBatchAttachments.push({ url: res.url, name: res.name || file.name, path: res.path || path });
                     processUploadQueue(dateStr);
                 },
                 function(err) {
@@ -7257,6 +7533,158 @@
                     processUploadQueue(dateStr); // 略過繼續
                 }
             );
+        }
+
+        // ★★★ 留言與老師回覆共用附件上傳（Storage 二進位，不進 RTDB）★★★
+        function uploadFeedbackFilePromise(file, path) {
+            return new Promise(function(resolve, reject) {
+                uploadToFirebase(file, path, function(result) {
+                    resolve({
+                        url: result.url,
+                        name: result.name || file.name || '附件',
+                        path: result.path || path
+                    });
+                }, reject);
+            });
+        }
+
+        async function uploadFeedbackAttachmentFiles(files, scope, targetDate, statusElement) {
+            var authUid = ebookAuth.currentUser && ebookAuth.currentUser.uid;
+            if (!authUid) throw new Error('登入已失效，請重新登入後再上傳附件。');
+            var subjectKey = BEAR_SUBJECT.replace('/', '');
+            var results = [];
+            try {
+                for (var i = 0; i < files.length; i++) {
+                    var file = files[i];
+                    var safeName = (file.name || 'attachment').replace(/[/\\?%*:|"<>]/g, '-');
+                    var path = 'uploads/student/' + authUid + '/' + subjectKey + '/' + safeKey(scope) + '/' + safeKey(targetDate) + '/' + Date.now() + '_' + i + '_' + safeName;
+                    if (statusElement) statusElement.innerText = '正在上傳附件 ' + (i + 1) + '／' + files.length + '：' + file.name;
+                    results.push(await uploadFeedbackFilePromise(file, path));
+                }
+                return results;
+            } catch (err) {
+                await Promise.all(results.map(function(item) {
+                    return ebookStorage.ref(item.path).delete().catch(function() {});
+                }));
+                throw err;
+            }
+        }
+
+        function buildFeedbackContentWithAttachments(text, uploaded) {
+            var parts = [];
+            var cleanText = (text || '').toString().trim();
+            if (cleanText) parts.push(cleanText);
+            (uploaded || []).forEach(function(item) {
+                var displayName = (item.name || '附件').toString().replace(/[\r\n\[\]]/g, '-').slice(0, 120);
+                parts.push('📎 ' + displayName + '\n[附件]' + item.url);
+            });
+            return parts.join('\n');
+        }
+
+        function discardUploadedFeedbackDraft(draft) {
+            var uploaded = draft && Array.isArray(draft.uploaded) ? draft.uploaded.slice() : [];
+            if (draft) draft.uploaded = [];
+            uploaded.forEach(function(item) {
+                if (!item || !item.path) return;
+                ebookStorage.ref(item.path).delete().catch(function(err) {
+                    console.warn('清理未送出留言附件失敗:', item.path, err);
+                });
+            });
+        }
+
+        function stageStudentFeedbackAttachments(input, dateStr) {
+            var files = input && input.files ? Array.from(input.files) : [];
+            var key = getSafeDateId(dateStr);
+            var accepted = validateAttachmentFiles(files, STUDENT_UPLOAD_MAX_BYTES);
+            var existing = studentFeedbackAttachmentDrafts[key] || { files: [] };
+            if ((existing.files || []).length + accepted.length > FEEDBACK_ATTACHMENT_MAX_FILES) {
+                swalAlert('附件太多', '每則留言最多 5 個附件。', 'warning');
+            }
+            discardUploadedFeedbackDraft(existing);
+            existing.files = mergeDraftFiles(existing.files, accepted, FEEDBACK_ATTACHMENT_MAX_FILES);
+            studentFeedbackAttachmentDrafts[key] = existing;
+            if (input) input.value = '';
+            renderStudentFeedbackAttachmentDraft(dateStr);
+        }
+
+        function renderStudentFeedbackAttachmentDraft(dateStr) {
+            var key = getSafeDateId(dateStr);
+            var draft = studentFeedbackAttachmentDrafts[key] || { files: [] };
+            var files = draft.files || [];
+            renderAttachmentDraftList('feedback-attachments-' + key, files, 'removeStudentFeedbackAttachment', dateStr);
+            var input = document.getElementById('input-' + key);
+            if (input && document.activeElement !== input) input.value = draft.text || '';
+        }
+
+        function updateStudentFeedbackDraftText(dateStr, value) {
+            var key = getSafeDateId(dateStr);
+            var draft = studentFeedbackAttachmentDrafts[key] || { files: [] };
+            draft.text = String(value || '');
+            studentFeedbackAttachmentDrafts[key] = draft;
+        }
+
+        function removeStudentFeedbackAttachment(dateStr, index) {
+            var key = getSafeDateId(dateStr);
+            var draft = studentFeedbackAttachmentDrafts[key] || { files: [] };
+            discardUploadedFeedbackDraft(draft);
+            draft.files.splice(index, 1);
+            studentFeedbackAttachmentDrafts[key] = draft;
+            renderStudentFeedbackAttachmentDraft(dateStr);
+        }
+
+        async function sendStudentFeedbackWithAttachments(safeId, realDate) {
+            var input = document.getElementById('input-' + safeId);
+            var btn = document.getElementById('feedback-send-' + safeId);
+            var status = document.getElementById('feedback-attachment-status-' + safeId);
+            var draft = studentFeedbackAttachmentDrafts[safeId] || { files: [] };
+            var text = input ? input.value.trim() : '';
+            if (!text && !draft.files.length) {
+                swalAlert('請輸入留言或選擇附件', '', 'warning');
+                return;
+            }
+            if (!draft.files.length) {
+                sendFeedback(safeId, realDate, '學生留言', null, function() {
+                    studentFeedbackAttachmentDrafts[safeId] = { files: [] };
+                });
+                return;
+            }
+            if (isFeedbackAttachmentUploading || (btn && btn.disabled)) return;
+            if (!(await confirmStudentPreviewAction('送出留言與附件'))) return;
+            isFeedbackAttachmentUploading = true;
+            if (btn) {
+                btn.disabled = true;
+                btn.innerText = '上傳中';
+            }
+            var feedbackSubmitStarted = false;
+            try {
+                var uploaded = Array.isArray(draft.uploaded) && draft.uploaded.length === draft.files.length
+                    ? draft.uploaded
+                    : await uploadFeedbackAttachmentFiles(draft.files, 'student-feedback', realDate, status);
+                draft.uploaded = uploaded;
+                var content = buildFeedbackContentWithAttachments(text, uploaded);
+                if (content.length > 4800) throw new Error('留言與附件連結太長，請減少附件後再試。');
+                if (status) status.innerText = '附件完成，正在送出留言...';
+                feedbackSubmitStarted = true;
+                await new Promise(function(resolve, reject) {
+                    sendFeedback(safeId, realDate, '學生留言', content, resolve, reject, true);
+                });
+                studentFeedbackAttachmentDrafts[safeId] = { files: [] };
+                if (input) input.value = '';
+                renderStudentFeedbackAttachmentDraft(realDate);
+                if (status) status.innerText = '';
+                swalAlert('已送出', '留言與附件已一起送出。', 'success');
+            } catch (err) {
+                if (status) status.innerText = feedbackSubmitStarted
+                    ? '留言送出失敗，附件仍保留，可直接重試。'
+                    : '附件上傳失敗：' + getUploadErrorText(err);
+                if (!feedbackSubmitStarted) swalAlert('附件上傳失敗', getUploadErrorText(err), 'warning');
+            } finally {
+                isFeedbackAttachmentUploading = false;
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = '送出';
+                }
+            }
         }
 
         function isGiftedScienceClassName(className) {
@@ -8187,10 +8615,15 @@
                 var uploadHtml = `
         <div class="student-upload-box" ondragenter="handleStudentUploadDrag(event)" ondragover="handleStudentUploadDrag(event)" ondragleave="handleStudentUploadDragLeave(event)" ondrop="handleStudentUploadDrop(event, '${post.date}')">
             <span class="upload-title"><svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' style='vertical-align:middle;margin-right:4px'><polyline points='16 16 12 12 8 16'/><line x1='12' y1='12' x2='12' y2='21'/><path d='M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3'/></svg>作業/筆記上傳區</span>
-            <div style="font-size:0.82rem; color:#64748b; font-weight:bold; margin-bottom:8px;">可多選檔案，也可以直接拖曳檔案到這個區塊。</div>
+            <div style="font-size:0.82rem; color:#64748b; font-weight:bold; margin-bottom:8px;">先選檔案，可補充一句說明，確認後再一起送出。</div>
             <div class="upload-btn-wrapper">
                 <button class="upload-btn-real"><svg width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='3' stroke-linecap='round' style='vertical-align:middle;margin-right:3px'><line x1='12' y1='5' x2='12' y2='19'/><line x1='5' y1='12' x2='19' y2='12'/></svg> 選擇檔案 (可多選)</button>
                 <input type="file" multiple onchange="handleStudentUpload(this, '${post.date}')">
+            </div>
+            <div class="student-upload-draft">
+                <div id="homework-upload-files-${safeDateId}" class="feedback-attachment-list"></div>
+                <textarea id="homework-upload-note-${safeDateId}" class="student-upload-note-input" maxlength="1000" oninput="updateStudentHomeworkNote('${post.date}', this.value)" placeholder="補充說明（選填），例如：第 5 題看不懂、第二張是訂正後版本"></textarea>
+                <button type="button" id="homework-upload-submit-${safeDateId}" class="student-upload-submit" onclick="submitStudentHomeworkUpload('${post.date}')" disabled>送出作業與留言</button>
             </div>
             <div id="upload-status-${safeDateId}" class="upload-status"></div>
         </div>
@@ -8212,12 +8645,30 @@
                     window.adminModeStickerAdjustmentContext[adjustmentContextKey] = { targetDate: post.date, sourceClassName: post.storedClassName || post.sourceClassName || post.className || gData.className, sourceClassKey: post.storedClassKey || post.sourceClassKey || "" };
                     godStickerAdjustmentHtml = buildGodStickerAdjustmentBox(adjustmentContextKey);
                 }
-                var studentInputHtml = (isAdminMode || isDashboardDraftPreviewMode || post.isTransferFormerClass) ? "" : "<div class='input-box'><input type='text' class='fb-input' id='input-" + safeDateId + "' placeholder='" + inputPlaceholder + "'><button class='fb-btn' onclick=\"sendFeedback('" + safeDateId + "', '" + post.date + "', '學生留言')\">送出</button></div>";
+                var studentInputHtml = (isAdminMode || isDashboardDraftPreviewMode || post.isTransferFormerClass) ? "" :
+                    "<div class='input-box'><div class='feedback-composer-main'>" +
+                    "<input type='text' class='fb-input' id='input-" + safeDateId + "' oninput=\"updateStudentFeedbackDraftText('" + post.date + "', this.value)\" placeholder='" + inputPlaceholder + "'>" +
+                    "<label class='feedback-attachment-picker' title='加入附件' aria-label='加入附件'>📎<input type='file' multiple onchange=\"stageStudentFeedbackAttachments(this, '" + post.date + "')\"></label>" +
+                    "<button type='button' class='fb-btn' id='feedback-send-" + safeDateId + "' onclick=\"sendStudentFeedbackWithAttachments('" + safeDateId + "', '" + post.date + "')\">送出</button>" +
+                    "</div><div id='feedback-attachments-" + safeDateId + "' class='feedback-attachment-list'></div>" +
+                    "<div id='feedback-attachment-status-" + safeDateId + "' class='feedback-attachment-status'></div></div>";
 
                 // ★★★ v3.9 修正：家長留言 -> 留言內容 ★★★
                 var feedbackHtml = "<div class='feedback-section'>" + uploadHtml + "<div class='section-title'>" + SVG.chat + "留言內容</div><div id='history-" + safeDateId + "'>" + historyHtml + "</div>" + godStickerAdjustmentHtml + adminDirectHtml + studentInputHtml + "</div>"; var headerTitle = escapeHtml(post.date + (post.title ? " " + post.title : "")); var transferBadge = post.isTransferFormerClass ? "<span style='margin-left:8px; background:#fffbeb; color:#92400e; border:1px solid #fde68a; border-radius:999px; padding:2px 8px; font-size:0.78rem; font-weight:900;'>轉班前紀錄｜" + escapeHtml(post.sourceClassName || "原班") + "</span>" : ""; html += "<div class='post-card-wrapper'><div class='post-card'><div class='post-header'><span>" + SVG.calendar + headerTitle + transferBadge + "</span></div>" + gradeHtml + "<div class='content-section'><div class='section-title'>" + SVG.megaphone + "聯絡事項</div>" + contentHtml + "</div>" + feedbackHtml + "</div></div>";
 
             }); container.innerHTML = html;
+
+            posts.forEach(function(post) {
+                if (isAdminMode || isDashboardDraftPreviewMode || post.isTransferFormerClass) return;
+                renderStudentHomeworkDraft(post.date);
+                renderStudentFeedbackAttachmentDraft(post.date);
+            });
+            Object.keys(window.adminModeReplyContext || {}).forEach(function(contextKey) {
+                renderAdminModeAttachmentDraft(contextKey, false);
+            });
+            Object.keys(window.adminModeDirectMessageContext || {}).forEach(function(contextKey) {
+                renderAdminModeAttachmentDraft(contextKey, true);
+            });
 
             var observer = new IntersectionObserver(function(entries, obs) {
                 entries.forEach(function(entry) {
@@ -8828,7 +9279,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var val = contentOverride || document.getElementById(inputId).value;
             if (!val) return;
 
-            var btn = document.querySelector("#" + inputId + " + button");
+            var btn = document.getElementById('feedback-send-' + safeId) || document.querySelector("#" + inputId + " + button");
             if (btn && !contentOverride) setEbookSubmitLoading(btn, "送出中");
 
             var form;
@@ -9395,7 +9846,10 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 "<div class='admin-reply-title'>老師回覆</div>" +
                 "<div class='admin-reply-row'>" +
                 "<input type='text' id='admin-reply-input-" + contextKey + "' placeholder='以老師身分回覆這則留言'>" +
-                "<button type='button' onclick=\"sendAdminModeReply('" + contextKey + "')\">回覆</button>" +
+                "<label class='feedback-attachment-picker' title='加入答案或附件' aria-label='加入答案或附件'>📎<input type='file' multiple onchange=\"stageAdminModeReplyAttachments(this, '" + contextKey + "')\"></label>" +
+                "<button type='button' id='admin-reply-send-" + contextKey + "' onclick=\"sendAdminModeReply('" + contextKey + "')\">回覆</button>" +
+                "<div id='admin-reply-attachments-" + contextKey + "' class='feedback-attachment-list'></div>" +
+                "<div id='admin-reply-status-" + contextKey + "' class='feedback-attachment-status'></div>" +
                 "</div></div>";
         }
 
@@ -9407,12 +9861,86 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             return isAdminMode && !!ebookGodSessionId && !!(ebookGodSessionInfo && ebookGodSessionInfo.permissions && ebookGodSessionInfo.permissions.review);
         }
 
+        function stageAdminModeAttachmentFiles(input, contextKey, isDirect) {
+            var store = isDirect ? adminDirectAttachmentDrafts : adminReplyAttachmentDrafts;
+            var draft = store[contextKey] || { files: [] };
+            discardUploadedFeedbackDraft(draft);
+            var files = input && input.files ? Array.from(input.files) : [];
+            var accepted = validateAttachmentFiles(files, STUDENT_UPLOAD_MAX_BYTES);
+            if ((draft.files || []).length + accepted.length > FEEDBACK_ATTACHMENT_MAX_FILES) {
+                swalAlert('附件太多', '每則留言最多 5 個附件。', 'warning');
+            }
+            draft.files = mergeDraftFiles(draft.files, accepted, FEEDBACK_ATTACHMENT_MAX_FILES);
+            store[contextKey] = draft;
+            if (input) input.value = '';
+            renderAdminModeAttachmentDraft(contextKey, isDirect);
+        }
+
+        function stageAdminModeReplyAttachments(input, contextKey) {
+            stageAdminModeAttachmentFiles(input, contextKey, false);
+        }
+
+        function stageAdminModeDirectAttachments(input, contextKey) {
+            stageAdminModeAttachmentFiles(input, contextKey, true);
+        }
+
+        function renderAdminModeAttachmentDraft(contextKey, isDirect) {
+            var store = isDirect ? adminDirectAttachmentDrafts : adminReplyAttachmentDrafts;
+            var files = (store[contextKey] || {}).files || [];
+            renderAttachmentDraftList(
+                (isDirect ? 'admin-direct-attachments-' : 'admin-reply-attachments-') + contextKey,
+                files,
+                isDirect ? 'removeAdminModeDirectAttachment' : 'removeAdminModeReplyAttachment',
+                contextKey
+            );
+        }
+
+        function removeAdminModeAttachment(contextKey, index, isDirect) {
+            var store = isDirect ? adminDirectAttachmentDrafts : adminReplyAttachmentDrafts;
+            var draft = store[contextKey] || { files: [] };
+            discardUploadedFeedbackDraft(draft);
+            draft.files.splice(index, 1);
+            store[contextKey] = draft;
+            renderAdminModeAttachmentDraft(contextKey, isDirect);
+        }
+
+        function removeAdminModeReplyAttachment(contextKey, index) {
+            removeAdminModeAttachment(contextKey, index, false);
+        }
+
+        function removeAdminModeDirectAttachment(contextKey, index) {
+            removeAdminModeAttachment(contextKey, index, true);
+        }
+
+        async function prepareAdminModeAttachmentContent(contextKey, isDirect, text, targetDate, status) {
+            var store = isDirect ? adminDirectAttachmentDrafts : adminReplyAttachmentDrafts;
+            var draft = store[contextKey] || { files: [] };
+            if (!draft.files.length) return (text || '').toString().trim();
+            var uploaded = Array.isArray(draft.uploaded) && draft.uploaded.length === draft.files.length
+                ? draft.uploaded
+                : await uploadFeedbackAttachmentFiles(draft.files, isDirect ? 'god-direct-message' : 'god-reply', targetDate, status);
+            draft.uploaded = uploaded;
+            store[contextKey] = draft;
+            var content = buildFeedbackContentWithAttachments(text, uploaded);
+            if (content.length > 1900) throw new Error('回覆文字與附件連結太長，請減少附件後再試。');
+            return content;
+        }
+
+        function clearAdminModeAttachmentDraft(contextKey, isDirect) {
+            var store = isDirect ? adminDirectAttachmentDrafts : adminReplyAttachmentDrafts;
+            store[contextKey] = { files: [] };
+            renderAdminModeAttachmentDraft(contextKey, isDirect);
+        }
+
         function buildAdminDirectMessageBox(contextKey) {
             return "<div class='admin-reply-box'>" +
                 "<div class='admin-reply-title'>老師直接留言</div>" +
                 "<div class='admin-reply-row'>" +
                 "<input type='text' id='admin-direct-input-" + contextKey + "' placeholder='不引用留言，直接以老師身分留言給學生'>" +
-                "<button type='button' onclick=\"sendAdminModeDirectMessage('" + contextKey + "')\">送出</button>" +
+                "<label class='feedback-attachment-picker' title='加入答案或附件' aria-label='加入答案或附件'>📎<input type='file' multiple onchange=\"stageAdminModeDirectAttachments(this, '" + contextKey + "')\"></label>" +
+                "<button type='button' id='admin-direct-send-" + contextKey + "' onclick=\"sendAdminModeDirectMessage('" + contextKey + "')\">送出</button>" +
+                "<div id='admin-direct-attachments-" + contextKey + "' class='feedback-attachment-list'></div>" +
+                "<div id='admin-direct-status-" + contextKey + "' class='feedback-attachment-status'></div>" +
                 "</div></div>";
         }
 
@@ -9608,21 +10136,25 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var context = window.adminModeDirectMessageContext && window.adminModeDirectMessageContext[contextKey];
             var input = document.getElementById('admin-direct-input-' + contextKey);
             var content = input ? input.value.trim() : '';
+            var draft = adminDirectAttachmentDrafts[contextKey] || { files: [] };
+            var status = document.getElementById('admin-direct-status-' + contextKey);
             if (!context || !context.targetDate) {
                 swalAlert('找不到聯絡簿日期', '請重新開啟學生畫面後再試。', 'warning');
                 return;
             }
-            if (!content) {
-                swalAlert('請輸入留言內容', '', 'warning');
+            if (!content && !draft.files.length) {
+                swalAlert('請輸入留言內容或選擇附件', '', 'warning');
                 return;
             }
-            var btn = input && input.nextElementSibling;
+            var btn = document.getElementById('admin-direct-send-' + contextKey);
             if (btn && btn.disabled) return;
             if (btn) {
                 btn.disabled = true;
                 btn.innerText = '傳送中';
             }
             try {
+                content = await prepareAdminModeAttachmentContent(contextKey, true, content, context.targetDate, status);
+                if (status) status.innerText = draft.files.length ? '附件完成，正在送出留言...' : '正在送出留言...';
                 context.clientRequestId = context.clientRequestId || createClientRequestId('god_direct');
                 var fn = getGodSessionCallable('sendEbookGodDirectMessage');
                 var result = await fn({
@@ -9636,6 +10168,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     ebookGodSessionInfo.expiresAt = result.data.expiresAt;
                 }
                 if (input) input.value = '';
+                clearAdminModeAttachmentDraft(contextKey, true);
+                if (status) status.innerText = '已送出。';
                 if (btn) {
                     btn.innerText = '已送出';
                     btn.style.background = 'var(--primary)';
@@ -9645,7 +10179,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     btn.disabled = false;
                     btn.innerText = '送出';
                 }
-                swalAlert('留言失敗', 'Google Sheet 寫入或 Firebase 同步失敗，學生端尚未收到。' + (err && err.message ? ' ' + err.message : ''), 'error');
+                if (status) status.innerText = '送出失敗，附件仍保留，可直接重試。';
+                swalAlert('留言或附件送出失敗', '學生端尚未收到。' + (err && err.message ? ' ' + err.message : ''), 'error');
             }
         }
 
@@ -10076,11 +10611,13 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }
             var input = document.getElementById('admin-reply-input-' + contextKey);
             var content = input ? input.value.trim() : '';
-            if (!content) {
-                swalAlert('請輸入回覆內容', '', 'warning');
+            var draft = adminReplyAttachmentDrafts[contextKey] || { files: [] };
+            var status = document.getElementById('admin-reply-status-' + contextKey);
+            if (!content && !draft.files.length) {
+                swalAlert('請輸入回覆內容或選擇附件', '', 'warning');
                 return;
             }
-            var btn = input && input.nextElementSibling;
+            var btn = document.getElementById('admin-reply-send-' + contextKey);
             if (btn && btn.disabled) return;
             if (btn) {
                 btn.disabled = true;
@@ -10088,6 +10625,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }
 
             try {
+                content = await prepareAdminModeAttachmentContent(contextKey, false, content, context.targetDate, status);
+                if (status) status.innerText = draft.files.length ? '附件完成，正在送出回覆...' : '正在送出回覆...';
                 context.clientRequestId = context.clientRequestId || createClientRequestId('god_reply');
                 var fn = getGodSessionCallable('sendEbookGodReply');
                 var result = await fn({
@@ -10102,6 +10641,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     ebookGodSessionInfo.expiresAt = result.data.expiresAt;
                 }
                 if (input) input.value = '';
+                clearAdminModeAttachmentDraft(contextKey, false);
+                if (status) status.innerText = '已回覆。';
                 if (btn) {
                     btn.innerText = '已回覆';
                     btn.style.background = 'var(--primary)';
@@ -10111,7 +10652,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     btn.disabled = false;
                     btn.innerText = '回覆';
                 }
-                swalAlert('回覆失敗', 'Google Sheet 寫入或 Firebase 同步失敗，學生端尚未收到。' + (err && err.message ? ' ' + err.message : ''), 'error');
+                if (status) status.innerText = '回覆失敗，附件仍保留，可直接重試。';
+                swalAlert('回覆或附件送出失敗', '學生端尚未收到。' + (err && err.message ? ' ' + err.message : ''), 'error');
             }
         }
 
