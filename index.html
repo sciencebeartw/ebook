@@ -5918,6 +5918,9 @@
         var activeEmergencyAnnouncement = null;
         var currentEditingBulletin = null;
         var activeRealtimeListeners = [];
+        var EBOOK_BACKGROUND_RTDB_PAUSE_MS = 5 * 60 * 1000;
+        var ebookBackgroundPauseTimer = null;
+        var ebookRealtimeConnectionPaused = false;
 
         // ★★★ 即時監聽生命週期管理 ★★★
         function clearRealtimeListeners() {
@@ -5929,6 +5932,7 @@
                 }
             });
             activeRealtimeListeners = [];
+            clearEbookBackgroundPauseTimer();
         }
 
         function watchRealtimeValue(path, handler, cancelHandler) {
@@ -5939,6 +5943,64 @@
             activeRealtimeListeners.push({ ref: ref, handler: handler });
             return ref;
         }
+
+        // ★★★ eBook 背景省流量：短暫切換不斷線，長時間隱藏才暫停 RTDB ★★★
+        function clearEbookBackgroundPauseTimer() {
+            if (!ebookBackgroundPauseTimer) return;
+            clearTimeout(ebookBackgroundPauseTimer);
+            ebookBackgroundPauseTimer = null;
+        }
+
+        function pauseEbookRealtimeConnection(reason) {
+            clearEbookBackgroundPauseTimer();
+            if (ebookRealtimeConnectionPaused || activeRealtimeListeners.length === 0) return;
+            try {
+                db.goOffline();
+                ebookRealtimeConnectionPaused = true;
+                console.info('eBook RTDB 已暫停：' + (reason || 'background'));
+            } catch (error) {
+                console.warn('eBook RTDB 暫停失敗：', error);
+            }
+        }
+
+        function resumeEbookRealtimeConnection(reason) {
+            clearEbookBackgroundPauseTimer();
+            if (!ebookRealtimeConnectionPaused) return;
+            try {
+                db.goOnline();
+                ebookRealtimeConnectionPaused = false;
+                console.info('eBook RTDB 已恢復：' + (reason || 'foreground'));
+            } catch (error) {
+                console.warn('eBook RTDB 恢復失敗：', error);
+            }
+        }
+
+        function scheduleEbookBackgroundPause() {
+            clearEbookBackgroundPauseTimer();
+            if (document.visibilityState !== 'hidden' || activeRealtimeListeners.length === 0) return;
+            ebookBackgroundPauseTimer = setTimeout(function() {
+                ebookBackgroundPauseTimer = null;
+                if (document.visibilityState === 'hidden') {
+                    pauseEbookRealtimeConnection('hidden-timeout');
+                }
+            }, EBOOK_BACKGROUND_RTDB_PAUSE_MS);
+        }
+
+        function syncEbookRealtimeVisibilityState() {
+            if (document.visibilityState === 'hidden') {
+                scheduleEbookBackgroundPause();
+                return;
+            }
+            resumeEbookRealtimeConnection('visible');
+        }
+
+        document.addEventListener('visibilitychange', syncEbookRealtimeVisibilityState);
+        window.addEventListener('pagehide', function() {
+            pauseEbookRealtimeConnection('pagehide');
+        });
+        window.addEventListener('pageshow', function() {
+            syncEbookRealtimeVisibilityState();
+        });
 
         function getDashboardDraftPreviewStorageKey(key) {
             return 'dashboardDraftPreviewPayload:' + (key || 'latest');
@@ -6584,6 +6646,7 @@
             } catch(e) {
                 if (!(e && e.message === "skip-realtime-for-dashboard-draft-preview")) console.warn('Firebase real-time listener error:', e);
             }
+            syncEbookRealtimeVisibilityState();
 
             renderDailyPosts(result.dailyPost, result.feedbackHistory);
             renderOldGradeCards(result.grades);
