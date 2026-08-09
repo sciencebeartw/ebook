@@ -10068,7 +10068,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }).join("");
             return "<div class='god-makeup-review-box'>" +
                 "<div class='god-makeup-review-title'>補考結果登記</div>" +
-                "<div style='font-size:0.9rem; color:#475569; font-weight:800; margin-bottom:8px;'>" + escapeAdminHtml(title) + "</div>" +
+                "<div class='god-makeup-current' id='god-makeup-current-" + contextKey + "' style='font-size:0.9rem; color:#475569; font-weight:800; margin-bottom:8px;'>" + escapeAdminHtml(title) + "</div>" +
                 scoreHtml +
                 "<div class='makeup-color-row'>" + buttons + "</div>" +
                 "<div class='god-makeup-status' id='god-makeup-status-" + contextKey + "'></div>" +
@@ -10482,17 +10482,52 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 swalAlert('找不到補考欄位資料', '請重新整理後再試。', 'warning');
                 return;
             }
+            var nextColorInfo = getMakeupColorInfo(colorHex);
+            var currentColorInfo = getMakeupColorInfo(context.currentColor);
+            if (!nextColorInfo) {
+                swalAlert('補考顏色不正確', '請重新整理後再試。', 'warning');
+                return;
+            }
+            if (currentColorInfo && currentColorInfo.hex === nextColorInfo.hex) {
+                if (status) {
+                    status.style.color = '#64748b';
+                    status.innerText = '補考結果沒有變更。';
+                }
+                return;
+            }
+            var isColorCorrection = !!currentColorInfo;
+            if (isColorCorrection) {
+                var confirmText = gData.studentName + '｜' + (context.targetDate || '') + '｜' + (context.title || '') +
+                    '\n\n原結果：' + currentColorInfo.label + '｜' + currentColorInfo.text +
+                    '\n新結果：' + nextColorInfo.label + '｜' + nextColorInfo.text +
+                    '\n\n原稽核紀錄會保留，並新增一筆老師更正紀錄。';
+                var ok = await swalConfirm('確認更正補考結果', confirmText);
+                if (!ok) return;
+            }
             var box = btn ? btn.closest('.god-makeup-review-box') : null;
             var buttons = box ? box.querySelectorAll('button') : [];
             buttons.forEach(function(button) { button.disabled = true; });
             if (status) {
                 status.style.color = '#64748b';
-                status.innerText = '登記中...';
+                status.innerText = isColorCorrection ? '正在比對目前顏色並建立更正紀錄...' : '登記中...';
             }
             try {
                 var colorReview = context.resultReview || null;
                 var sourceExamId = colorReview ? (colorReview.targetExamId || "") : (context.targetExamId || "");
-                await runGodAdminAction('writeMakeupResultColorGas', {
+                var requestId = isColorCorrection
+                    ? createStableEbookRequestId('god-makeup-color-correction', [
+                        BEAR_SUBJECT,
+                        context.gradeClassName || gData.className,
+                        gData.studentKey || gData.studentName,
+                        context.targetExamId || sourceExamId,
+                        colorReview ? (colorReview.feedbackKey || '') : '',
+                        currentColorInfo.hex,
+                        nextColorInfo.hex
+                    ])
+                    : (colorReview && colorReview.feedbackKey
+                        ? colorReview.feedbackKey
+                        : createClientRequestId('direct-makeup-color'));
+                var actionResult = await runGodAdminAction('writeMakeupResultColorGas', {
                     className: gData.className,
                     studentName: gData.studentName,
                     gradeClassName: context.gradeClassName || gData.className,
@@ -10505,23 +10540,34 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     writeExamId: context.targetExamId || sourceExamId,
                     feedbackId: colorReview ? (colorReview.feedbackKey || "") : "",
                     studentKey: gData.studentKey || gData.studentName,
-                    clientRequestId: colorReview && colorReview.feedbackKey
-                        ? colorReview.feedbackKey
-                        : createClientRequestId('direct-makeup-color'),
-                    sourceSurface: "ebook_god_review",
+                    clientRequestId: requestId,
+                    sourceSurface: isColorCorrection ? "ebook_god_color_correction" : "ebook_god_review",
                     teacherDirectColorWriteback: !(colorReview && colorReview.feedbackKey),
-                    colorHex: colorHex
+                    teacherColorCorrection: isColorCorrection,
+                    expectedCurrentColor: isColorCorrection ? currentColorInfo.hex : '',
+                    colorHex: nextColorInfo.hex
                 });
+                context.currentColor = nextColorInfo.hex;
+                var currentNode = document.getElementById('god-makeup-current-' + contextKey);
+                if (currentNode) currentNode.textContent = '目前：' + nextColorInfo.label + '｜' + nextColorInfo.text;
                 if (status) {
-                    status.style.color = '#16a34a';
-                    status.innerText = '已登記，等待雲端同步顯示。';
+                    var gasResult = actionResult && actionResult.result ? actionResult.result : {};
+                    var isReplay = gasResult.idempotentReplay === true;
+                    var firebaseSynced = gasResult.firebaseSynced === true;
+                    status.style.color = (isReplay || firebaseSynced) ? '#16a34a' : '#b45309';
+                    status.innerText = isReplay
+                        ? '已確認先前的' + (isColorCorrection ? '更正' : '登記') + '完成。'
+                        : (firebaseSynced
+                            ? (isColorCorrection ? '已更正補考結果，並完成單格雲端同步。' : '已登記補考結果，並完成單格雲端同步。')
+                            : (isColorCorrection ? '已更正 Google Sheet；雲端單格同步待補。' : '已登記 Google Sheet；雲端單格同步待補。'));
                 }
             } catch (err) {
-                buttons.forEach(function(button) { button.disabled = false; });
                 if (status) {
                     status.style.color = '#dc2626';
-                    status.innerText = '登記失敗：' + (err && err.message ? err.message : String(err));
+                    status.innerText = (isColorCorrection ? '更正失敗：' : '登記失敗：') + (err && err.message ? err.message : String(err));
                 }
+            } finally {
+                buttons.forEach(function(button) { button.disabled = false; });
             }
         }
 

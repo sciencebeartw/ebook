@@ -72,6 +72,12 @@ assert(reportLookup.includes("sameStableExamId"), "makeup result history must pr
 assert(reportLookup.includes("examId && feedbackExamId && !sameStableExamId"), "different stable exam IDs must fail closed");
 assert(reportLookup.includes("!sameStoredCol && !isUniqueEbookFeedbackExamMatch(fb, exam)"), "makeup result history must repair a stale column only through a unique exact match");
 
+const colorCorrection = extractFunction(html, "setGodMakeupResultColor");
+assert(colorCorrection.includes("teacherColorCorrection: isColorCorrection"), "changing an existing makeup color must create a separate correction action");
+assert(colorCorrection.includes("expectedCurrentColor: isColorCorrection ? currentColorInfo.hex"), "color correction must reject a stale overwrite");
+assert(colorCorrection.includes("createStableEbookRequestId('god-makeup-color-correction'"), "color correction retries must reuse a stable request ID");
+assert(colorCorrection.includes("原稽核紀錄會保留"), "the confirmation must explain that the original audit record remains");
+
 const stableIdContext = {
   normalizeEbookFeedbackExamId: value => /^exam_/.test(value || "") ? value : "",
   isMakeupResultReportType: type => type === "補考結果回報",
