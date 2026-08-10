@@ -30,6 +30,13 @@
             --primary-glow: rgba(34, 197, 94, 0.3);
             --primary-bg: #e8f5e9;       /* Very light tint for backgrounds */
             --primary-bg2: #f0fdf4;      /* Subtle page tint */
+            --pending-accent: #f59e0b;
+            --pending-accent-light: #fbbf24;
+            --pending-accent-dark: #b45309;
+            --pending-border: #fde68a;
+            --pending-badge: #fef3c7;
+            --pending-surface: #fffbeb;
+            --pending-glow: rgba(217, 119, 6, 0.22);
             --bg: #f0fdf4;
             --text: #333;
             --line-green: #06C755;
@@ -1278,12 +1285,219 @@
             background: rgba(255, 255, 255, 0.7);
             border: 1px solid rgba(0, 0, 0, 0.05);
             transition: all 0.3s ease;
+            position: relative;
+            min-width: 0;
         }
         .tab-item.active { 
             color: white; 
             background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%); 
             box-shadow: 0 4px 15px var(--primary-glow);
             border: none;
+        }
+        .pending-tab-count {
+            display: none;
+            min-width: 22px;
+            height: 22px;
+            padding: 0 6px;
+            margin-left: 5px;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            background: var(--pending-badge);
+            color: var(--pending-accent-dark);
+            font-size: 0.76rem;
+            line-height: 1;
+            vertical-align: middle;
+            box-sizing: border-box;
+        }
+        .tab-item.active .pending-tab-count {
+            background: #fff;
+            color: var(--pending-accent-dark);
+        }
+        .pending-tab-count.is-visible { display: inline-flex; }
+        #tab-pending.active:not(.is-reminder-due) {
+            border-color: transparent;
+            background: linear-gradient(135deg, var(--pending-accent-light) 0%, #d97706 100%);
+            color: #451a03;
+            box-shadow: 0 4px 15px rgba(217, 119, 6, 0.24);
+        }
+        #tab-pending.is-reminder-due {
+            border-color: #fecdd3;
+            background: #fff1f2;
+            color: #be123c;
+        }
+        #tab-pending.is-reminder-due.active {
+            border-color: transparent;
+            background: linear-gradient(135deg, #e11d48 0%, #be123c 100%);
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(225, 29, 72, 0.24);
+        }
+        #tab-pending.is-reminder-due .pending-tab-count {
+            background: #e11d48;
+            color: #fff;
+        }
+        #tab-pending.is-reminder-due.active .pending-tab-count {
+            background: #fff;
+            color: #be123c;
+        }
+        .pending-page {
+            padding: 15px;
+        }
+        .pending-page-intro {
+            padding: 14px 16px;
+            margin-bottom: 12px;
+            border: 1px solid var(--pending-border);
+            border-radius: 14px;
+            background: var(--pending-surface);
+            color: #92400e;
+            font-size: 0.95rem;
+            font-weight: 800;
+            line-height: 1.55;
+        }
+        .pending-page.is-reminder-due .pending-page-intro {
+            border-color: #fecdd3;
+            background: #fff1f2;
+            color: #9f1239;
+        }
+        .pending-list {
+            display: grid;
+            gap: 12px;
+        }
+        .pending-card {
+            border: 1px solid #e2e8f0;
+            border-left: 5px solid var(--pending-accent);
+            border-radius: 14px;
+            background: linear-gradient(180deg, #fff 0%, var(--pending-surface) 100%);
+            box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+            padding: 14px;
+        }
+        .pending-card.is-reminder-due {
+            border-color: #fecdd3;
+            border-left-color: #e11d48;
+            background: linear-gradient(180deg, #fff 0%, #fff1f2 100%);
+        }
+        .pending-card-status {
+            display: inline-flex;
+            margin-top: 8px;
+            padding: 4px 9px;
+            border-radius: 999px;
+            background: #fff1f2;
+            color: #be123c;
+            font-size: 0.78rem;
+            font-weight: 900;
+        }
+        .pending-reminder-swal {
+            border: 2px solid #fecdd3;
+            box-shadow: 0 18px 50px rgba(159, 18, 57, 0.2);
+        }
+        .pending-reminder-swal-title {
+            color: #be123c;
+        }
+        .pending-card-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .pending-card-label {
+            color: var(--pending-accent-dark);
+            font-size: 1rem;
+            font-weight: 950;
+            line-height: 1.35;
+        }
+        .pending-card-date {
+            flex: 0 0 auto;
+            color: #64748b;
+            font-size: 0.82rem;
+            font-weight: 800;
+            line-height: 1.35;
+        }
+        .pending-card-title {
+            margin-top: 7px;
+            color: #334155;
+            font-size: 0.92rem;
+            font-weight: 750;
+            line-height: 1.55;
+            overflow-wrap: anywhere;
+        }
+        .pending-card-source {
+            margin-top: 5px;
+            color: #64748b;
+            font-size: 0.8rem;
+            font-weight: 750;
+        }
+        .pending-card-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .pending-action-btn {
+            min-height: 44px;
+            border: 0;
+            border-radius: 11px;
+            padding: 9px 14px;
+            background: linear-gradient(135deg, var(--pending-accent) 0%, #d97706 100%);
+            color: #451a03;
+            font: inherit;
+            font-size: 0.9rem;
+            font-weight: 900;
+            cursor: pointer;
+            box-shadow: 0 5px 12px var(--pending-glow);
+        }
+        .pending-action-btn.secondary,
+        .pending-action-btn.paper {
+            background: linear-gradient(135deg, var(--pending-accent) 0%, #d97706 100%);
+        }
+        .pending-card.is-reminder-due .pending-card-label {
+            color: #be123c;
+        }
+        .pending-card.is-reminder-due .pending-action-btn {
+            background: linear-gradient(135deg, #e11d48 0%, #be123c 100%);
+            color: #fff;
+            box-shadow: 0 5px 12px rgba(225, 29, 72, 0.22);
+        }
+        .pending-card.is-reminder-due .pending-action-btn.secondary,
+        .pending-card.is-reminder-due .pending-action-btn.paper {
+            border: 1px solid #fda4af;
+            background: #fff1f2;
+            color: #be123c;
+            box-shadow: none;
+        }
+        .pending-empty,
+        .pending-unavailable {
+            padding: 32px 20px;
+            border: 1px dashed #cbd5e1;
+            border-radius: 14px;
+            background: #f8fafc;
+            color: #475569;
+            text-align: center;
+            font-weight: 850;
+            line-height: 1.65;
+        }
+        .pending-unavailable {
+            border-color: #fed7aa;
+            background: #fff7ed;
+            color: #9a3412;
+        }
+        .pending-anchor-highlight {
+            animation: pendingAnchorPulse 2.2s ease-out;
+            outline: 4px solid rgba(37, 99, 235, 0.35);
+            outline-offset: 3px;
+            border-radius: 14px;
+        }
+        @keyframes pendingAnchorPulse {
+            0%, 35% { outline-color: rgba(225, 29, 72, 0.7); box-shadow: 0 0 0 8px rgba(225, 29, 72, 0.12); }
+            100% { outline-color: rgba(37, 99, 235, 0); box-shadow: none; }
+        }
+        @media (max-width: 600px) {
+            .tabs { gap: 4px; margin-left: 8px; margin-right: 8px; }
+            .tab-item { padding: 10px 3px; font-size: 0.96rem; white-space: nowrap; }
+            .pending-tab-count { min-width: 19px; height: 19px; padding: 0 5px; margin-left: 2px; font-size: 0.68rem; }
+            .pending-page { padding: 10px; }
+            .pending-card-head { display: block; }
+            .pending-card-date { margin-top: 3px; }
+            .pending-action-btn { flex: 1 1 120px; }
         }
         /* 置頂提醒橫幅 (Sticky Notice) - 強化版 */
         #sticky-notice-container {
@@ -3634,6 +3848,7 @@
   <script src="exam_identity_app.js?v=20260712_exam_identity_phase1"></script>
   <script src="ebook_lifecycle_app.js?v=20260711_lifecycle_security_v2"></script>
   <script src="gifted_homework_full_scores.js?v=20260720_geo3_question_count_v2"></script>
+  <script src="ebook_pending_tasks_app.js?v=20260810_pending_reminder_v2"></script>
 
   <!-- Webhook API & Firebase Polyfill (Replace google.script.run) -->
   <script>
@@ -3655,6 +3870,7 @@
     let ebookGodSessionHeartbeatTimer = null;
     let ebookAuthSessionInfo = null;
     const pendingEbookRequestIds = {};
+    const PENDING_REMINDER_SESSION_STORAGE_PREFIX = 'sciencebear.ebook.pendingReminderShown.v1:';
 
     function createClientRequestId(prefix) {
       var random = new Uint32Array(4);
@@ -3696,6 +3912,75 @@
          if (onSuccess) onSuccess(result || { success: false, msg: "伺服器沒有回傳寫入結果" });
       })
       .catch(err => { console.error(err); if(onErr) onErr(err); });
+    }
+
+    function normalizeEbookPendingPolicyPayload(value) {
+      var payload = value || {};
+      var ready = payload.success === true && payload.status === 'ready' && Array.isArray(payload.items);
+      if (!ready) {
+        return {
+          status: 'unavailable',
+          reason: (payload.reason || 'policy-unavailable').toString().slice(0, 120),
+          loadedAt: 0,
+          showPending: false,
+          loginReminder: false,
+          reminderDue: false,
+          reminderDueAt: '',
+          reminderDueDateKey: ''
+        };
+      }
+      var loadedAt = typeof payload.loadedAt === 'number' && Number.isFinite(payload.loadedAt) && payload.loadedAt > 0
+        ? payload.loadedAt
+        : 0;
+      var reminderDueAt = typeof payload.reminderDueAt === 'number' && Number.isFinite(payload.reminderDueAt) &&
+        payload.reminderDueAt > 0 && loadedAt > 0 && payload.reminderDueAt <= loadedAt
+        ? payload.reminderDueAt
+        : 0;
+      var loginReminder = payload.showPending === true && payload.loginReminder === true;
+      var explicitDueDateKey = window.EbookPendingTasks
+        ? window.EbookPendingTasks.normalizeReminderDueDateKey(payload.reminderDueDateKey, 0)
+        : '';
+      var dueAtDateKey = window.EbookPendingTasks
+        ? window.EbookPendingTasks.normalizeReminderDueDateKey('', reminderDueAt)
+        : '';
+      var hasTrustedDueDate = !!explicitDueDateKey && explicitDueDateKey === dueAtDateKey;
+      return {
+        status: 'ready',
+        loadedAt: loadedAt,
+        showPending: payload.showPending === true,
+        loginReminder: loginReminder,
+        reminderDue: loginReminder && payload.reminderDue === true && reminderDueAt > 0 && hasTrustedDueDate,
+        reminderDueAt: reminderDueAt,
+        reminderDueDateKey: hasTrustedDueDate ? explicitDueDateKey : '',
+        items: Array.isArray(payload.items) ? payload.items : [],
+        skippedItemKeys: Array.isArray(payload.skippedItemKeys) || (payload.skippedItemKeys && typeof payload.skippedItemKeys === 'object')
+          ? payload.skippedItemKeys
+          : []
+      };
+    }
+
+    async function loadEbookPendingTaskPolicy() {
+      try {
+        var callable = ebookFunctions.httpsCallable('getEbookPendingTaskPolicy');
+        var result = await callable({});
+        return normalizeEbookPendingPolicyPayload(result && result.data);
+      } catch (error) {
+        console.warn('eBook 待完成略過政策讀取失敗，已停止產生清單：', error && error.code ? error.code : error);
+        return { status: 'unavailable', reason: 'policy-call-failed', loadedAt: 0, reminderDue: false, reminderDueAt: '', reminderDueDateKey: '' };
+      }
+    }
+
+    function getTeacherGodHiddenPendingPolicy() {
+      return {
+        status: 'ready',
+        loadedAt: 0,
+        showPending: false,
+        loginReminder: false,
+        reminderDue: false,
+        reminderDueAt: '',
+        reminderDueDateKey: '',
+        items: []
+      };
     }
 
     function ebookAdminFeatureRetired(onSuccess) {
@@ -3856,6 +4141,33 @@
         return result;
     }
 
+    function getStudentKeysForClass(studentKeysByClassKey, classKey, fallbackStudentKey) {
+        var configured = studentKeysByClassKey && studentKeysByClassKey[classKey];
+        var values = Array.isArray(configured) ? configured : (configured ? [configured] : []);
+        if (!values.length && fallbackStudentKey) values.push(fallbackStudentKey);
+        return uniqueClassKeys(values);
+    }
+
+    async function loadClassStudentNodeMapByKeys(basePath, classKeys, studentKeysByClassKey, fallbackStudentKey) {
+        var pairs = [];
+        uniqueClassKeys(classKeys).forEach(function(classKey) {
+            getStudentKeysForClass(studentKeysByClassKey, classKey, fallbackStudentKey).forEach(function(studentKey) {
+                pairs.push({ classKey: classKey, studentKey: studentKey });
+            });
+        });
+        var snaps = await Promise.all(pairs.map(function(pair) {
+            return db.ref(basePath + "/" + pair.classKey + "/" + pair.studentKey).once("value").then(function(snap) {
+                return { classKey: pair.classKey, studentKey: pair.studentKey, value: snap.val() || {} };
+            });
+        }));
+        var result = {};
+        snaps.forEach(function(item) {
+            if (!result[item.classKey]) result[item.classKey] = {};
+            result[item.classKey][item.studentKey] = item.value || {};
+        });
+        return result;
+    }
+
     async function loadHomeworkAliasClassNodeMap(basePath, classKey, childKey) {
         return loadClassNodeMapByKeys(
             basePath,
@@ -3884,10 +4196,12 @@
         return merged;
     }
 
-    function mergeHomeworkDoneForStudentByKeys(classNodeMap, classKeys, studentKey) {
+    function mergeHomeworkDoneForStudentByKeys(classNodeMap, classKeys, studentKey, studentKeysByClassKey) {
         var merged = {};
         uniqueClassKeys(classKeys).forEach(function(key) {
-            Object.assign(merged, ((classNodeMap[key] || {})[studentKey]) || {});
+            getStudentKeysForClass(studentKeysByClassKey, key, studentKey).forEach(function(scopedStudentKey) {
+                Object.assign(merged, ((classNodeMap[key] || {})[scopedStudentKey]) || {});
+            });
         });
         return merged;
     }
@@ -3966,23 +4280,46 @@
         return allowed;
     }
 
+    function addStudentKeyForClass(studentKeysByClassKey, classKey, studentKey) {
+        if (!classKey || !studentKey) return;
+        if (!studentKeysByClassKey[classKey]) studentKeysByClassKey[classKey] = [];
+        if (studentKeysByClassKey[classKey].indexOf(studentKey) === -1) {
+            studentKeysByClassKey[classKey].push(studentKey);
+        }
+    }
+
     async function loadStudentLifecycleIndexes(currentClassKey, studentKey) {
         var transferIndex = {};
-        var queue = [currentClassKey];
+        var studentKeysByClassKey = {};
+        addStudentKeyForClass(studentKeysByClassKey, currentClassKey, studentKey);
+        var queue = [{ classKey: currentClassKey, studentKey: studentKey }];
         var visited = {};
         var reads = 0;
         while (queue.length && reads < 8) {
-            var destinationClassKey = queue.shift();
-            if (!destinationClassKey || visited[destinationClassKey]) continue;
-            visited[destinationClassKey] = true;
+            var cursor = queue.shift() || {};
+            var destinationClassKey = cursor.classKey;
+            var destinationStudentKey = cursor.studentKey;
+            var visitKey = destinationClassKey + "__" + destinationStudentKey;
+            if (!destinationClassKey || !destinationStudentKey || visited[visitKey]) continue;
+            visited[visitKey] = true;
             reads += 1;
-            var node = await loadStudentTransferIndexForStudent(destinationClassKey, studentKey);
+            var node = await loadStudentTransferIndexForStudent(destinationClassKey, destinationStudentKey);
             Object.keys(node || {}).forEach(function(id) {
                 var item = node[id] || {};
-                var mergedId = destinationClassKey + "__" + id;
-                transferIndex[mergedId] = Object.assign({ id: item.id || id }, item);
-                if (item.status !== "deleted" && item.studentKey === studentKey && item.toClassKey === destinationClassKey && item.fromClassKey && !visited[item.fromClassKey]) {
-                    queue.push(item.fromClassKey);
+                var mergedId = destinationClassKey + "__" + destinationStudentKey + "__" + id;
+                transferIndex[mergedId] = Object.assign({
+                    id: item.id || id,
+                    studentKey: item.studentKey || destinationStudentKey
+                }, item);
+                var recordStudentKey = (item.studentKey || destinationStudentKey).toString();
+                if (item.status !== "deleted" && recordStudentKey === destinationStudentKey && item.toClassKey === destinationClassKey && item.fromClassKey) {
+                    var sourceStudentKey = (item.sourceStudentKey || destinationStudentKey).toString();
+                    addStudentKeyForClass(studentKeysByClassKey, destinationClassKey, destinationStudentKey);
+                    addStudentKeyForClass(studentKeysByClassKey, item.fromClassKey, sourceStudentKey);
+                    var sourceVisitKey = item.fromClassKey + "__" + sourceStudentKey;
+                    if (!visited[sourceVisitKey]) {
+                        queue.push({ classKey: item.fromClassKey, studentKey: sourceStudentKey });
+                    }
                 }
             });
         }
@@ -4002,21 +4339,31 @@
             getHomeworkDoneRelatedClassKeyCandidates(baseClassKey).forEach(function(candidateClassKey) {
                 if (candidateClassKey === baseClassKey || sessionAllowedClassKeys[candidateClassKey] === true) {
                     trackedClassKeys.push(candidateClassKey);
+                    getStudentKeysForClass(studentKeysByClassKey, baseClassKey, studentKey).forEach(function(scopedStudentKey) {
+                        addStudentKeyForClass(studentKeysByClassKey, candidateClassKey, scopedStudentKey);
+                    });
                 }
             });
         });
         trackedClassKeys = uniqueClassKeys(trackedClassKeys);
         var enrollmentIndex = {};
         var enrollmentNodeMap = {};
-        var enrollmentSnaps = await Promise.all(trackedClassKeys.map(function(classKey) {
-            return loadStudentEnrollmentIndexForStudent(classKey, studentKey).then(function(value) {
-                return { classKey: classKey, value: value || {} };
+        var enrollmentReads = [];
+        trackedClassKeys.forEach(function(classKey) {
+            getStudentKeysForClass(studentKeysByClassKey, classKey, studentKey).forEach(function(scopedStudentKey) {
+                enrollmentReads.push({ classKey: classKey, studentKey: scopedStudentKey });
+            });
+        });
+        var enrollmentSnaps = await Promise.all(enrollmentReads.map(function(entry) {
+            return loadStudentEnrollmentIndexForStudent(entry.classKey, entry.studentKey).then(function(value) {
+                return { classKey: entry.classKey, studentKey: entry.studentKey, value: value || {} };
             });
         }));
         enrollmentSnaps.forEach(function(entry) {
-            enrollmentNodeMap[entry.classKey] = entry.value || {};
+            if (!enrollmentNodeMap[entry.classKey]) enrollmentNodeMap[entry.classKey] = {};
+            enrollmentNodeMap[entry.classKey][entry.studentKey] = entry.value || {};
             Object.keys(entry.value).forEach(function(id) {
-                enrollmentIndex[entry.classKey + "__" + id] = Object.assign({ id: id }, entry.value[id] || {});
+                enrollmentIndex[entry.classKey + "__" + entry.studentKey + "__" + id] = Object.assign({ id: id }, entry.value[id] || {});
             });
         });
 
@@ -4034,6 +4381,7 @@
             transferChain: chainResult,
             trackedClassKeys: trackedClassKeys,
             trackedGradeClassKeys: trackedClassKeys.slice(),
+            studentKeysByClassKey: studentKeysByClassKey,
             enrollmentIndex: enrollmentIndex,
             enrollmentNodeMap: enrollmentNodeMap,
             classNameByKey: classNameByKey
@@ -4375,7 +4723,8 @@
                 total: eData.total,
                 isMissing: isMissing,
                 colIndex: parseInt(col.replace('col_','')),
-                cellColor: eData.cellColor
+                cellColor: eData.cellColor,
+                sourceStudentKey: eData.sourceStudentKey || ""
             });
         }
         return fullGradeList;
@@ -4421,17 +4770,57 @@
         });
     }
 
-    async function loadGradeExamMapByKeys(classKeys, studentKey) {
-        var snaps = await Promise.all(uniqueClassKeys(classKeys).map(function(classKey) {
-            return db.ref(`${BEAR_SUBJECT}/grades/${classKey}/${studentKey}/exams`).once("value").then(function(snap) {
-                return { key: classKey, value: snap.val() || {} };
-            });
-        }));
+    function mergeGradeExamNodeMap(nodeMap, classKeys, studentKey, studentKeysByClassKey, transferChain, currentClassKey) {
         var result = {};
-        snaps.forEach(function(item) {
-            result[item.key] = item.value || {};
+        uniqueClassKeys(classKeys).forEach(function(classKey) {
+            result[classKey] = {};
+            getStudentKeysForClass(studentKeysByClassKey, classKey, studentKey).forEach(function(scopedStudentKey) {
+                var exams = ((nodeMap[classKey] || {})[scopedStudentKey]) || {};
+                Object.keys(exams).forEach(function(colKey) {
+                    var exam = exams[colKey] || {};
+                    var examDateKey = getTransferDateKey(exam.date || exam.targetDate || '');
+                    if (examDateKey && transferChain && currentClassKey) {
+                        var resolved = resolveTransferStudentAtDate(currentClassKey, transferChain, examDateKey, studentKey, classKey);
+                        var classMatches = resolved.classKey === classKey;
+                        if (!classMatches) {
+                            var resolvedAlias = getHomeworkDoneCourseAliasKey(resolved.classKey);
+                            var classAlias = getHomeworkDoneCourseAliasKey(classKey);
+                            classMatches = !!resolvedAlias && resolvedAlias === classAlias;
+                        }
+                        if (classMatches && resolved.studentKey && resolved.studentKey !== scopedStudentKey) return;
+                    }
+                    if (!Object.prototype.hasOwnProperty.call(result[classKey], colKey)) {
+                        result[classKey][colKey] = Object.assign({}, exam, { sourceStudentKey: scopedStudentKey });
+                    }
+                });
+            });
         });
         return result;
+    }
+
+    async function loadGradeExamMapByKeys(classKeys, studentKey, studentKeysByClassKey, nodeMapOut, transferChain, currentClassKey) {
+        var pairs = [];
+        uniqueClassKeys(classKeys).forEach(function(classKey) {
+            getStudentKeysForClass(studentKeysByClassKey, classKey, studentKey).forEach(function(scopedStudentKey) {
+                pairs.push({ classKey: classKey, studentKey: scopedStudentKey });
+            });
+        });
+        var snaps = await Promise.all(pairs.map(function(pair) {
+            return db.ref(`${BEAR_SUBJECT}/grades/${pair.classKey}/${pair.studentKey}/exams`).once("value").then(function(snap) {
+                return { classKey: pair.classKey, studentKey: pair.studentKey, value: snap.val() || {} };
+            });
+        }));
+        var nodeMap = {};
+        snaps.forEach(function(item) {
+            if (!nodeMap[item.classKey]) nodeMap[item.classKey] = {};
+            nodeMap[item.classKey][item.studentKey] = item.value || {};
+        });
+        if (nodeMapOut && typeof nodeMapOut === "object") {
+            Object.keys(nodeMap).forEach(function(classKey) {
+                nodeMapOut[classKey] = nodeMap[classKey];
+            });
+        }
+        return mergeGradeExamNodeMap(nodeMap, classKeys, studentKey, studentKeysByClassKey, transferChain, currentClassKey);
     }
 
     async function loadExamIdByClassColKey(classKeys, catalogEntriesByClassKey) {
@@ -4517,6 +4906,25 @@
         return !!classAlias && classAlias === resolvedAlias;
     }
 
+    function resolveTransferStudentAtDate(currentClassKey, transferChain, dateKey, currentStudentKey, fallbackClassKey) {
+        var chain = transferChain && Array.isArray(transferChain.chain) ? transferChain.chain : [];
+        var cursorClassKey = currentClassKey || fallbackClassKey || '';
+        var cursorStudentKey = currentStudentKey || (chain[0] && chain[0].studentKey) || '';
+        var usedTransfer = false;
+        chain.forEach(function(item) {
+            if (item.toClassKey === cursorClassKey && dateKey && dateKey < item.effectiveDateKey) {
+                cursorClassKey = item.fromClassKey || cursorClassKey;
+                cursorStudentKey = item.sourceStudentKey || cursorStudentKey;
+                usedTransfer = true;
+            }
+        });
+        return {
+            classKey: usedTransfer ? cursorClassKey : (fallbackClassKey || cursorClassKey),
+            studentKey: cursorStudentKey,
+            usedTransfer: usedTransfer
+        };
+    }
+
     function getTrackedClassKeysForStudent(classKey, transferIndex) {
         return uniqueClassKeys(getHomeworkDoneRelatedClassKeyCandidates(classKey).concat(getTransferSourceClassKeys(transferIndex)));
     }
@@ -4525,7 +4933,7 @@
         return uniqueClassKeys([classKey].concat(getTransferSourceClassKeys(transferIndex)));
     }
 
-    function mergeDailyPostClassNodeByKeys(classNodeMap, classKeys, currentClassKey, transferIndex, currentClassName, transferChain) {
+    function mergeDailyPostClassNodeByKeys(classNodeMap, classKeys, currentClassKey, transferIndex, currentClassName, transferChain, currentStudentKey) {
         var merged = {};
         var chain = transferChain || EbookLifecycleApp.buildTransferChain(transferIndex || {}, currentClassKey, { maxDepth: 8 });
         uniqueClassKeys(classKeys).forEach(function(key) {
@@ -4535,56 +4943,59 @@
                 if (!shouldIncludeTransferPost(key, currentClassKey, row, transferIndex, chain)) return;
                 var dateKey = getTransferDateKey(row.date, getTransferFallbackYear(transferIndex));
                 var resolved = dateKey
-                    ? EbookLifecycleApp.resolveClassAtDate(currentClassKey, chain, dateKey, { fallbackClassKey: key })
-                    : { classKey: key };
+                    ? resolveTransferStudentAtDate(currentClassKey, chain, dateKey, currentStudentKey, key)
+                    : { classKey: key, studentKey: currentStudentKey || '', usedTransfer: false };
                 var sourceClassKey = resolved.classKey || key;
                 var sourceClassName = getTransferClassNameForKey(sourceClassKey, currentClassKey, transferIndex, currentClassName) || row.className || currentClassName;
-                var sameCohortAlias = !!getHomeworkDoneCourseAliasKey(sourceClassKey) &&
-                    getHomeworkDoneCourseAliasKey(sourceClassKey) === getHomeworkDoneCourseAliasKey(currentClassKey);
                 var mergedKey = merged[postKey] ? key + "__" + postKey : postKey;
                 merged[mergedKey] = Object.assign({}, row, {
+                    dailyPostId: postKey,
                     className: row.className || sourceClassName,
                     sourceClassKey: sourceClassKey,
                     sourceClassName: sourceClassName,
+                    sourceStudentKey: resolved.studentKey || currentStudentKey || '',
                     storedClassKey: key,
                     storedClassName: row.className || key,
-                    isTransferFormerClass: sourceClassKey !== currentClassKey && !sameCohortAlias
+                    isTransferFormerClass: sourceClassKey !== currentClassKey && resolved.usedTransfer === true
                 });
             });
         });
         return merged;
     }
 
-    function mergeStudentChildNodeByKeys(classNodeMap, classKeys, studentKey, transferIndex, currentClassName, currentClassKey, transferChain, classNameByKey) {
+    function mergeStudentChildNodeByKeys(classNodeMap, classKeys, studentKey, transferIndex, currentClassName, currentClassKey, transferChain, classNameByKey, studentKeysByClassKey) {
         var merged = {};
         uniqueClassKeys(classKeys).forEach(function(key) {
-            var rows = ((classNodeMap[key] || {})[studentKey]) || {};
-            Object.keys(rows).forEach(function(rowKey) {
-                var row = rows[rowKey] || {};
-                var mergedKey = merged[rowKey] ? key + "__" + rowKey : rowKey;
-                var scope = EbookLifecycleApp.resolveFeedbackScope({
-                    feedback: row,
-                    storedClassKey: key,
-                    currentClassKey: currentClassKey,
-                    currentClassName: currentClassName,
-                    chain: transferChain || EbookLifecycleApp.buildTransferChain(transferIndex || {}, currentClassKey, { maxDepth: 8 }),
-                    classNameByKey: classNameByKey || {},
-                    isSameCohort: function(left, right) {
-                        var leftAlias = getHomeworkDoneCourseAliasKey(left);
-                        var rightAlias = getHomeworkDoneCourseAliasKey(right);
-                        return !!leftAlias && leftAlias === rightAlias;
-                    }
-                });
-                merged[mergedKey] = Object.assign({}, row, {
-                    storedClassKey: scope.storedClassKey,
-                    storedClassName: scope.storedClassName || key,
-                    displayClassKey: scope.displayClassKey,
-                    displayClassName: scope.displayClassName,
-                    sourceClassKey: scope.sourceClassKey,
-                    sourceClassName: scope.sourceClassName,
-                    currentClassName: scope.currentClassName || currentClassName,
-                    isTransferFormerClass: scope.isTransferFormerClass,
-                    originalFeedbackKey: rowKey
+            getStudentKeysForClass(studentKeysByClassKey, key, studentKey).forEach(function(scopedStudentKey) {
+                var rows = ((classNodeMap[key] || {})[scopedStudentKey]) || {};
+                Object.keys(rows).forEach(function(rowKey) {
+                    var row = rows[rowKey] || {};
+                    var mergedKey = merged[rowKey] ? key + "__" + scopedStudentKey + "__" + rowKey : rowKey;
+                    var scope = EbookLifecycleApp.resolveFeedbackScope({
+                        feedback: row,
+                        storedClassKey: key,
+                        currentClassKey: currentClassKey,
+                        currentClassName: currentClassName,
+                        chain: transferChain || EbookLifecycleApp.buildTransferChain(transferIndex || {}, currentClassKey, { maxDepth: 8 }),
+                        classNameByKey: classNameByKey || {},
+                        isSameCohort: function(left, right) {
+                            var leftAlias = getHomeworkDoneCourseAliasKey(left);
+                            var rightAlias = getHomeworkDoneCourseAliasKey(right);
+                            return !!leftAlias && leftAlias === rightAlias;
+                        }
+                    });
+                    merged[mergedKey] = Object.assign({}, row, {
+                        storedClassKey: scope.storedClassKey,
+                        storedClassName: scope.storedClassName || key,
+                        storedStudentKey: scopedStudentKey,
+                        displayClassKey: scope.displayClassKey,
+                        displayClassName: scope.displayClassName,
+                        sourceClassKey: scope.sourceClassKey,
+                        sourceClassName: scope.sourceClassName,
+                        currentClassName: scope.currentClassName || currentClassName,
+                        isTransferFormerClass: scope.isTransferFormerClass,
+                        originalFeedbackKey: rowKey
+                    });
                 });
             });
         });
@@ -4625,6 +5036,7 @@
                 actorRole: fb.actorRole || "",
                 source: fb.source || "",
                 replyToFeedbackKey: fb.replyToFeedbackKey || "",
+                storedStudentKey: fb.storedStudentKey || fb.sourceStudentKey || "",
                 storedClassKey: fb.storedClassKey || fb.sourceClassKey || "",
                 storedClassName: fb.storedClassName || fb.sourceClassName || "",
                 displayClassKey: fb.displayClassKey || fb.sourceClassKey || "",
@@ -4677,6 +5089,7 @@
         }
         if (gData.dailyPost) renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
         if (gData.grades) renderOldGradeCards(gData.grades);
+        schedulePendingTasksRecompute();
     }
 
     function normalizeLoginSecret(value) {
@@ -4841,11 +5254,13 @@
             result.classNameByKey = lifecycle.classNameByKey;
             result.trackedClassKeys = lifecycle.trackedClassKeys;
             result.trackedGradeClassKeys = lifecycle.trackedGradeClassKeys;
+            result.studentKeysByClassKey = lifecycle.studentKeysByClassKey;
 
             // Fetch Grades. Transfer students read only their current class plus indexed source classes.
             result.examCatalogEntriesByClassKey = {};
+            result.cohortGradeExamNodeMap = {};
             var gradeSources = await Promise.all([
-                loadGradeExamMapByKeys(result.trackedGradeClassKeys, foundUserKey),
+                loadGradeExamMapByKeys(result.trackedGradeClassKeys, foundUserKey, result.studentKeysByClassKey, result.cohortGradeExamNodeMap, result.transferChain, safeC),
                 loadExamIdByClassColKey(result.trackedGradeClassKeys, result.examCatalogEntriesByClassKey)
             ]);
             result.cohortGradeExamRoot = gradeSources[0];
@@ -4860,7 +5275,7 @@
             let postsObj = {};
             if (result.trackedClassKeys.length > 1) {
                 result.cohortDailyPostRoot = await loadClassNodeMapByKeys(`${BEAR_SUBJECT}/dailyPosts`, result.trackedClassKeys);
-                postsObj = mergeDailyPostClassNodeByKeys(result.cohortDailyPostRoot, result.trackedClassKeys, safeC, result.studentTransferIndex, result.className, result.studentTransferChain);
+                postsObj = mergeDailyPostClassNodeByKeys(result.cohortDailyPostRoot, result.trackedClassKeys, safeC, result.studentTransferIndex, result.className, result.studentTransferChain, foundUserKey);
             } else {
                 const snapP = await db.ref(`${BEAR_SUBJECT}/dailyPosts/${safeC}`).once('value');
                 result.cohortDailyPostRoot = null;
@@ -4877,9 +5292,11 @@
                 
                 let postObj = {
                     id: pRow.id || rowId,
+                    dailyPostId: pRow.dailyPostId || rowId,
                     className: pRow.className || result.className,
                     sourceClassKey: pRow.sourceClassKey || safeC,
                     sourceClassName: pRow.sourceClassName || pRow.className || result.className,
+                    sourceStudentKey: pRow.sourceStudentKey || foundUserKey,
                     storedClassKey: pRow.storedClassKey || pRow.sourceClassKey || safeC,
                     storedClassName: pRow.storedClassName || pRow.className || result.className,
                     isTransferFormerClass: pRow.isTransferFormerClass === true,
@@ -4923,8 +5340,8 @@
 
             // Fetch Feedbacks
             if (result.trackedClassKeys.length > 1) {
-                result.cohortFeedbackRoot = await loadClassNodeMapByKeys(`${BEAR_SUBJECT}/feedbacks`, result.trackedClassKeys, foundUserKey);
-                result.feedbackHistory = buildFeedbackHistoryList(mergeStudentChildNodeByKeys(result.cohortFeedbackRoot, result.trackedClassKeys, foundUserKey, result.studentTransferIndex, result.className, safeC, result.studentTransferChain, result.classNameByKey));
+                result.cohortFeedbackRoot = await loadClassStudentNodeMapByKeys(`${BEAR_SUBJECT}/feedbacks`, result.trackedClassKeys, result.studentKeysByClassKey, foundUserKey);
+                result.feedbackHistory = buildFeedbackHistoryList(mergeStudentChildNodeByKeys(result.cohortFeedbackRoot, result.trackedClassKeys, foundUserKey, result.studentTransferIndex, result.className, safeC, result.studentTransferChain, result.classNameByKey, result.studentKeysByClassKey));
             } else {
                 const snapF = await db.ref(`${BEAR_SUBJECT}/feedbacks/${safeC}/${foundUserKey}`).once('value');
                 result.cohortFeedbackRoot = null;
@@ -4933,8 +5350,8 @@
 
             try {
                 if (result.trackedClassKeys.length > 1) {
-                    result.cohortHomeworkDoneRoot = await loadClassNodeMapByKeys(`${BEAR_SUBJECT}/homeworkDone`, result.trackedClassKeys, foundUserKey);
-                    result.homeworkDone = mergeHomeworkDoneForStudentByKeys(result.cohortHomeworkDoneRoot, result.trackedClassKeys, foundUserKey);
+                    result.cohortHomeworkDoneRoot = await loadClassStudentNodeMapByKeys(`${BEAR_SUBJECT}/homeworkDone`, result.trackedClassKeys, result.studentKeysByClassKey, foundUserKey);
+                    result.homeworkDone = mergeHomeworkDoneForStudentByKeys(result.cohortHomeworkDoneRoot, result.trackedClassKeys, foundUserKey, result.studentKeysByClassKey);
                 } else {
                     const snapHD = await db.ref(`${BEAR_SUBJECT}/homeworkDone/${safeC}/${foundUserKey}`).once('value');
                     result.cohortHomeworkDoneRoot = null;
@@ -4965,7 +5382,13 @@
                await ebookAuth.setPersistence(firebase.auth.Auth.Persistence.NONE);
                await ebookAuth.signInWithCustomToken(session.firebaseCustomToken);
                ebookAuthSessionInfo = session;
-               const res = await executeFirebaseRead(u, '', true, session.className, session.studentKey);
+               const loaded = await Promise.all([
+                   executeFirebaseRead(u, '', true, session.className, session.studentKey),
+                   loadEbookPendingTaskPolicy()
+               ]);
+               const res = loaded[0];
+               res.pendingPolicy = loaded[1];
+               ebookAuthSessionInfo.pendingPolicy = loaded[1];
                if(onSuccess) onSuccess(res);
            } catch(e){ if(onErr) onErr(e); }
         },
@@ -4979,6 +5402,9 @@
                if (!allowGodSession) throw new Error('上帝視角連線未驗證，請從行政中心重新開啟');
                const studentKey = (ebookGodSessionInfo && ebookGodSessionInfo.studentKey) || '';
                const res = await executeFirebaseRead(u, pwd, true, cls, studentKey);
+               res.pendingPolicy = isStudentPreviewMode
+                   ? ((ebookGodSessionInfo && ebookGodSessionInfo.pendingPolicy) || null)
+                   : getTeacherGodHiddenPendingPolicy();
                if(onSuccess) onSuccess(res);
            } catch(e){ if(onErr) onErr(e); }
         },
@@ -4988,7 +5414,20 @@
                if (!session || !session.className || !session.studentName || !session.studentKey || !ebookAuth.currentUser) {
                    throw new Error('登入已失效，請重新登入');
                }
-               const res = await executeFirebaseRead(session.studentName, '', true, session.className, session.studentKey);
+               const shouldReloadPendingPolicy = !!ebookAuthSessionInfo && (!ebookGodSessionId || isStudentPreviewMode);
+               const fallbackPendingPolicy = ebookGodSessionId && !isStudentPreviewMode
+                   ? getTeacherGodHiddenPendingPolicy()
+                   : (session.pendingPolicy || null);
+               const loaded = await Promise.all([
+                   executeFirebaseRead(session.studentName, '', true, session.className, session.studentKey),
+                   shouldReloadPendingPolicy ? loadEbookPendingTaskPolicy() : Promise.resolve(fallbackPendingPolicy)
+               ]);
+               const res = loaded[0];
+               res.pendingPolicy = loaded[1];
+               if (shouldReloadPendingPolicy && ebookAuthSessionInfo) {
+                   ebookAuthSessionInfo.pendingPolicy = loaded[1];
+                   if (ebookGodSessionInfo) ebookGodSessionInfo.pendingPolicy = loaded[1];
+               }
                if(onSuccess) onSuccess(res);
            } catch(e){ if(onErr) onErr(e); }
         },
@@ -5502,11 +5941,13 @@
                         重要公告
                         <div id="tab-bulletin-decorator"></div>
                     </div>
+                    <div class="tab-item" id="tab-pending" onclick="switchTab(3)">待完成<span id="tab-pending-count" class="pending-tab-count" aria-live="polite"></span></div>
                 </div>
             </div>
             <div id="tab-content-0"></div>
             <div id="tab-content-1" style="display:none; padding:15px;"></div>
             <div id="tab-content-2" style="display:none; padding:15px;"></div>
+            <div id="tab-content-3" style="display:none;"></div>
         </div>
 
         <button id="godModeExitBtn" class="admin-exit-btn" onclick="exitGodMode()">退出預覽模式</button>
@@ -5686,8 +6127,14 @@
     </div>
 
     <script>
-        window.swalAlert = function(title, text, icon) {
-            return Swal.fire({ title: title, text: text, icon: icon || 'info', confirmButtonText: '確定', confirmButtonColor: '#3b82f6' });
+        window.swalAlert = function(title, text, icon, confirmButtonText, options) {
+            return Swal.fire(Object.assign({
+                title: title,
+                text: text,
+                icon: icon || 'info',
+                confirmButtonText: confirmButtonText || '確定',
+                confirmButtonColor: '#3b82f6'
+            }, options || {}));
         };
         window.swalConfirm = function(title, text) {
             return Swal.fire({ title: title, text: text, icon: 'warning', showCancelButton: true, confirmButtonColor: '#a855f7', cancelButtonColor: '#d1d5db', confirmButtonText: '確定', cancelButtonText: '取消' }).then(function(res) { return res.isConfirmed; });
@@ -5921,6 +6368,382 @@
         var EBOOK_BACKGROUND_RTDB_PAUSE_MS = 5 * 60 * 1000;
         var ebookBackgroundPauseTimer = null;
         var ebookRealtimeConnectionPaused = false;
+        var pendingTasksState = { status: 'unavailable', items: [] };
+        var pendingTasksRenderScheduled = false;
+        var pendingEntryNoticeReady = false;
+        var pendingEntryReminderHandled = false;
+        var pendingReminderShownSessionIdentity = '';
+        var pendingAnchorHighlightTimer = null;
+
+        function isSamePendingSourceClass(left, right) {
+            var leftText = (left || '').toString();
+            var rightText = (right || '').toString();
+            if (!leftText || !rightText || leftText === rightText) return true;
+            var leftAlias = getHomeworkDoneCourseAliasKey(leftText);
+            var rightAlias = getHomeworkDoneCourseAliasKey(rightText);
+            return !!leftAlias && leftAlias === rightAlias;
+        }
+
+        function isPendingExamSourceClassWritable(exam, sourceClassKey, sourceClassName) {
+            var currentClassName = (gData && gData.className || '').toString();
+            if (!currentClassName) return false;
+            var currentClassKey = safeKey(currentClassName);
+            var semanticSource = ((exam && exam.sourceClassKey) ||
+                (exam && exam.sourceClassName) ||
+                (exam && exam.className) ||
+                sourceClassName ||
+                sourceClassKey ||
+                (exam && exam.storedClassKey) ||
+                (exam && exam.storedClassName) || '').toString();
+            if (!semanticSource) return true;
+            if (semanticSource === currentClassName || safeKey(semanticSource) === currentClassKey) return true;
+            var sourceAlias = getHomeworkDoneCourseAliasKey(semanticSource);
+            var currentAlias = getHomeworkDoneCourseAliasKey(currentClassName);
+            return !!sourceAlias && sourceAlias === currentAlias;
+        }
+
+        function getPendingTaskHelpers() {
+            return {
+                isHomeworkColumnTitle: isHomeworkColumnTitle,
+                isEnrollmentExemptExam: isCurrentStudentEnrollmentExemptExam,
+                shouldUseHomeworkDoneFlowForClass: shouldUseHomeworkDoneFlowForClass,
+                shouldUseHomeworkDoneFlowForPost: shouldUseHomeworkDoneFlowForPost,
+                getHomeworkDoneDateKey: getHomeworkDoneDateKey,
+                getLegacyHomeworkSkipSourceItemIds: function(post, dateKey) {
+                    return [dateKey, safeKey((post && post.date) || '')].filter(function(value, index, list) {
+                        return !!value && list.indexOf(value) === index;
+                    });
+                },
+                getPostHomeworkText: getPostHomeworkText,
+                getLatestScoreReportInfo: getLatestMakeupReportInfo,
+                getLatestResultReportInfo: getLatestMakeupResultReportInfo,
+                isMathGuidanceExam: isMathAdvancedGuidanceExam,
+                getMakeupColorInfo: getMakeupColorInfo,
+                getDisplayOptions: getDailyPostDisplayOptions,
+                isExamBeforePostDate: isExamBeforePostDate,
+                isSameSource: isSamePendingSourceClass,
+                isExamSourceClassWritable: isPendingExamSourceClassWritable
+            };
+        }
+
+        function buildPendingTasksForCurrentView() {
+            if (!window.EbookPendingTasks || !gData) return { status: 'unavailable', items: [] };
+            if (isDashboardDraftPreviewMode && Array.isArray(gData.pendingPreviewTasks)) {
+                return {
+                    status: 'ready',
+                    items: window.EbookPendingTasks.normalizePreviewTasks(gData.pendingPreviewTasks),
+                    policy: {
+                        status: 'ready',
+                        loginReminder: gData.pendingPolicy && gData.pendingPolicy.loginReminder === true,
+                        reminderDue: gData.pendingPolicy && gData.pendingPolicy.reminderDue === true,
+                        reminderDueAt: gData.pendingPolicy && gData.pendingPolicy.reminderDueAt || '',
+                        reminderDueDateKey: gData.pendingPolicy && gData.pendingPolicy.reminderDueDateKey || '',
+                        previewReminderDueAll: !!(gData.pendingPolicy && gData.pendingPolicy.previewReminderDueAll)
+                    }
+                };
+            }
+            return window.EbookPendingTasks.buildPendingTasks({
+                classKey: safeKey(gData.className || ''),
+                className: gData.className || '',
+                studentKey: gData.foundUserKey || (ebookAuthSessionInfo && ebookAuthSessionInfo.studentKey) || safeKey(gData.studentName || ''),
+                posts: gData.dailyPost || [],
+                grades: gData.grades || [],
+                feedbackHistory: gData.feedbackHistory || [],
+                homeworkDone: gData.homeworkDone || {},
+                cohortHomeworkDoneRoot: gData.cohortHomeworkDoneRoot || null,
+                studentKeysByClassKey: gData.studentKeysByClassKey || null,
+                pendingPolicy: gData.pendingPolicy || null,
+                helpers: getPendingTaskHelpers()
+            });
+        }
+
+        function getPendingTaskById(taskId) {
+            return (pendingTasksState.items || []).find(function(item) {
+                return item && item.taskId === taskId;
+            }) || null;
+        }
+
+        function getPendingTaskPrimaryTargetKind(task) {
+            if (task && task.kind === 'makeup_result' && task.reportTarget) return 'report';
+            return 'display';
+        }
+
+        function buildPendingTaskActionButton(task, targetKind, label, extraClass) {
+            if (!task) return '';
+            var target = targetKind === 'report' ? task.reportTarget : (targetKind === 'paper' ? task.paperTarget : task.displayTarget);
+            if (!target) return '';
+            return "<button type='button' class='pending-action-btn " + (extraClass || '') + "' data-pending-task-id='" + escapeHtmlAttr(task.taskId || '') + "' onclick=\"openPendingTaskFromButton(this, '" + targetKind + "')\">" + escapeHtml(label) + "</button>";
+        }
+
+        function getPendingTaskPrimaryActionLabel(task) {
+            if (!task) return '前往查看';
+            if (task.kind === 'homework_done') return '前往完成回報';
+            if (task.kind === 'homework_score') return '前往作業';
+            if (task.kind === 'absence' || task.kind === 'guidance_absence') return '前往回報分數';
+            if (task.kind === 'makeup_result') return '前往回報補考結果';
+            return '查看考試';
+        }
+
+        function renderPendingTasks() {
+            var container = document.getElementById('tab-content-3');
+            var badge = document.getElementById('tab-pending-count');
+            var tab = document.getElementById('tab-pending');
+            if (!container || !badge || !tab) return;
+            var showPending = isDashboardDraftPreviewMode || !gData || !gData.pendingPolicy || gData.pendingPolicy.showPending !== false;
+            tab.style.display = showPending ? '' : 'none';
+            if (!showPending) {
+                pendingTasksState = { status: 'hidden', items: [] };
+                badge.textContent = '';
+                badge.classList.remove('is-visible');
+                tab.classList.remove('is-reminder-due');
+                tab.removeAttribute('aria-label');
+                container.innerHTML = '';
+                if (container.style.display !== 'none') switchTab(0);
+                return;
+            }
+            pendingTasksState = buildPendingTasksForCurrentView();
+            var isReady = pendingTasksState.status === 'ready';
+            var items = isReady ? (pendingTasksState.items || []) : [];
+            var reminderDueItems = isReady && window.EbookPendingTasks
+                ? window.EbookPendingTasks.getReminderDueItems(pendingTasksState)
+                : [];
+            var reminderDue = reminderDueItems.length > 0;
+            var reminderDueTaskIds = reminderDueItems.reduce(function(result, item) {
+                if (item && item.taskId) result[item.taskId] = true;
+                return result;
+            }, {});
+            badge.textContent = isReady && items.length ? String(reminderDue ? reminderDueItems.length : items.length) : '';
+            badge.classList.toggle('is-visible', isReady && items.length > 0);
+            tab.classList.toggle('is-reminder-due', reminderDue);
+            tab.setAttribute('aria-label', reminderDue ? '待完成，有 ' + reminderDueItems.length + ' 項需要留意' : '待完成');
+
+            var html = "<div class='pending-page" + (reminderDue ? " is-reminder-due" : "") + "'>" +
+                "<div class='pending-page-intro'>" + (reminderDue
+                    ? "目前有 " + reminderDueItems.length + " 項待完成的課務項目需要留意。完成回報或老師登記後，項目會自動從清單移除。"
+                    : "這裡整理目前尚待完成的課務項目。完成回報或老師登記後，項目會自動從清單移除。") + "</div>";
+            if (!isReady) {
+                html += "<div class='pending-unavailable'>待完成資料目前無法安全確認。為避免顯示錯誤清單，這次不會顯示數量，請重新整理後再試。</div></div>";
+                container.innerHTML = html;
+                return;
+            }
+            if (!items.length) {
+                html += "<div class='pending-empty'>目前沒有待完成項目。</div></div>";
+                container.innerHTML = html;
+                return;
+            }
+            html += "<div class='pending-list'>";
+            items.forEach(function(task) {
+                var primaryTargetKind = getPendingTaskPrimaryTargetKind(task);
+                var taskReminderDue = !!reminderDueTaskIds[task.taskId];
+                html += "<article class='pending-card" + (taskReminderDue ? " is-reminder-due" : "") + "' data-pending-task-card='" + escapeHtmlAttr(task.taskId || '') + "'>" +
+                    "<div class='pending-card-head'><div class='pending-card-label'>" + escapeHtml(task.neutralLabel || '待完成項目') + "</div>" +
+                    "<div class='pending-card-date'>" + escapeHtml(task.date || '') + "</div></div>" +
+                    "<div class='pending-card-title'>" + escapeHtml(task.title || '待完成項目') + "</div>" +
+                    (taskReminderDue ? "<div class='pending-card-status'>記得儘快處理</div>" : '') +
+                    (task.sourceClassName && task.sourceClassName !== (gData && gData.className) ? "<div class='pending-card-source'>來源：" + escapeHtml(task.sourceClassName) + "</div>" : '') +
+                    "<div class='pending-card-actions'>" +
+                    buildPendingTaskActionButton(task, primaryTargetKind, getPendingTaskPrimaryActionLabel(task), '') +
+                    (task.kind === 'makeup_result' ? buildPendingTaskActionButton(task, 'display', '查看原考試', 'secondary') : '') +
+                    buildPendingTaskActionButton(task, 'paper', '前往補考卷', 'paper') +
+                    "</div></article>";
+            });
+            html += "</div></div>";
+            container.innerHTML = html;
+        }
+
+        function schedulePendingTasksRecompute() {
+            if (pendingTasksRenderScheduled) return;
+            pendingTasksRenderScheduled = true;
+            Promise.resolve().then(function() {
+                pendingTasksRenderScheduled = false;
+                if (gData) renderPendingTasks();
+            });
+        }
+
+        function pendingTargetMatchesPost(element, target) {
+            if (!element || !target) return false;
+            var targetPostId = (target.dailyPostId || '').toString();
+            var elementPostId = (element.dataset.postId || '').toString();
+            var targetSource = (target.sourceClassKey || '').toString();
+            if (targetPostId) {
+                if (elementPostId !== targetPostId) return false;
+                return !targetSource || targetSource === (element.dataset.sourceClassKey || '') || targetSource === (element.dataset.storedClassKey || '');
+            }
+            var targetDate = (target.postDate || '').toString();
+            if (!targetDate || (element.dataset.postDate || '') !== targetDate) return false;
+            return !targetSource || (element.dataset.sourceClassKey || '') === targetSource || (element.dataset.storedClassKey || '') === targetSource;
+        }
+
+        function pendingTargetMatchesExam(element, target) {
+            if (!element || !target) return false;
+            var examId = (target.examId || '').toString();
+            var storedExamId = (target.storedExamId || '').toString();
+            var elementExamId = (element.dataset.examId || '').toString();
+            var elementStoredExamId = (element.dataset.storedExamId || '').toString();
+            if (examId || storedExamId) {
+                return (!!examId && (examId === elementExamId || examId === elementStoredExamId)) ||
+                    (!!storedExamId && (storedExamId === elementStoredExamId || storedExamId === elementExamId));
+            }
+            var colIndex = target.colIndex === undefined || target.colIndex === null ? '' : String(target.colIndex);
+            return !!colIndex && colIndex === (element.dataset.examColIndex || '');
+        }
+
+        function findPendingTargetElement(target) {
+            if (!target) return null;
+            var postAnchors = Array.prototype.slice.call(document.querySelectorAll('[data-pending-post-anchor]'));
+            var postAnchor = postAnchors.find(function(element) { return pendingTargetMatchesPost(element, target); }) || null;
+            if ((target.section === 'homework' || target.section === 'homework-score') && postAnchor) {
+                return postAnchor.querySelector('[data-pending-homework-anchor]') || postAnchor;
+            }
+            if (target.section === 'makeup-paper' && postAnchor) {
+                return postAnchor.querySelector('[data-pending-paper-anchor]') || postAnchor;
+            }
+            var examRoot = postAnchor || document;
+            if (target.section === 'makeup-result') {
+                var reportAnchors = Array.prototype.slice.call(examRoot.querySelectorAll('[data-pending-makeup-result-anchor]'));
+                var reportAnchor = reportAnchors.find(function(element) { return pendingTargetMatchesExam(element, target); });
+                if (reportAnchor) return reportAnchor;
+            }
+            if (target.examId || target.storedExamId || target.colIndex !== undefined && target.colIndex !== null && target.colIndex !== '') {
+                var examAnchors = Array.prototype.slice.call(examRoot.querySelectorAll('[data-pending-exam-anchor]'));
+                var examAnchor = examAnchors.find(function(element) { return pendingTargetMatchesExam(element, target); });
+                if (examAnchor) return examAnchor;
+            }
+            return postAnchor;
+        }
+
+        function focusPendingTarget(element, target) {
+            if (!element || !target) return;
+            var selector = '';
+            if (target.focus === 'homework') selector = '.homework-done-btn:not([disabled])';
+            else if (target.focus === 'score-report') selector = '.score-input';
+            else if (target.focus === 'makeup-result') selector = '.makeup-wrong-count-input';
+            else if (target.section === 'makeup-paper') selector = 'a[href]';
+            var focusTarget = selector ? element.querySelector(selector) : null;
+            if (focusTarget && typeof focusTarget.focus === 'function') {
+                try { focusTarget.focus({ preventScroll: true }); }
+                catch (err) { focusTarget.focus(); }
+            }
+        }
+
+        function openPendingTaskFromButton(button, targetKind) {
+            var task = getPendingTaskById(button && button.dataset ? button.dataset.pendingTaskId : '');
+            if (!task) return;
+            var target = targetKind === 'report' ? task.reportTarget : (targetKind === 'paper' ? task.paperTarget : task.displayTarget);
+            if (!target) return;
+            var tabIndex = target.tab === 'grades' ? 1 : 0;
+            switchTab(tabIndex);
+            window.setTimeout(function() {
+                var element = findPendingTargetElement(target);
+                if (!element) return;
+                if (pendingAnchorHighlightTimer) window.clearTimeout(pendingAnchorHighlightTimer);
+                document.querySelectorAll('.pending-anchor-highlight').forEach(function(item) {
+                    item.classList.remove('pending-anchor-highlight');
+                });
+                element.classList.add('pending-anchor-highlight');
+                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                focusPendingTarget(element, target);
+                pendingAnchorHighlightTimer = window.setTimeout(function() {
+                    element.classList.remove('pending-anchor-highlight');
+                }, 2400);
+            }, 80);
+        }
+
+        function getPendingReminderSessionIdentity() {
+            if (isDashboardDraftPreviewMode) {
+                return ['draft', BEAR_SUBJECT, gData && gData.className, gData && gData.studentName].join('|');
+            }
+            var session = ebookAuthSessionInfo || {};
+            return [
+                session.firebaseAuthUid || (ebookAuth.currentUser && ebookAuth.currentUser.uid) || '',
+                BEAR_SUBJECT,
+                session.className || (gData && gData.className) || '',
+                session.studentKey || (gData && gData.foundUserKey) || ''
+            ].join('|');
+        }
+
+        function getPendingReminderDeliveryIdentity() {
+            var policy = pendingTasksState && pendingTasksState.policy ? pendingTasksState.policy : {};
+            return [
+                getPendingReminderSessionIdentity(),
+                policy.reminderDueAt || '',
+                policy.reminderDueDateKey || ''
+            ].join('|');
+        }
+
+        function getPendingReminderBrowserSessionStorageKey(identity) {
+            if (!identity) return '';
+            return PENDING_REMINDER_SESSION_STORAGE_PREFIX + createStableEbookRequestId('pending_reminder', [identity]);
+        }
+
+        function wasPendingReminderShownInBrowserSession(identity) {
+            var key = getPendingReminderBrowserSessionStorageKey(identity);
+            if (!key) return false;
+            try {
+                return window.sessionStorage.getItem(key) === '1';
+            } catch (error) {
+                return false;
+            }
+        }
+
+        function markPendingReminderShownInBrowserSession(identity) {
+            var key = getPendingReminderBrowserSessionStorageKey(identity);
+            if (!key) return;
+            try {
+                window.sessionStorage.setItem(key, '1');
+            } catch (error) {
+                // In-memory identity still prevents duplicate prompts while this page stays open.
+            }
+        }
+
+        function clearPendingReminderBrowserSessionMarks() {
+            try {
+                for (var index = window.sessionStorage.length - 1; index >= 0; index -= 1) {
+                    var key = window.sessionStorage.key(index) || '';
+                    if (key.indexOf(PENDING_REMINDER_SESSION_STORAGE_PREFIX) === 0) {
+                        window.sessionStorage.removeItem(key);
+                    }
+                }
+            } catch (error) {
+                // Storage may be unavailable in strict in-app browsers; login must still continue.
+            }
+        }
+
+        function maybeShowPendingEntryReminder() {
+            if (!pendingEntryNoticeReady || pendingEntryReminderHandled) return;
+            if (activeEmergencyAnnouncement) return;
+            if (isAdminMode && !isDashboardDraftPreviewMode) return;
+            if (!isDashboardDraftPreviewMode && gData && gData.pendingPolicy && gData.pendingPolicy.loginReminder === false) return;
+            var reminderDueItems = window.EbookPendingTasks
+                ? window.EbookPendingTasks.getReminderDueItems(pendingTasksState)
+                : [];
+            if (!reminderDueItems.length) return;
+            var identity = getPendingReminderDeliveryIdentity();
+            if (identity && (pendingReminderShownSessionIdentity === identity || wasPendingReminderShownInBrowserSession(identity))) {
+                pendingEntryReminderHandled = true;
+                pendingReminderShownSessionIdentity = identity;
+                return;
+            }
+            pendingEntryReminderHandled = true;
+            pendingReminderShownSessionIdentity = identity;
+            markPendingReminderShownInBrowserSession(identity);
+            swalAlert(
+                '溫馨小提醒',
+                '還有 ' + reminderDueItems.length + ' 項課務尚待完成，記得儘快處理喔！',
+                'warning',
+                '查看待完成',
+                {
+                    iconColor: '#e11d48',
+                    confirmButtonColor: '#e11d48',
+                    customClass: {
+                        popup: 'pending-reminder-swal',
+                        title: 'pending-reminder-swal-title'
+                    }
+                }
+            ).then(function(result) {
+                if (result.isConfirmed) switchTab(3);
+            });
+        }
 
         // ★★★ 即時監聽生命週期管理 ★★★
         function clearRealtimeListeners() {
@@ -6024,10 +6847,12 @@
         function normalizeDashboardDraftPreviewPayload(payload) {
             payload = payload || {};
             var subject = payload.subject === 'math' ? 'math' : 'science';
-            var kind = payload.kind === 'bulletin' ? 'bulletin' : 'dailyPost';
+            var rawKind = (payload.kind || '').toString();
+            var kind = rawKind === 'bulletin' ? 'bulletin' : ((rawKind === 'pending' || rawKind === 'pendingTasks') ? 'pendingTasks' : 'dailyPost');
             var className = sanitizeDashboardDraftPreviewText(payload.className || '草稿預覽班級');
             var dailyPosts = Array.isArray(payload.dailyPosts) ? payload.dailyPosts : [];
             var bulletins = Array.isArray(payload.bulletins) ? payload.bulletins : [];
+            var pendingTasks = Array.isArray(payload.pendingTasks) ? payload.pendingTasks : (Array.isArray(payload.tasks) ? payload.tasks : []);
             return {
                 version: 1,
                 kind: kind,
@@ -6037,6 +6862,14 @@
                 dailyPosts: dailyPosts.map(function(post) {
                     post = post || {};
                     return {
+                        id: sanitizeDashboardDraftPreviewText(post.id || post.dailyPostId || ''),
+                        dailyPostId: sanitizeDashboardDraftPreviewText(post.dailyPostId || post.id || ''),
+                        className: sanitizeDashboardDraftPreviewText(post.className || className),
+                        sourceClassKey: sanitizeDashboardDraftPreviewText(post.sourceClassKey || ''),
+                        sourceClassName: sanitizeDashboardDraftPreviewText(post.sourceClassName || ''),
+                        storedClassKey: sanitizeDashboardDraftPreviewText(post.storedClassKey || post.sourceClassKey || ''),
+                        storedClassName: sanitizeDashboardDraftPreviewText(post.storedClassName || post.className || className),
+                        isTransferFormerClass: post.isTransferFormerClass === true,
                         date: sanitizeDashboardDraftPreviewText(post.date),
                         title: sanitizeDashboardDraftPreviewText(post.title),
                         progress: sanitizeDashboardDraftPreviewText(post.progress),
@@ -6050,6 +6883,12 @@
                         examData: post.examData || { main: null, others: [] }
                     };
                 }),
+                pendingTasks: window.EbookPendingTasks
+                    ? window.EbookPendingTasks.normalizePreviewTasks(pendingTasks)
+                    : [],
+                reminderDue: payload.reminderDue === true,
+                reminderDueAt: sanitizeDashboardDraftPreviewText(payload.reminderDueAt || ''),
+                reminderDueDateKey: sanitizeDashboardDraftPreviewText(payload.reminderDueDateKey || ''),
                 bulletins: bulletins.map(function(bulletin) {
                     bulletin = bulletin || {};
                     return {
@@ -6092,6 +6931,7 @@
             document.getElementById('tab-content-0').innerHTML = '<div style="text-align:center; padding:30px; color:#b91c1c; font-weight:900;">' + escapeHtml(message || '找不到 Dashboard 草稿預覽資料。') + '</div>';
             document.getElementById('tab-content-1').innerHTML = '';
             document.getElementById('tab-content-2').innerHTML = '';
+            document.getElementById('tab-content-3').innerHTML = '';
         }
 
         function enterDashboardDraftPreview(payload) {
@@ -6102,6 +6942,9 @@
             ebookGodSessionId = "";
             ebookGodSessionInfo = null;
             clearRealtimeListeners();
+            pendingEntryNoticeReady = false;
+            pendingEntryReminderHandled = false;
+            pendingReminderShownSessionIdentity = '';
             document.body.classList.add('draft-preview-mode');
             document.getElementById('full-loader').style.display = 'none';
             document.getElementById('login-screen').style.display = 'none';
@@ -6115,23 +6958,41 @@
                 found: true,
                 className: payload.className,
                 studentName: payload.studentName || '家長端預覽',
+                foundUserKey: safeKey(payload.studentName || '家長端預覽'),
                 dailyPost: payload.dailyPosts,
                 grades: [],
                 feedbackHistory: [],
                 bulletins: payload.bulletins,
                 stickers: 0,
-                homeworkDone: {}
+                homeworkDone: {},
+                pendingPolicy: {
+                    status: 'ready',
+                    items: [],
+                    showPending: true,
+                    loginReminder: true,
+                    reminderDue: payload.reminderDue === true,
+                    reminderDueAt: payload.reminderDueAt || '',
+                    reminderDueDateKey: payload.reminderDueDateKey || '',
+                    previewReminderDueAll: payload.reminderDue === true && !payload.reminderDueDateKey && !payload.reminderDueAt
+                },
+                pendingPreviewTasks: payload.pendingTasks || []
             };
             renderDailyPosts(payload.dailyPosts, []);
             renderOldGradeCards([]);
             renderBulletins(payload.bulletins);
+            renderPendingTasks();
             document.getElementById('tab-content-0').insertAdjacentHTML('afterbegin', previewBanner);
             if (payload.kind === 'bulletin') {
                 switchTab(2);
                 document.getElementById('tab-content-2').insertAdjacentHTML('afterbegin', previewBanner);
+            } else if (payload.kind === 'pendingTasks') {
+                switchTab(3);
+                document.getElementById('tab-content-3').insertAdjacentHTML('afterbegin', previewBanner);
             } else {
                 switchTab(0);
             }
+            pendingEntryNoticeReady = true;
+            if (!checkEmergency(payload.bulletins)) maybeShowPendingEntryReminder();
             window.scrollTo(0, 0);
         }
 
@@ -6393,9 +7254,14 @@
         function enterStudentView(result, pass) {
             document.getElementById('full-loader').style.display = 'none';
             clearRealtimeListeners();
+            var activeSession = ebookAuthSessionInfo || ebookGodSessionInfo || {};
+            if (result.pendingPolicy === undefined) result.pendingPolicy = activeSession.pendingPolicy || null;
             gData = result;
             emergencyShownIdentityForCurrentEntry = '';
             activeEmergencyAnnouncement = null;
+            pendingTasksState = { status: 'unavailable', items: [] };
+            pendingEntryNoticeReady = false;
+            pendingEntryReminderHandled = false;
             if (pass !== "admin_view" && pass !== "god_session" && pass !== "student_preview" && pass !== "dashboard_draft_preview") gPass = pass; // ★ 防止預覽模式覆蓋真正的密碼
 
             // ★ v4.0 登入記錄：fire-and-forget，不阻塞 UI
@@ -6421,9 +7287,19 @@
                     const homeworkAliasClassKeys = hasHomeworkCohortAlias ? getHomeworkDoneRelatedClassKeyCandidates(safeC) : [safeC];
                     const trackedClassKeys = uniqueClassKeys(result.trackedClassKeys || homeworkAliasClassKeys);
                     const trackedGradeClassKeys = uniqueClassKeys(result.trackedGradeClassKeys || getTrackedGradeClassKeysForStudent(safeC, result.studentTransferIndex || {}));
+                    const studentKeysByClassKey = result.studentKeysByClassKey || {};
+                    trackedClassKeys.forEach(function(classKey) {
+                        if (!getStudentKeysForClass(studentKeysByClassKey, classKey, "").length) {
+                            studentKeysByClassKey[classKey] = [studentKey];
+                        }
+                    });
+                    const hasMultipleStudentScopes = trackedClassKeys.length > 1 || trackedClassKeys.some(function(classKey) {
+                        return getStudentKeysForClass(studentKeysByClassKey, classKey, studentKey).length > 1;
+                    });
                     result.foundUserKey = studentKey;
                     result.trackedClassKeys = trackedClassKeys;
                     result.trackedGradeClassKeys = trackedGradeClassKeys;
+                    result.studentKeysByClassKey = studentKeysByClassKey;
                     result.studentEnrollmentIndex = result.studentEnrollmentIndex || {};
                     let enrollmentIndexSnapshotText = JSON.stringify(result.studentEnrollmentIndex || {});
                     let lifecycleRealtimeWarningShown = false;
@@ -6445,39 +7321,45 @@
 
                     // 2. 留言回報監聽 (包含審核狀態與老師回覆)
                     trackedClassKeys.forEach(function(classKey) {
-                        watchRealtimeValue(BEAR_SUBJECT + '/feedbacks/' + classKey + '/' + studentKey, function(snap) {
-                            const fbsObj = snap.val() || {};
-                            if (trackedClassKeys.length > 1) {
-                                if (!gData.cohortFeedbackRoot) gData.cohortFeedbackRoot = {};
-                                if (!gData.cohortFeedbackRoot[classKey]) gData.cohortFeedbackRoot[classKey] = {};
-                                gData.cohortFeedbackRoot[classKey][studentKey] = fbsObj;
-                                gData.feedbackHistory = buildFeedbackHistoryList(mergeStudentChildNodeByKeys(gData.cohortFeedbackRoot, trackedClassKeys, studentKey, gData.studentTransferIndex || {}, gData.className, safeC, gData.studentTransferChain, gData.classNameByKey));
-                            } else {
-                                gData.feedbackHistory = buildFeedbackHistoryList(fbsObj);
-                            }
-                            // 重新渲染聯絡簿區塊，確保狀態即時更新
-                            renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
-                            // 同步重新渲染近期分數區塊，讓待審核狀態即時顯示在成績卡片上
-                            if (gData.grades) {
-                                renderOldGradeCards(gData.grades);
-                            }
+                        getStudentKeysForClass(studentKeysByClassKey, classKey, studentKey).forEach(function(scopedStudentKey) {
+                            watchRealtimeValue(BEAR_SUBJECT + '/feedbacks/' + classKey + '/' + scopedStudentKey, function(snap) {
+                                const fbsObj = snap.val() || {};
+                                if (hasMultipleStudentScopes) {
+                                    if (!gData.cohortFeedbackRoot) gData.cohortFeedbackRoot = {};
+                                    if (!gData.cohortFeedbackRoot[classKey]) gData.cohortFeedbackRoot[classKey] = {};
+                                    gData.cohortFeedbackRoot[classKey][scopedStudentKey] = fbsObj;
+                                    gData.feedbackHistory = buildFeedbackHistoryList(mergeStudentChildNodeByKeys(gData.cohortFeedbackRoot, trackedClassKeys, studentKey, gData.studentTransferIndex || {}, gData.className, safeC, gData.studentTransferChain, gData.classNameByKey, studentKeysByClassKey));
+                                } else {
+                                    gData.feedbackHistory = buildFeedbackHistoryList(fbsObj);
+                                }
+                                // 重新渲染聯絡簿區塊，確保狀態即時更新
+                                renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
+                                // 同步重新渲染近期分數區塊，讓待審核狀態即時顯示在成績卡片上
+                                if (gData.grades) {
+                                    renderOldGradeCards(gData.grades);
+                                }
+                                schedulePendingTasksRecompute();
+                            });
                         });
                     });
 
                     try {
                         trackedClassKeys.forEach(function(classKey) {
-                            watchRealtimeValue(BEAR_SUBJECT + '/homeworkDone/' + classKey + '/' + studentKey, function(snap) {
-                                if (trackedClassKeys.length > 1) {
-                                    if (!gData.cohortHomeworkDoneRoot) gData.cohortHomeworkDoneRoot = {};
-                                    if (!gData.cohortHomeworkDoneRoot[classKey]) gData.cohortHomeworkDoneRoot[classKey] = {};
-                                    gData.cohortHomeworkDoneRoot[classKey][studentKey] = snap.val() || {};
-                                    gData.homeworkDone = mergeHomeworkDoneForStudentByKeys(gData.cohortHomeworkDoneRoot, trackedClassKeys, studentKey);
-                                } else {
-                                    gData.homeworkDone = snap.val() || {};
-                                }
-                                renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
-                            }, function(error) {
-                                console.warn("HomeworkDone realtime watch skipped:", error);
+                            getStudentKeysForClass(studentKeysByClassKey, classKey, studentKey).forEach(function(scopedStudentKey) {
+                                watchRealtimeValue(BEAR_SUBJECT + '/homeworkDone/' + classKey + '/' + scopedStudentKey, function(snap) {
+                                    if (hasMultipleStudentScopes) {
+                                        if (!gData.cohortHomeworkDoneRoot) gData.cohortHomeworkDoneRoot = {};
+                                        if (!gData.cohortHomeworkDoneRoot[classKey]) gData.cohortHomeworkDoneRoot[classKey] = {};
+                                        gData.cohortHomeworkDoneRoot[classKey][scopedStudentKey] = snap.val() || {};
+                                        gData.homeworkDone = mergeHomeworkDoneForStudentByKeys(gData.cohortHomeworkDoneRoot, trackedClassKeys, studentKey, studentKeysByClassKey);
+                                    } else {
+                                        gData.homeworkDone = snap.val() || {};
+                                    }
+                                    renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
+                                    schedulePendingTasksRecompute();
+                                }, function(error) {
+                                    console.warn("HomeworkDone realtime watch skipped:", error);
+                                });
                             });
                         });
                     } catch (homeworkDoneWatchErr) {
@@ -6537,12 +7419,24 @@
                             remapDailyPostGrades();
                             renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
                         }
+                        schedulePendingTasksRecompute();
                     }
                     trackedGradeClassKeys.forEach(function(classKey) {
-                        watchRealtimeValue(BEAR_SUBJECT + '/grades/' + classKey + '/' + studentKey + '/exams', function(snap) {
-                            if (!gData.cohortGradeExamRoot) gData.cohortGradeExamRoot = {};
-                            gData.cohortGradeExamRoot[classKey] = snap.val() || {};
-                            rebuildGradesFromScopedSources();
+                        getStudentKeysForClass(studentKeysByClassKey, classKey, studentKey).forEach(function(scopedStudentKey) {
+                            watchRealtimeValue(BEAR_SUBJECT + '/grades/' + classKey + '/' + scopedStudentKey + '/exams', function(snap) {
+                                if (!gData.cohortGradeExamNodeMap) gData.cohortGradeExamNodeMap = {};
+                                if (!gData.cohortGradeExamNodeMap[classKey]) gData.cohortGradeExamNodeMap[classKey] = {};
+                                gData.cohortGradeExamNodeMap[classKey][scopedStudentKey] = snap.val() || {};
+                                gData.cohortGradeExamRoot = mergeGradeExamNodeMap(
+                                    gData.cohortGradeExamNodeMap,
+                                    trackedGradeClassKeys,
+                                    studentKey,
+                                    studentKeysByClassKey,
+                                    gData.transferChain,
+                                    safeC
+                                );
+                                rebuildGradesFromScopedSources();
+                            });
                         });
                     });
 
@@ -6557,9 +7451,13 @@
                             if (postReserveDate && postReserveDate > now) continue;
                             let postObj = {
                                 id: pRow.id || rowId,
+                                dailyPostId: pRow.dailyPostId || rowId,
                                 className: pRow.className || result.className,
                                 sourceClassKey: pRow.sourceClassKey || safeC,
                                 sourceClassName: pRow.sourceClassName || pRow.className || result.className,
+                                sourceStudentKey: pRow.sourceStudentKey || studentKey,
+                                storedClassKey: pRow.storedClassKey || pRow.sourceClassKey || safeC,
+                                storedClassName: pRow.storedClassName || pRow.className || result.className,
                                 isTransferFormerClass: pRow.isTransferFormerClass === true,
                                 date: pRow.date, title: pRow.title, progress: pRow.progress, hw1: pRow.hw1, hw2: pRow.hw2,
                                 makeup: pRow.makeup, quiz: pRow.quiz, range: pRow.range, note: pRow.note,
@@ -6575,6 +7473,7 @@
                         
                         remapDailyPostGrades(); // 從 grades 陣列進行映射
                         renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
+                        schedulePendingTasksRecompute();
                     }
 
                     function rebuildViewsForStudentEnrollmentIndex() {
@@ -6588,8 +7487,10 @@
                     function rebuildMergedEnrollmentIndex() {
                         var merged = {};
                         Object.keys(gData.studentEnrollmentNodeMap || {}).forEach(function(classKey) {
-                            Object.keys(gData.studentEnrollmentNodeMap[classKey] || {}).forEach(function(id) {
-                                merged[classKey + '__' + id] = Object.assign({ id: id }, gData.studentEnrollmentNodeMap[classKey][id] || {});
+                            Object.keys(gData.studentEnrollmentNodeMap[classKey] || {}).forEach(function(scopedStudentKey) {
+                                Object.keys(gData.studentEnrollmentNodeMap[classKey][scopedStudentKey] || {}).forEach(function(id) {
+                                    merged[classKey + '__' + scopedStudentKey + '__' + id] = Object.assign({ id: id }, gData.studentEnrollmentNodeMap[classKey][scopedStudentKey][id] || {});
+                                });
                             });
                         });
                         var nextEnrollmentText = JSON.stringify(merged);
@@ -6600,11 +7501,14 @@
                     }
                     gData.studentEnrollmentNodeMap = gData.studentEnrollmentNodeMap || {};
                     trackedClassKeys.forEach(function(classKey) {
-                        watchRealtimeValue(BEAR_SUBJECT + '/studentEnrollmentIndex/' + classKey + '/' + studentKey, function(snap) {
-                            gData.studentEnrollmentNodeMap[classKey] = snap.val() || {};
-                            rebuildMergedEnrollmentIndex();
-                        }, function(error) {
-                            showLifecycleRealtimeWarning("Student enrollment index", error);
+                        getStudentKeysForClass(studentKeysByClassKey, classKey, studentKey).forEach(function(scopedStudentKey) {
+                            watchRealtimeValue(BEAR_SUBJECT + '/studentEnrollmentIndex/' + classKey + '/' + scopedStudentKey, function(snap) {
+                                if (!gData.studentEnrollmentNodeMap[classKey]) gData.studentEnrollmentNodeMap[classKey] = {};
+                                gData.studentEnrollmentNodeMap[classKey][scopedStudentKey] = snap.val() || {};
+                                rebuildMergedEnrollmentIndex();
+                            }, function(error) {
+                                showLifecycleRealtimeWarning("Student enrollment index", error);
+                            });
                         });
                     });
 
@@ -6614,7 +7518,7 @@
                             if (trackedClassKeys.length > 1) {
                                 if (!gData.cohortDailyPostRoot) gData.cohortDailyPostRoot = {};
                                 gData.cohortDailyPostRoot[classKey] = snap.val() || {};
-                                rebuildDailyPostsFromScopedData(mergeDailyPostClassNodeByKeys(gData.cohortDailyPostRoot || {}, trackedClassKeys, safeC, gData.studentTransferIndex || {}, gData.className, gData.studentTransferChain));
+                                rebuildDailyPostsFromScopedData(mergeDailyPostClassNodeByKeys(gData.cohortDailyPostRoot || {}, trackedClassKeys, safeC, gData.studentTransferIndex || {}, gData.className, gData.studentTransferChain, studentKey));
                             } else {
                                 rebuildDailyPostsFromScopedData(snap.val() || {});
                             }
@@ -6651,7 +7555,9 @@
             renderDailyPosts(result.dailyPost, result.feedbackHistory);
             renderOldGradeCards(result.grades);
             renderBulletins(result.bulletins);
-            checkEmergency(result.bulletins);
+            renderPendingTasks();
+            pendingEntryNoticeReady = true;
+            if (!checkEmergency(result.bulletins)) maybeShowPendingEntryReminder();
 
             window.scrollTo(0, 0);
             if (isAdminMode) {
@@ -7070,10 +7976,15 @@
             clearRealtimeListeners();
             if (isAdminMode) exitGodMode();
             ebookAuth.signOut().catch(function() {});
+            clearPendingReminderBrowserSessionMarks();
             ebookAuthSessionInfo = null;
             gData = null; gPass = "";
+            pendingTasksState = { status: 'unavailable', items: [] };
+            pendingEntryNoticeReady = false;
+            pendingEntryReminderHandled = false;
+            pendingReminderShownSessionIdentity = '';
             document.getElementById('sName').value = ""; document.getElementById('sPass').value = ""; document.getElementById('loginMsg').innerText = "";
-            document.getElementById('tab-content-0').innerHTML = ""; document.getElementById('tab-content-1').innerHTML = ""; document.getElementById('tab-content-2').innerHTML = "";
+            document.getElementById('tab-content-0').innerHTML = ""; document.getElementById('tab-content-1').innerHTML = ""; document.getElementById('tab-content-2').innerHTML = ""; document.getElementById('tab-content-3').innerHTML = "";
             document.getElementById('main-screen').style.display = 'none'; document.getElementById('admin-screen').style.display = 'none';
             document.getElementById('login-screen').style.display = 'flex'; document.getElementById('backTopBtn').style.display = 'none';
         }
@@ -7089,6 +8000,9 @@
             }).refreshStudentData();
         }
         function switchTab(idx) {
+            idx = Number(idx);
+            if (![0, 1, 2, 3].includes(idx)) idx = 0;
+            if (idx === 3 && document.getElementById('tab-pending').style.display === 'none') idx = 0;
             if (idx === 2) {
                 // 點擊公告分頁時清除紅點與導引
                 var deco = document.getElementById('tab-bulletin-decorator');
@@ -7100,10 +8014,11 @@
             }
             var tabs = document.querySelectorAll('.tab-item');
             tabs.forEach(function (t) { t.classList.remove('active'); });
-            tabs[idx].classList.add('active');
+            if (tabs[idx]) tabs[idx].classList.add('active');
             document.getElementById('tab-content-0').style.display = (idx === 0) ? 'block' : 'none';
             document.getElementById('tab-content-1').style.display = (idx === 1) ? 'block' : 'none';
             document.getElementById('tab-content-2').style.display = (idx === 2) ? 'block' : 'none';
+            document.getElementById('tab-content-3').style.display = (idx === 3) ? 'block' : 'none';
             window.scrollTo(0, 0);
         }
 
@@ -7159,6 +8074,7 @@
                     targetExamColIndex: fb.targetExamColIndex || "",
                     targetExamTitle: fb.targetExamTitle || "",
                     targetExamId: typeof normalizeEbookFeedbackExamId === 'function' ? normalizeEbookFeedbackExamId(fb.targetExamId) : '',
+                    storedStudentKey: fb.storedStudentKey || "",
                     storedClassKey: fb.storedClassKey || fb.sourceClassKey || "",
                     storedClassName: fb.storedClassName || fb.sourceClassName || "",
                     content: fb.content || "",
@@ -7898,25 +8814,72 @@
         }
 
         function shouldShowHomeworkDoneButton(post) {
-            return shouldUseHomeworkDoneFlowForPost(post, gData && gData.className) &&
+            var sourceClassName = getStudentActionPostSourceClassName(post, gData && gData.className);
+            return shouldUseHomeworkDoneFlowForPost(post, sourceClassName) &&
                 (!isAdminMode || isDashboardDraftPreviewMode) &&
-                !(post && post.isTransferFormerClass) &&
                 gData &&
+                (!!(post && (post.dailyPostId || post.id)) || isDashboardDraftPreviewMode) &&
                 !!getPostHomeworkText(post);
+        }
+
+        function getHomeworkDoneDomKey(post) {
+            return makeDomSafeId('homework_done_' + ((post && (post.storedClassKey || post.sourceClassKey)) || '') + '__' + ((post && (post.dailyPostId || post.id || post.date)) || ''));
+        }
+
+        function getHomeworkDoneRecordForPost(post, dateKey) {
+            if (!gData) return null;
+            if (window.EbookPendingTasks && typeof window.EbookPendingTasks.resolveHomeworkDoneRecord === 'function') {
+                return window.EbookPendingTasks.resolveHomeworkDoneRecord({
+                    classKey: safeKey(gData.className || ''),
+                    className: gData.className || '',
+                    studentKey: gData.foundUserKey || (ebookAuthSessionInfo && ebookAuthSessionInfo.studentKey) || safeKey(gData.studentName || ''),
+                    posts: gData.dailyPost || [],
+                    homeworkDone: gData.homeworkDone || {},
+                    cohortHomeworkDoneRoot: gData.cohortHomeworkDoneRoot || null,
+                    studentKeysByClassKey: gData.studentKeysByClassKey || null,
+                    helpers: getPendingTaskHelpers()
+                }, post);
+            }
+            var scopedRoot = gData.cohortHomeworkDoneRoot;
+            if (scopedRoot && typeof scopedRoot === 'object') {
+                var sourceClassKey = (post && (post.storedClassKey || post.sourceClassKey)) || safeKey(gData.className || '');
+                var currentStudentKey = gData.foundUserKey || (ebookAuthSessionInfo && ebookAuthSessionInfo.studentKey) || safeKey(gData.studentName || '');
+                var studentKey = (post && post.sourceStudentKey) || getStudentKeysForClass(gData.studentKeysByClassKey || {}, sourceClassKey, currentStudentKey)[0] || currentStudentKey;
+                return ((((scopedRoot[sourceClassKey] || {})[studentKey]) || {})[dateKey]) || null;
+            }
+            return (gData.homeworkDone && gData.homeworkDone[dateKey]) || null;
+        }
+
+        function getHomeworkDoneLocalWriteClassKey(post) {
+            var currentClassKey = safeKey((gData && gData.className) || '');
+            var sourceClassKey = (post && (post.storedClassKey || post.sourceClassKey)) || currentClassKey;
+            if (!(post && post.isTransferFormerClass) && sourceClassKey !== currentClassKey && isSamePendingSourceClass(sourceClassKey, currentClassKey)) {
+                // 自然超前升班 alias 由正式後端維持既有「寫目前班」行為；
+                // 真正換班的 exact 舊作業則仍寫回來源舊班。
+                return currentClassKey;
+            }
+            return sourceClassKey;
+        }
+
+        function getHomeworkDoneLocalWriteStudentKey(post, sourceClassKey) {
+            var currentStudentKey = gData.foundUserKey || (ebookAuthSessionInfo && ebookAuthSessionInfo.studentKey) || safeKey(gData.studentName || '');
+            if (post && post.isTransferFormerClass && post.sourceStudentKey) return post.sourceStudentKey;
+            return getStudentKeysForClass(gData.studentKeysByClassKey || {}, sourceClassKey, currentStudentKey)[0] || currentStudentKey;
         }
 
         function buildHomeworkDoneButton(post) {
             if (!shouldShowHomeworkDoneButton(post)) return "";
-            var safeDateId = post.date.replace(/\//g, '-');
+            var homeworkDoneDomKey = getHomeworkDoneDomKey(post);
             var dateKey = getHomeworkDoneDateKey(post.date);
-            var done = !!(gData && gData.homeworkDone && gData.homeworkDone[dateKey] && gData.homeworkDone[dateKey].status === "done");
+            var doneRecord = getHomeworkDoneRecordForPost(post, dateKey);
+            var done = !!(doneRecord && doneRecord.status === "done");
             var btnText = done ? "✓ 已回報完成" : "我已完成本次作業";
             var doneClass = done ? " done" : "";
             var disabled = done ? " disabled" : "";
             var hint = done ? "已記錄到作業完成回報。" : "完成作業後按一下，老師會看到你的回報。";
-            return "<div class='homework-done-box' id='homework-done-box-" + safeDateId + "'>" +
-                "<button class='homework-done-btn" + doneClass + "' id='homework-done-btn-" + safeDateId + "' onclick=\"submitHomeworkDone('" + safeDateId + "', '" + post.date + "')\"" + disabled + ">" + btnText + "</button>" +
-                "<div class='homework-done-hint' id='homework-done-hint-" + safeDateId + "'>" + hint + "</div>" +
+            return "<div class='homework-done-box' id='homework-done-box-" + homeworkDoneDomKey + "'>" +
+                "<button class='homework-done-btn" + doneClass + "' id='homework-done-btn-" + homeworkDoneDomKey + "' onclick=\"submitHomeworkDone('" + homeworkDoneDomKey + "')\"" + disabled + ">" + btnText + "</button>" +
+                "<div class='homework-done-hint' id='homework-done-hint-" + homeworkDoneDomKey + "'>" + hint + "</div>" +
                 "</div>";
         }
 
@@ -8171,6 +9134,7 @@
                     targetExamColIndex: fb.targetExamColIndex || "",
                     targetExamTitle: fb.targetExamTitle || "",
                     targetExamId: typeof normalizeEbookFeedbackExamId === 'function' ? normalizeEbookFeedbackExamId(fb.targetExamId) : '',
+                    storedStudentKey: fb.storedStudentKey || "",
                     storedClassKey: fb.storedClassKey || fb.sourceClassKey || "",
                     storedClassName: fb.storedClassName || fb.sourceClassName || "",
                     content: fb.content || "",
@@ -8215,7 +9179,8 @@
                 var title = ((exam.date || "") + " " + (exam.exam || "")).trim();
                 var targetDate = getMakeupResultTargetDate(exam, post);
                 var scoreText = exam.score ? exam.score : "空白";
-                html += "<div class='makeup-result-report-card'>" +
+                var pendingReportAttrs = " data-pending-makeup-result-anchor='1' data-exam-id='" + escapeHtmlAttr(exam.examId || '') + "' data-stored-exam-id='" + escapeHtmlAttr(exam.storedExamId || '') + "' data-exam-col-index='" + escapeHtmlAttr(exam.colIndex === undefined || exam.colIndex === null ? '' : exam.colIndex) + "'";
+                html += "<div class='makeup-result-report-card'" + pendingReportAttrs + ">" +
                     "<div class='makeup-result-report-meta'>" + escapeHtml(title || ("考試欄位 " + exam.colIndex)) + "</div>" +
                     "<div class='makeup-result-report-meta'>原本成績：" + escapeHtml(scoreText) + "｜補考標準：" + escapeHtml(exam.makeupThreshold) + "</div>";
                 if (report) {
@@ -8268,6 +9233,7 @@
                 window.adminModeScoreEditContext[scoreEditContextKey] = {
                     targetDate: post.date,
                     sourceClassName: post.storedClassName || post.sourceClassName || gData.className,
+                    storedStudentKey: exam.sourceStudentKey || post.sourceStudentKey || "",
                     gradeClassName: exam.storedClassName || gData.className,
                     examColIndex: exam.colIndex,
                     title: exam.exam || "",
@@ -8278,7 +9244,7 @@
             }
             if (canUseAdminModeReview() && shouldShowGodMakeupReview(exam, logic)) {
                 var makeupContextKey = makeDomSafeId("makeup_" + safeDate + "_" + (exam.colIndex || 0));
-                window.adminModeMakeupContext[makeupContextKey] = { className: gData.className, studentName: gData.studentName, targetDate: post.date, sourceClassName: post.storedClassName || post.sourceClassName || gData.className, gradeClassName: exam.storedClassName || gData.className, gradeClassKey: exam.storedClassKey || "", examColIndex: exam.colIndex, title: exam.exam || "", targetExamId: exam.storedExamId || exam.examId || exam.targetExamId || "", currentColor: exam.cellColor || "", scoreReview: getLatestMakeupReportInfo(exam, history), resultReview: getLatestMakeupResultReportInfo(exam, history) };
+                window.adminModeMakeupContext[makeupContextKey] = { className: gData.className, studentName: gData.studentName, targetDate: post.date, sourceClassName: post.storedClassName || post.sourceClassName || gData.className, storedStudentKey: exam.sourceStudentKey || post.sourceStudentKey || "", gradeClassName: exam.storedClassName || gData.className, gradeClassKey: exam.storedClassKey || "", examColIndex: exam.colIndex, title: exam.exam || "", targetExamId: exam.storedExamId || exam.examId || exam.targetExamId || "", currentColor: exam.cellColor || "", scoreReview: getLatestMakeupReportInfo(exam, history), resultReview: getLatestMakeupResultReportInfo(exam, history) };
                 scoreReportHtml += buildGodMakeupReviewBox(makeupContextKey, exam, logic);
             }
             var chartHtml = "";
@@ -8342,8 +9308,9 @@
             }
 
             var examTitle = getDailyPostExamTimePrefix(exam) + getDailyPostExamLabel(exam) + "成績";
+            var pendingExamAttrs = " data-pending-exam-anchor='1' data-exam-id='" + escapeHtmlAttr(exam.examId || '') + "' data-stored-exam-id='" + escapeHtmlAttr(exam.storedExamId || '') + "' data-exam-col-index='" + escapeHtmlAttr(exam.colIndex === undefined || exam.colIndex === null ? '' : exam.colIndex) + "'";
 
-            return "<div class='grade-section'><div class='main-exam-title'>" + examTitle + "</div><div class='main-exam-range'>" + exam.exam + "</div><div class='main-score'>" + scoreDisplay + "</div>" + logic.statusHtml + "<div class='score-sub'>班平均: " + exam.average + "</div>" + standardHtml + scoreReportHtml + chartHtml + refHwHtml + "</div>";
+            return "<div class='grade-section'" + pendingExamAttrs + "><div class='main-exam-title'>" + examTitle + "</div><div class='main-exam-range'>" + exam.exam + "</div><div class='main-score'>" + scoreDisplay + "</div>" + logic.statusHtml + "<div class='score-sub'>班平均: " + exam.average + "</div>" + standardHtml + scoreReportHtml + chartHtml + refHwHtml + "</div>";
         }
 
         function renderDailyPosts(posts, history) {
@@ -8536,7 +9503,9 @@
                     if (!f.val && !f.extra) return "";
                     var kind = getPostInfoKind(f.label);
                     var noteHtml = f.labelNote ? "<span class='info-label-note'>" + f.labelNote + "</span>" : "";
-                    return "<section class='info-block info-kind-" + kind + "'><div class='info-label'>" + f.label + "</div>" + noteHtml + "<div class='info-content'>" + parseBtn(f.val || "", f.linkMode || "auto") + (f.extra || "") + "</div></section>";
+                    var pendingPaperAttr = kind === 'makeup' ? " data-pending-paper-anchor='1'" : "";
+                    var pendingHomeworkAttr = kind === 'homework' ? " data-pending-homework-anchor='1'" : "";
+                    return "<section class='info-block info-kind-" + kind + "'" + pendingPaperAttr + pendingHomeworkAttr + "><div class='info-label'>" + f.label + "</div>" + noteHtml + "<div class='info-content'>" + parseBtn(f.val || "", f.linkMode || "auto") + (f.extra || "") + "</div></section>";
                 }
                 function buildPostMakeupFields(postData, extraHtml) {
                     var lines = splitPostMultiLinkValue(postData.makeup || "");
@@ -8605,6 +9574,7 @@
                                     count: parseInt(stickerData.count, 10) || 0,
                                     sourceClassName: h.storedClassName || h.sourceClassName || post.storedClassName || post.sourceClassName || gData.className,
                                     sourceClassKey: h.storedClassKey || h.sourceClassKey || post.sourceClassKey || "",
+                                    storedStudentKey: h.storedStudentKey || post.sourceStudentKey || "",
                                     balanceClassName: h.currentClassName || gData.className
                                 };
                                 stickerReviewHtml = buildGodStickerReviewActions(stickerContextKey);
@@ -8622,6 +9592,7 @@
                                     content: h.content || "",
                                     storedClassName: h.storedClassName || h.sourceClassName || post.storedClassName || post.sourceClassName || gData.className,
                                     storedClassKey: h.storedClassKey || h.sourceClassKey || post.sourceClassKey || "",
+                                    storedStudentKey: h.storedStudentKey || post.sourceStudentKey || "",
                                     sourceClassName: h.sourceClassName || post.storedClassName || post.sourceClassName || gData.className,
                                     sourceClassKey: h.sourceClassKey || post.sourceClassKey || ""
                                 };
@@ -8699,13 +9670,13 @@
                 var adminDirectHtml = "";
                 if (canUseAdminModeReply()) {
                     var directContextKey = makeDomSafeId("direct_" + safeDateId);
-                    window.adminModeDirectMessageContext[directContextKey] = { targetDate: post.date, sourceClassName: post.storedClassName || post.sourceClassName || post.className || gData.className, sourceClassKey: post.storedClassKey || post.sourceClassKey || "" };
+                    window.adminModeDirectMessageContext[directContextKey] = { targetDate: post.date, sourceClassName: post.storedClassName || post.sourceClassName || post.className || gData.className, sourceClassKey: post.storedClassKey || post.sourceClassKey || "", storedStudentKey: post.sourceStudentKey || "" };
                     adminDirectHtml = buildAdminDirectMessageBox(directContextKey);
                 }
                 var godStickerAdjustmentHtml = "";
                 if (canUseAdminModeReview()) {
                     var adjustmentContextKey = makeDomSafeId("adjust_" + safeDateId);
-                    window.adminModeStickerAdjustmentContext[adjustmentContextKey] = { targetDate: post.date, sourceClassName: post.storedClassName || post.sourceClassName || post.className || gData.className, sourceClassKey: post.storedClassKey || post.sourceClassKey || "" };
+                    window.adminModeStickerAdjustmentContext[adjustmentContextKey] = { targetDate: post.date, sourceClassName: post.storedClassName || post.sourceClassName || post.className || gData.className, sourceClassKey: post.storedClassKey || post.sourceClassKey || "", storedStudentKey: post.sourceStudentKey || "" };
                     godStickerAdjustmentHtml = buildGodStickerAdjustmentBox(adjustmentContextKey);
                 }
                 var studentInputHtml = (isAdminMode || isDashboardDraftPreviewMode || post.isTransferFormerClass) ? "" :
@@ -8717,7 +9688,7 @@
                     "<div id='feedback-attachment-status-" + safeDateId + "' class='feedback-attachment-status'></div></div>";
 
                 // ★★★ v3.9 修正：家長留言 -> 留言內容 ★★★
-                var feedbackHtml = "<div class='feedback-section'>" + uploadHtml + "<div class='section-title'>" + SVG.chat + "留言內容</div><div id='history-" + safeDateId + "'>" + historyHtml + "</div>" + godStickerAdjustmentHtml + adminDirectHtml + studentInputHtml + "</div>"; var headerTitle = escapeHtml(post.date + (post.title ? " " + post.title : "")); var transferBadge = post.isTransferFormerClass ? "<span style='margin-left:8px; background:#fffbeb; color:#92400e; border:1px solid #fde68a; border-radius:999px; padding:2px 8px; font-size:0.78rem; font-weight:900;'>轉班前紀錄｜" + escapeHtml(post.sourceClassName || "原班") + "</span>" : ""; html += "<div class='post-card-wrapper'><div class='post-card'><div class='post-header'><span>" + SVG.calendar + headerTitle + transferBadge + "</span></div>" + gradeHtml + "<div class='content-section'><div class='section-title'>" + SVG.megaphone + "聯絡事項</div>" + contentHtml + "</div>" + feedbackHtml + "</div></div>";
+                var feedbackHtml = "<div class='feedback-section'>" + uploadHtml + "<div class='section-title'>" + SVG.chat + "留言內容</div><div id='history-" + safeDateId + "'>" + historyHtml + "</div>" + godStickerAdjustmentHtml + adminDirectHtml + studentInputHtml + "</div>"; var headerTitle = escapeHtml(post.date + (post.title ? " " + post.title : "")); var transferBadge = post.isTransferFormerClass ? "<span style='margin-left:8px; background:#fffbeb; color:#92400e; border:1px solid #fde68a; border-radius:999px; padding:2px 8px; font-size:0.78rem; font-weight:900;'>轉班前紀錄｜" + escapeHtml(post.sourceClassName || "原班") + "</span>" : ""; var pendingPostAttrs = " data-pending-post-anchor='1' data-post-id='" + escapeHtmlAttr(post.dailyPostId || post.id || '') + "' data-source-class-key='" + escapeHtmlAttr(post.sourceClassKey || post.storedClassKey || '') + "' data-stored-class-key='" + escapeHtmlAttr(post.storedClassKey || '') + "' data-post-date='" + escapeHtmlAttr(post.date || '') + "'"; html += "<div class='post-card-wrapper'" + pendingPostAttrs + "><div class='post-card'><div class='post-header'><span>" + SVG.calendar + headerTitle + transferBadge + "</span></div>" + gradeHtml + "<div class='content-section'><div class='section-title'>" + SVG.megaphone + "聯絡事項</div>" + contentHtml + "</div>" + feedbackHtml + "</div></div>";
 
             }); container.innerHTML = html;
 
@@ -8786,6 +9757,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     window.adminModeScoreEditContext[oldScoreEditContextKey] = {
                         targetDate: item.storedDate || item.date || "",
                         sourceClassName: item.storedClassName || item.className || gData.className,
+                        storedStudentKey: item.sourceStudentKey || "",
                         gradeClassName: item.storedClassName || item.className || gData.className,
                         examColIndex: item.colIndex,
                         title: item.exam || "",
@@ -8801,8 +9773,9 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 var oldStandardHtml = isMathAdvancedGuidance
                     ? ((mathGuidanceStandard && mathGuidanceStandard.guidanceThreshold > 0) ? "<div class='detail-box'>" + SVG.target + " 輔導標準：" + escapeHtml(mathGuidanceStandard.guidanceThreshold) + "分</div>" : "")
                     : ((item.note && !isHomeworkColumnTitle((item.date || "") + (item.exam || ""))) ? "<div class='detail-box'>" + SVG.target + " 補考標準：" + escapeHtml(item.note) + "</div>" : "");
+                var pendingOldExamAttrs = " data-pending-exam-anchor='1' data-exam-id='" + escapeHtmlAttr(item.examId || '') + "' data-stored-exam-id='" + escapeHtmlAttr(item.storedExamId || '') + "' data-exam-col-index='" + escapeHtmlAttr(item.colIndex === undefined || item.colIndex === null ? '' : item.colIndex) + "'";
                 html += `
-        <div class='score-card' onclick='toggleCard(this)'>
+        <div class='score-card'${pendingOldExamAttrs} onclick='toggleCard(this)'>
             <div class='class-badge'>${escapeHtml(classBadgeText)}</div>
             <div class='card-main'>
                 <div class='exam-info'><span class='exam-date'>${escapeHtml(item.date)}</span><span class='exam-name'>${escapeHtml(item.exam)}</span></div>
@@ -9203,28 +10176,26 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }).submitFeedback(form);
         }
 
-        async function submitHomeworkDone(safeId, realDate) {
+        async function submitHomeworkDone(homeworkDoneDomKey) {
             if (!gData || !gData.className || !gData.studentName) return;
             if (!(await confirmStudentPreviewAction("回報作業完成"))) return;
-            var sourceClassName;
-            try {
-                sourceClassName = resolveStudentActionSourceClassName(realDate);
-            } catch (sourceErr) {
-                swalAlert('無法回報作業完成', sourceErr.message || String(sourceErr), 'warning');
+            var post = (gData.dailyPost || []).find(function(item) {
+                return item && getHomeworkDoneDomKey(item) === homeworkDoneDomKey;
+            });
+            if (!post || !(post.dailyPostId || post.id)) {
+                swalAlert('無法回報作業完成', '找不到這一則聯絡簿的精確識別碼，請重新整理後再試。', 'warning');
                 return;
             }
-            var post = (gData.dailyPost || []).find(function(item) {
-                return item && item.date === realDate && !item.isTransferFormerClass &&
-                    getStudentActionPostSourceClassName(item, gData.className) === sourceClassName;
-            });
-            if (!shouldUseHomeworkDoneFlowForPost(post, gData.className)) return;
+            var realDate = post.date;
+            var sourceClassName = getStudentActionPostSourceClassName(post, gData.className);
+            if (!shouldUseHomeworkDoneFlowForPost(post, sourceClassName)) return;
             var homeworkText = getPostHomeworkText(post || {});
             if (!homeworkText) {
                 swalAlert("沒有作業內容", "這一天聯絡簿沒有作業，不需要回報完成。", "info");
                 return;
             }
-            var btn = document.getElementById("homework-done-btn-" + safeId);
-            var hint = document.getElementById("homework-done-hint-" + safeId);
+            var btn = document.getElementById("homework-done-btn-" + homeworkDoneDomKey);
+            var hint = document.getElementById("homework-done-hint-" + homeworkDoneDomKey);
             if (!btn || btn.disabled) return;
             var originalText = btn.innerText;
             btn.disabled = true;
@@ -9233,25 +10204,41 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var form = {
                 className: (post && post.className) || gData.className,
                 sourceClassName: sourceClassName,
+                sourceClassKey: (post && (post.storedClassKey || post.sourceClassKey)) || safeKey(sourceClassName),
+                sourceStudentKey: (post && post.sourceStudentKey) || "",
                 studentName: gData.studentName,
                 targetDate: realDate,
                 homeworkText: homeworkText,
-                dailyPostId: (post && post.id) || ""
+                dailyPostId: (post && (post.dailyPostId || post.id)) || "",
+                sourceItemId: (post && (post.id || post.dailyPostId)) || ""
             };
             google.script.run.withSuccessHandler(function(res) {
                 if (res && res.success) {
                     var dateKey = getHomeworkDoneDateKey(realDate);
-                    if (!gData.homeworkDone) gData.homeworkDone = {};
-                    gData.homeworkDone[dateKey] = {
+                    var doneRecord = {
                         status: "done",
                         targetDate: realDate,
                         homeworkText: homeworkText,
+                        sourceClassKey: form.sourceClassKey,
+                        sourceItemId: form.sourceItemId,
+                        sourceDailyPostId: form.dailyPostId,
+                        dailyPostId: form.dailyPostId,
                         time: res.time || ""
                     };
+                    if (!gData.homeworkDone) gData.homeworkDone = {};
+                    gData.homeworkDone[dateKey] = doneRecord;
+                    if (gData.cohortHomeworkDoneRoot && typeof gData.cohortHomeworkDoneRoot === 'object') {
+                        var sourceClassKey = getHomeworkDoneLocalWriteClassKey(post);
+                        var studentKey = getHomeworkDoneLocalWriteStudentKey(post, sourceClassKey);
+                        if (!gData.cohortHomeworkDoneRoot[sourceClassKey]) gData.cohortHomeworkDoneRoot[sourceClassKey] = {};
+                        if (!gData.cohortHomeworkDoneRoot[sourceClassKey][studentKey]) gData.cohortHomeworkDoneRoot[sourceClassKey][studentKey] = {};
+                        gData.cohortHomeworkDoneRoot[sourceClassKey][studentKey][dateKey] = doneRecord;
+                    }
                     btn.innerText = "✓ 已回報完成";
                     btn.classList.add("done");
                     btn.disabled = true;
                     if (hint) hint.innerText = "已記錄到作業完成回報。";
+                    schedulePendingTasksRecompute();
                 } else {
                     btn.disabled = false;
                     btn.innerText = originalText;
@@ -9754,12 +10741,13 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var activeList = isDashboardDraftPreviewMode ? (list || []) : (list || []).filter(function(b) { return isBulletinEffective(b); });
             if (activeList.length === 0) {
                 hideEmergencyModal();
-                return;
+                if (pendingEntryNoticeReady) maybeShowPendingEntryReminder();
+                return false;
             }
             var emergency = activeList.find(b => b.type === "緊急");
             if (emergency) {
                 var emergencyIdentity = buildEmergencyIdentity(emergency);
-                if (emergencyShownIdentityForCurrentEntry === emergencyIdentity) return;
+                if (emergencyShownIdentityForCurrentEntry === emergencyIdentity) return !!activeEmergencyAnnouncement;
                 emergencyShownIdentityForCurrentEntry = emergencyIdentity;
                 activeEmergencyAnnouncement = emergency;
                 var emergencyTitle = document.getElementById('emergencyTitle');
@@ -9770,13 +10758,17 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 if (modal) {
                     modal.style.display = 'flex';
                 }
+                return true;
             } else {
                 hideEmergencyModal();
+                if (pendingEntryNoticeReady) maybeShowPendingEntryReminder();
+                return false;
             }
         }
 
         function closeEmergencyModal() {
             hideEmergencyModal();
+            maybeShowPendingEntryReminder();
         }
 
         var currentMakeupExamData = null;
@@ -9849,10 +10841,14 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             if (!ebookGodSessionId) return null;
             var now = Date.now();
             if (!force && now - ebookGodSessionLastRenewAt < 30000) return ebookGodSessionInfo;
+            var previousPendingPolicy = ebookGodSessionInfo && ebookGodSessionInfo.pendingPolicy;
             var fn = getGodSessionCallable('getEbookGodSession');
             var needsFirebaseToken = !!force;
             var result = await fn({ sessionId: ebookGodSessionId, includeFirebaseToken: needsFirebaseToken });
             ebookGodSessionInfo = result && result.data ? result.data : null;
+            if (ebookGodSessionInfo && ebookGodSessionInfo.pendingPolicy === undefined && previousPendingPolicy) {
+                ebookGodSessionInfo.pendingPolicy = previousPendingPolicy;
+            }
             if (ebookGodSessionInfo && ebookGodSessionInfo.firebaseCustomToken) {
                 await ebookAuth.setPersistence(firebase.auth.Auth.Persistence.NONE);
                 await ebookAuth.signInWithCustomToken(ebookGodSessionInfo.firebaseCustomToken);
@@ -9885,6 +10881,11 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 if (!session || !session.className || !session.studentName) throw new Error('session 資料不完整');
                 isStudentPreviewMode = !!(session.viewMode === 'student_preview' || (session.permissions && session.permissions.studentPreview === true));
                 isAdminMode = !isStudentPreviewMode;
+                session.pendingPolicy = isStudentPreviewMode
+                    ? await loadEbookPendingTaskPolicy()
+                    : getTeacherGodHiddenPendingPolicy();
+                ebookGodSessionInfo = session;
+                ebookAuthSessionInfo = session;
                 startEbookGodSessionHeartbeat();
                 google.script.run.withSuccessHandler(function(result) {
                     if (result && result.found) {
@@ -10149,6 +11150,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     targetDateStr: context.targetDate,
                     gradeClassName: context.gradeClassName || gData.className,
                     sourceClassName: context.sourceClassName || gData.className,
+                    storedStudentKey: context.storedStudentKey || "",
                     scoreValue: nextScore,
                     expectedCurrentScore: context.currentScore,
                     examColIndex: context.examColIndex,
@@ -10191,6 +11193,29 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }
         }
 
+        var EBOOK_ADMIN_FEEDBACK_JOB_STORAGE_KEY = 'sciencebear.dashboard.ebookFeedbackJobs.v1';
+
+        function rememberAdminFeedbackJobForDashboard(callableResult) {
+            var data = callableResult && callableResult.data ? callableResult.data : {};
+            var jobId = (data.jobId || '').toString();
+            if (!data.success || !/^ebook_feedback_[a-f0-9]{40}$/.test(jobId)) {
+                throw new Error('伺服器沒有建立留言背景工作');
+            }
+            var browserIndexSaved = false;
+            try {
+                var parsed = JSON.parse(window.localStorage.getItem(EBOOK_ADMIN_FEEDBACK_JOB_STORAGE_KEY) || '[]');
+                var jobIds = Array.isArray(parsed) ? parsed.filter(function(value) {
+                    return /^ebook_feedback_[a-f0-9]{40}$/.test(value) && value !== jobId;
+                }) : [];
+                jobIds.push(jobId);
+                window.localStorage.setItem(EBOOK_ADMIN_FEEDBACK_JOB_STORAGE_KEY, JSON.stringify(jobIds.slice(-24)));
+                browserIndexSaved = true;
+            } catch (storageError) {
+                console.warn('無法保存留言背景工作索引，後端工作仍會繼續：', storageError);
+            }
+            return { data: data, browserIndexSaved: browserIndexSaved };
+        }
+
         async function sendAdminModeDirectMessage(contextKey) {
             if (!canUseAdminModeReply()) {
                 swalAlert('這個上帝視角連線不能留言', '請回行政中心重新開啟學生畫面。', 'warning');
@@ -10224,17 +11249,22 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     sessionId: ebookGodSessionId,
                     targetDate: context.targetDate,
                     sourceClassName: context.sourceClassName || context.className || gData.className,
+                    storedStudentKey: context.storedStudentKey || "",
                     content: content,
                     clientRequestId: context.clientRequestId
                 });
-                if (result && result.data && result.data.expiresAt && ebookGodSessionInfo) {
-                    ebookGodSessionInfo.expiresAt = result.data.expiresAt;
+                var queuedJobResult = rememberAdminFeedbackJobForDashboard(result);
+                var queuedJob = queuedJobResult.data;
+                if (queuedJob.expiresAt && ebookGodSessionInfo) {
+                    ebookGodSessionInfo.expiresAt = queuedJob.expiresAt;
                 }
                 if (input) input.value = '';
                 clearAdminModeAttachmentDraft(contextKey, true);
-                if (status) status.innerText = '已送出。';
+                if (status) status.innerText = queuedJobResult.browserIndexSaved
+                    ? '已排入後端佇列，可安全離開；回到 Dashboard 後可在工作中心查看進度。'
+                    : '已排入後端佇列，工作會繼續；但此瀏覽器無法保存進度索引，返回 Dashboard 後可能無法自動顯示。';
                 if (btn) {
-                    btn.innerText = '已送出';
+                    btn.innerText = '已排入佇列';
                     btn.style.background = 'var(--primary)';
                 }
             } catch (err) {
@@ -10369,6 +11399,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     studentName: gData.studentName,
                     targetDate: context.targetDate,
                     sourceClassName: context.sourceClassName || gData.className,
+                    storedStudentKey: context.storedStudentKey || "",
                     balanceClassName: gData.className,
                     requestId: context.requestId,
                     reason: adjustment.reason,
@@ -10461,6 +11492,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     count: finalAction === '通過' ? context.count : 0,
                     actionStr: finalAction,
                     sourceClassName: context.sourceClassName || gData.className,
+                    storedStudentKey: context.storedStudentKey || "",
                     balanceClassName: context.balanceClassName || gData.className
                 });
                 if (btn) btn.innerText = finalAction === '通過' ? '已通過' : '已退回';
@@ -10532,6 +11564,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     studentName: gData.studentName,
                     gradeClassName: context.gradeClassName || gData.className,
                     sourceClassName: (colorReview && colorReview.storedClassName) || context.sourceClassName || gData.className,
+                    storedStudentKey: (colorReview && colorReview.storedStudentKey) || context.storedStudentKey || "",
                     examColIndex: context.examColIndex,
                     targetDateStr: context.targetDate || "",
                     targetExamTitle: context.title || "",
@@ -10602,6 +11635,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     studentName: gData.studentName,
                     targetDateStr: context.targetDate,
                     sourceClassName: context.scoreReview.storedClassName || context.sourceClassName || gData.className,
+                    storedStudentKey: context.scoreReview.storedStudentKey || context.storedStudentKey || "",
                     gradeClassName: context.gradeClassName || gData.className,
                     scoreValue: finalScore,
                     targetExamId: context.scoreReview.targetExamId || "",
@@ -10679,6 +11713,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     targetDateStr: context.targetDate,
                     gradeClassName: context.gradeClassName || gData.className,
                     sourceClassName: context.sourceClassName || gData.className,
+                    storedStudentKey: context.storedStudentKey || "",
                     scoreValue: finalScore,
                     examColIndex: context.examColIndex,
                     targetExamTitle: context.title || "",
@@ -10744,16 +11779,21 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     targetDate: context.targetDate,
                     replyContent: content,
                     sourceClassName: context.storedClassName || context.sourceClassName || gData.className,
+                    storedStudentKey: context.storedStudentKey || "",
                     clientRequestId: context.clientRequestId
                 });
-                if (result && result.data && result.data.expiresAt && ebookGodSessionInfo) {
-                    ebookGodSessionInfo.expiresAt = result.data.expiresAt;
+                var queuedJobResult = rememberAdminFeedbackJobForDashboard(result);
+                var queuedJob = queuedJobResult.data;
+                if (queuedJob.expiresAt && ebookGodSessionInfo) {
+                    ebookGodSessionInfo.expiresAt = queuedJob.expiresAt;
                 }
                 if (input) input.value = '';
                 clearAdminModeAttachmentDraft(contextKey, false);
-                if (status) status.innerText = '已回覆。';
+                if (status) status.innerText = queuedJobResult.browserIndexSaved
+                    ? '已排入後端佇列，可安全離開；回到 Dashboard 後可在工作中心查看進度。'
+                    : '已排入後端佇列，工作會繼續；但此瀏覽器無法保存進度索引，返回 Dashboard 後可能無法自動顯示。';
                 if (btn) {
-                    btn.innerText = '已回覆';
+                    btn.innerText = '已排入佇列';
                     btn.style.background = 'var(--primary)';
                 }
             } catch (err) {
@@ -11156,35 +12196,21 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             };
         }
 
-        function submitFeedbackToSheetAndSync(form) {
-            return new Promise(function(resolve, reject) {
-                google.script.run
-                    .withSuccessHandler(function(res) {
-                        if (res && res.success) {
-                            resolve(res);
-                        } else {
-                            reject(new Error((res && res.msg) || 'Google Sheet 寫入或 Firebase 同步失敗'));
-                        }
-                    })
-                    .withFailureHandler(function(err) {
-                        reject(err instanceof Error ? err : new Error(err && err.message ? err.message : String(err)));
-                    })
-                    .submitFeedback(form);
-            });
+        function retireLegacyAdminFeedbackAction() {
+            swalAlert(
+                'eBook 內建管理入口已退場',
+                '老師留言與回覆請回 Dashboard 聯絡簿中心操作；該處會排入可離頁的後端佇列。',
+                'info'
+            );
         }
 
-        async function writeFeedbackDirectToFirebase(cls, stuKey, form) {
-            var res = await submitFeedbackToSheetAndSync({
-                className: form.className || cls,
-                studentName: form.studentName || '',
-                targetDate: form.targetDate,
-                type: form.type,
-                content: form.content
-            });
-            return res && res.feedbackKey ? res.feedbackKey : '';
+        async function writeFeedbackDirectToFirebase() {
+            throw new Error('eBook 內建管理入口已退場，請改由 Dashboard 聯絡簿中心建立留言背景工作。');
         }
 
         async function sendDirectStudentMessage(btn) {
+            retireLegacyAdminFeedbackAction();
+            return;
             var cls = document.getElementById('directMsgClassSelect').value;
             var selectedStudent = getDirectMessageSelectedStudent();
             var stuKey = selectedStudent.key;
@@ -11507,6 +12533,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         }
 
         async function sendAdminReply(idx, safeC, stuKey, targetDate, clsName, stuName) {
+            retireLegacyAdminFeedbackAction();
+            return;
             var input = document.getElementById('fb-reply-' + idx);
             var content = input.value.trim();
             if(!content) { swalAlert('請輸入回覆內容', '', 'warning'); return; }

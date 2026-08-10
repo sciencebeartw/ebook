@@ -159,6 +159,7 @@
       id: String(item.id || fallbackId || '').trim(),
       studentName: String(item.studentName || '').trim(),
       studentKey: String(item.studentKey || '').trim(),
+      sourceStudentKey: String(item.sourceStudentKey || '').trim(),
       fromClassName: String(item.fromClassName || item.oldClassName || '').trim(),
       fromClassKey: String(item.fromClassKey || item.fromClassName || item.oldClassName || '').trim(),
       toClassName: String(item.toClassName || item.newClassName || '').trim(),
@@ -206,7 +207,9 @@
     var sameMoment = candidates.filter(function(item) {
       return item.effectiveDateKey === selected.effectiveDateKey;
     });
-    var distinctSources = uniqueStrings(sameMoment.map(function(item) { return item.fromClassKey; }));
+    var distinctSources = uniqueStrings(sameMoment.map(function(item) {
+      return item.fromClassKey + '|' + (item.sourceStudentKey || item.studentKey || '');
+    }));
     return {
       transfer: selected,
       ambiguous: distinctSources.length > 1,
@@ -237,7 +240,10 @@
           toClassKey: cursor,
           effectiveDateKey: transfer.effectiveDateKey,
           candidateIds: selection.candidates.map(function(item) { return item.id; }),
-          fromClassKeys: uniqueStrings(selection.candidates.map(function(item) { return item.fromClassKey; }))
+          fromClassKeys: uniqueStrings(selection.candidates.map(function(item) { return item.fromClassKey; })),
+          sourceStudentKeys: uniqueStrings(selection.candidates.map(function(item) {
+            return item.sourceStudentKey || item.studentKey || '';
+          }))
         });
       }
       upperBound = transfer.effectiveDateKey;

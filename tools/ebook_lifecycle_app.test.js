@@ -86,6 +86,13 @@ const ambiguous = Lifecycle.buildTransferChain({
 assert.strictEqual(ambiguous.ambiguities.length, 1);
 assert.deepStrictEqual(ambiguous.ambiguities[0].fromClassKeys.sort(), ['A', 'B']);
 
+const keyAmbiguous = Lifecycle.buildTransferChain({
+  oldKey1: { id: 'oldKey1', studentKey: 'current', sourceStudentKey: 'old-1', fromClassKey: 'A', toClassKey: 'C', effectiveDate: '2026-07-10' },
+  oldKey2: { id: 'oldKey2', studentKey: 'current', sourceStudentKey: 'old-2', fromClassKey: 'A', toClassKey: 'C', effectiveDate: '2026-07-10' },
+}, 'C');
+assert.strictEqual(keyAmbiguous.ambiguities.length, 1, 'same source class with different source student keys must fail closed');
+assert.deepStrictEqual(keyAmbiguous.ambiguities[0].sourceStudentKeys.sort(), ['old-1', 'old-2']);
+
 assert.deepStrictEqual(
   Lifecycle.getTrackedClassKeys('C', chainABC, ['114國一自然超前班', '115國二自然超前班', 'C']),
   ['C', 'B', 'A', '114國一自然超前班', '115國二自然超前班']

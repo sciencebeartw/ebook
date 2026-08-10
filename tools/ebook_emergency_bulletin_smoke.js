@@ -89,6 +89,7 @@ assert.match(html, /class="emergency-expiry-notice"[\s\S]*id="emergencyExpiresAt
   'the effective-until label must remain in a compact non-interactive notice');
 
 const storage = new Map();
+let pendingReminderAttempts = 0;
 const elements = {
   emergencyModal: { style: { display: 'none' } },
   emergencyTitle: { textContent: '' },
@@ -101,6 +102,7 @@ const context = {
   isDashboardDraftPreviewMode: false,
   emergencyShownIdentityForCurrentEntry: '',
   activeEmergencyAnnouncement: null,
+  maybeShowPendingEntryReminder() { pendingReminderAttempts += 1; },
   localStorage: {
     getItem(key) { return storage.has(key) ? storage.get(key) : null; },
     setItem(key, value) { storage.set(key, String(value)); },
@@ -139,6 +141,7 @@ assert.equal(elements.emergencyExpiresAt.textContent, '本公告有效至 2099/0
 
 context.closeEmergencyModal();
 assert.equal(elements.emergencyModal.style.display, 'none');
+assert.equal(pendingReminderAttempts, 1, 'pending reminder may continue only after the emergency closes');
 assert.equal(storage.size, 0, 'the default close action must not persist a dismissal');
 
 context.checkEmergency([emergency]);
