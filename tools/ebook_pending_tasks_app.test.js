@@ -105,7 +105,7 @@ assert.strictEqual(Pending.normalizePendingPolicy(Object.assign({}, VALID_REMIND
 assert.strictEqual(Pending.normalizeReminderDueDateKey('20260809', 0), '2026-08-09');
 
 const reminderItems = [
-  { taskId: 'old', date: '2026-08-09' },
+  { taskId: 'old', date: '2026-08-08' },
   { taskId: 'same-day-partial', date: '8/9 小考' },
   { taskId: 'new-after-slot', date: '2026-08-10' },
 ];
@@ -116,11 +116,183 @@ const validReminderResult = {
 };
 assert.deepStrictEqual(
   Pending.getReminderDueItems(validReminderResult).map(item => item.taskId),
-  ['old', 'same-day-partial'],
-  'only tasks on or before the latest server reminder slot date may turn red'
+  ['old'],
+  'only tasks strictly before the latest server reminder slot date may turn red'
 );
 assert.strictEqual(Pending.isReminderDueState(validReminderResult), true);
 assert.strictEqual(Pending.isReminderDueState(Object.assign({}, validReminderResult, { items: [] })), false, 'completion must immediately clear reminder state');
+
+function weeklyReminderPolicy(slotDateKey, loadedAt) {
+  const reminderDueAt = Date.parse(slotDateKey + 'T15:00:00+08:00');
+  return Pending.normalizePendingPolicy({
+    status: 'ready',
+    items: [],
+    showPending: true,
+    loginReminder: true,
+    loadedAt,
+    reminderDue: true,
+    reminderDueAt,
+    reminderDueDateKey: slotDateKey,
+  });
+}
+
+const weeklyDerivedKinds = ['homework_done', 'homework_score', 'absence', 'makeup', 'makeup_result'];
+function derivedTasksForPost(postDate, labelDate) {
+  return weeklyDerivedKinds.map(kind => ({
+    taskId: postDate + '-' + kind,
+    kind,
+    // Deliberately differs from the DailyPost date so this fixture proves
+    // the reminder cycle follows the source post, not a legacy exam label.
+    date: labelDate,
+    reminderSourceDate: postDate,
+    displayTarget: { postDate },
+  }));
+}
+
+const aug8DerivedTasks = derivedTasksForPost('2026-08-08', '2026-08-01');
+const aug8SlotAt = Date.parse('2026-08-08T15:00:00+08:00');
+const aug15SlotAt = Date.parse('2026-08-15T15:00:00+08:00');
+assert.deepStrictEqual(
+  Pending.getReminderDueItems({
+    status: 'ready',
+    items: aug8DerivedTasks,
+    policy: weeklyReminderPolicy('2026-08-08', aug8SlotAt + 1),
+  }),
+  [],
+  'all tasks introduced by the 8/8 DailyPost must stay neutral at the same-day 8/8 slot'
+);
+assert.deepStrictEqual(
+  Pending.getReminderDueItems({
+    status: 'ready',
+    items: aug8DerivedTasks,
+    policy: weeklyReminderPolicy('2026-08-08', aug15SlotAt - 1),
+  }),
+  [],
+  'all 8/8 DailyPost tasks must remain neutral immediately before the next weekly slot'
+);
+assert.deepStrictEqual(
+  Pending.getReminderDueItems({
+    status: 'ready',
+    items: aug8DerivedTasks,
+    policy: weeklyReminderPolicy('2026-08-15', aug15SlotAt + 1),
+  }).map(item => item.taskId),
+  aug8DerivedTasks.map(item => item.taskId),
+  '8/8 homework, exam, absence, makeup, and result tasks may turn red only after the 8/15 slot'
+);
+const aug15ReachedPolicy = weeklyReminderPolicy('2026-08-15', aug15SlotAt + 1);
+const mixedOldAndCurrentResult = {
+  status: 'ready',
+  items: [
+    { taskId: 'old-aug8', date: '2026-08-08', reminderSourceDate: '2026-08-08', displayTarget: { postDate: '2026-08-08' } },
+    { taskId: 'current-aug15', date: '2026-08-15', reminderSourceDate: '2026-08-15', displayTarget: { postDate: '2026-08-15' } },
+  ],
+  policy: aug15ReachedPolicy,
+};
+assert.deepStrictEqual(
+  Pending.getReminderDueItems(mixedOldAndCurrentResult).map(item => item.taskId),
+  ['old-aug8'],
+  'mixed old and current work must mark only the older reminder cycle as due'
+);
+assert.strictEqual(Pending.isReminderDueState(mixedOldAndCurrentResult), true, 'one old item keeps the overall pending state red');
+const currentOnlyResult = {
+  status: 'ready',
+  items: [mixedOldAndCurrentResult.items[1]],
+  policy: aug15ReachedPolicy,
+};
+assert.deepStrictEqual(Pending.getReminderDueItems(currentOnlyResult), [], 'same-day current work remains visible but is not due');
+assert.strictEqual(Pending.isReminderDueState(currentOnlyResult), false, 'removing the final old item returns the overall state to amber');
+assert.strictEqual(
+  Pending.isReminderDueState({ status: 'ready', items: [], policy: aug15ReachedPolicy }),
+  false,
+  'completing every item leaves no reminder-due state'
+);
+assert.deepStrictEqual(
+  Pending.getReminderDueItems({
+    status: 'ready',
+    items: derivedTasksForPost('2026-08-08', '2026-08-01')
+      .concat(derivedTasksForPost('2026-08-15', '2026-08-01'))
+      .concat(derivedTasksForPost('2026-08-22', '2026-08-01')),
+    policy: weeklyReminderPolicy('2026-08-22', Date.parse('2026-08-22T15:00:01+08:00')),
+  }).map(item => item.taskId),
+  derivedTasksForPost('2026-08-08', '2026-08-01')
+    .concat(derivedTasksForPost('2026-08-15', '2026-08-01'))
+    .map(item => item.taskId),
+  'later weekly slots must include every prior DailyPost kind while keeping same-day work neutral'
+);
+assert.deepStrictEqual(
+  Pending.getReminderDueItems({
+    status: 'ready',
+    items: [{
+      taskId: 'malformed-source-post',
+      kind: 'makeup_result',
+      date: '2026-08-01',
+      reminderSourceDate: 'not-a-date',
+      displayTarget: { postDate: 'not-a-date' },
+    }],
+    policy: weeklyReminderPolicy('2026-08-15', aug15SlotAt + 1),
+  }),
+  [],
+  'a malformed explicit reminder source must fail closed instead of falling back to navigation metadata'
+);
+assert.deepStrictEqual(
+  Pending.getReminderDueItems({
+    status: 'ready',
+    items: [{
+      taskId: 'stable-source-ignores-navigation-targets',
+      kind: 'makeup_result',
+      date: '2026-08-01',
+      reminderSourceDate: '2026-08-08',
+      displayTarget: { postDate: '2026-08-01' },
+      paperTarget: { postDate: 'not-a-date' },
+      reportTarget: { postDate: '2026-08-22' },
+    }],
+    policy: weeklyReminderPolicy('2026-08-15', aug15SlotAt + 1),
+  }).map(item => item.taskId),
+  ['stable-source-ignores-navigation-targets'],
+  'an explicit stable source must not be replaced by malformed or later navigation targets'
+);
+assert.deepStrictEqual(
+  Pending.getReminderDueItems({
+    status: 'ready',
+    items: [{
+      taskId: 'legacy-report-target-must-not-delay',
+      kind: 'makeup_result',
+      date: '2026-08-01',
+      displayTarget: { postDate: '2026-08-01' },
+      reportTarget: { postDate: '2027-08-08' },
+    }],
+    policy: weeklyReminderPolicy('2026-08-08', Date.parse('2026-08-08T15:00:01+08:00')),
+  }).map(item => item.taskId),
+  ['legacy-report-target-must-not-delay'],
+  'legacy classification uses display/item fallback and must never consult a moving report target'
+);
+const rolloverTask = {
+  taskId: 'adjacent-year-rollover',
+  kind: 'makeup_result',
+  date: '12/26 小考',
+  reminderSourceDate: '2027-01-02',
+  displayTarget: { postDate: '2026-12-26' },
+  paperTarget: { postDate: '2027-01-02' },
+  reportTarget: { postDate: '2027-01-02' },
+};
+assert.deepStrictEqual(
+  Pending.getReminderDueItems({
+    status: 'ready',
+    items: [rolloverTask],
+    policy: weeklyReminderPolicy('2027-01-02', Date.parse('2027-01-02T15:00:01+08:00')),
+  }),
+  [],
+  'a valid adjacent-year target timeline remains neutral on its latest actionable post day'
+);
+assert.deepStrictEqual(
+  Pending.getReminderDueItems({
+    status: 'ready',
+    items: [rolloverTask],
+    policy: weeklyReminderPolicy('2027-01-09', Date.parse('2027-01-09T15:00:01+08:00')),
+  }).map(item => item.taskId),
+  ['adjacent-year-rollover'],
+  'a valid adjacent-year target timeline becomes due at the first later weekly slot'
+);
 assert.deepStrictEqual(
   Pending.getReminderDueItems({
     status: 'ready',
@@ -689,12 +861,50 @@ assert.strictEqual(absenceResult.items[0].writeTarget.storedExamId, 'stored_abse
 const absencePaper = {
   id: 'absence_paper_exact',
   date: '2026-08-08',
+  sourceClassKey: CURRENT_CLASS,
   makeup: '[補考卷]https://example.com/absence-exact.pdf',
-  displayOptions: { makeup: { targetExamId: 'stored_absence' } },
+  displayOptions: { makeup: { targetExamId: 'stored_absence', sourceClassKey: CURRENT_CLASS } },
 };
 const mappedAbsenceResult = Pending.buildPendingTasks(baseOptions({ posts: [absencePaper], grades: [absenceExam] }));
 assert.strictEqual(mappedAbsenceResult.items[0].paperTarget.dailyPostId, absencePaper.id, 'absence task exposes an explicitly mapped makeup paper');
 assert.strictEqual(mappedAbsenceResult.items[0].paperTarget.url, 'https://example.com/absence-exact.pdf');
+assert.strictEqual(mappedAbsenceResult.items[0].reminderSourceDate, '2026-08-08', 'mapped absence uses the exact paper date as its stable reminder source');
+assert.deepStrictEqual(
+  Pending.getReminderDueItems({
+    status: 'ready',
+    items: mappedAbsenceResult.items,
+    policy: weeklyReminderPolicy('2026-08-08', Date.parse('2026-08-08T15:00:01+08:00')),
+  }),
+  [],
+  'a real absence task with an exact 8/8 makeup paper remains neutral at the 8/8 slot'
+);
+assert.deepStrictEqual(
+  Pending.getReminderDueItems({
+    status: 'ready',
+    items: mappedAbsenceResult.items,
+    policy: weeklyReminderPolicy('2026-08-15', Date.parse('2026-08-15T15:00:01+08:00')),
+  }).map(item => item.kind),
+  ['absence'],
+  'the real absence task becomes due at the first later 8/15 weekly slot'
+);
+const mappedAbsenceWithLaterPosts = Pending.buildPendingTasks(baseOptions({
+  posts: [
+    { id: 'absence_latest_host_aug22', date: '2026-08-22', sourceClassKey: CURRENT_CLASS },
+    { id: 'absence_later_host_aug15', date: '2026-08-15', sourceClassKey: CURRENT_CLASS },
+    absencePaper,
+  ],
+  grades: [absenceExam],
+}));
+assert.strictEqual(mappedAbsenceWithLaterPosts.items[0].reminderSourceDate, '2026-08-08', 'later posts do not move a mapped absence source beyond its exact paper');
+assert.deepStrictEqual(
+  Pending.getReminderDueItems({
+    status: 'ready',
+    items: mappedAbsenceWithLaterPosts.items,
+    policy: weeklyReminderPolicy('2026-08-22', Date.parse('2026-08-22T15:00:01+08:00')),
+  }).map(item => item.kind),
+  ['absence'],
+  'mapped absence remains due when later DailyPosts are published'
+);
 
 const legacyAbsencePaperResult = Pending.buildPendingTasks(baseOptions({
   posts: [Object.assign({}, absencePaper, { displayOptions: { makeup: { examId: 'stored_absence' } } })],
@@ -732,12 +942,269 @@ assert.strictEqual(lowResult.items[0].paperTarget, null, 'legacy paper text/date
 const mappedPaper = {
   id: 'mapped_paper',
   date: '2026-08-08',
+  sourceClassKey: CURRENT_CLASS,
   makeup: '[補考卷]https://example.com/exact.pdf',
-  displayOptions: { makeup: { targetExamId: 'display_exam_low' } },
+  displayOptions: { makeup: { targetExamId: 'display_exam_low', sourceClassKey: CURRENT_CLASS } },
 };
 const mappedResult = Pending.buildPendingTasks(baseOptions({ posts: [latestPost, mappedPaper], grades: [lowExam] }));
 assert.strictEqual(mappedResult.items[0].paperTarget.dailyPostId, mappedPaper.id);
 assert.strictEqual(mappedResult.items[0].paperTarget.url, 'https://example.com/exact.pdf');
+
+const reminderSourceExam = {
+  date: '8/1 小考',
+  exam: '化學第 1 章',
+  score: '60',
+  scoreNum: 60,
+  makeupThreshold: 85,
+  colIndex: 32,
+  examId: 'display_exam_reminder_source',
+  storedExamId: 'stored_exam_reminder_source',
+  storedClassKey: CURRENT_CLASS,
+};
+const reminderSourceExamPost = {
+  id: 'reminder_source_exam_post',
+  date: '2026-08-01',
+  sourceClassKey: CURRENT_CLASS,
+};
+const builtMakeupTaskResult = Pending.buildPendingTasks(baseOptions({
+  posts: [reminderSourceExamPost],
+  grades: [reminderSourceExam],
+}));
+assert.strictEqual(builtMakeupTaskResult.items.length, 1, 'real builder fixture must create one pending makeup task');
+assert.strictEqual(builtMakeupTaskResult.items[0].kind, 'makeup');
+assert.strictEqual(builtMakeupTaskResult.items[0].date, '8/1 小考', 'task label date remains the original exam date');
+assert.strictEqual(builtMakeupTaskResult.items[0].reminderSourceDate, '2026-08-01');
+assert.strictEqual(builtMakeupTaskResult.items[0].displayTarget.postDate, '2026-08-01');
+assert.deepStrictEqual(
+  Pending.getReminderDueItems({
+    status: 'ready',
+    items: builtMakeupTaskResult.items,
+    policy: weeklyReminderPolicy('2026-08-01', Date.parse('2026-08-01T15:00:01+08:00')),
+  }),
+  [],
+  'a real makeup task remains neutral on its source DailyPost date'
+);
+assert.deepStrictEqual(
+  Pending.getReminderDueItems({
+    status: 'ready',
+    items: builtMakeupTaskResult.items,
+    policy: weeklyReminderPolicy('2026-08-08', Date.parse('2026-08-08T15:00:01+08:00')),
+  }).map(item => item.kind),
+  ['makeup'],
+  'a real 8/1 makeup task becomes due at the first later 8/8 weekly slot'
+);
+
+const reminderSourceMakeupPost = {
+  id: 'reminder_source_makeup_post',
+  date: '2026-08-08',
+  sourceClassKey: CURRENT_CLASS,
+  makeup: '[補考卷]https://example.com/reminder-source.pdf',
+  displayOptions: { makeup: { targetExamId: 'stored_exam_reminder_source', sourceClassKey: CURRENT_CLASS } },
+};
+const reminderReportHostAug15 = {
+  id: 'reminder_report_host_aug15',
+  date: '2026-08-15',
+  sourceClassKey: CURRENT_CLASS,
+};
+const reminderReportHostAug22 = {
+  id: 'reminder_report_host_aug22',
+  date: '2026-08-22',
+  sourceClassKey: CURRENT_CLASS,
+};
+const wrongSourceMappedPaper = {
+  id: 'wrong_source_mapped_paper',
+  date: '2026-08-03',
+  sourceClassKey: '另一班',
+  makeup: '[補考卷]https://example.com/wrong-source.pdf',
+  displayOptions: { makeup: { targetExamId: 'stored_exam_reminder_source', sourceClassKey: '另一班' } },
+};
+const builtMakeupResultTaskResult = Pending.buildPendingTasks(baseOptions({
+  posts: [wrongSourceMappedPaper, reminderSourceExamPost, reminderSourceMakeupPost, reminderReportHostAug15, reminderReportHostAug22],
+  grades: [reminderSourceExam],
+}));
+assert.strictEqual(builtMakeupResultTaskResult.items.length, 1, 'real builder fixture must create one pending makeup-result task');
+assert.strictEqual(builtMakeupResultTaskResult.items[0].kind, 'makeup_result');
+assert.strictEqual(builtMakeupResultTaskResult.items[0].date, '8/1 小考', 'makeup-result label keeps the original 8/1 exam date');
+assert.strictEqual(builtMakeupResultTaskResult.items[0].displayTarget.postDate, '2026-08-01');
+assert.strictEqual(builtMakeupResultTaskResult.items[0].paperTarget.dailyPostId, reminderSourceMakeupPost.id, 'exact ExamID links the 8/8 makeup paper');
+assert.strictEqual(builtMakeupResultTaskResult.items[0].paperTarget.postDate, '2026-08-08', 'the exact makeup paper carries its own 8/8 DailyPost date');
+assert.strictEqual(builtMakeupResultTaskResult.items[0].reminderSourceDate, '2026-08-08', 'the exact paper fixes the reminder source at 8/8');
+assert.strictEqual(builtMakeupResultTaskResult.items[0].reportTarget.postDate, '2026-08-22', 'navigation may keep moving to the latest DailyPost');
+assert.strictEqual(builtMakeupResultTaskResult.items[0].reportTarget.dailyPostId, reminderReportHostAug22.id);
+assert.deepStrictEqual(
+  Pending.getReminderDueItems({
+    status: 'ready',
+    items: builtMakeupResultTaskResult.items,
+    policy: weeklyReminderPolicy('2026-08-08', Date.parse('2026-08-08T15:00:01+08:00')),
+  }),
+  [],
+  'a real 8/1 exam with an exact 8/8 makeup paper remains neutral at the 8/8 slot'
+);
+assert.deepStrictEqual(
+  Pending.getReminderDueItems({
+    status: 'ready',
+    items: builtMakeupResultTaskResult.items,
+    policy: weeklyReminderPolicy('2026-08-15', Date.parse('2026-08-15T15:00:01+08:00')),
+  }).map(item => item.kind),
+  ['makeup_result'],
+  'the real 8/8 actionable makeup-result task is already due at the 8/15 slot despite later navigation hosts'
+);
+assert.deepStrictEqual(
+  Pending.getReminderDueItems({
+    status: 'ready',
+    items: builtMakeupResultTaskResult.items,
+    policy: weeklyReminderPolicy('2026-08-22', Date.parse('2026-08-22T15:00:01+08:00')),
+  }).map(item => item.kind),
+  ['makeup_result'],
+  'the moving 8/22 report host must not reset an already-due 8/8 reminder source'
+);
+
+const firstActionableUnmappedPost = {
+  id: 'first_actionable_unmapped_aug8',
+  date: '2026-08-08',
+  sourceClassKey: CURRENT_CLASS,
+};
+const wrongSourceEarlyHost = { id: 'wrong_source_early_host', date: '2026-08-03', sourceClassKey: '另一班' };
+const wrongSourceLatestHost = { id: 'wrong_source_latest_host', date: '2026-08-29', sourceClassKey: '另一班' };
+const unmappedStableSourceResult = Pending.buildPendingTasks(baseOptions({
+  posts: [wrongSourceLatestHost, reminderReportHostAug22, reminderReportHostAug15, firstActionableUnmappedPost, wrongSourceEarlyHost, reminderSourceExamPost],
+  grades: [reminderSourceExam],
+}));
+assert.strictEqual(unmappedStableSourceResult.items[0].kind, 'makeup_result');
+assert.strictEqual(unmappedStableSourceResult.items[0].paperTarget, null);
+assert.strictEqual(unmappedStableSourceResult.items[0].reminderSourceDate, '2026-08-08', 'without an exact paper, the earliest safe post after the exam fixes the reminder source');
+assert.strictEqual(unmappedStableSourceResult.items[0].reportTarget.postDate, '2026-08-22', 'unmapped navigation still uses the latest report host');
+assert.deepStrictEqual(
+  Pending.getReminderDueItems({
+    status: 'ready',
+    items: unmappedStableSourceResult.items,
+    policy: weeklyReminderPolicy('2026-08-15', Date.parse('2026-08-15T15:00:01+08:00')),
+  }).map(item => item.kind),
+  ['makeup_result'],
+  'an unmapped first-actionable 8/8 source must be due at 8/15, not postponed by the latest host'
+);
+
+const missingMappingSourcePost = Object.assign({}, reminderSourceMakeupPost, {
+  id: 'missing_mapping_source_post',
+  displayOptions: { makeup: { targetExamId: 'stored_exam_reminder_source' } },
+});
+const missingMappingSourceResult = Pending.buildPendingTasks(baseOptions({
+  posts: [reminderSourceExamPost, missingMappingSourcePost, reminderReportHostAug22],
+  grades: [reminderSourceExam],
+}));
+assert.strictEqual(missingMappingSourceResult.items[0].paperTarget, null);
+assert.strictEqual(missingMappingSourceResult.items[0].reminderSourceDateInvalid, true, 'an exact mapping without sourceClassKey remains visible but fail-closed');
+assert.deepStrictEqual(
+  Pending.getReminderDueItems({
+    status: 'ready',
+    items: missingMappingSourceResult.items,
+    policy: weeklyReminderPolicy('2026-08-15', Date.parse('2026-08-15T15:00:01+08:00')),
+  }),
+  [],
+  'missing exact mapping source metadata must never turn the task red via fallback'
+);
+
+const duplicateMappedPaper = Object.assign({}, reminderSourceMakeupPost, {
+  id: 'duplicate_mapped_paper',
+  date: '2026-08-09',
+});
+const duplicateMappingResult = Pending.buildPendingTasks(baseOptions({
+  posts: [reminderSourceExamPost, reminderSourceMakeupPost, duplicateMappedPaper, reminderReportHostAug22],
+  grades: [reminderSourceExam],
+}));
+assert.strictEqual(duplicateMappingResult.items[0].paperTarget, null);
+assert.strictEqual(duplicateMappingResult.items[0].reminderSourceDateInvalid, true, 'duplicate exact mappings remain visible but fail-closed');
+assert.deepStrictEqual(
+  Pending.getReminderDueItems({
+    status: 'ready',
+    items: duplicateMappingResult.items,
+    policy: weeklyReminderPolicy('2026-08-15', Date.parse('2026-08-15T15:00:01+08:00')),
+  }),
+  [],
+  'duplicate exact mappings must not fall back to an arbitrary first post and turn red'
+);
+
+const sameDayMappedPaper = Object.assign({}, reminderSourceMakeupPost, {
+  id: 'same_day_mapped_paper',
+  date: '2026-08-01',
+});
+const sameDayMappingResult = Pending.buildPendingTasks(baseOptions({
+  posts: [reminderSourceExamPost, sameDayMappedPaper, reminderReportHostAug22],
+  grades: [reminderSourceExam],
+}));
+assert.strictEqual(sameDayMappingResult.items[0].reminderSourceDateInvalid, true, 'a mapped paper must be strictly after its exam date');
+assert.deepStrictEqual(
+  Pending.getReminderDueItems({
+    status: 'ready',
+    items: sameDayMappingResult.items,
+    policy: weeklyReminderPolicy('2026-08-15', Date.parse('2026-08-15T15:00:01+08:00')),
+  }),
+  [],
+  'a mapped paper on or before the exam date must fail closed'
+);
+
+const ambiguousFirstHostResult = Pending.buildPendingTasks(baseOptions({
+  posts: [
+    reminderSourceExamPost,
+    firstActionableUnmappedPost,
+    Object.assign({}, firstActionableUnmappedPost, { id: 'second_unmapped_aug8' }),
+    reminderReportHostAug22,
+  ],
+  grades: [reminderSourceExam],
+}));
+assert.strictEqual(ambiguousFirstHostResult.items[0].paperTarget, null);
+assert.strictEqual(ambiguousFirstHostResult.items[0].reminderSourceDateInvalid, true, 'two earliest same-day hosts are not a unique stable source');
+assert.deepStrictEqual(
+  Pending.getReminderDueItems({
+    status: 'ready',
+    items: ambiguousFirstHostResult.items,
+    policy: weeklyReminderPolicy('2026-08-15', Date.parse('2026-08-15T15:00:01+08:00')),
+  }),
+  [],
+  'an ambiguous first actionable DailyPost must remain neutral rather than guess'
+);
+
+const rolloverExam = Object.assign({}, reminderSourceExam, {
+  date: '12/26 小考',
+  exam: '跨年補考',
+  colIndex: 33,
+  examId: 'display_exam_rollover',
+  storedExamId: 'stored_exam_rollover',
+});
+const rolloverExamPost = { id: 'rollover_exam_post', date: '2026-12-26', sourceClassKey: CURRENT_CLASS };
+const rolloverPaperPost = {
+  id: 'rollover_paper_post',
+  date: '2027-01-02',
+  sourceClassKey: CURRENT_CLASS,
+  makeup: '[補考卷]https://example.com/rollover.pdf',
+  displayOptions: { makeup: { targetExamId: 'stored_exam_rollover', sourceClassKey: CURRENT_CLASS } },
+};
+const rolloverLatestHost = { id: 'rollover_latest_host', date: '2027-01-09', sourceClassKey: CURRENT_CLASS };
+const builtRolloverResult = Pending.buildPendingTasks(baseOptions({
+  posts: [rolloverExamPost, rolloverPaperPost, rolloverLatestHost],
+  grades: [rolloverExam],
+}));
+assert.strictEqual(builtRolloverResult.items[0].kind, 'makeup_result');
+assert.strictEqual(builtRolloverResult.items[0].reminderSourceDate, '2027-01-02', 'real builder resolves a 12/26 exam to its adjacent-year 1/2 paper');
+assert.strictEqual(builtRolloverResult.items[0].reportTarget.postDate, '2027-01-09');
+assert.deepStrictEqual(
+  Pending.getReminderDueItems({
+    status: 'ready',
+    items: builtRolloverResult.items,
+    policy: weeklyReminderPolicy('2027-01-02', Date.parse('2027-01-02T15:00:01+08:00')),
+  }),
+  [],
+  'real adjacent-year builder output remains neutral on its 1/2 source slot'
+);
+assert.deepStrictEqual(
+  Pending.getReminderDueItems({
+    status: 'ready',
+    items: builtRolloverResult.items,
+    policy: weeklyReminderPolicy('2027-01-09', Date.parse('2027-01-09T15:00:01+08:00')),
+  }).map(item => item.kind),
+  ['makeup_result'],
+  'real adjacent-year builder output becomes due at the first later 1/9 slot'
+);
 
 const wrongLegacyMapping = Pending.buildPendingTasks(baseOptions({
   posts: [latestPost, Object.assign({}, mappedPaper, {
@@ -800,10 +1267,12 @@ const preview = Pending.normalizePreviewTasks([{
   kind: 'makeup_result',
   neutralLabel: '補考結果待回報',
   title: '8/2 小考',
+  reminderSourceDate: '2026-08-08',
   displayTarget: { tab: 'grades', examId: 'exam_1', url: 'javascript:alert(1)' },
   reportTarget: { tab: 'contact', dailyPostId: 'post_1', focus: 'makeup-result' },
 }]);
 assert.strictEqual(preview[0].taskId, 'preview-one');
+assert.strictEqual(preview[0].reminderSourceDate, '2026-08-08', 'preview preserves the stable reminder source date');
 assert.strictEqual(preview[0].displayTarget.url, '', 'preview targets only retain http(s) URLs');
 assert.strictEqual(preview[0].reportTarget.dailyPostId, 'post_1');
 

@@ -40,7 +40,7 @@ function extractFunction(name) {
   return '';
 }
 
-check(html.includes('ebook_pending_tasks_app.js?v=20260810_pending_reminder_v2'), 'pending UMD module must load before the app');
+check(html.includes('ebook_pending_tasks_app.js?v=20260811_pending_stable_source_v5'), 'pending UMD module must load with the stable-source cache bust before the app');
 check((html.match(/class="tab-item/g) || []).length === 4, 'student view must have exactly four tabs');
 check(html.includes('id="tab-pending" onclick="switchTab(3)"'), 'pending tab must retain numeric switchTab compatibility at index 3');
 check(html.includes('id="tab-content-3"'), 'pending tab content is missing');

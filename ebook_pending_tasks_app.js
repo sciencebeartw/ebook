@@ -177,6 +177,52 @@
     return format(fromTimestamp(reminderDueAt));
   }
 
+  function normalizeReminderTargetDate(value, dueParts) {
+    var raw = text(value).trim();
+    var full = raw.match(/^(\d{4})[\/.\-](\d{1,2})[\/.\-](\d{1,2})$/);
+    if (full) return normalizeDateParts(full[1] + "-" + full[2] + "-" + full[3]);
+
+    var partial = raw.match(/^(\d{1,2})[\/.\-](\d{1,2})$/);
+    if (!partial || !dueParts) return null;
+    var month = Number(partial[1]);
+    var year = dueParts.year;
+    var monthDelta = month - dueParts.month;
+    // A partial target near the previous calendar year is resolved against
+    // the trusted server slot. An exact six-month gap is ambiguous, so it
+    // deliberately fails closed instead of guessing a year.
+    if (monthDelta > 6) year -= 1;
+    else if (monthDelta === 6) return null;
+    return normalizeDateParts(partial[1] + "-" + partial[2], year);
+  }
+
+  function normalizeReminderLabelDate(value, dueParts) {
+    var rawDate = text(value).trim();
+    var fallbackParts = normalizeDateParts(rawDate, dueParts.year);
+    if (!fallbackParts) return null;
+    var hasExplicitYear = /(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/.test(rawDate);
+    if (!hasExplicitYear && fallbackParts.month > dueParts.month + 6) {
+      fallbackParts = normalizeDateParts(rawDate, dueParts.year - 1);
+    }
+    return fallbackParts;
+  }
+
+  function resolveReminderSourceDateParts(item, dueParts) {
+    if (item && item.reminderSourceDateInvalid === true) return null;
+    // New tasks carry an explicit stable source which is independent from the
+    // reportTarget used to navigate to the latest host DailyPost.
+    var explicitSourceDate = text(item && item.reminderSourceDate).trim();
+    if (explicitSourceDate) return normalizeReminderLabelDate(explicitSourceDate, dueParts);
+
+    // Legacy tasks never consult reportTarget: it can move to each newly
+    // published DailyPost and would postpone the reminder forever. Prefer an
+    // exact mapped paper, then the original display post, then the grade label.
+    var paperDate = text(item && item.paperTarget && item.paperTarget.postDate).trim();
+    if (paperDate) return normalizeReminderTargetDate(paperDate, dueParts);
+    var displayDate = text(item && item.displayTarget && item.displayTarget.postDate).trim();
+    if (displayDate) return normalizeReminderTargetDate(displayDate, dueParts);
+    return normalizeReminderLabelDate(item && item.date, dueParts);
+  }
+
   function getReminderDueItems(result) {
     result = result || {};
     var items = result.status === "ready" && Array.isArray(result.items) ? result.items : [];
@@ -193,14 +239,15 @@
     if (!dueParts) return [];
 
     return items.filter(function(item) {
-      var rawDate = text(item && item.date).trim();
-      var taskParts = normalizeDateParts(rawDate, dueParts.year);
-      if (!taskParts) return false;
-      var hasExplicitYear = /(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/.test(rawDate);
-      if (!hasExplicitYear && taskParts.month > dueParts.month + 6) {
-        taskParts = normalizeDateParts(rawDate, dueParts.year - 1);
-      }
-      return !!taskParts && taskParts.key <= dueParts.key;
+      // Reminder age follows the stable source captured when the task first
+      // became actionable. reportTarget may keep moving for navigation, but it
+      // must never move the reminder clock.
+      var taskParts = resolveReminderSourceDateParts(item, dueParts);
+      // reminderDueDateKey is the latest weekly slot that server time has
+      // reached. A task dated on that same day belongs to the following
+      // reminder cycle, so only an earlier task date has passed its first
+      // weekly slot strictly after the task date.
+      return !!taskParts && taskParts.key < dueParts.key;
     });
   }
 
@@ -295,12 +342,24 @@
   }
 
   function isExamBeforePost(exam, post, helpers) {
-    if (helpers && typeof helpers.isExamBeforePostDate === "function") {
-      return helpers.isExamBeforePostDate(exam, post);
-    }
     var postParts = normalizeDateParts(post && post.date);
     var examParts = normalizeDateParts(exam && exam.date, postParts && postParts.year);
-    return !!(postParts && examParts && examParts.key < postParts.key);
+    if (postParts && examParts) {
+      var rawExamDate = text(exam && exam.date);
+      var hasExplicitYear = /(\d{4})[\/.\-](\d{1,2})[\/.\-](\d{1,2})/.test(rawExamDate);
+      if (!hasExplicitYear) {
+        if (examParts.month > postParts.month + 6) {
+          examParts = normalizeDateParts(rawExamDate, postParts.year - 1);
+        } else if (postParts.month > examParts.month + 6) {
+          examParts = normalizeDateParts(rawExamDate, postParts.year + 1);
+        }
+      }
+      return !!examParts && examParts.key < postParts.key;
+    }
+    if (helpers && typeof helpers.isExamBeforePostDate === "function") {
+      return helpers.isExamBeforePostDate(exam, post) === true;
+    }
+    return false;
   }
 
   function getMakeupOptions(post, helpers) {
@@ -317,24 +376,72 @@
     return match ? match[0] : "";
   }
 
-  function findMappedMakeupPost(posts, exam, helpers) {
+  function makeupSourceMatches(left, right, helpers) {
+    var leftText = text(left).trim();
+    var rightText = text(right).trim();
+    return !leftText || !rightText || sourceMatches(leftText, rightText, helpers);
+  }
+
+  function resolveMappedMakeupPost(posts, exam, helpers) {
     var ids = [exam && exam.examId, exam && exam.storedExamId]
       .map(normalizeExamId)
       .filter(Boolean);
-    if (!ids.length) return null;
-    return (posts || []).find(function(post) {
+    var examSource = text(exam && (exam.sourceClassKey || exam.storedClassKey));
+    if (!ids.length) return { post: null, invalid: false };
+    var matches = (posts || []).filter(function(post) {
+      var postSource = text(post && (post.sourceClassKey || post.storedClassKey)).trim();
+      // The app loader backfills current scoped posts with their class key; a
+      // truly legacy missing value is tolerated only as that scoped fallback.
+      if (examSource && postSource && postSource !== examSource) return false;
       var makeup = getMakeupOptions(post, helpers);
       // Only a persisted explicit targetExamId is authoritative. Legacy text/date
       // proximity is intentionally never used to guess which makeup paper belongs here.
       var mappedId = normalizeExamId(makeup.targetExamId);
       return !!mappedId && ids.indexOf(mappedId) > -1 && !!text(post.makeup).trim();
-    }) || null;
+    });
+    if (matches.length > 1) return { post: null, invalid: true };
+    if (!matches.length) return { post: null, invalid: false };
+    var mappedSource = text(getMakeupOptions(matches[0], helpers).sourceClassKey).trim();
+    if (!examSource || !mappedSource || mappedSource !== examSource) {
+      return { post: null, invalid: true };
+    }
+    if (!isExamBeforePost(exam, matches[0], helpers)) {
+      return { post: null, invalid: true };
+    }
+    return { post: matches[0], invalid: false };
   }
 
   function findMakeupReportHostPost(posts, exam, helpers) {
-    return (posts || []).find(function(post) {
-      return isExamBeforePost(exam, post, helpers);
-    }) || null;
+    var examSource = text(exam && (exam.sourceClassKey || exam.storedClassKey));
+    var candidates = (posts || []).filter(function(post) {
+      return makeupSourceMatches(examSource, post && (post.sourceClassKey || post.storedClassKey), helpers) &&
+        isExamBeforePost(exam, post, helpers);
+    });
+    return candidates.reduce(function(latest, post) {
+      var parts = normalizeDateParts(post && post.date);
+      if (!parts) return latest;
+      var latestParts = normalizeDateParts(latest && latest.date);
+      return !latestParts || parts.key > latestParts.key ? post : latest;
+    }, null) || candidates[0] || null;
+  }
+
+  function resolveFirstMakeupReminderSourcePost(posts, exam, helpers) {
+    var examSource = text(exam && (exam.sourceClassKey || exam.storedClassKey));
+    var candidates = (posts || []).filter(function(post) {
+      return makeupSourceMatches(examSource, post && (post.sourceClassKey || post.storedClassKey), helpers) &&
+        isExamBeforePost(exam, post, helpers);
+    }).map(function(post) {
+      var parts = normalizeDateParts(post && post.date);
+      return parts ? { post: post, key: parts.key } : null;
+    }).filter(Boolean).sort(function(left, right) {
+      return left.key - right.key;
+    });
+    if (!candidates.length) return { post: null, invalid: false };
+    var earliest = candidates[0];
+    if (candidates.filter(function(candidate) { return candidate.key === earliest.key; }).length !== 1) {
+      return { post: null, invalid: true };
+    }
+    return { post: earliest.post, invalid: false };
   }
 
   function createTask(base, context) {
@@ -636,6 +743,7 @@
         sourceClassName: getPostSourceClassName(post, context),
         sourceItemId: text(post.id) || postRowKey || dateKey,
         legacySourceItemIds: legacySourceItemIds,
+        reminderSourceDate: text(post.date),
         displayTarget: {
           tab: "contact",
           dailyPostId: postRowKey,
@@ -689,6 +797,7 @@
           sourceClassKey: sourceClassKey,
           sourceClassName: sourceClassName,
           sourceItemId: colKey || normalizeExamId(exam && (exam.storedExamId || exam.examId)),
+          reminderSourceDate: text((linkedPost && linkedPost.date) || (exam && exam.date)),
           displayTarget: {
             tab: linkedPost ? "contact" : "grades",
             dailyPostId: getPostRowKey(linkedPost),
@@ -716,7 +825,10 @@
         : null;
       if (isPureAbsence(exam) && !scoreReport && !hasResultColor(exam, helpers)) {
         var guidanceAbsence = helpers && typeof helpers.isMathGuidanceExam === "function" && helpers.isMathGuidanceExam(exam);
-        var absencePaperPost = guidanceAbsence ? null : findMappedMakeupPost(posts, exam, helpers);
+        var absencePaperResolution = guidanceAbsence
+          ? { post: null, invalid: false }
+          : resolveMappedMakeupPost(posts, exam, helpers);
+        var absencePaperPost = absencePaperResolution.post;
         pushIfActive(tasks, createTask({
           kind: guidanceAbsence ? "guidance_absence" : "absence",
           itemType: "makeup",
@@ -726,6 +838,12 @@
           sourceClassKey: sourceClassKey,
           sourceClassName: sourceClassName,
           sourceItemId: normalizeExamId(exam && (exam.storedExamId || exam.examId)) || colKey,
+          reminderSourceDateInvalid: absencePaperResolution.invalid === true,
+          reminderSourceDate: text(
+            (absencePaperPost && absencePaperPost.date) ||
+            (linkedPost && linkedPost.date) ||
+            (exam && exam.date)
+          ),
           displayTarget: {
             tab: linkedPost ? "contact" : "grades",
             dailyPostId: getPostRowKey(linkedPost),
@@ -764,7 +882,20 @@
       if (!threshold.value || scoreNum === null || scoreNum >= threshold.value || hasResultColor(exam, helpers) || resultReport) return;
 
       var reportHost = threshold.isGuidance ? null : findMakeupReportHostPost(posts, exam, helpers);
-      var mappedPaperPost = threshold.isGuidance ? null : findMappedMakeupPost(posts, exam, helpers);
+      var mappedPaperResolution = threshold.isGuidance
+        ? { post: null, invalid: false }
+        : resolveMappedMakeupPost(posts, exam, helpers);
+      var mappedPaperPost = mappedPaperResolution.post;
+      var firstReminderResolution = threshold.isGuidance
+        ? { post: null, invalid: false }
+        : resolveFirstMakeupReminderSourcePost(posts, exam, helpers);
+      var firstReminderHost = firstReminderResolution.post;
+      var reminderSourceDate = text(
+        (mappedPaperPost && mappedPaperPost.date) ||
+        (firstReminderHost && firstReminderHost.date) ||
+        (linkedPost && linkedPost.date) ||
+        (exam && exam.date)
+      );
       var taskKind = threshold.isGuidance ? "guidance" : (reportHost ? "makeup_result" : "makeup");
       var taskLabel = threshold.isGuidance ? "輔導待完成" : (reportHost ? "補考結果待回報" : "補考待完成");
       pushIfActive(tasks, createTask({
@@ -776,6 +907,9 @@
         sourceClassKey: sourceClassKey,
         sourceClassName: sourceClassName,
         sourceItemId: normalizeExamId(exam && (exam.storedExamId || exam.examId)) || colKey,
+        reminderSourceDateInvalid: mappedPaperResolution.invalid === true ||
+          (!mappedPaperPost && firstReminderResolution.invalid === true),
+        reminderSourceDate: reminderSourceDate,
         displayTarget: {
           tab: linkedPost ? "contact" : "grades",
           dailyPostId: getPostRowKey(linkedPost),
@@ -848,6 +982,8 @@
       neutralLabel: text(task.neutralLabel || "作業待完成"),
       title: text(task.title || "待完成項目"),
       date: text(task.date),
+      reminderSourceDateInvalid: task.reminderSourceDateInvalid === true,
+      reminderSourceDate: text(task.reminderSourceDate),
       sourceClassName: text(task.sourceClassName),
       displayTarget: target(task.displayTarget),
       reportTarget: task.reportTarget ? target(task.reportTarget) : null,
