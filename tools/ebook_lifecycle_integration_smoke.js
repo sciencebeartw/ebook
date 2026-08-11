@@ -13,7 +13,7 @@ assert.match(html, /sessionAllowedClassKeys\[candidateClassKey\] === true/, "pro
 assert.match(html, /sourceClassName: resolveStudentActionSourceClassName\(realDate\)/, "student actions must target the physical post class");
 assert.match(html, /post\.storedClassName \|\| post\.sourceClassName/, "student action source must prefer physical post storage over presentation class");
 assert.match(html, /作業完成回報讀取失敗，為避免把已完成誤顯示為未完成/, "homeworkDone read failures must fail closed");
-assert.match(html, /queue = \[\{ classKey: currentClassKey, studentKey: studentKey \}\]/, "lifecycle traversal must carry the current student key");
+assert.match(html, /getVerifiedLifecycleIndexReadScopes\([\s\S]*currentClassKey[\s\S]*studentKey/, "lifecycle traversal must carry the current exact student identity from the signed session chain");
 assert.match(html, /item\.sourceStudentKey \|\| destinationStudentKey/, "each historical hop must carry its source student key");
 assert.match(html, /loadStudentEnrollmentIndexForStudent\(entry\.classKey, entry\.studentKey\)/, "enrollment reads must use each class-scoped student key");
 assert.match(html, /adminModeDirectMessageContext\[directContextKey\][\s\S]*storedStudentKey:\s*post\.sourceStudentKey/, "old-post direct message context must retain the exact source student key");

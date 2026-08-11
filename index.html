@@ -3535,6 +3535,77 @@
             border-color: #f39c12;
         }
 
+        .bulletin-history-section {
+            margin-top: 28px;
+            padding-top: 20px;
+            border-top: 1px solid #dbe3ea;
+        }
+
+        .bulletin-history-heading {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 0 17px 12px;
+            color: #526174;
+            font-size: 1rem;
+            font-weight: 900;
+        }
+
+        .bulletin-history-note {
+            margin: -4px 17px 14px;
+            color: #7b8794;
+            font-size: 0.82rem;
+            line-height: 1.6;
+        }
+
+        .bulletin-card.is-promotion-history {
+            border-color: #94a3b8;
+            background: #fbfcfe;
+            box-shadow: 0 4px 14px rgba(71, 85, 105, 0.08);
+        }
+
+        .bulletin-card.is-promotion-history .bulletin-header {
+            background: #f1f5f9;
+            color: #475569;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .bulletin-card.is-promotion-history .bulletin-header > div:first-child {
+            min-width: 0;
+            flex: 1 1 auto;
+            overflow-wrap: anywhere;
+        }
+
+        .bulletin-card.is-promotion-history .bulletin-date {
+            flex: 0 0 auto;
+        }
+
+        @media (max-width: 600px) {
+            .bulletin-history-section {
+                margin-top: 22px;
+                padding-top: 16px;
+            }
+
+            .bulletin-history-heading,
+            .bulletin-history-note {
+                margin-left: 2px;
+                margin-right: 2px;
+            }
+
+            .bulletin-card.is-promotion-history .bulletin-header {
+                padding: 13px 14px;
+                flex-wrap: wrap;
+            }
+
+            .bulletin-card.is-promotion-history .bulletin-tag {
+                display: inline-block;
+                max-width: 100%;
+                margin-bottom: 5px;
+                overflow-wrap: anywhere;
+            }
+        }
+
         .bulletin-header {
             padding: 15px 20px;
             display: flex;
@@ -3853,6 +3924,7 @@
   <script src="firebase-config.js"></script>
   <script src="exam_identity_app.js?v=20260712_exam_identity_phase1"></script>
   <script src="ebook_lifecycle_app.js?v=20260711_lifecycle_security_v2"></script>
+  <script src="ebook_promotion_app.js?v=20260811_class_promotion_v1"></script>
   <script src="gifted_homework_full_scores.js?v=20260720_geo3_question_count_v2"></script>
   <script src="ebook_pending_tasks_app.js?v=20260811_pending_navigation_v6"></script>
 
@@ -3875,6 +3947,7 @@
     let ebookGodSessionLastRenewAt = 0;
     let ebookGodSessionHeartbeatTimer = null;
     let ebookAuthSessionInfo = null;
+    let activeEbookPromotionContext = null;
     const pendingEbookRequestIds = {};
     const PENDING_REMINDER_SESSION_STORAGE_PREFIX = 'sciencebear.ebook.pendingReminderShown.v1:';
 
@@ -4066,8 +4139,27 @@
         .replace(/\s+/g, '_');
     }
 
+    function normalizeSessionPromotionContext(currentClassKey, currentStudentKey) {
+        if (!window.EbookPromotionApp || typeof window.EbookPromotionApp.normalizePromotionContext !== "function") {
+            throw new Error("升班歷程模組尚未載入，請重新整理後再試");
+        }
+        var session = ebookAuthSessionInfo || ebookGodSessionInfo || {};
+        return window.EbookPromotionApp.normalizePromotionContext(session.promotionContext || null, {
+            currentClassKey: currentClassKey,
+            currentStudentKey: currentStudentKey,
+            allowedClassKeys: getEbookSessionAllowedClassKeySet()
+        });
+    }
+
+    function getActivePromotionLineageKey(classKey) {
+        if (!activeEbookPromotionContext || activeEbookPromotionContext.status !== "ready") return "";
+        return window.EbookPromotionApp.getLineageKey(activeEbookPromotionContext, classKey);
+    }
+
     function getHomeworkDoneCourseAliasKey(className) {
         var cls = (className || "").toString();
+        var promotionLineageKey = typeof getActivePromotionLineageKey === "function" ? getActivePromotionLineageKey(cls) : "";
+        if (promotionLineageKey) return promotionLineageKey;
         if (BEAR_SUBJECT === "/science" && cls.indexOf("自然超前") > -1 && cls.indexOf("資優自然") === -1) {
             var match = cls.match(/^(\d{3,4})國([一二])自然超前/);
             var gradeMap = { "一": 1, "二": 2 };
@@ -4079,6 +4171,7 @@
 
     function getHomeworkDoneRelatedClassKeyCandidates(classKey) {
         var cls = (classKey || "").toString();
+        if (typeof getActivePromotionLineageKey === "function" && getActivePromotionLineageKey(cls)) return cls ? [cls] : [];
         var aliasKey = getHomeworkDoneCourseAliasKey(cls);
         if (!aliasKey) return cls ? [cls] : [];
         var match = cls.match(/^(\d{3,4})國([一二])自然超前/);
@@ -4237,7 +4330,14 @@
             item.id = item.id || id;
             return item;
         }).filter(function(item) {
-            return item.status !== "deleted" && item.fromClassKey && item.toClassKey;
+            // Dashboard 會把正式升班 edge materialize 到公開 transfer index，供 exact
+            // student-key 鏈結讀取；升班的日期／storage policy 只能信 Functions session
+            // 簽回的 promotionContext，不能再把同一筆當成一般換班套用一次。
+            return item.status !== "deleted" &&
+                item.transitionKind !== "promotion" &&
+                !item.promotionId &&
+                item.fromClassKey &&
+                item.toClassKey;
         });
     }
 
@@ -4298,7 +4398,13 @@
         var transferIndex = {};
         var studentKeysByClassKey = {};
         addStudentKeyForClass(studentKeysByClassKey, currentClassKey, studentKey);
-        var queue = [{ classKey: currentClassKey, studentKey: studentKey }];
+        var promotionContext = normalizeSessionPromotionContext(currentClassKey, studentKey);
+        activeEbookPromotionContext = promotionContext;
+        var queue = window.EbookPromotionApp.getVerifiedLifecycleIndexReadScopes(
+            promotionContext,
+            currentClassKey,
+            studentKey
+        );
         var visited = {};
         var reads = 0;
         while (queue.length && reads < 8) {
@@ -4312,6 +4418,11 @@
             var node = await loadStudentTransferIndexForStudent(destinationClassKey, destinationStudentKey);
             Object.keys(node || {}).forEach(function(id) {
                 var item = node[id] || {};
+                if (item.status === "deleted" || !window.EbookPromotionApp.matchesVerifiedLifecycleTransition(
+                    promotionContext,
+                    item,
+                    { destinationClassKey: destinationClassKey, destinationStudentKey: destinationStudentKey }
+                )) return;
                 var mergedId = destinationClassKey + "__" + destinationStudentKey + "__" + id;
                 transferIndex[mergedId] = Object.assign({
                     id: item.id || id,
@@ -4322,22 +4433,26 @@
                     var sourceStudentKey = (item.sourceStudentKey || destinationStudentKey).toString();
                     addStudentKeyForClass(studentKeysByClassKey, destinationClassKey, destinationStudentKey);
                     addStudentKeyForClass(studentKeysByClassKey, item.fromClassKey, sourceStudentKey);
-                    var sourceVisitKey = item.fromClassKey + "__" + sourceStudentKey;
-                    if (!visited[sourceVisitKey]) {
-                        queue.push({ classKey: item.fromClassKey, studentKey: sourceStudentKey });
-                    }
                 }
             });
         }
-
-        var chainResult = EbookLifecycleApp.buildTransferChain(transferIndex, currentClassKey, { maxDepth: 8 });
+        var chainResult = window.EbookPromotionApp.buildPriorityLifecycleChain(
+            transferIndex,
+            promotionContext,
+            currentClassKey,
+            { maxDepth: 8, currentStudentKey: studentKey }
+        );
         if (chainResult.ambiguities.length) {
-            throw new Error("這位學生同一天有多筆互相衝突的換班紀錄，請先回 Dashboard 整理後再開啟聯絡簿");
+            throw new Error("這位學生同一天有多筆互相衝突的換班或升班紀錄，請先回 Dashboard 整理後再開啟聯絡簿");
         }
         if (chainResult.truncated || queue.length) {
             throw new Error("這位學生的換班鏈超過安全讀取上限，請先回 Dashboard 檢查換班紀錄");
         }
 
+        chainResult.chain.forEach(function(item) {
+            addStudentKeyForClass(studentKeysByClassKey, item.toClassKey, item.studentKey || studentKey);
+            addStudentKeyForClass(studentKeysByClassKey, item.fromClassKey, item.sourceStudentKey || item.studentKey || studentKey);
+        });
         var baseTrackedClassKeys = EbookLifecycleApp.getTrackedClassKeys(currentClassKey, chainResult, []);
         var sessionAllowedClassKeys = getEbookSessionAllowedClassKeySet();
         var trackedClassKeys = [];
@@ -4352,6 +4467,13 @@
             });
         });
         trackedClassKeys = uniqueClassKeys(trackedClassKeys);
+        var trackedGradeClassKeys = promotionContext.status === "ready"
+            ? window.EbookPromotionApp.getTrackedGradeDataClassKeys(currentClassKey, chainResult)
+            : trackedClassKeys.slice();
+        trackedGradeClassKeys.forEach(function(classKey) {
+            if (getStudentKeysForClass(studentKeysByClassKey, classKey, "").length) return;
+            addStudentKeyForClass(studentKeysByClassKey, classKey, studentKey);
+        });
         var enrollmentIndex = {};
         var enrollmentNodeMap = {};
         var enrollmentReads = [];
@@ -4385,8 +4507,9 @@
         return {
             transferIndex: transferIndex,
             transferChain: chainResult,
+            promotionContext: promotionContext,
             trackedClassKeys: trackedClassKeys,
-            trackedGradeClassKeys: trackedClassKeys.slice(),
+            trackedGradeClassKeys: trackedGradeClassKeys,
             studentKeysByClassKey: studentKeysByClassKey,
             enrollmentIndex: enrollmentIndex,
             enrollmentNodeMap: enrollmentNodeMap,
@@ -4446,14 +4569,26 @@
         return null;
     }
 
-    function getTransferDateKey(value, fallbackYear) {
+    function getTransferDateKey(value, fallbackYear, transferChain) {
+        var anchorDateKeys = transferChain && Array.isArray(transferChain.chain)
+            ? transferChain.chain.map(function(item) { return item.effectiveDateKey || 0; }).filter(Boolean)
+            : [];
+        if (anchorDateKeys.length && typeof window !== "undefined" && window.EbookPromotionApp && typeof window.EbookPromotionApp.parseDateKeyWithAnchors === "function") {
+            return window.EbookPromotionApp.parseDateKeyWithAnchors(value, anchorDateKeys);
+        }
         return EbookLifecycleApp.parseDateKey(value, {
             fallbackYear: fallbackYear || 0,
-            preferFallbackYear: !!fallbackYear
+            preferFallbackYear: !!fallbackYear && anchorDateKeys.length === 0,
+            anchorDateKeys: anchorDateKeys
         });
     }
 
-    function getTransferFallbackYear(transferIndex) {
+    function getTransferFallbackYear(transferIndex, transferChain) {
+        var chain = transferChain && Array.isArray(transferChain.chain) ? transferChain.chain : [];
+        for (var chainIndex = 0; chainIndex < chain.length; chainIndex++) {
+            var chainMatch = (chain[chainIndex].effectiveDate || "").toString().match(/(\d{4})/);
+            if (chainMatch) return Number(chainMatch[1]);
+        }
         var list = listActiveIncomingTransfers(transferIndex);
         for (var i = 0; i < list.length; i++) {
             var text = (list[i].effectiveDate || "").toString();
@@ -4463,37 +4598,49 @@
         return new Date().getFullYear();
     }
 
-    function getTransferClassNameForKey(classKey, currentClassKey, transferIndex, currentClassName) {
+    function getTransferClassNameForKey(classKey, currentClassKey, transferIndex, currentClassName, transferChain) {
         if (classKey === currentClassKey) return currentClassName;
+        var chain = transferChain && Array.isArray(transferChain.chain) ? transferChain.chain : [];
+        for (var chainIndex = 0; chainIndex < chain.length; chainIndex++) {
+            if (chain[chainIndex].fromClassKey === classKey) return chain[chainIndex].fromClassName || classKey;
+            if (chain[chainIndex].toClassKey === classKey) return chain[chainIndex].toClassName || classKey;
+        }
         var transfer = getTransferBySourceClassKey(transferIndex, classKey);
         return (transfer && transfer.fromClassName) || classKey || currentClassName;
     }
 
-    function shouldIncludeTransferGrade(classKey, currentClassKey, grade, transferIndex, transferChain) {
-        var fallbackYear = getTransferFallbackYear(transferIndex);
-        var gradeDateKey = getTransferDateKey(grade && grade.date, fallbackYear);
-        if (!gradeDateKey) return true;
-        if (classKey === currentClassKey) return true;
+    function shouldIncludeTransferGrade(classKey, currentClassKey, grade, transferIndex, transferChain, promotionContext) {
+        var fallbackYear = getTransferFallbackYear(transferIndex, transferChain);
+        var gradeDateKey = getTransferDateKey(grade && grade.date, fallbackYear, transferChain);
+        if (!gradeDateKey) return !(promotionContext && promotionContext.status === "ready");
         var resolved = EbookLifecycleApp.resolveClassAtDate(
             currentClassKey,
             transferChain || EbookLifecycleApp.buildTransferChain(transferIndex || {}, currentClassKey, { maxDepth: 8 }),
             gradeDateKey,
             { fallbackClassKey: classKey }
         );
+        if (promotionContext && promotionContext.status === "ready") {
+            var promotionScope = window.EbookPromotionApp.resolvePromotionScopeAtDate(promotionContext, grade && grade.date, "grades");
+            if (!promotionScope.matched && promotionScope.reason !== "promotion-scope-owned-by-explicit-transfer") return false;
+            if (promotionScope.logicalClassKey === resolved.classKey) {
+                return classKey === promotionScope.dataClassKey;
+            }
+        }
+        if (classKey === currentClassKey) return true;
         var classAlias = getHomeworkDoneCourseAliasKey(classKey);
         var resolvedAlias = getHomeworkDoneCourseAliasKey(resolved.classKey);
         return resolved.classKey === classKey || (!!classAlias && classAlias === resolvedAlias);
     }
 
     function getTransferGradePresentation(classKey, currentClassKey, grade, transferIndex, currentClassName, className, transferChain) {
-        var fallbackYear = getTransferFallbackYear(transferIndex);
-        var gradeDateKey = getTransferDateKey(grade && grade.date, fallbackYear);
+        var fallbackYear = getTransferFallbackYear(transferIndex, transferChain);
+        var gradeDateKey = getTransferDateKey(grade && grade.date, fallbackYear, transferChain);
         var chain = transferChain || EbookLifecycleApp.buildTransferChain(transferIndex || {}, currentClassKey, { maxDepth: 8 });
         var resolved = gradeDateKey
             ? EbookLifecycleApp.resolveClassAtDate(currentClassKey, chain, gradeDateKey, { fallbackClassKey: classKey })
             : { classKey: classKey };
         var presentationClassKey = resolved.classKey || classKey;
-        var presentationClassName = getTransferClassNameForKey(presentationClassKey, currentClassKey, transferIndex, currentClassName) || className || currentClassName;
+        var presentationClassName = getTransferClassNameForKey(presentationClassKey, currentClassKey, transferIndex, currentClassName, chain) || className || currentClassName;
         var sameCohortAlias = !!getHomeworkDoneCourseAliasKey(presentationClassKey) &&
             getHomeworkDoneCourseAliasKey(presentationClassKey) === getHomeworkDoneCourseAliasKey(currentClassKey);
         return {
@@ -4512,9 +4659,9 @@
             .replace(/\d{1,2}[\/.-]\d{1,2}/g, "");
     }
 
-    function getTransferGradeDateDistanceDays(leftValue, rightValue, fallbackYear) {
-        var leftKey = getTransferDateKey(leftValue, fallbackYear);
-        var rightKey = getTransferDateKey(rightValue, fallbackYear);
+    function getTransferGradeDateDistanceDays(leftValue, rightValue, fallbackYear, transferChain) {
+        var leftKey = getTransferDateKey(leftValue, fallbackYear, transferChain);
+        var rightKey = getTransferDateKey(rightValue, fallbackYear, transferChain);
         if (!leftKey || !rightKey) return null;
         function toUtcDate(key) {
             var text = String(key);
@@ -4564,14 +4711,14 @@
         var kindKey = getTransferGradeCatalogKind(storedEntry && storedEntry.date || grade.date || "");
         if (!titleKey || !kindKey) return fallback;
 
-        var fallbackYear = getTransferFallbackYear(options.transferIndex || {});
+        var fallbackYear = getTransferFallbackYear(options.transferIndex || {}, options.transferChain);
         var chain = options.transferChain || EbookLifecycleApp.buildTransferChain(options.transferIndex || {}, currentClassKey, { maxDepth: 8 });
         var exactKindCandidates = [];
         var compatibleAssessmentCandidates = [];
         Object.keys(sourceEntries).forEach(function(examId) {
             var entry = sourceEntries[examId] || {};
             if (normalizeEbookExamLookupText(entry.title || "").toLowerCase() !== titleKey) return;
-            var candidateDateKey = getTransferDateKey(entry.date, fallbackYear);
+            var candidateDateKey = getTransferDateKey(entry.date, fallbackYear, chain);
             if (!candidateDateKey) return;
             var resolved = EbookLifecycleApp.resolveClassAtDate(currentClassKey, chain, candidateDateKey, { fallbackClassKey: sourceClassKey });
             var resolvedAlias = getHomeworkDoneCourseAliasKey(resolved.classKey);
@@ -4587,7 +4734,7 @@
                 exactKindCandidates.push(candidate);
                 return;
             }
-            var distanceDays = getTransferGradeDateDistanceDays(entry.date, storedEntry.date || grade.date, fallbackYear);
+            var distanceDays = getTransferGradeDateDistanceDays(entry.date, storedEntry.date || grade.date, fallbackYear, chain);
             if (isTransferGradeCompatibleAssessmentKinds(entryKind, kindKey) && distanceDays !== null && distanceDays <= 2) {
                 compatibleAssessmentCandidates.push(candidate);
             }
@@ -4618,7 +4765,7 @@
                 dist: Array.isArray(rawData.dist) ? rawData.dist.slice() : rawData.dist,
                 labels: Array.isArray(rawData.labels) ? rawData.labels.slice() : rawData.labels
             });
-            if (!shouldIncludeTransferGrade(classKey, currentClassKey, eData, transferIndex, transferChain)) continue;
+            if (!shouldIncludeTransferGrade(classKey, currentClassKey, eData, transferIndex, transferChain, options.promotionContext)) continue;
             var presentation = getTransferGradePresentation(classKey, currentClassKey, eData, transferIndex, options.currentClassName || className, className, transferChain);
             var displayIdentity = resolveTransferGradeDisplayIdentity({
                 grade: eData,
@@ -4709,7 +4856,7 @@
                 isTransferFormerClass: presentation.isTransferFormerClass,
                 date: displayIdentity.date || eData.date,
                 storedDate: displayIdentity.storedDate || eData.date,
-                dateKey: getTransferDateKey(displayIdentity.date || eData.date, getTransferFallbackYear(transferIndex)) || 0,
+                dateKey: getTransferDateKey(displayIdentity.date || eData.date, getTransferFallbackYear(transferIndex, transferChain), transferChain) || 0,
                 exam: eData.examName,
                 examId: displayIdentity.examId || "",
                 storedExamId: displayIdentity.storedExamId || "",
@@ -4736,12 +4883,12 @@
         return fullGradeList;
     }
 
-    function buildGradeListFromClassExamMap(classExamMap, classKeys, currentClassKey, transferIndex, currentClassName, examIdByClassColKey, examCatalogEntriesByClassKey) {
+    function buildGradeListFromClassExamMap(classExamMap, classKeys, currentClassKey, transferIndex, currentClassName, examIdByClassColKey, examCatalogEntriesByClassKey, transferChain, promotionContext) {
         var grades = [];
         var trackedKeys = uniqueClassKeys(classKeys);
-        var transferChain = EbookLifecycleApp.buildTransferChain(transferIndex || {}, currentClassKey, { maxDepth: 8 });
+        transferChain = transferChain || EbookLifecycleApp.buildTransferChain(transferIndex || {}, currentClassKey, { maxDepth: 8 });
         trackedKeys.forEach(function(classKey) {
-            var className = getTransferClassNameForKey(classKey, currentClassKey, transferIndex, currentClassName);
+            var className = getTransferClassNameForKey(classKey, currentClassKey, transferIndex, currentClassName, transferChain);
             grades = grades.concat(buildGradeListFromExams(classExamMap[classKey] || {}, {
                 classKey: classKey,
                 currentClassKey: currentClassKey,
@@ -4749,6 +4896,7 @@
                 transferChain: transferChain,
                 className: className,
                 currentClassName: currentClassName,
+                promotionContext: promotionContext,
                 examIdByColKey: (examIdByClassColKey || {})[classKey] || {},
                 examCatalogEntriesByClassKey: examCatalogEntriesByClassKey || {}
             }));
@@ -4776,7 +4924,7 @@
         });
     }
 
-    function mergeGradeExamNodeMap(nodeMap, classKeys, studentKey, studentKeysByClassKey, transferChain, currentClassKey) {
+    function mergeGradeExamNodeMap(nodeMap, classKeys, studentKey, studentKeysByClassKey, transferChain, currentClassKey, promotionContext) {
         var result = {};
         uniqueClassKeys(classKeys).forEach(function(classKey) {
             result[classKey] = {};
@@ -4784,16 +4932,24 @@
                 var exams = ((nodeMap[classKey] || {})[scopedStudentKey]) || {};
                 Object.keys(exams).forEach(function(colKey) {
                     var exam = exams[colKey] || {};
-                    var examDateKey = getTransferDateKey(exam.date || exam.targetDate || '');
+                    var examDateKey = getTransferDateKey(exam.date || exam.targetDate || '', 0, transferChain);
                     if (examDateKey && transferChain && currentClassKey) {
                         var resolved = resolveTransferStudentAtDate(currentClassKey, transferChain, examDateKey, studentKey, classKey);
+                        var promotionStorageHandled = false;
+                        if (promotionContext && promotionContext.status === "ready") {
+                            var promotionScope = window.EbookPromotionApp.resolvePromotionScopeAtDate(promotionContext, exam.date || exam.targetDate || "", "grades");
+                            if (promotionScope.matched && promotionScope.logicalClassKey === resolved.classKey) {
+                                promotionStorageHandled = true;
+                                if (promotionScope.dataClassKey !== classKey || promotionScope.dataStudentKey !== scopedStudentKey) return;
+                            }
+                        }
                         var classMatches = resolved.classKey === classKey;
                         if (!classMatches) {
                             var resolvedAlias = getHomeworkDoneCourseAliasKey(resolved.classKey);
                             var classAlias = getHomeworkDoneCourseAliasKey(classKey);
                             classMatches = !!resolvedAlias && resolvedAlias === classAlias;
                         }
-                        if (classMatches && resolved.studentKey && resolved.studentKey !== scopedStudentKey) return;
+                        if (!promotionStorageHandled && classMatches && resolved.studentKey && resolved.studentKey !== scopedStudentKey) return;
                     }
                     if (!Object.prototype.hasOwnProperty.call(result[classKey], colKey)) {
                         result[classKey][colKey] = Object.assign({}, exam, { sourceStudentKey: scopedStudentKey });
@@ -4804,7 +4960,7 @@
         return result;
     }
 
-    async function loadGradeExamMapByKeys(classKeys, studentKey, studentKeysByClassKey, nodeMapOut, transferChain, currentClassKey) {
+    async function loadGradeExamMapByKeys(classKeys, studentKey, studentKeysByClassKey, nodeMapOut, transferChain, currentClassKey, promotionContext) {
         var pairs = [];
         uniqueClassKeys(classKeys).forEach(function(classKey) {
             getStudentKeysForClass(studentKeysByClassKey, classKey, studentKey).forEach(function(scopedStudentKey) {
@@ -4826,7 +4982,7 @@
                 nodeMapOut[classKey] = nodeMap[classKey];
             });
         }
-        return mergeGradeExamNodeMap(nodeMap, classKeys, studentKey, studentKeysByClassKey, transferChain, currentClassKey);
+        return mergeGradeExamNodeMap(nodeMap, classKeys, studentKey, studentKeysByClassKey, transferChain, currentClassKey, promotionContext);
     }
 
     async function loadExamIdByClassColKey(classKeys, catalogEntriesByClassKey) {
@@ -4897,15 +5053,22 @@
         return list[0];
     }
 
-    function shouldIncludeTransferPost(classKey, currentClassKey, row, transferIndex, transferChain) {
-        var postDateKey = getTransferDateKey(row && row.date);
-        if (!postDateKey) return true;
+    function shouldIncludeTransferPost(classKey, currentClassKey, row, transferIndex, transferChain, promotionContext) {
+        var postDateKey = getTransferDateKey(row && row.date, 0, transferChain);
+        if (!postDateKey) return !(promotionContext && promotionContext.status === "ready");
         var resolved = EbookLifecycleApp.resolveClassAtDate(
             currentClassKey,
             transferChain || EbookLifecycleApp.buildTransferChain(transferIndex || {}, currentClassKey, { maxDepth: 8 }),
             postDateKey,
             { fallbackClassKey: classKey }
         );
+        if (promotionContext && promotionContext.status === "ready") {
+            var promotionScope = window.EbookPromotionApp.resolvePromotionScopeAtDate(promotionContext, row && row.date, "dailyPosts");
+            if (!promotionScope.matched && promotionScope.reason !== "promotion-scope-owned-by-explicit-transfer") return false;
+            if (promotionScope.logicalClassKey === resolved.classKey) {
+                return classKey === promotionScope.dataClassKey;
+            }
+        }
         if (resolved.classKey === classKey) return true;
         var classAlias = getHomeworkDoneCourseAliasKey(classKey);
         var resolvedAlias = getHomeworkDoneCourseAliasKey(resolved.classKey);
@@ -4939,20 +5102,27 @@
         return uniqueClassKeys([classKey].concat(getTransferSourceClassKeys(transferIndex)));
     }
 
-    function mergeDailyPostClassNodeByKeys(classNodeMap, classKeys, currentClassKey, transferIndex, currentClassName, transferChain, currentStudentKey) {
+    function mergeDailyPostClassNodeByKeys(classNodeMap, classKeys, currentClassKey, transferIndex, currentClassName, transferChain, currentStudentKey, promotionContext) {
         var merged = {};
         var chain = transferChain || EbookLifecycleApp.buildTransferChain(transferIndex || {}, currentClassKey, { maxDepth: 8 });
         uniqueClassKeys(classKeys).forEach(function(key) {
             var classPosts = classNodeMap[key] || {};
             Object.keys(classPosts).forEach(function(postKey) {
                 var row = classPosts[postKey] || {};
-                if (!shouldIncludeTransferPost(key, currentClassKey, row, transferIndex, chain)) return;
-                var dateKey = getTransferDateKey(row.date, getTransferFallbackYear(transferIndex));
+                if (!shouldIncludeTransferPost(key, currentClassKey, row, transferIndex, chain, promotionContext)) return;
+                var dateKey = getTransferDateKey(row.date, getTransferFallbackYear(transferIndex, chain), chain);
                 var resolved = dateKey
                     ? resolveTransferStudentAtDate(currentClassKey, chain, dateKey, currentStudentKey, key)
                     : { classKey: key, studentKey: currentStudentKey || '', usedTransfer: false };
                 var sourceClassKey = resolved.classKey || key;
-                var sourceClassName = getTransferClassNameForKey(sourceClassKey, currentClassKey, transferIndex, currentClassName) || row.className || currentClassName;
+                var sourceClassName = getTransferClassNameForKey(sourceClassKey, currentClassKey, transferIndex, currentClassName, chain) || row.className || currentClassName;
+                var sourceLineageKey = promotionContext && promotionContext.status === "ready"
+                    ? window.EbookPromotionApp.getLineageKey(promotionContext, sourceClassKey)
+                    : "";
+                var currentLineageKey = promotionContext && promotionContext.status === "ready"
+                    ? window.EbookPromotionApp.getLineageKey(promotionContext, currentClassKey)
+                    : "";
+                var isSameCourseLineage = !!sourceLineageKey && sourceLineageKey === currentLineageKey;
                 var mergedKey = merged[postKey] ? key + "__" + postKey : postKey;
                 merged[mergedKey] = Object.assign({}, row, {
                     dailyPostId: postKey,
@@ -4962,7 +5132,7 @@
                     sourceStudentKey: resolved.studentKey || currentStudentKey || '',
                     storedClassKey: key,
                     storedClassName: row.className || key,
-                    isTransferFormerClass: sourceClassKey !== currentClassKey && resolved.usedTransfer === true
+                    isTransferFormerClass: sourceClassKey !== currentClassKey && resolved.usedTransfer === true && !isSameCourseLineage
                 });
             });
         });
@@ -5153,6 +5323,69 @@
         return isExamScoreTitle(title);
     }
 
+    function getBulletinPublishedDateKey(bulletin, promotionContext) {
+        var value = bulletin && (bulletin.reserveTime || bulletin.time || "");
+        var anchors = promotionContext && promotionContext.status === "ready"
+            ? promotionContext.edges.map(function(edge) { return edge.effectiveDateKey; })
+            : [];
+        if (anchors.length && typeof window !== "undefined" && window.EbookPromotionApp && typeof window.EbookPromotionApp.parseDateKeyWithAnchors === "function") {
+            return window.EbookPromotionApp.parseDateKeyWithAnchors(value, anchors);
+        }
+        return EbookLifecycleApp.parseDateKey(value, { anchorDateKeys: anchors });
+    }
+
+    function isBulletinInsidePromotionWindow(bulletin, scope, promotionContext) {
+        if (!scope || (!scope.startDate && !scope.endDate)) return true;
+        var publishedDateKey = getBulletinPublishedDateKey(bulletin, promotionContext);
+        if (!publishedDateKey) return false;
+        var startDateKey = scope.startDate ? window.EbookPromotionApp.dateKeyFromCanonical(scope.startDate) : 0;
+        var endDateKey = scope.endDate ? window.EbookPromotionApp.dateKeyFromCanonical(scope.endDate) : 0;
+        if (startDateKey && publishedDateKey < startDateKey) return false;
+        if (endDateKey && publishedDateKey >= endDateKey) return false;
+        return true;
+    }
+
+    function buildEbookBulletinList(node, options) {
+        options = options || {};
+        var result = [];
+        Object.keys(node || {}).forEach(function(id) {
+            var b = (node || {})[id] || {};
+            if (!isBulletinInsidePromotionWindow(b, options.scope, options.promotionContext)) return;
+            if (options.effectiveOnly === true && !isBulletinEffective(b, new Date())) return;
+            result.push({
+                id: b.id || id,
+                time: b.time || "",
+                className: b.className || options.className || "",
+                type: b.type || "一般",
+                label: b.label || b.type || "",
+                title: b.title || "",
+                content: b.content || "",
+                btnName: b.btnName || "",
+                btnUrl: b.btnUrl || "",
+                reserveTime: b.reserveTime || "",
+                expiresAt: b.expiresAt || "",
+                sourceClassKey: options.classKey || "",
+                sourceClassName: options.className || b.className || "",
+                isHistoricalPromotionBulletin: options.historical === true,
+                promotionId: options.scope && options.scope.promotionId || "",
+                promotionEffectiveDate: options.scope && options.scope.effectiveDate || ""
+            });
+        });
+        return result;
+    }
+
+    function dedupeEbookBulletins(list) {
+        var result = [];
+        var seen = {};
+        (list || []).forEach(function(bulletin) {
+            var identity = (bulletin.id || bulletin.time || bulletin.title || "").toString();
+            if (!identity || seen[identity]) return;
+            seen[identity] = true;
+            result.push(bulletin);
+        });
+        return result;
+    }
+
     async function executeFirebaseRead(studentName, password, bypassPwd, targetClass, targetStudentKey) {
         let result = { found: false, className: "", studentName: "", dailyPost: [], grades: [], feedbackHistory: [], bulletins: [], stickers: 0, homeworkDone: {} };
         
@@ -5255,6 +5488,7 @@
             lifecycle.classNameByKey[safeC] = result.className;
             result.studentTransferIndex = lifecycle.transferIndex;
             result.studentTransferChain = lifecycle.transferChain;
+            result.promotionContext = lifecycle.promotionContext;
             result.studentEnrollmentIndex = lifecycle.enrollmentIndex;
             result.studentEnrollmentNodeMap = lifecycle.enrollmentNodeMap;
             result.classNameByKey = lifecycle.classNameByKey;
@@ -5266,13 +5500,13 @@
             result.examCatalogEntriesByClassKey = {};
             result.cohortGradeExamNodeMap = {};
             var gradeSources = await Promise.all([
-                loadGradeExamMapByKeys(result.trackedGradeClassKeys, foundUserKey, result.studentKeysByClassKey, result.cohortGradeExamNodeMap, result.transferChain, safeC),
+                loadGradeExamMapByKeys(result.trackedGradeClassKeys, foundUserKey, result.studentKeysByClassKey, result.cohortGradeExamNodeMap, result.transferChain, safeC, result.promotionContext),
                 loadExamIdByClassColKey(result.trackedGradeClassKeys, result.examCatalogEntriesByClassKey)
             ]);
             result.cohortGradeExamRoot = gradeSources[0];
             result.examIdByClassColKey = gradeSources[1];
             result.grades = filterItemsByStudentEnrollmentDate(
-                buildGradeListFromClassExamMap(result.cohortGradeExamRoot, result.trackedGradeClassKeys, safeC, result.studentTransferIndex, result.className, result.examIdByClassColKey, result.examCatalogEntriesByClassKey),
+                buildGradeListFromClassExamMap(result.cohortGradeExamRoot, result.trackedGradeClassKeys, safeC, result.studentTransferIndex, result.className, result.examIdByClassColKey, result.examCatalogEntriesByClassKey, result.studentTransferChain, result.promotionContext),
                 result.studentEnrollmentIndex,
                 result.trackedClassKeys
             );
@@ -5281,7 +5515,7 @@
             let postsObj = {};
             if (result.trackedClassKeys.length > 1) {
                 result.cohortDailyPostRoot = await loadClassNodeMapByKeys(`${BEAR_SUBJECT}/dailyPosts`, result.trackedClassKeys);
-                postsObj = mergeDailyPostClassNodeByKeys(result.cohortDailyPostRoot, result.trackedClassKeys, safeC, result.studentTransferIndex, result.className, result.studentTransferChain, foundUserKey);
+                postsObj = mergeDailyPostClassNodeByKeys(result.cohortDailyPostRoot, result.trackedClassKeys, safeC, result.studentTransferIndex, result.className, result.studentTransferChain, foundUserKey, result.promotionContext);
             } else {
                 const snapP = await db.ref(`${BEAR_SUBJECT}/dailyPosts/${safeC}`).once('value');
                 result.cohortDailyPostRoot = null;
@@ -5327,22 +5561,43 @@
 
             // Fetch Bulletins
             const globalBulletinKey = safeKey("全校");
-            const bulletinSnaps = await Promise.all([
-                db.ref(`${BEAR_SUBJECT}/bulletins/${safeC}`).once('value'),
-                safeC === globalBulletinKey ? Promise.resolve(null) : db.ref(`${BEAR_SUBJECT}/bulletins/${globalBulletinKey}`).once('value')
-            ]);
-            const bullObj = Object.assign({},
-                (bulletinSnaps[0] && bulletinSnaps[0].val()) || {},
-                (bulletinSnaps[1] && bulletinSnaps[1].val()) || {}
-            );
-            let bulls = [];
-            for (let id in bullObj) {
-                const b = bullObj[id];
-                if (b.className === "全校" || b.className === result.className || b.className.indexOf(result.className) > -1 || result.className.indexOf(b.className) > -1) {
-                    bulls.push({ id: b.id, time: b.time, className: b.className, type: b.type, label: b.label || b.type || "", title: b.title, content: b.content, btnName: b.btnName, btnUrl: b.btnUrl, reserveTime: b.reserveTime || "", expiresAt: b.expiresAt || "" });
-                }
-            }
-            result.bulletins = bulls.reverse(); // Reverse to roughly match desc order
+            const formerBulletinScopes = window.EbookPromotionApp.getFormerBulletinScopes(result.promotionContext, result.studentTransferChain);
+            const bulletinReadKeys = uniqueClassKeys([safeC, globalBulletinKey].concat(formerBulletinScopes.map(function(scope) {
+                return scope.classKey;
+            })));
+            const bulletinSnaps = await Promise.all(bulletinReadKeys.map(function(classKey) {
+                return db.ref(`${BEAR_SUBJECT}/bulletins/${classKey}`).once('value').then(function(snap) {
+                    return { classKey: classKey, value: snap.val() || {} };
+                });
+            }));
+            const bulletinNodeByClassKey = {};
+            bulletinSnaps.forEach(function(item) {
+                bulletinNodeByClassKey[item.classKey] = item.value || {};
+            });
+            const currentBulletinStartDate = window.EbookPromotionApp.getCurrentBulletinStartDate(result.promotionContext, result.studentTransferChain);
+            const currentClassBulletins = buildEbookBulletinList(bulletinNodeByClassKey[safeC] || {}, {
+                classKey: safeC,
+                className: result.className,
+                scope: currentBulletinStartDate ? { startDate: currentBulletinStartDate, endDate: "" } : null,
+                promotionContext: result.promotionContext
+            });
+            const globalBulletins = safeC === globalBulletinKey ? [] : buildEbookBulletinList(bulletinNodeByClassKey[globalBulletinKey] || {}, {
+                classKey: globalBulletinKey,
+                className: "全校",
+                promotionContext: result.promotionContext
+            });
+            result.currentBulletins = dedupeEbookBulletins(currentClassBulletins.concat(globalBulletins));
+            result.historicalBulletins = dedupeEbookBulletins([].concat.apply([], formerBulletinScopes.map(function(scope) {
+                return buildEbookBulletinList(bulletinNodeByClassKey[scope.classKey] || {}, {
+                    classKey: scope.classKey,
+                    className: scope.className,
+                    scope: scope,
+                    promotionContext: result.promotionContext,
+                    historical: true,
+                    effectiveOnly: true
+                });
+            })));
+            result.bulletins = result.currentBulletins;
 
             // Fetch Feedbacks
             if (result.trackedClassKeys.length > 1) {
@@ -6987,6 +7242,7 @@
             isAdminMode = true;
             ebookGodSessionId = "";
             ebookGodSessionInfo = null;
+            activeEbookPromotionContext = null;
             clearRealtimeListeners();
             pendingEntryNoticeReady = false;
             pendingEntryReminderHandled = false;
@@ -7303,6 +7559,7 @@
             var activeSession = ebookAuthSessionInfo || ebookGodSessionInfo || {};
             if (result.pendingPolicy === undefined) result.pendingPolicy = activeSession.pendingPolicy || null;
             gData = result;
+            activeEbookPromotionContext = result.promotionContext || null;
             emergencyShownIdentityForCurrentEntry = '';
             activeEmergencyAnnouncement = null;
             pendingTasksState = { status: 'unavailable', items: [] };
@@ -7416,21 +7673,21 @@
                     const globalBulletinKey = safeKey("全校");
                     const bulletinSources = { classOnly: {}, global: {} };
                     function rebuildBulletinsFromScopedSources() {
-                        const allBulls = {};
-                        allBulls[safeC] = bulletinSources.classOnly || {};
-                        if (safeC !== globalBulletinKey) allBulls[globalBulletinKey] = bulletinSources.global || {};
-                        let bulls = [];
-                        for (let cls in allBulls) {
-                            const bObj = allBulls[cls];
-                            for (let id in bObj) {
-                                const b = bObj[id];
-                                if (b.className === "全校" || b.className === result.className || b.className.indexOf(result.className) > -1 || result.className.indexOf(b.className) > -1) {
-                                    bulls.push({ id: b.id, time: b.time, className: b.className, type: b.type, label: b.label || b.type || "", title: b.title, content: b.content, btnName: b.btnName, btnUrl: b.btnUrl, reserveTime: b.reserveTime || "", expiresAt: b.expiresAt || "" });
-                                }
-                            }
-                        }
-                        gData.bulletins = bulls;
-                        renderBulletins(gData.bulletins);
+                        const currentStartDate = window.EbookPromotionApp.getCurrentBulletinStartDate(gData.promotionContext, gData.studentTransferChain);
+                        const classBulletins = buildEbookBulletinList(bulletinSources.classOnly || {}, {
+                            classKey: safeC,
+                            className: result.className,
+                            scope: currentStartDate ? { startDate: currentStartDate, endDate: "" } : null,
+                            promotionContext: gData.promotionContext
+                        });
+                        const globalBulletins = safeC === globalBulletinKey ? [] : buildEbookBulletinList(bulletinSources.global || {}, {
+                            classKey: globalBulletinKey,
+                            className: "全校",
+                            promotionContext: gData.promotionContext
+                        });
+                        gData.currentBulletins = dedupeEbookBulletins(classBulletins.concat(globalBulletins));
+                        gData.bulletins = gData.currentBulletins;
+                        renderBulletins(gData.currentBulletins, gData.historicalBulletins || []);
                     }
                     watchRealtimeValue(BEAR_SUBJECT + '/bulletins/' + safeC, function(snap) {
                         bulletinSources.classOnly = snap.val() || {};
@@ -7453,7 +7710,9 @@
                                 gData.studentTransferIndex || {},
                                 gData.className,
                                 gData.examIdByClassColKey || {},
-                                gData.examCatalogEntriesByClassKey || {}
+                                gData.examCatalogEntriesByClassKey || {},
+                                gData.studentTransferChain,
+                                gData.promotionContext
                             ),
                             gData.studentEnrollmentIndex || {},
                             trackedClassKeys
@@ -7479,7 +7738,8 @@
                                     studentKey,
                                     studentKeysByClassKey,
                                     gData.transferChain,
-                                    safeC
+                                    safeC,
+                                    gData.promotionContext
                                 );
                                 rebuildGradesFromScopedSources();
                             });
@@ -7564,7 +7824,7 @@
                             if (trackedClassKeys.length > 1) {
                                 if (!gData.cohortDailyPostRoot) gData.cohortDailyPostRoot = {};
                                 gData.cohortDailyPostRoot[classKey] = snap.val() || {};
-                                rebuildDailyPostsFromScopedData(mergeDailyPostClassNodeByKeys(gData.cohortDailyPostRoot || {}, trackedClassKeys, safeC, gData.studentTransferIndex || {}, gData.className, gData.studentTransferChain, studentKey));
+                                rebuildDailyPostsFromScopedData(mergeDailyPostClassNodeByKeys(gData.cohortDailyPostRoot || {}, trackedClassKeys, safeC, gData.studentTransferIndex || {}, gData.className, gData.studentTransferChain, studentKey, gData.promotionContext));
                             } else {
                                 rebuildDailyPostsFromScopedData(snap.val() || {});
                             }
@@ -7600,7 +7860,7 @@
 
             renderDailyPosts(result.dailyPost, result.feedbackHistory);
             renderOldGradeCards(result.grades);
-            renderBulletins(result.bulletins);
+            renderBulletins(result.currentBulletins || result.bulletins || [], result.historicalBulletins || []);
             renderPendingTasks();
             pendingEntryNoticeReady = true;
             if (!checkEmergency(result.bulletins)) maybeShowPendingEntryReminder();
@@ -7662,6 +7922,7 @@
             ebookGodSessionId = "";
             ebookGodSessionInfo = null;
             ebookAuthSessionInfo = null;
+            activeEbookPromotionContext = null;
             document.getElementById('appContainer').classList.remove('admin-mode-border');
             document.getElementById('godModeExitBtn').style.display = 'none';
             document.getElementById('main-screen').style.display = 'none';
@@ -8024,6 +8285,7 @@
             ebookAuth.signOut().catch(function() {});
             clearPendingReminderBrowserSessionMarks();
             ebookAuthSessionInfo = null;
+            activeEbookPromotionContext = null;
             gData = null; gPass = "";
             pendingTasksState = { status: 'unavailable', items: [] };
             pendingEntryNoticeReady = false;
@@ -8053,7 +8315,7 @@
                 // 點擊公告分頁時清除紅點與導引
                 var deco = document.getElementById('tab-bulletin-decorator');
                 if (deco) deco.innerHTML = '';
-                var list = gData ? gData.bulletins : [];
+                var list = gData ? (gData.currentBulletins || gData.bulletins || []) : [];
                 if (list && list.length > 0) {
                     localStorage.setItem('lastReadBulletinId', list[0].id || list[0].time);
                 }
@@ -10633,38 +10895,40 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             return true;
         }
 
-        function renderBulletins(list) {
+        function renderBulletins(list, historicalList) {
             var container = document.getElementById('tab-content-2');
             var now = new Date();
-            var activeList = isDashboardDraftPreviewMode ? (list || []) : (list || []).filter(function(b) { return isBulletinEffective(b, now); });
-            if (activeList.length === 0) {
-                container.innerHTML = "<div style='text-align:center; padding:30px; color:#999;'>目前沒有公告</div>";
-                updateBulletinTabs(activeList);
-                renderStickyNotice(activeList);
-                checkEmergency(activeList);
-                return;
-            }
+            var activeList = (isDashboardDraftPreviewMode ? (list || []) : (list || []).filter(function(b) { return isBulletinEffective(b, now); })).slice();
+            var activeHistoricalList = (isDashboardDraftPreviewMode ? [] : (historicalList || []).filter(function(b) {
+                return b && b.isHistoricalPromotionBulletin === true && isBulletinEffective(b, now);
+            })).slice();
 
             // ★ 排序邏輯：由新到舊 (使用字串直接比對最穩定) ★
             activeList.sort(function(a, b) {
-                return b.time.localeCompare(a.time);
+                return (b.time || '').localeCompare(a.time || '');
+            });
+            activeHistoricalList.sort(function(a, b) {
+                return (b.time || '').localeCompare(a.time || '');
             });
 
-            var html = "";
-            activeList.forEach(function (b) {
-                var cardClass = "bulletin-card";
+            function renderBulletinCards(items, historical) {
+                var cards = "";
+                items.forEach(function (b) {
+                var cardClass = historical ? "bulletin-card is-promotion-history" : "bulletin-card";
                 var tagClass = "tag-gray";
-                if (b.type === "緊急") { cardClass += " type-emergency"; tagClass = "tag-red"; }
-                else if (b.type === "課表") { cardClass += " type-schedule"; tagClass = "tag-blue"; }
-                else { cardClass += " type-normal"; tagClass = "tag-gray"; }
-                var displayLabel = (b.label || b.type || "公告").toString().trim();
+                if (!historical && b.type === "緊急") { cardClass += " type-emergency"; tagClass = "tag-red"; }
+                else if (!historical && b.type === "課表") { cardClass += " type-schedule"; tagClass = "tag-blue"; }
+                else if (!historical) { cardClass += " type-normal"; tagClass = "tag-gray"; }
+                var displayLabel = historical
+                    ? ("過往班級 · " + (b.sourceClassName || b.className || "原班級"))
+                    : (b.label || b.type || "公告").toString().trim();
 
                 var btnHtml = "";
                 if (b.btnName && b.btnUrl) {
                     btnHtml = `<div class="btn-center-wrapper">${renderParsedLink(escapeHtml(b.btnName), b.btnUrl, "btn-capsule", "")}</div>`;
                 }
 
-                html += `
+                cards += `
             <div class="${cardClass}">
                 <div class="bulletin-header">
                     <div><span class="bulletin-tag ${tagClass}">${escapeHtml(displayLabel)}</span><span class="bulletin-title">${escapeHtml(b.title)}</span></div>
@@ -10673,13 +10937,28 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 <div class="bulletin-content">${parseBtn(b.content)}</div>
                 ${btnHtml}
             </div>`;
-            });
+                });
+                return cards;
+            }
+
+            var html = activeList.length
+                ? renderBulletinCards(activeList, false)
+                : "<div style='text-align:center; padding:30px; color:#999;'>目前沒有本班公告</div>";
+            if (activeHistoricalList.length) {
+                html += '<section class="bulletin-history-section" aria-labelledby="bulletinHistoryHeading">' +
+                    '<h3 class="bulletin-history-heading" id="bulletinHistoryHeading">📚 過往班級公告</h3>' +
+                    '<div class="bulletin-history-note">這些是升班前仍在有效期間內的公告，僅供查閱，不會重新觸發提醒。</div>' +
+                    renderBulletinCards(activeHistoricalList, true) +
+                    '</section>';
+            }
             container.innerHTML = html;
 
-            // ★ 執行提醒邏輯 ★
+            // 只有目前班級／全校公告可以觸發未讀、跑馬燈與緊急彈窗；過往班級公告永遠只供查閱。
             updateBulletinTabs(activeList);
             renderStickyNotice(activeList);
             checkEmergency(activeList);
+
+            if (activeList.length === 0 && activeHistoricalList.length === 0) return;
 
             var observer = new IntersectionObserver(function(entries, obs) {
                 entries.forEach(function(entry) {
@@ -10924,12 +11203,18 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var now = Date.now();
             if (!force && now - ebookGodSessionLastRenewAt < 30000) return ebookGodSessionInfo;
             var previousPendingPolicy = ebookGodSessionInfo && ebookGodSessionInfo.pendingPolicy;
+            var previousAllowedClassKeys = ebookGodSessionInfo && ebookGodSessionInfo.allowedClassKeys;
             var fn = getGodSessionCallable('getEbookGodSession');
             var needsFirebaseToken = !!force;
             var result = await fn({ sessionId: ebookGodSessionId, includeFirebaseToken: needsFirebaseToken });
             ebookGodSessionInfo = result && result.data ? result.data : null;
             if (ebookGodSessionInfo && ebookGodSessionInfo.pendingPolicy === undefined && previousPendingPolicy) {
                 ebookGodSessionInfo.pendingPolicy = previousPendingPolicy;
+            }
+            // 一般 heartbeat 不一定重新簽 Firebase token；保留首次 Functions 回傳的
+            // allowed class scope，否則升班學生在 session 續期後重新整理會誤判未授權。
+            if (ebookGodSessionInfo && ebookGodSessionInfo.allowedClassKeys === undefined && previousAllowedClassKeys) {
+                ebookGodSessionInfo.allowedClassKeys = previousAllowedClassKeys;
             }
             if (ebookGodSessionInfo && ebookGodSessionInfo.firebaseCustomToken) {
                 await ebookAuth.setPersistence(firebase.auth.Auth.Persistence.NONE);
