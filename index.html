@@ -33,6 +33,7 @@
             --pending-accent: #f59e0b;
             --pending-accent-light: #fbbf24;
             --pending-accent-dark: #b45309;
+            --pending-ink: #6f2f08;
             --pending-border: #fde68a;
             --pending-badge: #fef3c7;
             --pending-surface: #fffbeb;
@@ -1304,7 +1305,7 @@
             justify-content: center;
             border-radius: 999px;
             background: var(--pending-badge);
-            color: var(--pending-accent-dark);
+            color: var(--pending-ink);
             font-size: 0.76rem;
             line-height: 1;
             vertical-align: middle;
@@ -1312,13 +1313,13 @@
         }
         .tab-item.active .pending-tab-count {
             background: #fff;
-            color: var(--pending-accent-dark);
+            color: var(--pending-ink);
         }
         .pending-tab-count.is-visible { display: inline-flex; }
         #tab-pending.active:not(.is-reminder-due) {
             border-color: transparent;
-            background: linear-gradient(135deg, var(--pending-accent-light) 0%, #d97706 100%);
-            color: #451a03;
+            background: linear-gradient(135deg, var(--pending-accent-light) 0%, var(--pending-accent) 100%);
+            color: var(--pending-ink);
             box-shadow: 0 4px 15px rgba(217, 119, 6, 0.24);
         }
         #tab-pending.is-reminder-due {
@@ -1349,7 +1350,7 @@
             border: 1px solid var(--pending-border);
             border-radius: 14px;
             background: var(--pending-surface);
-            color: #92400e;
+            color: var(--pending-ink);
             font-size: 0.95rem;
             font-weight: 800;
             line-height: 1.55;
@@ -1400,7 +1401,7 @@
             gap: 10px;
         }
         .pending-card-label {
-            color: var(--pending-accent-dark);
+            color: var(--pending-ink);
             font-size: 1rem;
             font-weight: 950;
             line-height: 1.35;
@@ -1437,8 +1438,8 @@
             border: 0;
             border-radius: 11px;
             padding: 9px 14px;
-            background: linear-gradient(135deg, var(--pending-accent) 0%, #d97706 100%);
-            color: #451a03;
+            background: linear-gradient(135deg, var(--pending-accent-light) 0%, var(--pending-accent) 100%);
+            color: var(--pending-ink);
             font: inherit;
             font-size: 0.9rem;
             font-weight: 900;
@@ -1447,7 +1448,10 @@
         }
         .pending-action-btn.secondary,
         .pending-action-btn.paper {
-            background: linear-gradient(135deg, var(--pending-accent) 0%, #d97706 100%);
+            border: 1px solid var(--pending-accent);
+            background: #fff7e0;
+            color: var(--pending-ink);
+            box-shadow: none;
         }
         .pending-card.is-reminder-due .pending-card-label {
             color: #be123c;
@@ -2702,6 +2706,8 @@
         }
 
         .score-btn {
+            min-width: 88px;
+            min-height: 44px;
             background: #e74c3c;
             color: white;
             border: none;
@@ -3848,7 +3854,7 @@
   <script src="exam_identity_app.js?v=20260712_exam_identity_phase1"></script>
   <script src="ebook_lifecycle_app.js?v=20260711_lifecycle_security_v2"></script>
   <script src="gifted_homework_full_scores.js?v=20260720_geo3_question_count_v2"></script>
-  <script src="ebook_pending_tasks_app.js?v=20260811_pending_stable_source_v5"></script>
+  <script src="ebook_pending_tasks_app.js?v=20260811_pending_navigation_v6"></script>
 
   <!-- Webhook API & Firebase Polyfill (Replace google.script.run) -->
   <script>
@@ -6468,11 +6474,34 @@
             return 'display';
         }
 
+        function getPendingTaskActionTarget(task, targetKind) {
+            if (!task) return null;
+            if (targetKind === 'report') return task.reportTarget || null;
+            if (targetKind === 'paper') return task.paperTarget || null;
+            return task.displayTarget || null;
+        }
+
+        function isPendingExactPaperTarget(target) {
+            if (!target || (target.section !== 'makeup-paper' && target.section !== 'exam-paper')) return true;
+            return !!((target.dailyPostId || '').toString() &&
+                (target.sourceClassKey || '').toString() &&
+                ((target.examId || '').toString() || (target.storedExamId || '').toString()));
+        }
+
         function buildPendingTaskActionButton(task, targetKind, label, extraClass) {
             if (!task) return '';
-            var target = targetKind === 'report' ? task.reportTarget : (targetKind === 'paper' ? task.paperTarget : task.displayTarget);
-            if (!target) return '';
+            var target = getPendingTaskActionTarget(task, targetKind);
+            if (!target || !isPendingExactPaperTarget(target)) return '';
             return "<button type='button' class='pending-action-btn " + (extraClass || '') + "' data-pending-task-id='" + escapeHtmlAttr(task.taskId || '') + "' onclick=\"openPendingTaskFromButton(this, '" + targetKind + "')\">" + escapeHtml(label) + "</button>";
+        }
+
+        function getPendingAbsencePaperActionLabel(task) {
+            var title = ((task && task.title) || '').toString();
+            if (title.indexOf('回家練習卷') > -1) return '查看回家練習卷';
+            if (title.indexOf('複習') > -1) return '查看複習考卷';
+            if (title.indexOf('鑑定') > -1) return '查看鑑定考卷';
+            if (title.indexOf('隨堂') > -1) return '查看隨堂考卷';
+            return '查看小考卷';
         }
 
         function getPendingTaskPrimaryActionLabel(task) {
@@ -6535,6 +6564,14 @@
             items.forEach(function(task) {
                 var primaryTargetKind = getPendingTaskPrimaryTargetKind(task);
                 var taskReminderDue = !!reminderDueTaskIds[task.taskId];
+                var secondaryActionHtml = '';
+                if (task.kind === 'makeup_result') {
+                    secondaryActionHtml = buildPendingTaskActionButton(task, 'paper', '查看補考卷', 'paper');
+                } else if (task.kind === 'absence') {
+                    secondaryActionHtml = buildPendingTaskActionButton(task, 'paper', getPendingAbsencePaperActionLabel(task), 'secondary');
+                } else {
+                    secondaryActionHtml = buildPendingTaskActionButton(task, 'paper', '前往補考卷', 'paper');
+                }
                 html += "<article class='pending-card" + (taskReminderDue ? " is-reminder-due" : "") + "' data-pending-task-card='" + escapeHtmlAttr(task.taskId || '') + "'>" +
                     "<div class='pending-card-head'><div class='pending-card-label'>" + escapeHtml(task.neutralLabel || '待完成項目') + "</div>" +
                     "<div class='pending-card-date'>" + escapeHtml(task.date || '') + "</div></div>" +
@@ -6543,8 +6580,7 @@
                     (task.sourceClassName && task.sourceClassName !== (gData && gData.className) ? "<div class='pending-card-source'>來源：" + escapeHtml(task.sourceClassName) + "</div>" : '') +
                     "<div class='pending-card-actions'>" +
                     buildPendingTaskActionButton(task, primaryTargetKind, getPendingTaskPrimaryActionLabel(task), '') +
-                    (task.kind === 'makeup_result' ? buildPendingTaskActionButton(task, 'display', '查看原考試', 'secondary') : '') +
-                    buildPendingTaskActionButton(task, 'paper', '前往補考卷', 'paper') +
+                    secondaryActionHtml +
                     "</div></article>";
             });
             html += "</div></div>";
@@ -6595,20 +6631,30 @@
             if ((target.section === 'homework' || target.section === 'homework-score') && postAnchor) {
                 return postAnchor.querySelector('[data-pending-homework-anchor]') || postAnchor;
             }
-            if (target.section === 'makeup-paper' && postAnchor) {
-                return postAnchor.querySelector('[data-pending-paper-anchor]') || postAnchor;
+            if (target.section === 'makeup-paper' || target.section === 'exam-paper') {
+                if (!postAnchor || !isPendingExactPaperTarget(target)) return null;
+                var paperSelector = target.section === 'makeup-paper'
+                    ? '[data-pending-paper-anchor]'
+                    : '[data-pending-exam-paper-anchor]';
+                var paperAnchors = Array.prototype.slice.call(postAnchor.querySelectorAll(paperSelector));
+                return paperAnchors.find(function(element) { return pendingTargetMatchesExam(element, target); }) || null;
             }
             var examRoot = postAnchor || document;
             if (target.section === 'makeup-result') {
                 var reportAnchors = Array.prototype.slice.call(examRoot.querySelectorAll('[data-pending-makeup-result-anchor]'));
                 var reportAnchor = reportAnchors.find(function(element) { return pendingTargetMatchesExam(element, target); });
                 if (reportAnchor) return reportAnchor;
+                return null;
             }
             if (target.examId || target.storedExamId || target.colIndex !== undefined && target.colIndex !== null && target.colIndex !== '') {
                 var examAnchors = Array.prototype.slice.call(examRoot.querySelectorAll('[data-pending-exam-anchor]'));
                 var examAnchor = examAnchors.find(function(element) { return pendingTargetMatchesExam(element, target); });
+                if (examAnchor && target.section === 'absence-report') {
+                    return examAnchor.querySelector('.score-report-section') || null;
+                }
                 if (examAnchor) return examAnchor;
             }
+            if (target.section === 'absence-report') return null;
             return postAnchor;
         }
 
@@ -6618,7 +6664,7 @@
             if (target.focus === 'homework') selector = '.homework-done-btn:not([disabled])';
             else if (target.focus === 'score-report') selector = '.score-input';
             else if (target.focus === 'makeup-result') selector = '.makeup-wrong-count-input';
-            else if (target.section === 'makeup-paper') selector = 'a[href]';
+            else if (target.section === 'makeup-paper' || target.section === 'exam-paper') selector = 'a[href]';
             var focusTarget = selector ? element.querySelector(selector) : null;
             if (focusTarget && typeof focusTarget.focus === 'function') {
                 try { focusTarget.focus({ preventScroll: true }); }
@@ -6629,8 +6675,8 @@
         function openPendingTaskFromButton(button, targetKind) {
             var task = getPendingTaskById(button && button.dataset ? button.dataset.pendingTaskId : '');
             if (!task) return;
-            var target = targetKind === 'report' ? task.reportTarget : (targetKind === 'paper' ? task.paperTarget : task.displayTarget);
-            if (!target) return;
+            var target = getPendingTaskActionTarget(task, targetKind);
+            if (!target || !isPendingExactPaperTarget(target)) return;
             var tabIndex = target.tab === 'grades' ? 1 : 0;
             switchTab(tabIndex);
             window.setTimeout(function() {
@@ -9433,6 +9479,35 @@
                     if (types.length === 1) return "今日" + types[0] + "考卷";
                     return "今日考卷";
                 }
+                function getPostPendingExamPaperIdentity(postData) {
+                    var examData = postData && postData.examData;
+                    if (!examData || typeof examData !== 'object') return null;
+                    var exams = Array.isArray(examData.exams) && examData.exams.length
+                        ? examData.exams.map(function(item) { return item && (item.main || item); }).filter(Boolean)
+                        : [examData.main].filter(Boolean);
+                    if (exams.length !== 1) return null;
+                    var exam = exams[0];
+                    if (!(exam.examId || exam.storedExamId)) return null;
+                    return {
+                        examId: exam.examId || '',
+                        storedExamId: exam.storedExamId || '',
+                        colIndex: exam.colIndex
+                    };
+                }
+                function buildPendingExamAnchorAttrs(anchorName, exam) {
+                    if (!anchorName || !exam || !(exam.examId || exam.storedExamId)) return '';
+                    return " " + anchorName + "='1' data-exam-id='" + escapeHtmlAttr(exam.examId || '') +
+                        "' data-stored-exam-id='" + escapeHtmlAttr(exam.storedExamId || '') +
+                        "' data-exam-col-index='" + escapeHtmlAttr(exam.colIndex === undefined || exam.colIndex === null ? '' : exam.colIndex) + "'";
+                }
+                function getPostMappedMakeupIdentity(postData) {
+                    var makeup = getDailyPostDisplayOptions(postData).makeup || {};
+                    var mappedExamId = (makeup.targetExamId || '').toString().trim();
+                    var mappedSource = (makeup.sourceClassKey || '').toString().trim();
+                    var postSource = ((postData && (postData.sourceClassKey || postData.storedClassKey)) || '').toString().trim();
+                    if (!mappedExamId || !mappedSource || !postSource || mappedSource !== postSource) return null;
+                    return { examId: mappedExamId, storedExamId: mappedExamId, colIndex: '' };
+                }
                 function splitPostMultiLinkValue(value) {
                     return (value || "").toString().split(/\n+/).map(function(line) {
                         return line.trim();
@@ -9449,6 +9524,7 @@
                     var quizText = postData.quiz || "";
                     var lines = splitPostMultiLinkValue(quizText);
                     var quizOptions = getDailyPostQuizOptions(postData);
+                    var pendingExamPaperIdentity = getPostPendingExamPaperIdentity(postData);
                     var hasExplicitRoles = quizOptions.slot1Role === "answer" || quizOptions.slot2Role === "answer";
                     if (hasExplicitRoles) {
                         var explicitFields = lines.map(function(line, index) {
@@ -9457,7 +9533,8 @@
                             return {
                                 label: role === "answer" ? ("今日" + type + "解答") : (type === "考卷" ? "今日考卷" : ("今日" + type + "考卷")),
                                 val: line,
-                                extra: ""
+                                extra: "",
+                                pendingExamPaper: role === "answer" ? null : pendingExamPaperIdentity
                             };
                         });
                         if (explicitFields.length) explicitFields[explicitFields.length - 1].extra = buildScienceQuizAnswerNote(postData);
@@ -9474,13 +9551,13 @@
                         groups[label].push(line);
                     });
                     if (order.length <= 1) {
-                        return [{ label: getPostQuizFieldLabel(postData), val: quizText, extra: buildScienceQuizAnswerNote(postData) }];
+                        return [{ label: getPostQuizFieldLabel(postData), val: quizText, extra: buildScienceQuizAnswerNote(postData), pendingExamPaper: pendingExamPaperIdentity }];
                     }
                     var html = order.map(function(label) {
                         var subtitle = label === "今日考卷" ? "其他考卷" : label;
                         return "<div class='info-subsection'><span class='info-subtitle'>" + subtitle + "</span>" + parseBtn(groups[label].join("\n")) + buildScienceQuizAnswerNote({ quiz: groups[label].join("\n"), title: postData.title, progress: postData.progress }) + "</div>";
                     }).join("");
-                    return [{ label: "今日考卷", val: "", extra: html }];
+                    return [{ label: "今日考卷", val: "", extra: html, pendingExamPaper: pendingExamPaperIdentity }];
                 }
                 function buildPostMakeupExtra(postData, extraHtml) {
                     var lines = splitPostMultiLinkValue(postData.makeup || "");
@@ -9503,9 +9580,14 @@
                     if (!f.val && !f.extra) return "";
                     var kind = getPostInfoKind(f.label);
                     var noteHtml = f.labelNote ? "<span class='info-label-note'>" + f.labelNote + "</span>" : "";
-                    var pendingPaperAttr = kind === 'makeup' ? " data-pending-paper-anchor='1'" : "";
+                    var pendingPaperAttr = kind === 'makeup'
+                        ? buildPendingExamAnchorAttrs('data-pending-paper-anchor', getPostMappedMakeupIdentity(post))
+                        : "";
+                    var pendingExamPaperAttr = kind === 'quiz'
+                        ? buildPendingExamAnchorAttrs('data-pending-exam-paper-anchor', f.pendingExamPaper)
+                        : "";
                     var pendingHomeworkAttr = kind === 'homework' ? " data-pending-homework-anchor='1'" : "";
-                    return "<section class='info-block info-kind-" + kind + "'" + pendingPaperAttr + pendingHomeworkAttr + "><div class='info-label'>" + f.label + "</div>" + noteHtml + "<div class='info-content'>" + parseBtn(f.val || "", f.linkMode || "auto") + (f.extra || "") + "</div></section>";
+                    return "<section class='info-block info-kind-" + kind + "'" + pendingPaperAttr + pendingExamPaperAttr + pendingHomeworkAttr + "><div class='info-label'>" + f.label + "</div>" + noteHtml + "<div class='info-content'>" + parseBtn(f.val || "", f.linkMode || "auto") + (f.extra || "") + "</div></section>";
                 }
                 function buildPostMakeupFields(postData, extraHtml) {
                     var lines = splitPostMultiLinkValue(postData.makeup || "");

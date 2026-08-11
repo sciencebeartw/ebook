@@ -341,6 +341,69 @@
     }) || null;
   }
 
+  function getPostExamMains(post) {
+    var examData = post && post.examData;
+    if (!examData || typeof examData !== "object") return [];
+    var rows = Array.isArray(examData.exams) && examData.exams.length
+      ? examData.exams.map(function(item) { return item && (item.main || item); })
+      : [examData.main];
+    return rows.filter(Boolean);
+  }
+
+  function hasSameStableExamIdentity(left, right) {
+    var leftIds = [left && left.examId, left && left.storedExamId].map(normalizeExamId).filter(Boolean);
+    var rightIds = [right && right.examId, right && right.storedExamId].map(normalizeExamId).filter(Boolean);
+    if (!leftIds.length || !rightIds.length) return false;
+    return leftIds.some(function(id) { return rightIds.indexOf(id) > -1; });
+  }
+
+  function hasNavigableOriginalExamPaper(post, helpers) {
+    var lines = text(post && post.quiz).split(/\n+/).map(function(line) {
+      return line.trim();
+    }).filter(Boolean);
+    if (!lines.length) return false;
+    var options = helpers && typeof helpers.getDisplayOptions === "function"
+      ? helpers.getDisplayOptions(post)
+      : ((post && post.displayOptions) || {});
+    var quiz = options && typeof options === "object" && options.quiz && typeof options.quiz === "object"
+      ? options.quiz
+      : {};
+    var hasExplicitAnswerRole = quiz.slot1Role === "answer" || quiz.slot2Role === "answer";
+    if (!hasExplicitAnswerRole) return true;
+    return lines.some(function(_line, index) {
+      var role = index === 0 ? quiz.slot1Role : quiz.slot2Role;
+      return role !== "answer";
+    });
+  }
+
+  function resolveExactExamPost(posts, exam, helpers, options) {
+    options = options || {};
+    var examIds = [exam && exam.examId, exam && exam.storedExamId].map(normalizeExamId).filter(Boolean);
+    var examDate = monthDayKey(exam && exam.date);
+    var examSource = text(exam && (exam.sourceClassKey || exam.storedClassKey)).trim();
+    if (!examIds.length || !examDate || !examSource) return null;
+    var matches = (posts || []).filter(function(post) {
+      var postSource = text(post && (post.sourceClassKey || post.storedClassKey)).trim();
+      if (!post || !getPostRowKey(post) || !postSource || monthDayKey(post.date) !== examDate) return false;
+      if (options.requireQuiz === true && !hasNavigableOriginalExamPaper(post, helpers)) return false;
+      if (!sourceMatches(examSource, postSource, helpers)) return false;
+      var postExams = getPostExamMains(post);
+      var matchingExams = postExams.filter(function(postExam) {
+        return hasSameStableExamIdentity(exam, postExam);
+      });
+      if (matchingExams.length !== 1) return false;
+      return options.requireSinglePostExam !== true || postExams.length === 1;
+    });
+    return matches.length === 1 ? matches[0] : null;
+  }
+
+  function resolveOriginalExamPaperPost(posts, exam, helpers) {
+    return resolveExactExamPost(posts, exam, helpers, {
+      requireQuiz: true,
+      requireSinglePostExam: true
+    });
+  }
+
   function isExamBeforePost(exam, post, helpers) {
     var postParts = normalizeDateParts(post && post.date);
     var examParts = normalizeDateParts(exam && exam.date, postParts && postParts.year);
@@ -829,6 +892,8 @@
           ? { post: null, invalid: false }
           : resolveMappedMakeupPost(posts, exam, helpers);
         var absencePaperPost = absencePaperResolution.post;
+        var exactAbsenceExamPost = resolveExactExamPost(posts, exam, helpers);
+        var originalExamPaperPost = guidanceAbsence ? null : resolveOriginalExamPaperPost(posts, exam, helpers);
         pushIfActive(tasks, createTask({
           kind: guidanceAbsence ? "guidance_absence" : "absence",
           itemType: "makeup",
@@ -841,27 +906,33 @@
           reminderSourceDateInvalid: absencePaperResolution.invalid === true,
           reminderSourceDate: text(
             (absencePaperPost && absencePaperPost.date) ||
-            (linkedPost && linkedPost.date) ||
+            (exactAbsenceExamPost && exactAbsenceExamPost.date) ||
             (exam && exam.date)
           ),
-          displayTarget: {
-            tab: linkedPost ? "contact" : "grades",
-            dailyPostId: getPostRowKey(linkedPost),
-            sourceClassKey: text((linkedPost && linkedPost.sourceClassKey) || exam.sourceClassKey),
-            postDate: text(linkedPost && linkedPost.date),
+          displayTarget: exactAbsenceExamPost ? {
+            tab: "contact",
+            dailyPostId: getPostRowKey(exactAbsenceExamPost),
+            sourceClassKey: text(exactAbsenceExamPost.sourceClassKey || exactAbsenceExamPost.storedClassKey),
+            postDate: text(exactAbsenceExamPost.date),
             examId: normalizeExamId(exam && exam.examId),
             storedExamId: normalizeExamId(exam && exam.storedExamId),
             colIndex: exam && exam.colIndex,
             section: "absence-report",
             focus: "score-report"
-          },
-          paperTarget: absencePaperPost ? {
+          } : null,
+          // Navigation stays on the original exam paper. The mapped makeup
+          // paper above is only the stable reminder-source date.
+          paperTarget: originalExamPaperPost ? {
             tab: "contact",
-            dailyPostId: getPostRowKey(absencePaperPost),
-            sourceClassKey: text(absencePaperPost.sourceClassKey || absencePaperPost.storedClassKey),
-            postDate: text(absencePaperPost.date),
-            section: "makeup-paper",
-            url: extractFirstUrl(absencePaperPost.makeup)
+            dailyPostId: getPostRowKey(originalExamPaperPost),
+            sourceClassKey: text(originalExamPaperPost.sourceClassKey || originalExamPaperPost.storedClassKey),
+            postDate: text(originalExamPaperPost.date),
+            examId: normalizeExamId(exam && exam.examId),
+            storedExamId: normalizeExamId(exam && exam.storedExamId),
+            colIndex: exam && exam.colIndex,
+            section: "exam-paper",
+            focus: "exam-paper",
+            url: extractFirstUrl(originalExamPaperPost.quiz)
           } : null,
           writeTarget: {
             storedClassKey: storedClassKey,
@@ -936,6 +1007,9 @@
           dailyPostId: getPostRowKey(mappedPaperPost),
           sourceClassKey: text(mappedPaperPost.sourceClassKey || mappedPaperPost.storedClassKey),
           postDate: text(mappedPaperPost.date),
+          examId: normalizeExamId(exam && exam.examId),
+          storedExamId: normalizeExamId(exam && exam.storedExamId),
+          colIndex: exam && exam.colIndex,
           section: "makeup-paper",
           url: extractFirstUrl(mappedPaperPost.makeup)
         } : null,

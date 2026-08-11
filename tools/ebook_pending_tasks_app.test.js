@@ -855,7 +855,7 @@ const absenceResult = Pending.buildPendingTasks(baseOptions({ grades: [absenceEx
 assert.strictEqual(absenceResult.items.length, 1, 'pure absence must not be coerced to score zero');
 assert.strictEqual(absenceResult.items[0].kind, 'absence');
 assert.strictEqual(absenceResult.items[0].neutralLabel, '請假考試待補');
-assert.strictEqual(absenceResult.items[0].displayTarget.examId, 'exam_absence');
+assert.strictEqual(absenceResult.items[0].displayTarget, null, 'absence report navigation without an exact DailyPost ExamID mapping must fail closed');
 assert.strictEqual(absenceResult.items[0].writeTarget.storedExamId, 'stored_absence');
 
 const absencePaper = {
@@ -866,8 +866,7 @@ const absencePaper = {
   displayOptions: { makeup: { targetExamId: 'stored_absence', sourceClassKey: CURRENT_CLASS } },
 };
 const mappedAbsenceResult = Pending.buildPendingTasks(baseOptions({ posts: [absencePaper], grades: [absenceExam] }));
-assert.strictEqual(mappedAbsenceResult.items[0].paperTarget.dailyPostId, absencePaper.id, 'absence task exposes an explicitly mapped makeup paper');
-assert.strictEqual(mappedAbsenceResult.items[0].paperTarget.url, 'https://example.com/absence-exact.pdf');
+assert.strictEqual(mappedAbsenceResult.items[0].paperTarget, null, 'absence navigation must not reuse the mapped makeup paper as the original exam paper');
 assert.strictEqual(mappedAbsenceResult.items[0].reminderSourceDate, '2026-08-08', 'mapped absence uses the exact paper date as its stable reminder source');
 assert.deepStrictEqual(
   Pending.getReminderDueItems({
@@ -887,15 +886,92 @@ assert.deepStrictEqual(
   ['absence'],
   'the real absence task becomes due at the first later 8/15 weekly slot'
 );
+const absenceOriginalExamPost = {
+  id: 'absence_original_exam_post',
+  date: '2026-08-02',
+  sourceClassKey: CURRENT_CLASS,
+  quiz: '[小考卷]https://example.com/absence-original.pdf',
+  examData: { main: absenceExam, exams: [{ main: absenceExam, others: [] }] },
+};
+const mappedAbsenceWithOriginalExam = Pending.buildPendingTasks(baseOptions({
+  posts: [absencePaper, absenceOriginalExamPost],
+  grades: [absenceExam],
+}));
+assert.strictEqual(mappedAbsenceWithOriginalExam.items[0].paperTarget.dailyPostId, absenceOriginalExamPost.id, 'absence secondary action points to the exact original exam DailyPost');
+assert.strictEqual(mappedAbsenceWithOriginalExam.items[0].displayTarget.dailyPostId, absenceOriginalExamPost.id, 'absence primary action points to the same exact ExamID-mapped DailyPost report box');
+assert.strictEqual(mappedAbsenceWithOriginalExam.items[0].displayTarget.examId, absenceExam.examId);
+assert.strictEqual(mappedAbsenceWithOriginalExam.items[0].paperTarget.section, 'exam-paper');
+assert.strictEqual(mappedAbsenceWithOriginalExam.items[0].paperTarget.examId, absenceExam.examId);
+assert.strictEqual(mappedAbsenceWithOriginalExam.items[0].paperTarget.storedExamId, absenceExam.storedExamId);
+assert.strictEqual(mappedAbsenceWithOriginalExam.items[0].paperTarget.url, 'https://example.com/absence-original.pdf');
+assert.strictEqual(mappedAbsenceWithOriginalExam.items[0].reminderSourceDate, absencePaper.date, 'absence navigation target must not change the mapped reminder source date');
+
+const ambiguousOriginalExamResult = Pending.buildPendingTasks(baseOptions({
+  posts: [
+    absenceOriginalExamPost,
+    Object.assign({}, absenceOriginalExamPost, { id: 'absence_original_exam_duplicate' }),
+  ],
+  grades: [absenceExam],
+}));
+assert.strictEqual(ambiguousOriginalExamResult.items[0].paperTarget, null, 'two matching original exam paper posts must fail closed');
+assert.strictEqual(ambiguousOriginalExamResult.items[0].displayTarget, null, 'two matching report DailyPosts must also fail closed');
+
+const unverifiedOriginalExamResult = Pending.buildPendingTasks(baseOptions({
+  posts: [Object.assign({}, absenceOriginalExamPost, { examData: { main: null, exams: [] } })],
+  grades: [absenceExam],
+}));
+assert.strictEqual(unverifiedOriginalExamResult.items[0].paperTarget, null, 'an original quiz block without an exact ExamID mapping must fail closed');
+
+const answerOnlyOriginalExamResult = Pending.buildPendingTasks(baseOptions({
+  posts: [Object.assign({}, absenceOriginalExamPost, {
+    quiz: '[小考解答]https://example.com/absence-answer.pdf',
+    displayOptions: { quiz: { slot1Role: 'answer' } },
+  })],
+  grades: [absenceExam],
+}));
+assert.strictEqual(answerOnlyOriginalExamResult.items[0].displayTarget.dailyPostId, absenceOriginalExamPost.id, 'answer-only post still keeps the exact score-report target');
+assert.strictEqual(answerOnlyOriginalExamResult.items[0].paperTarget, null, 'an answer-only quiz slot must not expose a misleading original-paper action');
+
+const questionAndAnswerOriginalExamResult = Pending.buildPendingTasks(baseOptions({
+  posts: [Object.assign({}, absenceOriginalExamPost, {
+    quiz: '[小考卷]https://example.com/absence-question.pdf\n[小考解答]https://example.com/absence-answer.pdf',
+    displayOptions: { quiz: { slot1Role: 'question', slot2Role: 'answer' } },
+  })],
+  grades: [absenceExam],
+}));
+assert.strictEqual(questionAndAnswerOriginalExamResult.items[0].paperTarget.dailyPostId, absenceOriginalExamPost.id, 'an explicit question slot keeps exact original-paper navigation');
+
+const guidanceAbsenceExam = Object.assign({}, absenceExam, {
+  exam: '數學超前輔導題',
+  examId: 'exam_guidance_absence',
+  storedExamId: 'stored_guidance_absence',
+});
+const guidanceAbsencePost = {
+  id: 'guidance_absence_post',
+  date: '2026-08-02',
+  sourceClassKey: CURRENT_CLASS,
+  examData: { main: guidanceAbsenceExam, exams: [{ main: guidanceAbsenceExam, others: [] }] },
+};
+const guidanceAbsenceResult = Pending.buildPendingTasks(baseOptions({
+  posts: [guidanceAbsencePost],
+  grades: [guidanceAbsenceExam],
+  helpers: Object.assign({}, baseOptions().helpers, { isMathGuidanceExam: () => true }),
+}));
+assert.strictEqual(guidanceAbsenceResult.items[0].kind, 'guidance_absence');
+assert.strictEqual(guidanceAbsenceResult.items[0].displayTarget.dailyPostId, guidanceAbsencePost.id, 'guidance absence keeps its exact score-report navigation');
+assert.strictEqual(guidanceAbsenceResult.items[0].paperTarget, null, 'guidance absence does not expose an unrelated exam-paper secondary action');
+
 const mappedAbsenceWithLaterPosts = Pending.buildPendingTasks(baseOptions({
   posts: [
     { id: 'absence_latest_host_aug22', date: '2026-08-22', sourceClassKey: CURRENT_CLASS },
     { id: 'absence_later_host_aug15', date: '2026-08-15', sourceClassKey: CURRENT_CLASS },
+    absenceOriginalExamPost,
     absencePaper,
   ],
   grades: [absenceExam],
 }));
 assert.strictEqual(mappedAbsenceWithLaterPosts.items[0].reminderSourceDate, '2026-08-08', 'later posts do not move a mapped absence source beyond its exact paper');
+assert.strictEqual(mappedAbsenceWithLaterPosts.items[0].paperTarget.dailyPostId, absenceOriginalExamPost.id, 'later report hosts do not move the original exam-paper navigation target');
 assert.deepStrictEqual(
   Pending.getReminderDueItems({
     status: 'ready',
@@ -949,6 +1025,8 @@ const mappedPaper = {
 const mappedResult = Pending.buildPendingTasks(baseOptions({ posts: [latestPost, mappedPaper], grades: [lowExam] }));
 assert.strictEqual(mappedResult.items[0].paperTarget.dailyPostId, mappedPaper.id);
 assert.strictEqual(mappedResult.items[0].paperTarget.url, 'https://example.com/exact.pdf');
+assert.strictEqual(mappedResult.items[0].paperTarget.examId, lowExam.examId, 'mapped makeup-paper navigation retains the exact display ExamID');
+assert.strictEqual(mappedResult.items[0].paperTarget.storedExamId, lowExam.storedExamId, 'mapped makeup-paper navigation retains the exact stored ExamID');
 
 const reminderSourceExam = {
   date: '8/1 小考',
@@ -1028,6 +1106,8 @@ assert.strictEqual(builtMakeupResultTaskResult.items[0].date, '8/1 小考', 'mak
 assert.strictEqual(builtMakeupResultTaskResult.items[0].displayTarget.postDate, '2026-08-01');
 assert.strictEqual(builtMakeupResultTaskResult.items[0].paperTarget.dailyPostId, reminderSourceMakeupPost.id, 'exact ExamID links the 8/8 makeup paper');
 assert.strictEqual(builtMakeupResultTaskResult.items[0].paperTarget.postDate, '2026-08-08', 'the exact makeup paper carries its own 8/8 DailyPost date');
+assert.strictEqual(builtMakeupResultTaskResult.items[0].paperTarget.examId, reminderSourceExam.examId);
+assert.strictEqual(builtMakeupResultTaskResult.items[0].paperTarget.storedExamId, reminderSourceExam.storedExamId);
 assert.strictEqual(builtMakeupResultTaskResult.items[0].reminderSourceDate, '2026-08-08', 'the exact paper fixes the reminder source at 8/8');
 assert.strictEqual(builtMakeupResultTaskResult.items[0].reportTarget.postDate, '2026-08-22', 'navigation may keep moving to the latest DailyPost');
 assert.strictEqual(builtMakeupResultTaskResult.items[0].reportTarget.dailyPostId, reminderReportHostAug22.id);
@@ -1270,10 +1350,13 @@ const preview = Pending.normalizePreviewTasks([{
   reminderSourceDate: '2026-08-08',
   displayTarget: { tab: 'grades', examId: 'exam_1', url: 'javascript:alert(1)' },
   reportTarget: { tab: 'contact', dailyPostId: 'post_1', focus: 'makeup-result' },
+  paperTarget: { tab: 'contact', dailyPostId: 'paper_1', sourceClassKey: CURRENT_CLASS, examId: 'exam_1', section: 'makeup-paper' },
 }]);
 assert.strictEqual(preview[0].taskId, 'preview-one');
 assert.strictEqual(preview[0].reminderSourceDate, '2026-08-08', 'preview preserves the stable reminder source date');
 assert.strictEqual(preview[0].displayTarget.url, '', 'preview targets only retain http(s) URLs');
 assert.strictEqual(preview[0].reportTarget.dailyPostId, 'post_1');
+assert.strictEqual(preview[0].paperTarget.dailyPostId, 'paper_1', 'preview retains the exact paper navigation target');
+assert.strictEqual(preview[0].paperTarget.examId, 'exam_1');
 
 console.log('ebook pending tasks app tests passed');

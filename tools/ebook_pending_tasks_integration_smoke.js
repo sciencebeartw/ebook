@@ -40,7 +40,7 @@ function extractFunction(name) {
   return '';
 }
 
-check(html.includes('ebook_pending_tasks_app.js?v=20260811_pending_stable_source_v5'), 'pending UMD module must load with the stable-source cache bust before the app');
+check(html.includes('ebook_pending_tasks_app.js?v=20260811_pending_navigation_v6'), 'pending UMD module must load with the navigation cache bust before the app');
 check((html.match(/class="tab-item/g) || []).length === 4, 'student view must have exactly four tabs');
 check(html.includes('id="tab-pending" onclick="switchTab(3)"'), 'pending tab must retain numeric switchTab compatibility at index 3');
 check(html.includes('id="tab-content-3"'), 'pending tab content is missing');
@@ -120,9 +120,11 @@ check(pendingRender.includes("classList.toggle('is-reminder-due', reminderDue)")
 check(pendingRender.includes('reminderDue ? reminderDueItems.length : items.length'), 'red badge must count due items without hiding future pending items');
 check(html.includes('#tab-pending.is-reminder-due') && html.includes('.pending-card.is-reminder-due'), 'due-only red tab and card styles are missing');
 check(html.includes('--pending-accent: #f59e0b;') && html.includes('--pending-surface: #fffbeb;'), 'pre-due pending state must use the shared amber palette');
+check(html.includes('--pending-ink: #6f2f08;'), 'pending amber state must use the accessible warm-brown ink token');
 check(html.includes('#tab-pending.active:not(.is-reminder-due)') && html.includes('var(--pending-accent-light)'), 'pre-due pending tab must use amber independently of the subject theme');
-check(html.includes('background: linear-gradient(135deg, var(--pending-accent) 0%, #d97706 100%);'), 'pre-due pending actions must use the shared amber palette');
-check(html.includes('color: #451a03;'), 'amber actions must use readable dark-brown text');
+check(html.includes('background: linear-gradient(135deg, var(--pending-accent-light) 0%, var(--pending-accent) 100%);'), 'pre-due pending actions must use the accessible shared amber palette');
+check(html.includes('color: var(--pending-ink);'), 'amber actions and headings must use readable warm-brown text');
+check(html.includes('.pending-action-btn.secondary') && html.includes('background: #fff7e0;'), 'secondary paper actions must use a quieter pale-amber hierarchy');
 check(html.includes("<div class='pending-card-status'>記得儘快處理</div>"), 'due cards must use the approved natural reminder copy');
 check(!html.includes("<div class='pending-card-status'>提醒時間已到</div>"), 'due cards must not expose the mechanical reminder-time status');
 check(html.includes('.pending-card.is-reminder-due .pending-action-btn'), 'due-card actions must use the same reminder color family as the card state');
@@ -138,10 +140,24 @@ check(extractFunction('buildPendingTasksForCurrentView').includes('studentKeysBy
 check(html.includes("data-pending-post-anchor='1'"), 'daily posts need exact pending anchors');
 check(html.includes("data-pending-exam-anchor='1'"), 'exam cards need exact ExamID anchors');
 check(html.includes("data-pending-makeup-result-anchor='1'"), 'makeup result widget needs an exact anchor');
-check(html.includes("data-pending-paper-anchor='1'"), 'explicitly mapped makeup paper section needs an anchor');
+check(html.includes("buildPendingExamAnchorAttrs('data-pending-paper-anchor'"), 'explicitly mapped makeup paper section needs an exact ExamID anchor');
+check(html.includes("buildPendingExamAnchorAttrs('data-pending-exam-paper-anchor'"), 'original quiz section needs an exact ExamID anchor');
 const findTarget = extractFunction('findPendingTargetElement');
 check(findTarget.includes('pendingTargetMatchesExam'), 'pending navigation must match exact exam identity');
+check(findTarget.includes("examAnchor.querySelector('.score-report-section') || null"), 'absence navigation must highlight only the red score-report box');
+check(findTarget.includes("target.section === 'makeup-paper' || target.section === 'exam-paper'"), 'paper navigation must distinguish exact makeup and original-exam sections');
+check(!findTarget.includes("querySelector('[data-pending-paper-anchor]') || postAnchor"), 'paper navigation must never fall back to the whole DailyPost');
 check(!findTarget.includes('querySelector("#" +'), 'pending navigation must not interpolate untrusted IDs into selectors');
+
+const pendingRenderActions = extractFunction('renderPendingTasks');
+check(pendingRenderActions.includes("task.kind === 'makeup_result'") && pendingRenderActions.includes("'查看補考卷'"), 'makeup-result cards must keep the report action and expose only the exact makeup-paper secondary action');
+check(!pendingRenderActions.includes('查看原考試'), 'makeup-result cards must not retain the old original-exam secondary action');
+check(pendingRenderActions.includes("task.kind === 'absence'") && pendingRenderActions.includes('getPendingAbsencePaperActionLabel(task)'), 'absence cards must expose their exact original exam-paper action');
+const absencePaperLabel = extractFunction('getPendingAbsencePaperActionLabel');
+check(absencePaperLabel.includes('查看鑑定考卷') && absencePaperLabel.includes('查看複習考卷') && absencePaperLabel.includes('查看小考卷'), 'absence paper labels must reflect the requested exam types');
+check(absencePaperLabel.includes('查看隨堂考卷') && absencePaperLabel.includes('查看回家練習卷'), 'existing special exam types must not be mislabeled as a small quiz');
+const exactPaperTarget = extractFunction('isPendingExactPaperTarget');
+check(exactPaperTarget.includes('target.dailyPostId') && exactPaperTarget.includes('target.sourceClassKey') && exactPaperTarget.includes('target.examId'), 'paper buttons must require exact post, source class, and ExamID identity');
 
 const showDone = extractFunction('shouldShowHomeworkDoneButton');
 check(!showDone.includes('isTransferFormerClass'), 'verified former-class homework may expose the narrow done button');
@@ -163,6 +179,8 @@ check(html.includes("data-post-id='\" + escapeHtmlAttr(post.dailyPostId || post.
 check(html.includes('.pending-unavailable'), 'policy-unavailable UI is missing');
 check(html.includes('這次不會顯示數量'), 'unavailable policy must not present a false zero');
 check(html.includes('@media (max-width: 600px)'), 'four-tab/pending mobile layout is missing');
+check(html.includes('min-height: 44px;') && html.includes('.pending-action-btn { flex: 1 1 120px; }'), 'pending actions must retain 44px touch targets and wrapping at mobile width');
+check(html.includes('.score-btn {') && html.includes('min-width: 88px;') && html.includes('min-height: 44px;'), 'the focused absence-report submit action must remain a 44px touch target after wrapping');
 
 const rememberFeedbackJob = extractFunction('rememberAdminFeedbackJobForDashboard');
 check(rememberFeedbackJob.includes('browserIndexSaved = false'), 'background feedback jobs must track local progress-index persistence failures');
@@ -336,7 +354,78 @@ function checkLocalWriteClassRouting() {
   );
 }
 
+function checkPendingNavigationBehavior() {
+  const context = {};
+  vm.createContext(context);
+  vm.runInContext(extractFunction('pendingTargetMatchesPost'), context);
+  vm.runInContext(extractFunction('pendingTargetMatchesExam'), context);
+  vm.runInContext(exactPaperTarget, context);
+
+  const scoreReportBox = { marker: 'score-report-box' };
+  let currentScoreReportBox = scoreReportBox;
+  const examCard = {
+    dataset: { examId: 'exam-1', storedExamId: 'stored-1', examColIndex: '7' },
+    querySelector(selector) {
+      if (selector === '.score-report-section') return currentScoreReportBox;
+      return null;
+    },
+  };
+  const originalPaper = {
+    dataset: { examId: 'exam-1', storedExamId: 'stored-1', examColIndex: '7' },
+    querySelector() { return null; },
+  };
+  const makeupPaper = {
+    dataset: { examId: 'stored-1', storedExamId: 'stored-1', examColIndex: '' },
+    querySelector() { return null; },
+  };
+  const postAnchor = {
+    dataset: { postId: 'post-1', sourceClassKey: 'class-1', storedClassKey: 'class-1', postDate: '2026-08-02' },
+    querySelector() { return null; },
+    querySelectorAll(selector) {
+      if (selector === '[data-pending-exam-anchor]') return [examCard];
+      if (selector === '[data-pending-exam-paper-anchor]') return [originalPaper];
+      if (selector === '[data-pending-paper-anchor]') return [makeupPaper];
+      return [];
+    },
+  };
+  context.document = {
+    querySelectorAll(selector) {
+      if (selector === '[data-pending-post-anchor]') return [postAnchor];
+      if (selector === '[data-pending-exam-anchor]') return [examCard];
+      return [];
+    },
+  };
+  vm.runInContext(findTarget, context);
+
+  const absenceTarget = {
+    dailyPostId: 'post-1', sourceClassKey: 'class-1', postDate: '2026-08-02',
+    examId: 'exam-1', storedExamId: 'stored-1', colIndex: 7, section: 'absence-report',
+  };
+  check(context.findPendingTargetElement(absenceTarget) === scoreReportBox, 'absence navigation behavior must return only the exact red report box');
+  currentScoreReportBox = null;
+  check(context.findPendingTargetElement(absenceTarget) === null, 'absence navigation must fail closed when the red report box is absent');
+  currentScoreReportBox = scoreReportBox;
+
+  const originalPaperTarget = Object.assign({}, absenceTarget, { section: 'exam-paper' });
+  check(context.findPendingTargetElement(originalPaperTarget) === originalPaper, 'absence paper action must resolve the exact original quiz anchor');
+  check(context.findPendingTargetElement(Object.assign({}, originalPaperTarget, { examId: '', storedExamId: '' })) === null, 'original paper action without ExamID must fail closed');
+
+  const makeupPaperTarget = Object.assign({}, absenceTarget, { section: 'makeup-paper' });
+  check(context.findPendingTargetElement(makeupPaperTarget) === makeupPaper, 'makeup-result paper action must resolve the exact mapped makeup anchor');
+  check(context.findPendingTargetElement(Object.assign({}, makeupPaperTarget, { examId: 'wrong', storedExamId: 'wrong' })) === null, 'wrong ExamID must never fall back to another makeup paper or the whole post');
+
+  const labelContext = {};
+  vm.createContext(labelContext);
+  vm.runInContext(absencePaperLabel, labelContext);
+  check(labelContext.getPendingAbsencePaperActionLabel({ title: '8/2 小考 生物' }) === '查看小考卷', 'ordinary absence uses the small-quiz paper label');
+  check(labelContext.getPendingAbsencePaperActionLabel({ title: '8/2 鑑定考 生物' }) === '查看鑑定考卷', 'identification absence uses the identification-paper label');
+  check(labelContext.getPendingAbsencePaperActionLabel({ title: '8/2 複習考 生物' }) === '查看複習考卷', 'review absence uses the review-paper label');
+  check(labelContext.getPendingAbsencePaperActionLabel({ title: '8/2 隨堂考 生物' }) === '查看隨堂考卷', 'in-class absence keeps the in-class paper label');
+  check(labelContext.getPendingAbsencePaperActionLabel({ title: '8/2 回家練習卷 生物' }) === '查看回家練習卷', 'take-home absence keeps the take-home paper label');
+}
+
 checkLocalWriteClassRouting();
+checkPendingNavigationBehavior();
 
 checkPendingReminderBehavior().then(checkExactFormerHomeworkSubmitBehavior).then(() => {
   if (failures.length) {
