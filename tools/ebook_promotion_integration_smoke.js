@@ -17,7 +17,7 @@ function between(start, end) {
 
 assert.match(
   html,
-  /ebook_lifecycle_app\.js[^\n]+<\/script>[\s\S]*ebook_promotion_app\.js\?v=20260811_class_promotion_v1/,
+  /ebook_lifecycle_app\.js[^\n]+<\/script>[\s\S]*ebook_promotion_app\.js\?v=20260812_legacy_transfer_student_key/,
   'promotion helper must load after the lifecycle helper and before the main inline runtime'
 );
 assert.match(html, /session\.promotionContext \|\| null/, 'promotion context must come from the verified Functions session');

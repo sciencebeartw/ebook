@@ -249,6 +249,35 @@ const mixedTransitionContext = Promotion.normalizePromotionContext({
   currentStudentKey: 'student-c',
   allowedClassKeys: ['A', 'B', 'C'],
 });
+const legacyTransferContext = Promotion.normalizePromotionContext({
+  version: 1,
+  currentClassKey: 'C',
+  edges: [{
+    transitionKind: 'transfer',
+    transitionId: 'legacy-manual-transfer',
+    fromClassKey: 'B',
+    fromClassName: 'B 班',
+    toClassKey: 'C',
+    toClassName: 'C 班',
+    effectiveDate: '2026-06-21',
+    studentKey: 'student-c',
+  }],
+}, {
+  currentClassKey: 'C',
+  currentStudentKey: 'student-c',
+  allowedClassKeys: ['B', 'C'],
+});
+assert.strictEqual(legacyTransferContext.edges[0].sourceStudentKey, 'student-c',
+  'a verified legacy transfer session must remain readable when sourceStudentKey was not stored yet');
+assert.throws(() => Promotion.normalizePromotionContext({
+  version: 1,
+  currentClassKey: 'C',
+  edges: [edge({ sourceStudentKey: '' })],
+}, {
+  currentClassKey: 'C',
+  currentStudentKey: 'student-b',
+  allowedClassKeys: ['A', 'B', 'C'],
+}), /invalid-student-map/, 'formal promotion mappings must still require an explicit source student key');
 assert.ok(Promotion.getLineageKey(mixedTransitionContext, 'A'));
 assert.strictEqual(Promotion.getLineageKey(mixedTransitionContext, 'A'), Promotion.getLineageKey(mixedTransitionContext, 'B'));
 assert.strictEqual(Promotion.getLineageKey(mixedTransitionContext, 'C'), '', 'an explicit transfer must split promotion course lineages');

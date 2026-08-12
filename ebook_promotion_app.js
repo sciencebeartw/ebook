@@ -136,8 +136,11 @@
     var toClassName = text(edge.toClassName || toClassKey);
     var effectiveDate = text(edge.effectiveDate);
     var effectiveDateKey = dateKeyFromCanonical(effectiveDate);
-    var sourceStudentKey = text(edge.sourceStudentKey);
     var studentKey = text(edge.studentKey);
+    // promotionContext 只來自已驗證的 Functions session。舊版手動換班
+    // 尚未保存 sourceStudentKey，當且僅當它是 transfer 時沿用相同學生 key；
+    // 正式 promotion 仍必須提供完整 mapping，缺少時維持 fail closed。
+    var sourceStudentKey = text(edge.sourceStudentKey || (transitionKind === 'transfer' ? studentKey : ''));
     var transitionId = text(edge.transitionId || (transitionKind === 'promotion' ? promotionId : (edge.id || edge.transferId)));
     if (!transitionId) transitionId = [fromClassKey, toClassKey, effectiveDate, sourceStudentKey, studentKey].join('|');
     var storageMode = text(edge.storageMode);
