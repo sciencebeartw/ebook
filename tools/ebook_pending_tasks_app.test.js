@@ -19,6 +19,16 @@ assert.strictEqual(
   'function',
   'UMD build must attach to window'
 );
+assert.strictEqual(
+  Pending.formatPendingTaskTitle('**國中Book 1：**\n主題三 第95、97-98頁 / {blue:國中Book1填格格}[20260801課本填格格.pdf]https://firebasestorage.googleapis.com/v0/b/example.pdf?token=secret'),
+  '國中Book 1： 主題三 第95、97-98頁 / 國中Book1填格格 20260801課本填格格.pdf',
+  'pending cards keep readable labels while hiding formatting tokens and raw Storage URLs'
+);
+assert.strictEqual(
+  Pending.formatPendingTaskTitle('[下載講義](https://example.com/very-long.pdf) {red:{u:記得完成}}'),
+  '下載講義 記得完成',
+  'markdown links and nested DailyPost styling are rendered as plain readable text'
+);
 
 const CURRENT_CLASS = '115小六資優自然週六上午班';
 const STUDENT_KEY = '王小明';
@@ -857,6 +867,51 @@ assert.strictEqual(absenceResult.items[0].kind, 'absence');
 assert.strictEqual(absenceResult.items[0].neutralLabel, '請假考試待補');
 assert.strictEqual(absenceResult.items[0].displayTarget, null, 'absence report navigation without an exact DailyPost ExamID mapping must fail closed');
 assert.strictEqual(absenceResult.items[0].writeTarget.storedExamId, 'stored_absence');
+
+const secondSameDayAbsenceExam = Object.assign({}, absenceExam, {
+  date: '8/2 隨堂',
+  exam: '生物第 2 章',
+  colIndex: 31,
+  examId: 'exam_absence_second',
+  storedExamId: 'stored_absence_second',
+});
+const twoSameDayAbsences = Pending.buildPendingTasks(baseOptions({
+  grades: [absenceExam, secondSameDayAbsenceExam],
+}));
+assert.strictEqual(twoSameDayAbsences.items.length, 2, 'two same-day absences with distinct ExamIDs must produce two pending cards');
+assert.strictEqual(new Set(twoSameDayAbsences.items.map(item => item.taskId)).size, 2, 'same-day absence task identity must remain ExamID-scoped');
+
+const twoMappedExamPaperPost = {
+  id: 'two_mapped_exam_papers',
+  date: '2026-08-02',
+  sourceClassKey: CURRENT_CLASS,
+  quiz: '[隨堂考卷]https://example.com/classroom.pdf\n[小考卷]https://example.com/quiz.pdf',
+  displayOptions: {
+    quiz: {
+      slot1Role: 'question',
+      slot1Exam: { targetExamId: secondSameDayAbsenceExam.examId, sourceClassKey: CURRENT_CLASS },
+      slot2Role: 'question',
+      slot2Exam: { targetExamId: absenceExam.examId, sourceClassKey: CURRENT_CLASS },
+    },
+  },
+  examData: {
+    main: absenceExam,
+    exams: [
+      { main: secondSameDayAbsenceExam, others: [] },
+      { main: absenceExam, others: [] },
+    ],
+  },
+};
+const twoMappedExamAbsences = Pending.buildPendingTasks(baseOptions({
+  posts: [twoMappedExamPaperPost],
+  grades: [absenceExam, secondSameDayAbsenceExam],
+}));
+assert.strictEqual(twoMappedExamAbsences.items.length, 2, 'two exact per-paper ExamID mappings keep both absence tasks');
+const twoMappedExamTargets = Object.fromEntries(twoMappedExamAbsences.items.map(item => [item.sourceItemId, item.paperTarget]));
+assert.strictEqual(twoMappedExamTargets[absenceExam.storedExamId].dailyPostId, twoMappedExamPaperPost.id, 'small quiz absence keeps its exact mapped paper target');
+assert.strictEqual(twoMappedExamTargets[absenceExam.storedExamId].examId, absenceExam.examId, 'small quiz paper target retains its own ExamID');
+assert.strictEqual(twoMappedExamTargets[secondSameDayAbsenceExam.storedExamId].dailyPostId, twoMappedExamPaperPost.id, 'classroom exam absence keeps its exact mapped paper target');
+assert.strictEqual(twoMappedExamTargets[secondSameDayAbsenceExam.storedExamId].examId, secondSameDayAbsenceExam.examId, 'classroom paper target retains its own ExamID');
 
 const absencePaper = {
   id: 'absence_paper_exact',

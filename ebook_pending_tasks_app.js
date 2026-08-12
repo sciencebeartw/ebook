@@ -289,6 +289,27 @@
       .join(" / ");
   }
 
+  function formatPendingTaskTitle(value) {
+    var result = text(value);
+    var previous = "";
+    var pass = 0;
+    // DailyPost content supports small nested style tokens such as
+    // {red:{u:text}}. Pending cards only need the readable text.
+    while (result !== previous && pass < 6) {
+      previous = result;
+      result = result.replace(/\{(?:red|blue|mark|u):([^{}]*)\}/gi, "$1");
+      pass += 1;
+    }
+    return result
+      .replace(/\[([^\]]+)\]\(\s*https?:\/\/[^\s)]+\s*\)/gi, " $1")
+      .replace(/\[([^\]]+)\]\s*https?:\/\/\S+/gi, " $1")
+      .replace(/https?:\/\/\S+/gi, "")
+      .replace(/\*\*/g, "")
+      .replace(/[\r\n\t]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim() || "待完成項目";
+  }
+
   function isCompletedHomeworkScore(rawScore) {
     var raw = text(rawScore).trim();
     if (!raw || raw === "#N/A" || raw === "0" || raw === "０") return false;
@@ -398,6 +419,34 @@
   }
 
   function resolveOriginalExamPaperPost(posts, exam, helpers) {
+    var examIds = [exam && exam.examId, exam && exam.storedExamId].map(normalizeExamId).filter(Boolean);
+    var examDate = monthDayKey(exam && exam.date);
+    var examSource = text(exam && (exam.sourceClassKey || exam.storedClassKey)).trim();
+    if (examIds.length && examDate && examSource) {
+      var mappedMatches = (posts || []).filter(function(post) {
+        var postSource = text(post && (post.sourceClassKey || post.storedClassKey)).trim();
+        if (!post || !getPostRowKey(post) || !postSource || monthDayKey(post.date) !== examDate) return false;
+        if (!sourceMatches(examSource, postSource, helpers) || !hasNavigableOriginalExamPaper(post, helpers)) return false;
+        var options = helpers && typeof helpers.getDisplayOptions === "function"
+          ? helpers.getDisplayOptions(post)
+          : ((post && post.displayOptions) || {});
+        var quiz = options && typeof options === "object" && options.quiz && typeof options.quiz === "object"
+          ? options.quiz
+          : {};
+        var lines = text(post.quiz).split(/\n+/).map(function(line) { return line.trim(); }).filter(Boolean);
+        var mappedSlots = [quiz.slot1Exam, quiz.slot2Exam].filter(function(mapping, index) {
+          mapping = mapping && typeof mapping === "object" ? mapping : {};
+          var mappedExamId = normalizeExamId(mapping.targetExamId);
+          var mappedSource = text(mapping.sourceClassKey).trim();
+          var role = index === 0 ? quiz.slot1Role : quiz.slot2Role;
+          return !!lines[index] && role !== "answer" && mappedExamId && mappedSource === postSource &&
+            sourceMatches(examSource, mappedSource, helpers) && examIds.indexOf(mappedExamId) > -1;
+        });
+        return mappedSlots.length === 1;
+      });
+      if (mappedMatches.length === 1) return mappedMatches[0];
+      if (mappedMatches.length > 1) return null;
+    }
     return resolveExactExamPost(posts, exam, helpers, {
       requireQuiz: true,
       requireSinglePostExam: true
@@ -1097,6 +1146,7 @@
     normalizeReminderDueDateKey: normalizeReminderDueDateKey,
     getReminderDueItems: getReminderDueItems,
     isReminderDueState: isReminderDueState,
+    formatPendingTaskTitle: formatPendingTaskTitle,
     isCompletedHomeworkScore: isCompletedHomeworkScore,
     resolveHomeworkDoneRecord: resolveHomeworkDoneRecord,
     buildPendingTasks: buildPendingTasks,

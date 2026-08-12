@@ -3927,7 +3927,7 @@
   <script src="ebook_lifecycle_app.js?v=20260711_lifecycle_security_v2"></script>
   <script src="ebook_promotion_app.js?v=20260812_legacy_transfer_student_key"></script>
   <script src="gifted_homework_full_scores.js?v=20260720_geo3_question_count_v2"></script>
-  <script src="ebook_pending_tasks_app.js?v=20260812_promotion_skip_identity_v7"></script>
+  <script src="ebook_pending_tasks_app.js?v=20260812_pending_title_exam_papers_v9"></script>
 
   <!-- Webhook API & Firebase Polyfill (Replace google.script.run) -->
   <script>
@@ -6832,6 +6832,10 @@
             items.forEach(function(task) {
                 var primaryTargetKind = getPendingTaskPrimaryTargetKind(task);
                 var taskReminderDue = !!reminderDueTaskIds[task.taskId];
+                var pendingTitle = window.EbookPendingTasks &&
+                    typeof window.EbookPendingTasks.formatPendingTaskTitle === 'function'
+                    ? window.EbookPendingTasks.formatPendingTaskTitle(task.title)
+                    : (task.title || '待完成項目');
                 var secondaryActionHtml = '';
                 if (task.kind === 'makeup_result') {
                     secondaryActionHtml = buildPendingTaskActionButton(task, 'paper', '查看補考卷', 'paper');
@@ -6843,7 +6847,7 @@
                 html += "<article class='pending-card" + (taskReminderDue ? " is-reminder-due" : "") + "' data-pending-task-card='" + escapeHtmlAttr(task.taskId || '') + "'>" +
                     "<div class='pending-card-head'><div class='pending-card-label'>" + escapeHtml(task.neutralLabel || '待完成項目') + "</div>" +
                     "<div class='pending-card-date'>" + escapeHtml(task.date || '') + "</div></div>" +
-                    "<div class='pending-card-title'>" + escapeHtml(task.title || '待完成項目') + "</div>" +
+                    "<div class='pending-card-title'>" + escapeHtml(pendingTitle) + "</div>" +
                     (taskReminderDue ? "<div class='pending-card-status'>記得儘快處理</div>" : '') +
                     (task.sourceClassName && task.sourceClassName !== (gData && gData.className) ? "<div class='pending-card-source'>來源：" + escapeHtml(task.sourceClassName) + "</div>" : '') +
                     "<div class='pending-card-actions'>" +

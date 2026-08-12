@@ -40,7 +40,7 @@ function extractFunction(name) {
   return '';
 }
 
-check(html.includes('ebook_pending_tasks_app.js?v=20260812_promotion_skip_identity_v7'), 'pending UMD module must load with the promotion skip identity cache bust before the app');
+check(html.includes('ebook_pending_tasks_app.js?v=20260812_pending_title_exam_papers_v9'), 'pending UMD module must load with the pending-title and per-paper cache bust before the app');
 check((html.match(/class="tab-item/g) || []).length === 4, 'student view must have exactly four tabs');
 check(html.includes('id="tab-pending" onclick="switchTab(3)"'), 'pending tab must retain numeric switchTab compatibility at index 3');
 check(html.includes('id="tab-content-3"'), 'pending tab content is missing');
