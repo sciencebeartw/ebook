@@ -97,6 +97,8 @@ check(closeEmergency.includes('maybeShowPendingEntryReminder'), 'pending reminde
 const pendingReminder = extractFunction('maybeShowPendingEntryReminder');
 const pendingIdentity = extractFunction('getPendingReminderSessionIdentity');
 const pendingRender = extractFunction('renderPendingTasks');
+check(html.includes('outline: 4px solid rgba(225, 29, 72, 0);'), 'pending target highlight must return to transparent red instead of flashing the old blue outline');
+check(!html.includes('outline: 4px solid rgba(37, 99, 235, 0.35);'), 'pending target highlight must not retain a blue fallback outline after the red pulse');
 check(pendingReminder.includes('pendingReminderShownSessionIdentity'), 'pending reminder must be limited to one per login session');
 check(pendingReminder.includes('wasPendingReminderShownInBrowserSession'), 'a same-tab page reload must not repeat the same due-slot reminder');
 check(pendingReminder.includes('markPendingReminderShownInBrowserSession'), 'shown reminders must persist for the current browser-tab session');
