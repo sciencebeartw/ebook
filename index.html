@@ -3374,6 +3374,96 @@
             font-weight: bold;
         }
 
+        .loader-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        .loader-session-label,
+        .loader-session-title,
+        .loader-session-hint {
+            display: none;
+        }
+
+        .loader-overlay.ebook-session-bootstrap {
+            box-sizing: border-box;
+            min-height: 100vh;
+            min-height: 100dvh;
+            z-index: 2147483000;
+            padding: max(24px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+            background: linear-gradient(145deg, #f0fdf4 0%, #f8fafc 55%, #ecfdf5 100%);
+        }
+
+        .loader-overlay.ebook-session-bootstrap .loader-panel {
+            box-sizing: border-box;
+            width: min(520px, 100%);
+            padding: clamp(32px, 6vw, 52px) clamp(24px, 6vw, 48px);
+            background: rgba(255, 255, 255, 0.96);
+            border: 1px solid #bbf7d0;
+            border-radius: 28px;
+            box-shadow: 0 24px 65px rgba(15, 118, 110, 0.15);
+        }
+
+        .loader-overlay.ebook-session-bootstrap .loader {
+            width: 68px;
+            height: 68px;
+            margin-bottom: 24px;
+            border-width: 7px;
+            border-color: #dcfce7;
+            border-top-color: #16a34a;
+        }
+
+        .loader-overlay.ebook-session-bootstrap .loader-session-label {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 38px;
+            padding: 6px 16px;
+            margin-bottom: 16px;
+            border-radius: 999px;
+            background: #dcfce7;
+            color: #166534;
+            font-size: 16px;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+        }
+
+        .loader-overlay.ebook-session-bootstrap .loader-session-title {
+            display: block;
+            margin: 0 0 14px;
+            color: #14532d;
+            font-size: clamp(26px, 5vw, 34px);
+            font-weight: 900;
+            line-height: 1.35;
+        }
+
+        .loader-overlay.ebook-session-bootstrap .loader-text {
+            margin: 0;
+            color: #334155;
+            font-size: clamp(18px, 3vw, 21px);
+            font-weight: 700;
+            line-height: 1.7;
+        }
+
+        .loader-overlay.ebook-session-bootstrap .loader-session-hint {
+            display: block;
+            margin-top: 18px;
+            color: #64748b;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .loader-overlay.ebook-session-bootstrap .loader {
+                animation: none;
+                border-color: #bbf7d0;
+                border-top-color: #16a34a;
+            }
+        }
+
         #loader {
             display: none;
             margin: 20px auto;
@@ -5986,8 +6076,13 @@
         </script>
 
         <div class="app-container" id="appContainer" style="display: none;"><div id="full-loader" class="loader-overlay">
-            <div class="loader" style="display:block;"></div>
-            <div class="loader-text">資料載入中...</div>
+            <div class="loader-panel">
+                <div class="loader" style="display:block;"></div>
+                <div class="loader-session-label" id="ebookSessionLoaderLabel">安全連線</div>
+                <div class="loader-session-title" id="ebookSessionLoaderTitle">正在開啟聯絡簿</div>
+                <div class="loader-text" id="ebookSessionLoaderText">資料載入中...</div>
+                <div class="loader-session-hint">請不要關閉這個頁面</div>
+            </div>
         </div>
 
         <!-- 緊急彈窗 -->
@@ -7628,6 +7723,7 @@
         }
 
         function enterStudentView(result, pass) {
+            resetEbookSessionBootstrapLoader();
             document.getElementById('full-loader').style.display = 'none';
             clearRealtimeListeners();
             var activeSession = ebookAuthSessionInfo || ebookGodSessionInfo || {};
@@ -11324,14 +11420,41 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }, 60 * 1000);
         }
 
+        function showEbookSessionBootstrapLoader(viewLabel) {
+            var loader = document.getElementById('full-loader');
+            if (!loader) return;
+            var safeLabel = String(viewLabel || '安全連線');
+            var label = document.getElementById('ebookSessionLoaderLabel');
+            var title = document.getElementById('ebookSessionLoaderTitle');
+            var text = document.getElementById('ebookSessionLoaderText');
+            if (label) label.textContent = safeLabel;
+            if (title) title.textContent = viewLabel ? ('正在開啟' + safeLabel) : '正在開啟聯絡簿';
+            if (text) text.textContent = '正在載入聯絡簿資料，請稍候…';
+            loader.classList.add('ebook-session-bootstrap');
+            loader.style.display = 'flex';
+        }
+
+        function resetEbookSessionBootstrapLoader() {
+            var loader = document.getElementById('full-loader');
+            if (!loader) return;
+            loader.classList.remove('ebook-session-bootstrap');
+            var label = document.getElementById('ebookSessionLoaderLabel');
+            var title = document.getElementById('ebookSessionLoaderTitle');
+            var text = document.getElementById('ebookSessionLoaderText');
+            if (label) label.textContent = '安全連線';
+            if (title) title.textContent = '正在開啟聯絡簿';
+            if (text) text.textContent = '資料載入中...';
+        }
+
         async function enterEbookGodSession(sessionId) {
-            document.getElementById('full-loader').style.display = 'flex';
+            showEbookSessionBootstrapLoader('');
             try {
                 ebookGodSessionId = sessionId;
                 var session = await renewEbookGodSession(true);
                 if (!session || !session.className || !session.studentName) throw new Error('session 資料不完整');
                 isStudentPreviewMode = !!(session.viewMode === 'student_preview' || (session.permissions && session.permissions.studentPreview === true));
                 isAdminMode = !isStudentPreviewMode;
+                showEbookSessionBootstrapLoader(isStudentPreviewMode ? '學生視角' : '上帝視角');
                 session.pendingPolicy = isStudentPreviewMode
                     ? await loadEbookPendingTaskPolicy()
                     : getTeacherGodHiddenPendingPolicy();
@@ -11343,15 +11466,18 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                         enterStudentView(result, isStudentPreviewMode ? 'student_preview' : 'god_session');
                     } else {
                         swalAlert('查無此學生資料', '請回行政中心重新開啟學生畫面。', 'warning');
+                        resetEbookSessionBootstrapLoader();
                         document.getElementById('full-loader').style.display = 'none';
                     }
                 }).withFailureHandler(function(e) {
                     swalAlert('學生畫面載入失敗', e && e.message ? e.message : String(e), 'error');
+                    resetEbookSessionBootstrapLoader();
                     document.getElementById('full-loader').style.display = 'none';
                 }).getStudentDataByAdmin(session.className, session.studentName, 'god_session');
             } catch (err) {
                 isStudentPreviewMode = false;
                 swalAlert('學生畫面連線已失效', err && err.message ? err.message : '請回行政中心重新開啟。', 'warning');
+                resetEbookSessionBootstrapLoader();
                 document.getElementById('full-loader').style.display = 'none';
             }
         }
