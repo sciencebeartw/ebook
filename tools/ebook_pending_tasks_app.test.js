@@ -1342,6 +1342,63 @@ const otherClassSkipResult = Pending.buildPendingTasks(baseOptions({
 }));
 assert.strictEqual(otherClassSkipResult.items.length, 1, 'a skip from another current class must not leak across classes');
 
+const promotedOldAbsence = {
+  date: '2/7隨堂考',
+  exam: '化學反應式',
+  score: '假',
+  scoreNum: null,
+  colIndex: 30,
+  examId: 'exam_promoted_old_absence',
+  storedExamId: 'exam_promoted_old_absence',
+  sourceClassKey: PROMOTED_OLD_CLASS,
+  sourceClassName: PROMOTED_OLD_CLASS,
+  storedClassKey: PROMOTED_CURRENT_CLASS,
+  storedClassName: PROMOTED_CURRENT_CLASS,
+};
+const promotedStorageSkipIdentity = Pending.buildSkipIdentity({
+  classKey: PROMOTED_CURRENT_CLASS,
+  studentKey: STUDENT_KEY,
+  itemType: 'makeup',
+  sourceClassKey: PROMOTED_CURRENT_CLASS,
+  sourceItemId: promotedOldAbsence.examId,
+});
+const promotedOldAbsenceResult = Pending.buildPendingTasks(baseOptions({
+  classKey: PROMOTED_CURRENT_CLASS,
+  className: PROMOTED_CURRENT_CLASS,
+  grades: [promotedOldAbsence],
+  pendingPolicy: {
+    status: 'ready',
+    items: [{ classKey: PROMOTED_CURRENT_CLASS, itemKey: promotedStorageSkipIdentity.itemKey }],
+  },
+  helpers: Object.assign({}, baseOptions().helpers, {
+    isExamSourceClassWritable: () => true,
+    getLegacyPendingSkipSourceClassKeys: sourceClassKey =>
+      sourceClassKey === PROMOTED_OLD_CLASS ? [PROMOTED_CURRENT_CLASS] : [],
+  }),
+}));
+assert.strictEqual(
+  promotedOldAbsenceResult.items.length,
+  0,
+  'a signed same-grid promotion must honor a pre-registry skip stored with the current storage class identity'
+);
+const unverifiedCrossClassSkipResult = Pending.buildPendingTasks(baseOptions({
+  classKey: PROMOTED_CURRENT_CLASS,
+  className: PROMOTED_CURRENT_CLASS,
+  grades: [promotedOldAbsence],
+  pendingPolicy: {
+    status: 'ready',
+    items: [{ classKey: PROMOTED_CURRENT_CLASS, itemKey: promotedStorageSkipIdentity.itemKey }],
+  },
+  helpers: Object.assign({}, baseOptions().helpers, {
+    isExamSourceClassWritable: () => true,
+  }),
+}));
+assert.strictEqual(
+  unverifiedCrossClassSkipResult.items.length,
+  1,
+  'without a signed promotion lineage, a current-class skip must not suppress another logical source class'
+);
+
 const preview = Pending.normalizePreviewTasks([{
   taskId: 'preview.one',
   kind: 'makeup_result',

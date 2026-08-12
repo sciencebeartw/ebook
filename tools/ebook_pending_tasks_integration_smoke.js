@@ -40,7 +40,7 @@ function extractFunction(name) {
   return '';
 }
 
-check(html.includes('ebook_pending_tasks_app.js?v=20260811_pending_navigation_v6'), 'pending UMD module must load with the navigation cache bust before the app');
+check(html.includes('ebook_pending_tasks_app.js?v=20260812_promotion_skip_identity_v7'), 'pending UMD module must load with the promotion skip identity cache bust before the app');
 check((html.match(/class="tab-item/g) || []).length === 4, 'student view must have exactly four tabs');
 check(html.includes('id="tab-pending" onclick="switchTab(3)"'), 'pending tab must retain numeric switchTab compatibility at index 3');
 check(html.includes('id="tab-content-3"'), 'pending tab content is missing');
@@ -133,7 +133,10 @@ check(html.includes('background: linear-gradient(180deg, #fff 0%, #fff1f2 100%);
 
 const writableExamSource = extractFunction('isPendingExamSourceClassWritable');
 check(writableExamSource.includes('getHomeworkDoneCourseAliasKey'), 'exam writeability must allow only current class or an explicit natural-advanced cohort alias');
-check(extractFunction('getPendingTaskHelpers').includes('isExamSourceClassWritable: isPendingExamSourceClassWritable'), 'pending derivation must enforce the exam-source writeability helper');
+const pendingHelpers = extractFunction('getPendingTaskHelpers');
+check(pendingHelpers.includes('isExamSourceClassWritable: isPendingExamSourceClassWritable'), 'pending derivation must enforce the exam-source writeability helper');
+check(pendingHelpers.includes('getLegacyPendingSkipSourceClassKeys'), 'pending derivation must expose the signed same-grid skip compatibility helper');
+check(pendingHelpers.includes('EbookPromotionApp.getLineageKey'), 'cross-class skip compatibility must be bounded by the verified promotion lineage');
 check(extractFunction('buildPendingTasksForCurrentView').includes('cohortHomeworkDoneRoot: gData.cohortHomeworkDoneRoot || null'), 'pending done state must receive the class-scoped cohort root');
 check(extractFunction('buildPendingTasksForCurrentView').includes('studentKeysByClassKey: gData.studentKeysByClassKey || null'), 'pending done state must receive verified class-scoped student keys');
 

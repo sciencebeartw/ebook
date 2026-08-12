@@ -516,15 +516,34 @@
       sourceItemId: base.sourceItemId
     });
     if (!identity) return null;
-    var legacySkipIdentities = (base.legacySourceItemIds || []).map(function(sourceItemId) {
-      return buildSkipIdentity({
-        classKey: context.classKey,
-        studentKey: context.studentKey,
-        itemType: base.itemType,
-        sourceClassKey: base.sourceClassKey,
-        sourceItemId: sourceItemId
+    var legacySourceClassKeys = context.helpers &&
+      typeof context.helpers.getLegacyPendingSkipSourceClassKeys === "function"
+      ? context.helpers.getLegacyPendingSkipSourceClassKeys(base.sourceClassKey, base)
+      : [];
+    var sourceClassKeys = [base.sourceClassKey].concat(
+      Array.isArray(legacySourceClassKeys) ? legacySourceClassKeys : [legacySourceClassKeys]
+    ).map(text).filter(function(value, index, list) {
+      return !!value && list.indexOf(value) === index;
+    });
+    var sourceItemIds = [base.sourceItemId].concat(base.legacySourceItemIds || []).map(text).filter(function(value, index, list) {
+      return !!value && list.indexOf(value) === index;
+    });
+    var legacySkipIdentities = [];
+    sourceClassKeys.forEach(function(sourceClassKey) {
+      sourceItemIds.forEach(function(sourceItemId) {
+        if (sourceClassKey === text(base.sourceClassKey) && sourceItemId === text(base.sourceItemId)) return;
+        var legacyIdentity = buildSkipIdentity({
+          classKey: context.classKey,
+          studentKey: context.studentKey,
+          itemType: base.itemType,
+          sourceClassKey: sourceClassKey,
+          sourceItemId: sourceItemId
+        });
+        if (legacyIdentity && !legacySkipIdentities.some(function(existing) {
+          return existing.lookupKey === legacyIdentity.lookupKey;
+        })) legacySkipIdentities.push(legacyIdentity);
       });
-    }).filter(Boolean);
+    });
     return Object.assign({}, base, {
       taskId: identity.itemKey,
       skipIdentity: identity,
@@ -762,7 +781,8 @@
     var context = {
       classKey: safeSegment(options.classKey || options.className),
       className: text(options.className),
-      studentKey: safeSegment(options.studentKey)
+      studentKey: safeSegment(options.studentKey),
+      helpers: helpers
     };
     if (!context.classKey || !context.studentKey) return { status: "unavailable", items: [], policy: policy };
 

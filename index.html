@@ -3926,7 +3926,7 @@
   <script src="ebook_lifecycle_app.js?v=20260711_lifecycle_security_v2"></script>
   <script src="ebook_promotion_app.js?v=20260812_legacy_transfer_student_key"></script>
   <script src="gifted_homework_full_scores.js?v=20260720_geo3_question_count_v2"></script>
-  <script src="ebook_pending_tasks_app.js?v=20260811_pending_navigation_v6"></script>
+  <script src="ebook_pending_tasks_app.js?v=20260812_promotion_skip_identity_v7"></script>
 
   <!-- Webhook API & Firebase Polyfill (Replace google.script.run) -->
   <script>
@@ -6674,6 +6674,18 @@
                     return [dateKey, safeKey((post && post.date) || '')].filter(function(value, index, list) {
                         return !!value && list.indexOf(value) === index;
                     });
+                },
+                getLegacyPendingSkipSourceClassKeys: function(sourceClassKey) {
+                    var currentClassKey = safeKey(gData && gData.className || '');
+                    var normalizedSourceClassKey = safeKey(sourceClassKey || '');
+                    if (!currentClassKey || !normalizedSourceClassKey || currentClassKey === normalizedSourceClassKey ||
+                        !window.EbookPromotionApp || typeof window.EbookPromotionApp.getLineageKey !== 'function') return [];
+                    var context = gData && gData.promotionContext;
+                    var currentLineage = window.EbookPromotionApp.getLineageKey(context, currentClassKey);
+                    var sourceLineage = window.EbookPromotionApp.getLineageKey(context, normalizedSourceClassKey);
+                    // 只相容 Functions session 已簽定的 same-grid promotion lineage；
+                    // 一般換班或未驗證的名稱別名不允許跨班套用略過紀錄。
+                    return currentLineage && currentLineage === sourceLineage ? [currentClassKey] : [];
                 },
                 getPostHomeworkText: getPostHomeworkText,
                 getLatestScoreReportInfo: getLatestMakeupReportInfo,
