@@ -50,6 +50,10 @@ if (context.getDailyPostHomeworkNoteMode({ displayOptions: { homework: { noteMod
 }
 const quiz = context.getDailyPostQuizOptions({ displayOptions: { quiz: { slot2Role: 'answer', noteMode: 'provided' } } });
 if (quiz.slot2Role !== 'answer' || quiz.noteMode !== 'provided') throw new Error('quiz answer role contract failed');
+const mappedQuiz = context.getDailyPostQuizOptions({ displayOptions: { quiz: { slot1Exam: { targetExamId: 'exam_a' }, slot2Exam: { targetExamId: 'exam_b' } } } });
+if (mappedQuiz.slot1Exam.targetExamId !== 'exam_a' || mappedQuiz.slot2Exam.targetExamId !== 'exam_b') {
+  throw new Error('per-slot quiz ExamID mappings must survive displayOptions parsing');
+}
 
 [
   'linkMode === "homework"',

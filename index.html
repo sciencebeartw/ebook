@@ -9754,7 +9754,21 @@
                     if (types.length === 1) return "今日" + types[0] + "考卷";
                     return "今日考卷";
                 }
-                function getPostPendingExamPaperIdentity(postData) {
+                function getPostMappedQuizIdentity(postData, index) {
+                    var quiz = getDailyPostQuizOptions(postData);
+                    var mapping = index === 1 ? quiz.slot2Exam : quiz.slot1Exam;
+                    mapping = mapping && typeof mapping === 'object' ? mapping : {};
+                    var mappedExamId = (mapping.targetExamId || '').toString().trim();
+                    var mappedSource = (mapping.sourceClassKey || '').toString().trim();
+                    var postSource = ((postData && (postData.sourceClassKey || postData.storedClassKey)) || '').toString().trim();
+                    if (!mappedExamId || !mappedSource || !postSource || mappedSource !== postSource) return null;
+                    return { examId: mappedExamId, storedExamId: mappedExamId, colIndex: '' };
+                }
+                function getPostPendingExamPaperIdentity(postData, index) {
+                    if (index === 0 || index === 1) {
+                        var mapped = getPostMappedQuizIdentity(postData, index);
+                        if (mapped) return mapped;
+                    }
                     var examData = postData && postData.examData;
                     if (!examData || typeof examData !== 'object') return null;
                     var exams = Array.isArray(examData.exams) && examData.exams.length
@@ -9799,9 +9813,10 @@
                     var quizText = postData.quiz || "";
                     var lines = splitPostMultiLinkValue(quizText);
                     var quizOptions = getDailyPostQuizOptions(postData);
-                    var pendingExamPaperIdentity = getPostPendingExamPaperIdentity(postData);
+                    var legacyPendingExamPaperIdentity = getPostPendingExamPaperIdentity(postData, -1);
                     var hasExplicitRoles = quizOptions.slot1Role === "answer" || quizOptions.slot2Role === "answer";
-                    if (hasExplicitRoles) {
+                    var hasExactSlotMappings = !!getPostMappedQuizIdentity(postData, 0) || !!getPostMappedQuizIdentity(postData, 1);
+                    if (hasExplicitRoles || hasExactSlotMappings) {
                         var explicitFields = lines.map(function(line, index) {
                             var role = index === 0 ? quizOptions.slot1Role : quizOptions.slot2Role;
                             var type = getPostLineExamType(line) || "考卷";
@@ -9809,7 +9824,7 @@
                                 label: role === "answer" ? ("今日" + type + "解答") : (type === "考卷" ? "今日考卷" : ("今日" + type + "考卷")),
                                 val: line,
                                 extra: "",
-                                pendingExamPaper: role === "answer" ? null : pendingExamPaperIdentity
+                                pendingExamPaper: role === "answer" ? null : getPostPendingExamPaperIdentity(postData, index)
                             };
                         });
                         if (explicitFields.length) explicitFields[explicitFields.length - 1].extra = buildScienceQuizAnswerNote(postData);
@@ -9826,13 +9841,13 @@
                         groups[label].push(line);
                     });
                     if (order.length <= 1) {
-                        return [{ label: getPostQuizFieldLabel(postData), val: quizText, extra: buildScienceQuizAnswerNote(postData), pendingExamPaper: pendingExamPaperIdentity }];
+                        return [{ label: getPostQuizFieldLabel(postData), val: quizText, extra: buildScienceQuizAnswerNote(postData), pendingExamPaper: legacyPendingExamPaperIdentity }];
                     }
                     var html = order.map(function(label) {
                         var subtitle = label === "今日考卷" ? "其他考卷" : label;
                         return "<div class='info-subsection'><span class='info-subtitle'>" + subtitle + "</span>" + parseBtn(groups[label].join("\n")) + buildScienceQuizAnswerNote({ quiz: groups[label].join("\n"), title: postData.title, progress: postData.progress }) + "</div>";
                     }).join("");
-                    return [{ label: "今日考卷", val: "", extra: html, pendingExamPaper: pendingExamPaperIdentity }];
+                    return [{ label: "今日考卷", val: "", extra: html, pendingExamPaper: legacyPendingExamPaperIdentity }];
                 }
                 function buildPostMakeupExtra(postData, extraHtml) {
                     var lines = splitPostMultiLinkValue(postData.makeup || "");

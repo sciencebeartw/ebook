@@ -153,7 +153,13 @@ check(makeupExtra.includes("\"<div class='info-subsection'\" + pendingPaperAttr"
 check(!postInfoBlock.includes("buildPendingExamAnchorAttrs('data-pending-paper-anchor'"), 'mapped makeup paper anchor must not highlight the whole makeup block');
 check((makeupExtra.match(/pendingPaperAttr/g) || []).length === 2, 'only the makeup question subsection may carry the exact paper anchor');
 const originalPaperIdentity = extractFunction('getPostPendingExamPaperIdentity');
+const mappedQuizIdentity = extractFunction('getPostMappedQuizIdentity');
+const quizFields = extractFunction('buildPostQuizFields');
+check(mappedQuizIdentity.includes('quiz.slot2Exam') && mappedQuizIdentity.includes('quiz.slot1Exam'), 'each quiz slot must resolve its own persisted ExamID mapping');
+check(mappedQuizIdentity.includes('mappedSource !== postSource'), 'quiz mappings from another source class must fail closed');
+check(originalPaperIdentity.includes('getPostMappedQuizIdentity(postData, index)'), 'exact per-slot mapping must outrank legacy same-date inference');
 check(originalPaperIdentity.includes('if (exams.length !== 1) return null'), 'multiple quiz ExamIDs must fail closed instead of locating the first paper');
+check(quizFields.includes('getPostPendingExamPaperIdentity(postData, index)'), 'two question papers must each render an exact independent anchor');
 const findTarget = extractFunction('findPendingTargetElement');
 check(findTarget.includes('pendingTargetMatchesExam'), 'pending navigation must match exact exam identity');
 check(findTarget.includes("examAnchor.querySelector('.score-report-section') || null"), 'absence navigation must highlight only the red score-report box');
