@@ -9837,7 +9837,8 @@
                 function buildPostMakeupExtra(postData, extraHtml) {
                     var lines = splitPostMultiLinkValue(postData.makeup || "");
                     var parts = [];
-                    if (lines[0]) parts.push("<div class='info-subsection'><span class='info-subtitle'>考卷題目</span>" + parseBtn(lines[0]) + "</div>");
+                    var pendingPaperAttr = buildPendingExamAnchorAttrs('data-pending-paper-anchor', getPostMappedMakeupIdentity(postData));
+                    if (lines[0]) parts.push("<div class='info-subsection'" + pendingPaperAttr + "><span class='info-subtitle'>考卷題目</span>" + parseBtn(lines[0]) + "</div>");
                     if (lines.length > 1) parts.push("<div class='info-subsection'><span class='info-subtitle'>考卷答案</span>" + parseBtn(lines.slice(1).join("\n")) + "</div>");
                     if (extraHtml) parts.push(extraHtml);
                     return parts.join("");
@@ -9855,21 +9856,15 @@
                     if (!f.val && !f.extra) return "";
                     var kind = getPostInfoKind(f.label);
                     var noteHtml = f.labelNote ? "<span class='info-label-note'>" + f.labelNote + "</span>" : "";
-                    var pendingPaperAttr = kind === 'makeup'
-                        ? buildPendingExamAnchorAttrs('data-pending-paper-anchor', getPostMappedMakeupIdentity(post))
-                        : "";
                     var pendingExamPaperAttr = kind === 'quiz'
                         ? buildPendingExamAnchorAttrs('data-pending-exam-paper-anchor', f.pendingExamPaper)
                         : "";
                     var pendingHomeworkAttr = kind === 'homework' ? " data-pending-homework-anchor='1'" : "";
-                    return "<section class='info-block info-kind-" + kind + "'" + pendingPaperAttr + pendingExamPaperAttr + pendingHomeworkAttr + "><div class='info-label'>" + f.label + "</div>" + noteHtml + "<div class='info-content'>" + parseBtn(f.val || "", f.linkMode || "auto") + (f.extra || "") + "</div></section>";
+                    return "<section class='info-block info-kind-" + kind + "'" + pendingExamPaperAttr + pendingHomeworkAttr + "><div class='info-label'>" + f.label + "</div>" + noteHtml + "<div class='info-content'>" + parseBtn(f.val || "", f.linkMode || "auto") + (f.extra || "") + "</div></section>";
                 }
                 function buildPostMakeupFields(postData, extraHtml) {
                     var lines = splitPostMultiLinkValue(postData.makeup || "");
                     var note = lines.length > 0 ? "補考題目也很適合當作加強練習，已達標的同學也可以下載挑戰" : "";
-                    if (lines.length <= 1) {
-                        return [{ label: "今日補考考卷", labelNote: note, val: postData.makeup, extra: extraHtml }];
-                    }
                     return [{
                         label: "今日補考考卷",
                         labelNote: note,

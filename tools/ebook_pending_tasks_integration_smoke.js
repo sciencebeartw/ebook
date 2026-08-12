@@ -147,6 +147,13 @@ check(html.includes("data-pending-exam-anchor='1'"), 'exam cards need exact Exam
 check(html.includes("data-pending-makeup-result-anchor='1'"), 'makeup result widget needs an exact anchor');
 check(html.includes("buildPendingExamAnchorAttrs('data-pending-paper-anchor'"), 'explicitly mapped makeup paper section needs an exact ExamID anchor');
 check(html.includes("buildPendingExamAnchorAttrs('data-pending-exam-paper-anchor'"), 'original quiz section needs an exact ExamID anchor');
+const makeupExtra = extractFunction('buildPostMakeupExtra');
+const postInfoBlock = extractFunction('renderPostInfoBlock');
+check(makeupExtra.includes("\"<div class='info-subsection'\" + pendingPaperAttr"), 'mapped makeup paper anchor must be attached only to the question subsection');
+check(!postInfoBlock.includes("buildPendingExamAnchorAttrs('data-pending-paper-anchor'"), 'mapped makeup paper anchor must not highlight the whole makeup block');
+check((makeupExtra.match(/pendingPaperAttr/g) || []).length === 2, 'only the makeup question subsection may carry the exact paper anchor');
+const originalPaperIdentity = extractFunction('getPostPendingExamPaperIdentity');
+check(originalPaperIdentity.includes('if (exams.length !== 1) return null'), 'multiple quiz ExamIDs must fail closed instead of locating the first paper');
 const findTarget = extractFunction('findPendingTargetElement');
 check(findTarget.includes('pendingTargetMatchesExam'), 'pending navigation must match exact exam identity');
 check(findTarget.includes("examAnchor.querySelector('.score-report-section') || null"), 'absence navigation must highlight only the red score-report box');
