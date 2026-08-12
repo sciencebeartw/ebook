@@ -130,6 +130,28 @@
             gap: 12px;
             padding: 8px 4px 2px;
         }
+        .pwa-home-guide-entry {
+            display: none;
+            padding: 10px 14px 0;
+        }
+        .pwa-home-guide-button {
+            width: 100%;
+            min-height: 48px;
+            border: 1px solid #86efac;
+            border-radius: 14px;
+            background: linear-gradient(135deg, #f0fdf4, #ecfeff);
+            color: #166534;
+            font: inherit;
+            font-weight: 900;
+            box-shadow: 0 5px 14px rgba(22, 163, 74, 0.09);
+        }
+        .pwa-home-guide-button small {
+            display: block;
+            margin-top: 2px;
+            color: #047857;
+            font-size: 12px;
+            font-weight: 700;
+        }
         .pwa-install-animation {
             width: 236px;
             height: 172px;
@@ -5870,7 +5892,34 @@
                     setTimeout(function() {
                         splash.style.display = 'none';
                         app.style.display = 'block';
+                        if (typeof window.syncEbookPwaHomeGuide === 'function') window.syncEbookPwaHomeGuide();
                     }, 400);
+                };
+
+                window.openEbookPwaInstallGuide = function() {
+                    if (isStandalone) {
+                        if (typeof Swal !== 'undefined') Swal.fire({ title: '已加入主畫面', text: '你現在已經用 App 模式開啟聯絡簿。', icon: 'success', confirmButtonColor: '#16a34a' });
+                        return;
+                    }
+                    var guideHtml = window.ebookPwaGuideHtml || (isAndroid
+                        ? '<div style="padding:10px;text-align:left;"><p>1. 點擊右上角的<b>「⋮」選單</b></p><p>2. 選擇<b>「安裝應用程式」</b>或<b>「將網頁加入主畫面」</b></p></div>'
+                        : '請使用 Safari 開啟，再從分享選單選擇「加入主畫面」。');
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            title: '📱 加入手機主畫面',
+                            html: '<div style="font-size:15px;line-height:1.5;">設定後就能像 App 一樣快速開啟聯絡簿。<br><br>' + guideHtml + '</div>',
+                            confirmButtonText: '我知道了',
+                            confirmButtonColor: '#16a34a'
+                        });
+                    }
+                };
+
+                window.syncEbookPwaHomeGuide = function() {
+                    var entry = document.getElementById('pwaHomeGuideEntry');
+                    if (!entry) return;
+                    var isMobile = isiOS || isAndroid;
+                    var isPreview = document.body.classList.contains('draft-preview-mode') || window.isDashboardDraftPreviewMode === true;
+                    entry.style.display = isMobile && !isStandalone && !isPreview ? 'block' : 'none';
                 };
 
                 function startDetection() {
@@ -5895,6 +5944,8 @@
                         var pwaBtn = isiOS
                             ? '<div class="pwa-install-guide"><div style="font-weight:bold; color:#2980b9; font-size:14px; text-align:center;">👉 請依下方動畫指示操作</div><div class="pwa-install-animation" aria-hidden="true"><div class="pwa-mini-page"><div class="pwa-mini-logo"></div></div><div class="pwa-browser-menu"><div class="pwa-browser-item share"><div class="pwa-icon-share"></div><span>分享</span></div><div class="pwa-browser-item"><span>加入「書籤」</span></div></div><div class="pwa-share-card"><div class="pwa-share-title"><img src="icon.png" alt=""><span>山熊科學數位聯絡簿</span></div><div class="pwa-share-actions"><div class="pwa-share-action"><div class="pwa-action-circle">□</div><span>拷貝</span></div><div class="pwa-share-action"><div class="pwa-action-circle">□</div><span>加入書籤</span></div><div class="pwa-share-action pwa-more-action"><div class="pwa-action-circle">⌃</div><span>檢視較多</span></div></div></div><div class="pwa-action-list"><div class="pwa-sheet-item"><div class="pwa-icon-add"></div><span>加入主畫面</span></div></div><div class="pwa-toolbar"><div class="pwa-toolbar-icon"></div><div class="pwa-toolbar-icon pwa-toolbar-share"><div class="pwa-icon-share"></div></div><div class="pwa-toolbar-icon pwa-toolbar-more"><div class="pwa-toolbar-dot"></div></div></div><div class="pwa-cursor"></div></div><div class="pwa-tutorial-ios"><div class="pwa-step"><div class="pwa-icon-box">•••</div><div>1. 點擊右下角<b>「三個點點」</b></div></div><div class="pwa-step"><div class="pwa-icon-box"><div class="pwa-icon-share"></div></div><div>2. 點擊<b>「分享」</b></div></div><div class="pwa-step"><div class="pwa-icon-box">⌃</div><div>3. 點擊<b>「檢視較多」</b>，或把選單往上拉</div></div><div class="pwa-step"><div class="pwa-icon-box"><div class="pwa-icon-add"></div></div><div>4. 點擊<b>「加入主畫面」</b></div></div></div></div>'
                             : '<div style="padding:10px;text-align:left;"><p>1. 點擊右上角的<b>「⋮」選單</b></p><p>2. 選擇<b>「安裝應用程式」</b>或<b>「將網頁加入主畫面」</b></p></div>';
+
+                        window.ebookPwaGuideHtml = pwaBtn;
 
                         setTimeout(function() {
                             if (typeof Swal !== 'undefined') {
@@ -5998,6 +6049,12 @@
             <div class="input-group"><input type="password" id="sPass" placeholder="請輸入密碼 (或家長手機)"></div>
             <button class="login-btn" onclick="doLogin()">登入查看</button>
             <div class="forgot-pwd">忘記密碼請洽山熊科學</div>
+            <div id="pwaHomeGuideEntry" class="pwa-home-guide-entry">
+                <button type="button" class="pwa-home-guide-button" onclick="openEbookPwaInstallGuide()">
+                    📱 加入手機主畫面
+                    <small>查看動畫教學，之後像 App 一樣快速開啟</small>
+                </button>
+            </div>
             <div class="error-msg" id="loginMsg"></div>
             <div class="loader" id="loader-login"></div>
         </div>
