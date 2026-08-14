@@ -34,6 +34,21 @@ const CURRENT_CLASS = '115小六資優自然週六上午班';
 const STUDENT_KEY = '王小明';
 const READY_POLICY = { status: 'ready', items: [] };
 
+function rescheduledSession(className, actualDate, startTime, endTime, overrides = {}) {
+  const contract = Pending.resolveClassSessionContract(className);
+  assert.ok(contract, `missing fixture contract for ${className}`);
+  return Object.assign({
+    status: 'rescheduled',
+    policyId: contract.id,
+    originalWeekday: contract.weekday,
+    originalStartTime: String(contract.startHour).padStart(2, '0') + ':' + String(contract.startMinute).padStart(2, '0'),
+    originalEndTime: String(contract.endHour).padStart(2, '0') + ':' + String(contract.endMinute).padStart(2, '0'),
+    actualDate,
+    startTime,
+    endTime,
+  }, overrides);
+}
+
 function baseOptions(overrides = {}) {
   return Object.assign({
     classKey: CURRENT_CLASS,
@@ -349,7 +364,18 @@ assert.strictEqual(Pending.getReminderDueItems.toString().includes('Date.now'), 
 
 assert.strictEqual(Pending.monthDayKey('2026-08-09'), '8/9');
 assert.strictEqual(Pending.monthDayKey('8/9 小考'), '8/9');
+assert.strictEqual(Pending.monthDayKey('2026/2/29 小考'), '', 'an invalid full-year token must not fall back to a legacy leap-day identity');
+assert.strictEqual(Pending.dateIdentityParts('2026/2/29 小考'), null, 'invalid full dates fail closed before any M/D matching');
 assert.strictEqual(Pending.monthDayKey('第1-8章'), '', 'chapter ranges are not dates');
+assert.deepStrictEqual(
+  Pending.selectYearAwareDateMatches(
+    [{ id: 'old', date: '2025/8/9' }, { id: 'current', date: '2026/8/9' }, { id: 'legacy', date: '8/9' }],
+    '2026/8/9',
+    item => item.date
+  ).map(item => item.id),
+  ['current'],
+  'a complete date selects only its exact year before considering legacy fallback'
+);
 
 const dashboardIdentity = DashboardSkips.buildIdentity({
   type: 'homework_report',
@@ -740,23 +766,381 @@ const duplicateGradeResult = Pending.buildPendingTasks(baseOptions({
 assert.strictEqual(duplicateGradeResult.items.length, 1, 'same source/date grade must not duplicate a done-flow post');
 assert.strictEqual(duplicateGradeResult.items[0].kind, 'homework_done');
 
+const crossYearDoneFlowResult = Pending.buildPendingTasks(baseOptions({
+  posts: [{
+    id: 'post_2026_same_month_day',
+    dailyPostId: 'row_2026_same_month_day',
+    date: '2026-08-09',
+    hw1: '2026 按鈕作業',
+    storedClassKey: CURRENT_CLASS,
+    storedClassName: CURRENT_CLASS,
+    sourceClassKey: CURRENT_CLASS,
+  }],
+  grades: [{
+    date: '2025/8/9 作業',
+    exam: '2025 成績欄作業',
+    score: '#N/A',
+    colIndex: 18,
+    storedClassKey: CURRENT_CLASS,
+    storedClassName: CURRENT_CLASS,
+  }],
+  helpers: Object.assign({}, baseOptions().helpers, {
+    shouldUseHomeworkDoneFlowForClass: () => false,
+    shouldUseHomeworkDoneFlowForPost: () => true,
+  }),
+}));
+assert.deepStrictEqual(
+  crossYearDoneFlowResult.items.map(item => item.kind).sort(),
+  ['homework_done', 'homework_score'],
+  'a 2026 done-flow post must not hide a 2025 same-month/day score homework'
+);
+
 const giftedGrades = ['', '#N/A', '0', 0].map((score, index) => ({
-  date: `8/${index + 1} 作業`,
+  date: '2026/8/8 作業',
   exam: `資優作業 ${index + 1}`,
   score,
   scoreNum: score === 0 ? 0 : null,
   colIndex: index + 10,
   storedClassKey: CURRENT_CLASS,
 }));
-giftedGrades.push({ date: '8/5 作業', exam: '已完成', score: '28', scoreNum: 28, colIndex: 15, storedClassKey: CURRENT_CLASS });
+giftedGrades.push({ date: '2026/8/8 作業', exam: '已完成', score: '28', scoreNum: 28, colIndex: 15, storedClassKey: CURRENT_CLASS });
 const giftedResult = Pending.buildPendingTasks(baseOptions({ grades: giftedGrades }));
 assert.strictEqual(giftedResult.items.length, 4, 'gifted blank/#N/A/string zero/numeric zero are all pending');
 assert.ok(giftedResult.items.every(item => item.kind === 'homework_score'));
 
+const stableHomeworkGrade = {
+  date: '2026/8/8 作業',
+  exam: '穩定作業身分',
+  score: '#N/A',
+  colIndex: 77,
+  examId: 'display_homework_stable',
+  storedExamId: 'stored_homework_stable',
+  storedClassKey: CURRENT_CLASS,
+};
+const stableHomeworkResult = Pending.buildPendingTasks(baseOptions({ grades: [stableHomeworkGrade] }));
+assert.strictEqual(stableHomeworkResult.items[0].sourceItemId, stableHomeworkGrade.storedExamId, 'grade homework uses stable ExamID before mutable col_N');
+assert.ok(stableHomeworkResult.items[0].legacySkipIdentities.some(identity => identity.sourceItemId === 'col_77'), 'col_N remains a legacy skip identity');
+const legacyHomeworkSkip = stableHomeworkResult.items[0].legacySkipIdentities.find(identity => identity.sourceItemId === 'col_77');
+assert.strictEqual(Pending.buildPendingTasks(baseOptions({
+  grades: [stableHomeworkGrade],
+  pendingPolicy: { status: 'ready', skippedItemKeys: [legacyHomeworkSkip.itemKey] },
+})).items.length, 0, 'an existing col_N exclusion continues to suppress the ExamID-based task');
+
+const timedGradeHomework = Object.assign({}, stableHomeworkGrade, {
+  date: '2026/8/15 作業',
+  colIndex: 80,
+  examId: 'timed_grade_homework',
+  storedExamId: 'timed_grade_homework',
+});
+assert.strictEqual(Pending.buildPendingTasks(baseOptions({
+  now: new Date('2026-08-15T11:59:59+08:00'),
+  grades: [timedGradeHomework],
+})).items.length, 0, 'GoogleSheet grade homework stays hidden during its class session');
+const timedGradeHomeworkAfterClass = Pending.buildPendingTasks(baseOptions({
+  now: new Date('2026-08-15T12:00:00+08:00'),
+  grades: [timedGradeHomework],
+}));
+assert.strictEqual(timedGradeHomeworkAfterClass.items.length, 0, 'a same-day GoogleSheet grade stays hidden until its public DailyPost exists, even at class end');
+
+function getGradeHomeworkEligibility(now, sessionPosts, exam = timedGradeHomework) {
+  const options = baseOptions({
+    now: new Date(now),
+    posts: [],
+    sessionPosts,
+    grades: [exam],
+  });
+  return Pending.resolveGradeHomeworkTaskEligibility(
+    options,
+    Pending.normalizePendingPolicy(options.pendingPolicy),
+    exam,
+    {
+      classKey: CURRENT_CLASS,
+      className: CURRENT_CLASS,
+      studentKey: STUDENT_KEY,
+      helpers: options.helpers,
+    },
+    options.helpers
+  );
+}
+
+const futureExactGradePost = {
+  id: 'future_exact_grade_post',
+  date: '2026-08-15',
+  reserveTime: '2026-08-15 13:00:00',
+  sourceClassKey: CURRENT_CLASS,
+};
+const futureGradeEligibility = getGradeHomeworkEligibility(
+  '2026-08-15T12:00:00+08:00',
+  [futureExactGradePost]
+);
+assert.strictEqual(futureGradeEligibility.allowed, false);
+assert.strictEqual(futureGradeEligibility.reason, 'source_daily_post_not_published', 'grade homework cannot appear before its exact DailyPost reserveTime even after class end');
+assert.strictEqual(
+  getGradeHomeworkEligibility('2026-08-15T12:00:00+08:00', []).reason,
+  'source_daily_post_not_published',
+  'the public student snapshot cannot use a same-day no-post source-record fallback'
+);
+assert.strictEqual(
+  getGradeHomeworkEligibility('2026-08-14T16:00:00Z', []).reason,
+  'source_daily_post_not_published',
+  'same-day no-post protection derives today from trusted Asia/Taipei time rather than the device timezone'
+);
+const historicalNoPostHomework = Object.assign({}, timedGradeHomework, {
+  date: '2026/8/8 作業',
+  examId: 'historical_no_post_homework',
+  storedExamId: 'historical_no_post_homework',
+});
+assert.strictEqual(
+  getGradeHomeworkEligibility('2026-08-15T12:00:00+08:00', [], historicalNoPostHomework).allowed,
+  true,
+  'a prior-date grade-only row retains the bounded historical source-record fallback'
+);
+assert.strictEqual(Pending.buildPendingTasks(baseOptions({
+  now: new Date('2026-08-15T12:00:00+08:00'),
+  posts: [],
+  sessionPosts: [futureExactGradePost],
+  grades: [timedGradeHomework],
+})).items.length, 0, 'the raw future session post blocks the production pending-task build');
+assert.strictEqual(Pending.buildPendingTasks(baseOptions({
+  now: new Date('2026-08-15T13:00:00+08:00'),
+  posts: [futureExactGradePost],
+  sessionPosts: [futureExactGradePost],
+  grades: [timedGradeHomework],
+})).items.length, 1, 'grade homework appears once both publication and session-end gates have passed');
+
+const malformedExactGradePost = Object.assign({}, futureExactGradePost, {
+  id: 'malformed_exact_grade_post',
+  reserveTime: '2026-08-15 下午 1:00',
+});
+assert.strictEqual(
+  getGradeHomeworkEligibility('2026-08-15T14:00:00+08:00', [malformedExactGradePost]).reason,
+  'invalid_daily_post_reserve_time',
+  'a malformed matching DailyPost reserveTime fails closed'
+);
+[
+  '2026-08-15',
+  '2026-08-15T10:30:00+0800',
+].forEach(reserveTime => {
+  assert.strictEqual(
+    getGradeHomeworkEligibility('2026-08-15T14:00:00+08:00', [Object.assign({}, futureExactGradePost, { reserveTime })]).reason,
+    'invalid_daily_post_reserve_time',
+    `${reserveTime} is not part of the shared strict reserveTime contract`
+  );
+});
+[
+  '2026-08-15T10:30:00+08:00',
+  '2026-08-15T02:30:00Z',
+  Date.parse('2026-08-15T10:30:00+08:00'),
+  new Date('2026-08-15T10:30:00+08:00'),
+].forEach(reserveTime => {
+  assert.strictEqual(
+    getGradeHomeworkEligibility('2026-08-15T12:00:00+08:00', [Object.assign({}, futureExactGradePost, { reserveTime })]).allowed,
+    true,
+    `${reserveTime} remains a valid explicitly-zoned publication instant`
+  );
+});
+
+const effectiveExactGradePost = Object.assign({}, futureExactGradePost, {
+  id: 'effective_exact_grade_post',
+  reserveTime: '2026-08-15 10:30:00',
+});
+const effectiveLegacyGradePost = {
+  id: 'effective_legacy_grade_post',
+  date: '8/15',
+  reserveTime: '2026-08-15 10:30:00',
+  sourceClassKey: CURRENT_CLASS,
+};
+const futureLegacyGradePost = Object.assign({}, effectiveLegacyGradePost, {
+  id: 'future_legacy_grade_post',
+  reserveTime: '2026-08-15 13:00:00',
+});
+[
+  [futureExactGradePost, effectiveLegacyGradePost],
+  [effectiveLegacyGradePost, futureExactGradePost],
+].forEach(sessionPosts => {
+  const eligibility = getGradeHomeworkEligibility('2026-08-15T12:00:00+08:00', sessionPosts);
+  assert.strictEqual(eligibility.allowed, false);
+  assert.strictEqual(eligibility.reason, 'source_daily_post_not_published', 'an effective legacy M/D row cannot bypass the future exact-year post regardless of array order');
+});
+[
+  [effectiveExactGradePost, futureLegacyGradePost],
+  [futureLegacyGradePost, effectiveExactGradePost],
+].forEach(sessionPosts => {
+  assert.strictEqual(
+    getGradeHomeworkEligibility('2026-08-15T12:00:00+08:00', sessionPosts).allowed,
+    true,
+    'the effective exact-year post remains authoritative over a future legacy row regardless of array order'
+  );
+});
+
+const futureRescheduledGradePost = Object.assign({}, futureExactGradePost, {
+  id: 'future_rescheduled_grade_post',
+  displayOptions: { session: rescheduledSession(CURRENT_CLASS, '2026-08-15', '14:00', '17:00') },
+});
+const futureCompanionSession = getGradeHomeworkEligibility(
+  '2026-08-15T12:00:00+08:00',
+  [effectiveExactGradePost, futureRescheduledGradePost]
+);
+assert.strictEqual(futureCompanionSession.allowed, false);
+assert.strictEqual(futureCompanionSession.reason, 'homework_session_not_ended', 'future companion metadata still defines the formal date-level rescheduled session');
+assert.strictEqual(futureCompanionSession.eligibleAt, Date.parse('2026-08-15T17:00:00+08:00'));
+assert.strictEqual(
+  getGradeHomeworkEligibility('2026-08-15T17:00:00+08:00', [effectiveExactGradePost, futureRescheduledGradePost]).allowed,
+  true,
+  'the future companion override unlocks only after both its reserveTime and rescheduled endTime'
+);
+
+const effectiveRescheduledGradePost = Object.assign({}, effectiveExactGradePost, {
+  id: 'effective_rescheduled_grade_post',
+  displayOptions: { session: rescheduledSession(CURRENT_CLASS, '2026-08-15', '14:00', '17:00') },
+});
+const conflictingFutureGradePost = Object.assign({}, futureRescheduledGradePost, {
+  id: 'conflicting_future_grade_post',
+  displayOptions: { session: rescheduledSession(CURRENT_CLASS, '2026-08-15', '14:00', '18:00') },
+});
+assert.strictEqual(
+  getGradeHomeworkEligibility('2026-08-15T12:00:00+08:00', [effectiveRescheduledGradePost, conflictingFutureGradePost]).reason,
+  'ambiguous_class_session_override',
+  'a conflicting future companion override cannot be ignored just because another same-date post is published'
+);
+const unknownFutureGradePost = Object.assign({}, futureExactGradePost, {
+  id: 'unknown_future_grade_post',
+  displayOptions: { session: { status: 'moved' } },
+});
+assert.strictEqual(
+  getGradeHomeworkEligibility('2026-08-15T12:00:00+08:00', [effectiveExactGradePost, unknownFutureGradePost]).reason,
+  'invalid_class_session_override',
+  'unknown future companion metadata keeps the entire date-level session fail closed'
+);
+[
+  [effectiveExactGradePost, futureExactGradePost],
+  [futureExactGradePost, effectiveExactGradePost],
+].forEach(sessionPosts => {
+  assert.strictEqual(
+    getGradeHomeworkEligibility('2026-08-15T12:00:00+08:00', sessionPosts).allowed,
+    true,
+    'one effective exact same-date post is sufficient for the publication gate regardless of array order'
+  );
+});
+[
+  [effectiveExactGradePost, malformedExactGradePost],
+  [malformedExactGradePost, effectiveExactGradePost],
+].forEach(sessionPosts => {
+  assert.strictEqual(
+    getGradeHomeworkEligibility('2026-08-15T14:00:00+08:00', sessionPosts).reason,
+    'invalid_daily_post_reserve_time',
+    'any malformed exact same-date publication record keeps the grade task fail closed regardless of array order'
+  );
+});
+
+const crossYearLegacyHomeworkOrder = Pending.buildPendingTasks(baseOptions({
+  now: new Date('2026-01-03T12:00:00+08:00'),
+  posts: [
+    { id: 'legacy_dec_post', date: '2025-12-27', sourceClassKey: CURRENT_CLASS },
+    { id: 'legacy_jan_post', date: '2026-01-03', sourceClassKey: CURRENT_CLASS },
+  ],
+  grades: [
+    { date: '12/27 作業', exam: '跨年前作業', score: '#N/A', colIndex: 90, storedClassKey: CURRENT_CLASS },
+    { date: '1/3 作業', exam: '跨年後作業', score: '#N/A', colIndex: 91, storedClassKey: CURRENT_CLASS },
+  ],
+}));
+assert.deepStrictEqual(
+  crossYearLegacyHomeworkOrder.items.map(item => item.title),
+  ['1/3 作業 跨年後作業', '12/27 作業 跨年前作業'],
+  'legacy M/D tasks sort by their exact DailyPost anchors instead of the browser year'
+);
+
+const duringClassButtonPost = {
+  id: 'during_class_button_post',
+  date: '2026-08-15',
+  reserveTime: '2026-08-15 10:30:00',
+  sourceClassKey: CURRENT_CLASS,
+  storedClassKey: CURRENT_CLASS,
+  hw1: '按我已完成',
+};
+const duringClassButtonResult = Pending.buildPendingTasks(baseOptions({
+  now: new Date('2026-08-15T10:31:00+08:00'),
+  posts: [duringClassButtonPost],
+  helpers: Object.assign({}, baseOptions().helpers, {
+    shouldUseHomeworkDoneFlowForClass: () => true,
+    shouldUseHomeworkDoneFlowForPost: () => true,
+  }),
+}));
+assert.strictEqual(duringClassButtonResult.items.length, 1, 'button homework appears immediately after its DailyPost reserveTime');
+assert.strictEqual(duringClassButtonResult.items[0].kind, 'homework_done');
+assert.deepStrictEqual(Pending.getReminderDueItems(duringClassButtonResult), [], 'newly published button homework remains neutral during class');
+
+const rescheduledSundayHomework = Object.assign({}, timedGradeHomework, {
+  date: '2026/8/16 作業',
+  colIndex: 81,
+  examId: 'rescheduled_sunday_homework',
+  storedExamId: 'rescheduled_sunday_homework',
+});
+const rescheduledSundayPost = {
+  id: 'rescheduled_sunday_post',
+  date: '2026-08-16',
+  sourceClassKey: CURRENT_CLASS,
+  displayOptions: { session: rescheduledSession(CURRENT_CLASS, '2026-08-16', '14:00', '17:00') },
+};
+assert.strictEqual(Pending.buildPendingTasks(baseOptions({
+  now: new Date('2026-08-16T16:59:59+08:00'),
+  posts: [rescheduledSundayPost],
+  grades: [rescheduledSundayHomework],
+})).items.length, 0, 'a Saturday class moved to Sunday stays hidden during the override session');
+assert.strictEqual(Pending.buildPendingTasks(baseOptions({
+  now: new Date('2026-08-16T17:00:00+08:00'),
+  posts: [rescheduledSundayPost],
+  grades: [rescheduledSundayHomework],
+})).items.length, 1, 'a complete one-off reschedule unlocks grade homework at override endTime');
+assert.strictEqual(Pending.buildPendingTasks(baseOptions({
+  now: new Date('2026-08-16T21:00:00+08:00'),
+  posts: [Object.assign({}, rescheduledSundayPost, {
+    displayOptions: { session: { status: 'cancelled', startTime: '14:00', endTime: '17:00' } },
+  })],
+  grades: [rescheduledSundayHomework],
+})).items.length, 0, 'a cancelled one-off session never creates grade homework pending');
+const sundayClass = '115小六資優自然週日下午班';
+const mondayHomework = Object.assign({}, timedGradeHomework, {
+  date: '2026/8/17 作業',
+  examId: 'sunday_class_monday_homework',
+  storedExamId: 'sunday_class_monday_homework',
+  storedClassKey: sundayClass,
+  storedClassName: sundayClass,
+});
+const mondayRescheduledPost = {
+  id: 'sunday_class_monday_post',
+  date: '2026-08-17',
+  sourceClassKey: sundayClass,
+  className: sundayClass,
+  displayOptions: { session: rescheduledSession(sundayClass, '2026-08-17', '14:00', '17:00') },
+};
+assert.strictEqual(Pending.buildPendingTasks(baseOptions({
+  classKey: sundayClass,
+  className: sundayClass,
+  now: new Date('2026-08-17T17:00:00+08:00'),
+  posts: [mondayRescheduledPost],
+  grades: [mondayHomework],
+})).items.length, 1, 'a complete Sunday-class override may safely move the session to Monday');
+[null, false, ''].forEach(invalidWeekday => {
+  assert.strictEqual(Pending.buildPendingTasks(baseOptions({
+    classKey: sundayClass,
+    className: sundayClass,
+    now: new Date('2026-08-17T17:00:00+08:00'),
+    posts: [Object.assign({}, mondayRescheduledPost, {
+      displayOptions: { session: rescheduledSession(sundayClass, '2026-08-17', '14:00', '17:00', { originalWeekday: invalidWeekday }) },
+    })],
+    grades: [mondayHomework],
+  })).items.length, 0, 'an invalid Sunday originalWeekday cannot coerce into a complete override');
+});
+assert.strictEqual(Pending.buildPendingTasks(baseOptions({
+  now: new Date('2026-08-15T13:00:00+08:00'),
+  grades: [Object.assign({}, timedGradeHomework, { date: '8/15 作業' })],
+})).items.length, 0, 'a partial homework date without a full DailyPost anchor fails closed');
+
 const sourceClassFlowResult = Pending.buildPendingTasks(baseOptions({
   className: '115國二自然超前班',
   grades: [{
-    date: '8/9 作業',
+    date: '2026/8/8 作業',
     exam: '資優班作業',
     score: '#N/A',
     colIndex: 17,
@@ -838,8 +1222,8 @@ assert.strictEqual(aliasGradeResult.items[0].writeTarget.storedClassKey, advance
 
 const enrollmentDayResult = Pending.buildPendingTasks(baseOptions({
   grades: [
-    { date: '8/9 小考', exam: '一般鑑定考', score: '', scoreNum: null, colIndex: 20, examId: 'exam_regular' },
-    { date: '8/9 作業', exam: '第一堂作業', score: '#N/A', scoreNum: null, colIndex: 21, examId: 'exam_homework' },
+    { date: '2026/8/8 小考', exam: '一般鑑定考', score: '', scoreNum: null, colIndex: 20, examId: 'exam_regular' },
+    { date: '2026/8/8 作業', exam: '第一堂作業', score: '#N/A', scoreNum: null, colIndex: 21, examId: 'exam_homework' },
   ],
   helpers: Object.assign({}, baseOptions().helpers, {
     isEnrollmentExemptExam: exam => exam.exam === '一般鑑定考',
@@ -867,6 +1251,7 @@ assert.strictEqual(absenceResult.items[0].kind, 'absence');
 assert.strictEqual(absenceResult.items[0].neutralLabel, '請假考試待補');
 assert.strictEqual(absenceResult.items[0].displayTarget, null, 'absence report navigation without an exact DailyPost ExamID mapping must fail closed');
 assert.strictEqual(absenceResult.items[0].writeTarget.storedExamId, 'stored_absence');
+assert.ok(absenceResult.items[0].legacySkipIdentities.some(identity => identity.sourceItemId === 'col_30'), 'ExamID absence keeps its legacy col_N skip identity');
 
 const secondSameDayAbsenceExam = Object.assign({}, absenceExam, {
   date: '8/2 隨堂',
@@ -961,6 +1346,17 @@ assert.strictEqual(mappedAbsenceWithOriginalExam.items[0].paperTarget.storedExam
 assert.strictEqual(mappedAbsenceWithOriginalExam.items[0].paperTarget.url, 'https://example.com/absence-original.pdf');
 assert.strictEqual(mappedAbsenceWithOriginalExam.items[0].reminderSourceDate, absencePaper.date, 'absence navigation target must not change the mapped reminder source date');
 
+const correctedHeaderExactExamPost = Object.assign({}, absenceOriginalExamPost, {
+  id: 'absence_original_after_header_date_correction',
+  date: '2026-08-03',
+});
+const correctedHeaderExactExamResult = Pending.buildPendingTasks(baseOptions({
+  posts: [correctedHeaderExactExamPost],
+  grades: [absenceExam],
+}));
+assert.strictEqual(correctedHeaderExactExamResult.items[0].displayTarget.dailyPostId, correctedHeaderExactExamPost.id, 'stable ExamID remains authoritative after a header date correction');
+assert.strictEqual(correctedHeaderExactExamResult.items[0].paperTarget.dailyPostId, correctedHeaderExactExamPost.id, 'paper navigation also survives a corrected header date');
+
 const ambiguousOriginalExamResult = Pending.buildPendingTasks(baseOptions({
   posts: [
     absenceOriginalExamPost,
@@ -976,6 +1372,17 @@ const unverifiedOriginalExamResult = Pending.buildPendingTasks(baseOptions({
   grades: [absenceExam],
 }));
 assert.strictEqual(unverifiedOriginalExamResult.items[0].paperTarget, null, 'an original quiz block without an exact ExamID mapping must fail closed');
+
+const duplicateDateOnlyHomework = Pending.buildPendingTasks(baseOptions({
+  posts: [
+    { id: 'date_only_a', date: '2026-08-08', sourceClassKey: CURRENT_CLASS },
+    { id: 'date_only_b', date: '2026-08-08', sourceClassKey: CURRENT_CLASS },
+  ],
+  grades: [{
+    date: '2026/8/8 作業', exam: '日期相同但無 ExamID', score: '#N/A', colIndex: 78, storedClassKey: CURRENT_CLASS,
+  }],
+}));
+assert.strictEqual(duplicateDateOnlyHomework.items[0].displayTarget.tab, 'grades', 'duplicate date-only DailyPosts must fail closed instead of picking array item zero');
 
 const answerOnlyOriginalExamResult = Pending.buildPendingTasks(baseOptions({
   posts: [Object.assign({}, absenceOriginalExamPost, {
@@ -1062,13 +1469,15 @@ const lowExam = {
   storedExamId: 'stored_exam_low',
   storedClassKey: CURRENT_CLASS,
 };
+const lowExamPost = { id: 'low_exam_post', date: '2026-08-02', sourceClassKey: CURRENT_CLASS };
 const latestPost = { id: 'latest_post', date: '2026-08-09', sourceClassKey: CURRENT_CLASS };
-const oldUnmappedPaper = { id: 'old_guess_only', date: '2026-08-08', makeup: '[補考卷]https://example.com/guess.pdf' };
-const lowResult = Pending.buildPendingTasks(baseOptions({ posts: [latestPost, oldUnmappedPaper], grades: [lowExam] }));
+const oldUnmappedPaper = { id: 'old_guess_only', date: '2026-08-08', sourceClassKey: CURRENT_CLASS, makeup: '[補考卷]https://example.com/guess.pdf' };
+const lowResult = Pending.buildPendingTasks(baseOptions({ posts: [lowExamPost, latestPost, oldUnmappedPaper], grades: [lowExam] }));
 assert.strictEqual(lowResult.items.length, 1);
 assert.strictEqual(lowResult.items[0].kind, 'makeup_result');
 assert.strictEqual(lowResult.items[0].reportTarget.dailyPostId, latestPost.id);
 assert.strictEqual(lowResult.items[0].paperTarget, null, 'legacy paper text/date must never be guessed as a mapping');
+assert.ok(lowResult.items[0].legacySkipIdentities.some(identity => identity.sourceItemId === 'col_31'), 'ExamID threshold makeup keeps its legacy col_N skip identity');
 
 const mappedPaper = {
   id: 'mapped_paper',
@@ -1077,11 +1486,254 @@ const mappedPaper = {
   makeup: '[補考卷]https://example.com/exact.pdf',
   displayOptions: { makeup: { targetExamId: 'display_exam_low', sourceClassKey: CURRENT_CLASS } },
 };
-const mappedResult = Pending.buildPendingTasks(baseOptions({ posts: [latestPost, mappedPaper], grades: [lowExam] }));
+const mappedResult = Pending.buildPendingTasks(baseOptions({ posts: [lowExamPost, latestPost, mappedPaper], grades: [lowExam] }));
 assert.strictEqual(mappedResult.items[0].paperTarget.dailyPostId, mappedPaper.id);
 assert.strictEqual(mappedResult.items[0].paperTarget.url, 'https://example.com/exact.pdf');
 assert.strictEqual(mappedResult.items[0].paperTarget.examId, lowExam.examId, 'mapped makeup-paper navigation retains the exact display ExamID');
 assert.strictEqual(mappedResult.items[0].paperTarget.storedExamId, lowExam.storedExamId, 'mapped makeup-paper navigation retains the exact stored ExamID');
+
+const thresholdTimingExam = {
+  date: '2026/08/08 小考',
+  exam: '理化第 3、4 章',
+  score: '65',
+  scoreNum: 65,
+  makeupThreshold: 85,
+  colIndex: 79,
+  examId: 'threshold_timing_exam',
+  storedExamId: 'threshold_timing_exam',
+  storedClassKey: CURRENT_CLASS,
+};
+const thresholdExamPost = { id: 'threshold_exam_post', date: '2026-08-08', sourceClassKey: CURRENT_CLASS };
+const thresholdNextPost = { id: 'threshold_next_post', date: '2026-08-15', sourceClassKey: CURRENT_CLASS };
+function buildThresholdTiming(now, nextPost = thresholdNextPost, extra = {}) {
+  return Pending.buildPendingTasks(baseOptions(Object.assign({
+    now: new Date(now),
+    posts: nextPost ? [thresholdExamPost, nextPost] : [thresholdExamPost],
+    grades: [thresholdTimingExam],
+  }, extra)));
+}
+function getThresholdEligibility(now, posts, exam = thresholdTimingExam) {
+  const options = baseOptions({ now: new Date(now), posts, grades: [exam] });
+  return Pending.resolveThresholdTaskEligibility(
+    options,
+    Pending.normalizePendingPolicy(options.pendingPolicy),
+    exam,
+    {
+      classKey: CURRENT_CLASS,
+      className: CURRENT_CLASS,
+      studentKey: STUDENT_KEY,
+      helpers: options.helpers,
+    },
+    options.helpers
+  );
+}
+assert.strictEqual(buildThresholdTiming('2026-08-14T23:59:59+08:00').items.length, 0, 'a future next-class post must not create a threshold task early');
+assert.strictEqual(buildThresholdTiming('2026-08-15T11:59:59+08:00').items.length, 0, 'a prepublished next DailyPost stays hidden before class ends');
+assert.strictEqual(buildThresholdTiming('2026-08-15T11:59:59+08:00', Object.assign({}, thresholdNextPost, {
+  reserveTime: '2026-08-15 10:30:00',
+})).items.length, 0, 'a DailyPost already released during class still does not expose threshold makeup before session end');
+assert.strictEqual(buildThresholdTiming('2026-08-15T12:30:00+08:00', Object.assign({}, thresholdNextPost, {
+  reserveTime: '2026-08-15 13:00:00',
+})).items.length, 0, 'a next-session post whose Taipei reserve time is still in the future is not effective');
+const laterAlreadyEffectivePost = {
+  id: 'later_already_effective_post',
+  date: '2026-08-22',
+  reserveTime: '2026-08-15 10:00:00',
+  sourceClassKey: CURRENT_CLASS,
+};
+const earlierFutureMustWin = getThresholdEligibility(
+  '2026-08-15T12:30:00+08:00',
+  [
+    thresholdExamPost,
+    Object.assign({}, thresholdNextPost, { reserveTime: '2026-08-15 13:00:00' }),
+    laterAlreadyEffectivePost,
+  ]
+);
+assert.strictEqual(earlierFutureMustWin.allowed, false);
+assert.strictEqual(earlierFutureMustWin.reason, 'missing_next_effective_post');
+assert.strictEqual(earlierFutureMustWin.nextPostDate, '2026-08-15', 'an earlier trusted session waiting for reserveTime cannot be bypassed by a later already-effective post');
+const invalidReserveEligibility = getThresholdEligibility(
+  '2026-08-15T12:30:00+08:00',
+  [thresholdExamPost, Object.assign({}, thresholdNextPost, { reserveTime: '2026-08-15 下午 10:30' })]
+);
+assert.strictEqual(invalidReserveEligibility.allowed, false);
+assert.strictEqual(invalidReserveEligibility.reason, 'invalid_daily_post_reserve_time', 'an unparseable reserveTime must fail closed instead of being treated as already published');
+const earlierMalformedMustBlock = getThresholdEligibility(
+  '2026-08-15T12:30:00+08:00',
+  [
+    thresholdExamPost,
+    Object.assign({}, thresholdNextPost, { reserveTime: 'not-a-reserve-time' }),
+    laterAlreadyEffectivePost,
+  ]
+);
+assert.strictEqual(earlierMalformedMustBlock.allowed, false);
+assert.strictEqual(earlierMalformedMustBlock.reason, 'invalid_daily_post_reserve_time');
+assert.strictEqual(earlierMalformedMustBlock.nextPostDate, '2026-08-15', 'a malformed earlier session record cannot be bypassed by a later effective post');
+const thresholdAfterClass = buildThresholdTiming('2026-08-15T12:00:00+08:00');
+assert.strictEqual(thresholdAfterClass.items.length, 1, 'threshold task appears when the next same-class session has ended');
+assert.strictEqual(thresholdAfterClass.items[0].reminderSourceDate, '2026-08-15');
+assert.strictEqual(thresholdAfterClass.items[0].thresholdEligibleAt, Date.parse('2026-08-15T12:00:00+08:00'));
+assert.strictEqual(thresholdAfterClass.items[0].thresholdSessionKey, 'p6_gifted_science_sat_am', 'task records the canonical shared policyId');
+
+const sameExamIdSameDatePosts = [1, 2].map(index => ({
+  id: `threshold_exam_duplicate_${index}`,
+  date: '2026-08-08',
+  sourceClassKey: CURRENT_CLASS,
+  examData: {
+    main: {
+      examId: thresholdTimingExam.examId,
+      storedExamId: thresholdTimingExam.storedExamId,
+    },
+  },
+}));
+const legacyThresholdExam = Object.assign({}, thresholdTimingExam, { date: '8/8 小考' });
+const sameExamIdSameDateResult = Pending.buildPendingTasks(baseOptions({
+  now: new Date('2026-08-15T12:00:00+08:00'),
+  posts: sameExamIdSameDatePosts.concat(thresholdNextPost),
+  grades: [legacyThresholdExam],
+}));
+assert.strictEqual(sameExamIdSameDateResult.items.length, 1, 'same ExamID in multiple posts on one exact date still anchors a legacy M/D exam');
+const sameExamIdDifferentYearsResult = Pending.buildPendingTasks(baseOptions({
+  now: new Date('2026-08-15T12:00:00+08:00'),
+  posts: sameExamIdSameDatePosts.slice(0, 1).map(post => Object.assign({}, post, { date: '2025-08-08' }))
+    .concat(sameExamIdSameDatePosts.slice(1), thresholdNextPost),
+  grades: [legacyThresholdExam],
+}));
+assert.strictEqual(sameExamIdDifferentYearsResult.items.length, 0, 'same ExamID mapped to different full dates remains cross-year ambiguous');
+
+assert.strictEqual(buildThresholdTiming('2026-08-22T12:00:00+08:00', null).items.length, 0, 'missing next DailyPost fails closed even long after the exam');
+const loneOffDayPost = {
+  id: 'wrong_weekday_next_post', date: '2026-08-16', sourceClassKey: CURRENT_CLASS,
+};
+assert.strictEqual(buildThresholdTiming('2026-08-16T21:00:00+08:00', loneOffDayPost).items.length, 0, 'a same-class post outside the contracted weekday is not the next class session');
+assert.strictEqual(
+  getThresholdEligibility('2026-08-16T21:00:00+08:00', [thresholdExamPost, loneOffDayPost]).reason,
+  'class_session_date_mismatch',
+  'a lone legacy off-day post fails closed with the session mismatch reason'
+);
+const laterRegularPost = { id: 'later_regular_post', date: '2026-08-22', sourceClassKey: CURRENT_CLASS };
+const legacyExtraThenRegular = getThresholdEligibility(
+  '2026-08-22T12:00:00+08:00',
+  [thresholdExamPost, loneOffDayPost, laterRegularPost]
+);
+assert.strictEqual(legacyExtraThenRegular.allowed, true, 'a legacy unmarked off-day supplement may be skipped only when a later regular session is verifiable');
+assert.strictEqual(legacyExtraThenRegular.nextPost.date, '2026-08-22');
+const malformedLegacyExtraThenRegular = getThresholdEligibility(
+  '2026-08-22T12:00:00+08:00',
+  [thresholdExamPost, Object.assign({}, loneOffDayPost, { reserveTime: 'legacy malformed reserve' }), laterRegularPost]
+);
+assert.strictEqual(malformedLegacyExtraThenRegular.allowed, true, 'a malformed reserve on a legacy off-weekday supplement is ignored only after a later ready session is verified');
+assert.strictEqual(malformedLegacyExtraThenRegular.nextPost.date, '2026-08-22');
+const explicitSupplementalThenRegular = getThresholdEligibility(
+  '2026-08-22T12:00:00+08:00',
+  [thresholdExamPost, Object.assign({}, loneOffDayPost, {
+    displayOptions: { session: { status: 'supplemental' } },
+  }), laterRegularPost]
+);
+assert.strictEqual(explicitSupplementalThenRegular.allowed, true, 'an explicit supplemental DailyPost never replaces the next class session');
+assert.strictEqual(
+  getThresholdEligibility('2026-08-22T12:00:00+08:00', [thresholdExamPost, Object.assign({}, loneOffDayPost, {
+    reserveTime: 'not-a-reserve-time',
+    displayOptions: { session: { status: 'supplemental' } },
+  }), laterRegularPost]).allowed,
+  true,
+  'an explicit supplemental row is ignored even when its irrelevant reserveTime is malformed'
+);
+assert.strictEqual(
+  getThresholdEligibility('2026-08-16T21:00:00+08:00', [thresholdExamPost, Object.assign({}, loneOffDayPost, {
+    displayOptions: { session: { status: 'supplemental' } },
+  })]).reason,
+  'missing_next_effective_post',
+  'an explicit supplemental DailyPost is ignored even when it is the only later post'
+);
+assert.strictEqual(
+  getThresholdEligibility('2026-08-16T21:00:00+08:00', [thresholdExamPost, Object.assign({}, loneOffDayPost, {
+    reserveTime: 'not-a-reserve-time',
+    displayOptions: { session: { status: 'cancelled' } },
+  })]).reason,
+  'missing_next_effective_post',
+  'an explicit cancelled row is ignored before reserveTime validation'
+);
+const thresholdRescheduledNextPost = {
+  id: 'threshold_rescheduled_next_post',
+  date: '2026-08-16',
+  sourceClassKey: CURRENT_CLASS,
+  displayOptions: { session: rescheduledSession(CURRENT_CLASS, '2026-08-16', '14:00', '17:00') },
+};
+assert.strictEqual(buildThresholdTiming('2026-08-16T16:59:59+08:00', thresholdRescheduledNextPost).items.length, 0, 'rescheduled next class remains hidden during the override session');
+assert.strictEqual(buildThresholdTiming('2026-08-16T17:00:00+08:00', thresholdRescheduledNextPost).items.length, 1, 'rescheduled next class unlocks threshold makeup at override endTime');
+const conflictingReschedule = getThresholdEligibility(
+  '2026-08-16T18:00:00+08:00',
+  [
+    thresholdExamPost,
+    thresholdRescheduledNextPost,
+    Object.assign({}, thresholdRescheduledNextPost, {
+      id: 'threshold_rescheduled_conflict',
+      displayOptions: { session: rescheduledSession(CURRENT_CLASS, '2026-08-16', '14:00', '18:00') },
+    }),
+  ]
+);
+assert.strictEqual(conflictingReschedule.allowed, false);
+assert.strictEqual(conflictingReschedule.reason, 'ambiguous_class_session_override', 'conflicting same-day formal reschedules fail closed');
+const invalidRescheduleBeforeRegular = getThresholdEligibility(
+  '2026-08-22T12:00:00+08:00',
+  [thresholdExamPost, Object.assign({}, thresholdRescheduledNextPost, {
+    displayOptions: { session: { status: 'rescheduled', actualDate: '2026-08-16', startTime: '14:00', endTime: '17:00' } },
+  }), laterRegularPost]
+);
+assert.strictEqual(invalidRescheduleBeforeRegular.allowed, false);
+assert.strictEqual(invalidRescheduleBeforeRegular.reason, 'invalid_class_session_override', 'an incomplete reschedule cannot be skipped as a legacy supplement');
+const unknownSessionStatus = getThresholdEligibility(
+  '2026-08-15T12:00:00+08:00',
+  [thresholdExamPost, Object.assign({}, thresholdNextPost, {
+    displayOptions: { session: { status: 'moved' } },
+  })]
+);
+assert.strictEqual(unknownSessionStatus.allowed, false);
+assert.strictEqual(unknownSessionStatus.reason, 'invalid_class_session_override', 'an unknown session status cannot silently fall back to the fixed schedule');
+assert.strictEqual(buildThresholdTiming('2026-08-16T21:00:00+08:00', Object.assign({}, thresholdRescheduledNextPost, {
+  displayOptions: { session: { status: 'cancelled', startTime: '14:00', endTime: '17:00' } },
+})).items.length, 0, 'cancelled DailyPost session is ignored by threshold timing');
+assert.strictEqual(Pending.buildPendingTasks(baseOptions({
+  now: null,
+  pendingPolicy: { status: 'ready', items: [], loadedAt: Date.parse('2026-08-15T12:00:00+08:00') },
+  posts: [thresholdExamPost, thresholdNextPost],
+  grades: [thresholdTimingExam],
+})).items.length, 1, 'production may use trusted server policy loadedAt instead of device time');
+assert.strictEqual(Pending.buildPendingTasks(baseOptions({
+  now: null,
+  posts: [thresholdExamPost, thresholdNextPost],
+  grades: [thresholdTimingExam],
+})).items.length, 0, 'missing explicit test time and missing server loadedAt fail closed');
+assert.strictEqual(Pending.buildPendingTasks(baseOptions({
+  classKey: '未知班',
+  className: '未知班',
+  now: new Date('2026-08-15T12:00:00+08:00'),
+  posts: [{ id: 'unknown_next', date: '2026-08-15', sourceClassKey: '未知班' }],
+  grades: [Object.assign({}, thresholdTimingExam, { storedClassKey: '未知班', sourceClassKey: '未知班' })],
+})).items.length, 0, 'a class without an explicit session contract fails closed');
+
+[
+  ['115小六資優自然週六上午班', 'p6_gifted_science_sat_am', 6, 9, 12],
+  ['115小六資優自然週日下午班', 'p6_gifted_science_sun_pm', 0, 14, 17],
+  ['115小六資優自然週日晚上班', 'p6_gifted_science_sun_night', 0, 18, 21],
+  ['115國一自然超前班', 'g7_advanced_science_sat', 6, 13, 16],
+  ['115國二自然超前班', 'g8_advanced_science_sat', 6, 18, 21],
+  ['115國一數學超前班', 'g7_advanced_math_sat', 6, 18, 21],
+  ['115國二數學超前班', 'g8_advanced_math_sun', 0, 18, 21],
+  ['115小六資優數學班', 'p6_gifted_math_wed', 3, 18, 21],
+  ['115資優數學', 'p6_gifted_math_wed', 3, 18, 21],
+  ['116資優數學', 'p6_gifted_math_wed', 3, 18, 21],
+].forEach(([className, policyId, weekday, startHour, endHour]) => {
+  const contract = Pending.resolveClassSessionContract(className);
+  assert.ok(contract, `${className} has an explicit class-session contract`);
+  assert.strictEqual(contract.id, policyId);
+  assert.strictEqual(contract.weekday, weekday);
+  assert.strictEqual(contract.startHour, startHour);
+  assert.strictEqual(contract.endHour, endHour);
+});
+assert.strictEqual(Pending.resolveClassSessionContract('115國一資優數學班'), null, 'non-grade-six gifted math classes must not inherit the Wednesday contract');
+assert.strictEqual(Pending.resolveClassSessionContract('115-小六資優自然週六上午班'), null, 'malformed punctuation must not be normalized into a valid class policy');
 
 const reminderSourceExam = {
   date: '8/1 小考',
@@ -1099,32 +1751,37 @@ const reminderSourceExamPost = {
   date: '2026-08-01',
   sourceClassKey: CURRENT_CLASS,
 };
+const reminderNextSessionPost = {
+  id: 'reminder_next_session_post',
+  date: '2026-08-08',
+  sourceClassKey: CURRENT_CLASS,
+};
 const builtMakeupTaskResult = Pending.buildPendingTasks(baseOptions({
-  posts: [reminderSourceExamPost],
+  posts: [reminderSourceExamPost, reminderNextSessionPost],
   grades: [reminderSourceExam],
 }));
-assert.strictEqual(builtMakeupTaskResult.items.length, 1, 'real builder fixture must create one pending makeup task');
-assert.strictEqual(builtMakeupTaskResult.items[0].kind, 'makeup');
+assert.strictEqual(builtMakeupTaskResult.items.length, 1, 'real builder fixture must create one pending threshold task after the next class');
+assert.strictEqual(builtMakeupTaskResult.items[0].kind, 'makeup_result');
 assert.strictEqual(builtMakeupTaskResult.items[0].date, '8/1 小考', 'task label date remains the original exam date');
-assert.strictEqual(builtMakeupTaskResult.items[0].reminderSourceDate, '2026-08-01');
+assert.strictEqual(builtMakeupTaskResult.items[0].reminderSourceDate, '2026-08-08');
 assert.strictEqual(builtMakeupTaskResult.items[0].displayTarget.postDate, '2026-08-01');
 assert.deepStrictEqual(
   Pending.getReminderDueItems({
     status: 'ready',
     items: builtMakeupTaskResult.items,
-    policy: weeklyReminderPolicy('2026-08-01', Date.parse('2026-08-01T15:00:01+08:00')),
+    policy: weeklyReminderPolicy('2026-08-08', Date.parse('2026-08-08T15:00:01+08:00')),
   }),
   [],
-  'a real makeup task remains neutral on its source DailyPost date'
+  'a real makeup task remains neutral on the next-class DailyPost date'
 );
 assert.deepStrictEqual(
   Pending.getReminderDueItems({
     status: 'ready',
     items: builtMakeupTaskResult.items,
-    policy: weeklyReminderPolicy('2026-08-08', Date.parse('2026-08-08T15:00:01+08:00')),
+    policy: weeklyReminderPolicy('2026-08-15', Date.parse('2026-08-15T15:00:01+08:00')),
   }).map(item => item.kind),
-  ['makeup'],
-  'a real 8/1 makeup task becomes due at the first later 8/8 weekly slot'
+  ['makeup_result'],
+  'a real 8/1 makeup task becomes due at the first weekly slot after it became actionable on 8/8'
 );
 
 const reminderSourceMakeupPost = {
@@ -1228,15 +1885,15 @@ const missingMappingSourceResult = Pending.buildPendingTasks(baseOptions({
   grades: [reminderSourceExam],
 }));
 assert.strictEqual(missingMappingSourceResult.items[0].paperTarget, null);
-assert.strictEqual(missingMappingSourceResult.items[0].reminderSourceDateInvalid, true, 'an exact mapping without sourceClassKey remains visible but fail-closed');
+assert.strictEqual(missingMappingSourceResult.items[0].reminderSourceDateInvalid, false, 'invalid paper metadata does not poison independently verified session timing');
 assert.deepStrictEqual(
   Pending.getReminderDueItems({
     status: 'ready',
     items: missingMappingSourceResult.items,
     policy: weeklyReminderPolicy('2026-08-15', Date.parse('2026-08-15T15:00:01+08:00')),
-  }),
-  [],
-  'missing exact mapping source metadata must never turn the task red via fallback'
+  }).map(item => item.kind),
+  ['makeup_result'],
+  'missing paper source metadata keeps navigation closed while date-level reminder timing stays valid'
 );
 
 const duplicateMappedPaper = Object.assign({}, reminderSourceMakeupPost, {
@@ -1248,15 +1905,15 @@ const duplicateMappingResult = Pending.buildPendingTasks(baseOptions({
   grades: [reminderSourceExam],
 }));
 assert.strictEqual(duplicateMappingResult.items[0].paperTarget, null);
-assert.strictEqual(duplicateMappingResult.items[0].reminderSourceDateInvalid, true, 'duplicate exact mappings remain visible but fail-closed');
+assert.strictEqual(duplicateMappingResult.items[0].reminderSourceDateInvalid, false, 'duplicate exact paper mappings keep navigation closed without invalidating session timing');
 assert.deepStrictEqual(
   Pending.getReminderDueItems({
     status: 'ready',
     items: duplicateMappingResult.items,
     policy: weeklyReminderPolicy('2026-08-15', Date.parse('2026-08-15T15:00:01+08:00')),
-  }),
-  [],
-  'duplicate exact mappings must not fall back to an arbitrary first post and turn red'
+  }).map(item => item.kind),
+  ['makeup_result'],
+  'duplicate exact paper mappings must not suppress a separately verified date-level reminder'
 );
 
 const sameDayMappedPaper = Object.assign({}, reminderSourceMakeupPost, {
@@ -1264,18 +1921,19 @@ const sameDayMappedPaper = Object.assign({}, reminderSourceMakeupPost, {
   date: '2026-08-01',
 });
 const sameDayMappingResult = Pending.buildPendingTasks(baseOptions({
-  posts: [reminderSourceExamPost, sameDayMappedPaper, reminderReportHostAug22],
+  posts: [reminderSourceExamPost, sameDayMappedPaper, reminderNextSessionPost, reminderReportHostAug22],
   grades: [reminderSourceExam],
 }));
-assert.strictEqual(sameDayMappingResult.items[0].reminderSourceDateInvalid, true, 'a mapped paper must be strictly after its exam date');
+assert.strictEqual(sameDayMappingResult.items[0].paperTarget, null, 'a mapped paper on the exam date is not a valid navigation target');
+assert.strictEqual(sameDayMappingResult.items[0].reminderSourceDateInvalid, false, 'invalid paper timing remains separate from next-session eligibility');
 assert.deepStrictEqual(
   Pending.getReminderDueItems({
     status: 'ready',
     items: sameDayMappingResult.items,
     policy: weeklyReminderPolicy('2026-08-15', Date.parse('2026-08-15T15:00:01+08:00')),
-  }),
-  [],
-  'a mapped paper on or before the exam date must fail closed'
+  }).map(item => item.kind),
+  ['makeup_result'],
+  'a same-day invalid paper stays closed while the verified 8/8 session controls reminder age'
 );
 
 const ambiguousFirstHostResult = Pending.buildPendingTasks(baseOptions({
@@ -1287,17 +1945,22 @@ const ambiguousFirstHostResult = Pending.buildPendingTasks(baseOptions({
   ],
   grades: [reminderSourceExam],
 }));
-assert.strictEqual(ambiguousFirstHostResult.items[0].paperTarget, null);
-assert.strictEqual(ambiguousFirstHostResult.items[0].reminderSourceDateInvalid, true, 'two earliest same-day hosts are not a unique stable source');
-assert.deepStrictEqual(
-  Pending.getReminderDueItems({
-    status: 'ready',
-    items: ambiguousFirstHostResult.items,
-    policy: weeklyReminderPolicy('2026-08-15', Date.parse('2026-08-15T15:00:01+08:00')),
-  }),
-  [],
-  'an ambiguous first actionable DailyPost must remain neutral rather than guess'
-);
+assert.strictEqual(ambiguousFirstHostResult.items.length, 1, 'multiple DailyPosts on the same next class date still permit date-level session eligibility');
+assert.strictEqual(ambiguousFirstHostResult.items[0].reminderSourceDate, '2026-08-08');
+assert.strictEqual(ambiguousFirstHostResult.items[0].sourceDailyPostId, '', 'date-level eligibility must not guess one same-day DailyPost identity');
+assert.strictEqual(ambiguousFirstHostResult.items[0].reminderSourceDateInvalid, false, 'same-day multiplicity is not a reminder-date ambiguity');
+const sameSessionOnlyMultiplicity = Pending.buildPendingTasks(baseOptions({
+  posts: [
+    reminderSourceExamPost,
+    firstActionableUnmappedPost,
+    Object.assign({}, firstActionableUnmappedPost, { id: 'same_session_only_second_post' }),
+  ],
+  grades: [reminderSourceExam],
+}));
+assert.strictEqual(sameSessionOnlyMultiplicity.items.length, 1);
+assert.strictEqual(sameSessionOnlyMultiplicity.items[0].kind, 'makeup', 'same-session multiplicity must not invent one report-host DailyPost');
+assert.strictEqual(sameSessionOnlyMultiplicity.items[0].reportTarget, null);
+assert.strictEqual(sameSessionOnlyMultiplicity.items[0].sourceDailyPostId, '');
 
 const rolloverExam = Object.assign({}, reminderSourceExam, {
   date: '12/26 小考',
@@ -1318,6 +1981,7 @@ const rolloverLatestHost = { id: 'rollover_latest_host', date: '2027-01-09', sou
 const builtRolloverResult = Pending.buildPendingTasks(baseOptions({
   posts: [rolloverExamPost, rolloverPaperPost, rolloverLatestHost],
   grades: [rolloverExam],
+  now: new Date('2027-01-03T12:00:00+08:00'),
 }));
 assert.strictEqual(builtRolloverResult.items[0].kind, 'makeup_result');
 assert.strictEqual(builtRolloverResult.items[0].reminderSourceDate, '2027-01-02', 'real builder resolves a 12/26 exam to its adjacent-year 1/2 paper');
@@ -1342,7 +2006,7 @@ assert.deepStrictEqual(
 );
 
 const wrongLegacyMapping = Pending.buildPendingTasks(baseOptions({
-  posts: [latestPost, Object.assign({}, mappedPaper, {
+  posts: [lowExamPost, latestPost, Object.assign({}, mappedPaper, {
     displayOptions: { makeup: { examId: 'display_exam_low' } },
   })],
   grades: [lowExam],

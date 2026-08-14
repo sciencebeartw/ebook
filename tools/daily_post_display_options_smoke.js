@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const Pending = require('../ebook_pending_tasks_app.js');
 
 const html = fs.readFileSync(path.resolve(__dirname, '..', 'index.html'), 'utf8');
 
@@ -18,7 +19,12 @@ function extractFunction(name) {
   throw new Error(`Could not extract function ${name}`);
 }
 
-const context = { BEAR_SUBJECT: '/science' };
+const context = {
+  BEAR_SUBJECT: '/science',
+  escapeHtml: value => String(value),
+  escapeHtmlAttr: value => String(value),
+  window: { EbookPendingTasks: Pending },
+};
 vm.createContext(context);
 [
   'isGiftedScienceClassName',
@@ -26,6 +32,10 @@ vm.createContext(context);
   'shouldUseHomeworkDoneFlowForClass',
   'parseDailyPostDisplayOptions',
   'getDailyPostDisplayOptions',
+  'parseDailyPostSessionClock',
+  'getDailyPostSessionContract',
+  'getDailyPostSessionPresentation',
+  'buildDailyPostSessionBadge',
   'getDailyPostHomeworkDoneMode',
   'shouldUseHomeworkDoneFlowForPost',
   'getDailyPostHomeworkLinkMode',
@@ -54,12 +64,79 @@ const mappedQuiz = context.getDailyPostQuizOptions({ displayOptions: { quiz: { s
 if (mappedQuiz.slot1Exam.targetExamId !== 'exam_a' || mappedQuiz.slot2Exam.targetExamId !== 'exam_b') {
   throw new Error('per-slot quiz ExamID mappings must survive displayOptions parsing');
 }
+const rescheduled = context.getDailyPostSessionPresentation({
+  date: '2026/08/16',
+  className: '115小六資優自然週六上午班',
+  displayOptions: { session: {
+    status: 'rescheduled',
+    policyId: 'p6_gifted_science_sat_am',
+    originalWeekday: 6,
+    originalStartTime: '09:00',
+    originalEndTime: '12:00',
+    actualDate: '2026-08-16',
+    startTime: '9:00',
+    endTime: '12:00',
+  } },
+});
+if (!rescheduled || rescheduled.label !== '本次調課｜8/16（日）09:00–12:00') {
+  throw new Error('rescheduled DailyPost must expose a validated parent-facing session label');
+}
+if (!context.buildDailyPostSessionBadge({
+  date: '2026/08/16',
+  className: '115小六資優自然週六上午班',
+  displayOptions: { session: {
+    status: 'rescheduled',
+    policyId: 'p6_gifted_science_sat_am',
+    originalWeekday: 6,
+    originalStartTime: '09:00',
+    originalEndTime: '12:00',
+    actualDate: '2026-08-16',
+    startTime: '09:00',
+    endTime: '12:00',
+  } },
+}).includes("post-session-badge")) throw new Error('rescheduled label must render as a DailyPost DOM badge');
+if (context.getDailyPostSessionPresentation({
+  date: '2026/08/16',
+  className: '115小六資優自然週六上午班',
+  displayOptions: { session: { status: 'rescheduled', startTime: '12:00', endTime: '09:00' } },
+}) !== null) throw new Error('invalid reschedule metadata must fail closed');
+if (context.getDailyPostSessionPresentation({
+  date: '2026/08/16',
+  className: '115小六資優自然週六上午班',
+  displayOptions: { session: {
+    status: 'rescheduled',
+    policyId: 'p6_gifted_science_sun_pm',
+    originalWeekday: 6,
+    originalStartTime: '09:00',
+    originalEndTime: '12:00',
+    actualDate: '2026-08-16',
+    startTime: '09:00',
+    endTime: '12:00',
+  } },
+}) !== null) throw new Error('a reschedule with the wrong shared policyId must fail closed');
+const cancelled = context.getDailyPostSessionPresentation({
+  date: '2026/08/16',
+  className: '115小六資優自然週六上午班',
+  displayOptions: { session: { status: 'cancelled' } },
+});
+if (!cancelled || cancelled.label !== '本次停課｜8/16（日）') throw new Error('cancelled session label contract failed');
+
+const renderStart = html.indexOf('function renderDailyPosts');
+const renderEnd = html.indexOf('function renderGrades', renderStart);
+const renderSource = html.slice(renderStart, renderEnd > renderStart ? renderEnd : undefined);
+if (renderSource.indexOf('var gradeHtml = examCards.map') === -1 ||
+    renderSource.indexOf('var sessionBadge = buildDailyPostSessionBadge(post)') === -1 ||
+    renderSource.indexOf('headerTitle + sessionBadge + transferBadge') === -1) {
+  throw new Error('session badge must remain a header-only addition independent of grade/paper card rendering');
+}
 
 [
   'linkMode === "homework"',
   '本次已附解答，請完成後自行核對並訂正。',
   'buildHomeworkUploadNote(post, item.val)',
-  'displayOptions: parseDailyPostDisplayOptions(post.displayOptions)'
+  'displayOptions: parseDailyPostDisplayOptions(post.displayOptions)',
+  'var sessionBadge = buildDailyPostSessionBadge(post)',
+  '.post-session-badge'
 ].forEach((needle) => {
   if (!html.includes(needle)) throw new Error(`Missing eBook display behavior: ${needle}`);
 });

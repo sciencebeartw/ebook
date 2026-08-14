@@ -331,7 +331,9 @@ const examLookupSandbox = {};
 vm.createContext(examLookupSandbox);
 [
   'normalizeEbookExamLookupText',
+  'isValidEbookExamLookupDate',
   'getEbookExamLookupDateParts',
+  'ebookExamLookupDatesMatch',
   'ebookExamLookupTextHasDate',
   'ebookExamLookupDateCandidates',
   'ebookFeedbackMatchesExamTitle',

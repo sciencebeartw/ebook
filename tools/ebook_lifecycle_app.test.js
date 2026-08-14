@@ -109,6 +109,21 @@ assert.strictEqual(
   'January after a December anchor must use the next calendar year'
 );
 assert.strictEqual(
+  Lifecycle.parseDateKey('8/15小考', { anchorDateKeys: [20250815, 20260815] }),
+  null,
+  'the same legacy M/D present in two calendar years must fail closed instead of choosing the older year'
+);
+assert.strictEqual(
+  Lifecycle.parseDateKey('2026/2/29 小考', { anchorDateKeys: [20240229, 20260228] }),
+  null,
+  'an invalid full-year token must not fall through to a valid legacy leap-day in another anchor year'
+);
+assert.strictEqual(
+  Lifecycle.parseDateKey('2024/2/29 小考', { anchorDateKeys: [20260228] }),
+  20240229,
+  'a valid full-year leap day remains exact and independent of anchors'
+);
+assert.strictEqual(
   Lifecycle.parseDateKey('12/20', {
     fallbackYear: 2026,
     preferFallbackYear: true,

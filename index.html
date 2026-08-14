@@ -1724,6 +1724,27 @@
             font-size: 1.25rem;
         }
 
+        .post-session-badge {
+            display: inline-flex;
+            align-items: center;
+            margin-left: 8px;
+            padding: 3px 9px;
+            border: 1px solid #93c5fd;
+            border-radius: 999px;
+            background: #eff6ff;
+            color: #1d4ed8;
+            font-size: 0.78rem;
+            font-weight: 900;
+            line-height: 1.35;
+            vertical-align: middle;
+        }
+
+        .post-session-badge.is-cancelled {
+            border-color: #fca5a5;
+            background: #fef2f2;
+            color: #b91c1c;
+        }
+
         .grade-section {
             padding: 25px 20px;
             border-bottom: 1px dashed #eee;
@@ -4036,10 +4057,10 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-functions.js"></script>
   <script src="firebase-config.js"></script>
   <script src="exam_identity_app.js?v=20260712_exam_identity_phase1"></script>
-  <script src="ebook_lifecycle_app.js?v=20260711_lifecycle_security_v2"></script>
+  <script src="ebook_lifecycle_app.js?v=20260815_full_year_date_v1"></script>
   <script src="ebook_promotion_app.js?v=20260812_legacy_transfer_student_key"></script>
   <script src="gifted_homework_full_scores.js?v=20260720_geo3_question_count_v2"></script>
-  <script src="ebook_pending_tasks_app.js?v=20260812_pending_title_exam_papers_v9"></script>
+  <script src="ebook_pending_tasks_app.js?v=20260815_full_year_session_v1"></script>
 
   <!-- Webhook API & Firebase Polyfill (Replace google.script.run) -->
   <script>
@@ -4682,10 +4703,14 @@
         return null;
     }
 
-    function getTransferDateKey(value, fallbackYear, transferChain) {
+    function getTransferDateKey(value, fallbackYear, transferChain, additionalAnchorDateKeys) {
         var anchorDateKeys = transferChain && Array.isArray(transferChain.chain)
             ? transferChain.chain.map(function(item) { return item.effectiveDateKey || 0; }).filter(Boolean)
             : [];
+        (additionalAnchorDateKeys || []).forEach(function(key) {
+            key = Number(key) || 0;
+            if (key && anchorDateKeys.indexOf(key) === -1) anchorDateKeys.push(key);
+        });
         if (anchorDateKeys.length && typeof window !== "undefined" && window.EbookPromotionApp && typeof window.EbookPromotionApp.parseDateKeyWithAnchors === "function") {
             return window.EbookPromotionApp.parseDateKeyWithAnchors(value, anchorDateKeys);
         }
@@ -4708,7 +4733,9 @@
             var match = text.match(/(\d{4})/);
             if (match) return Number(match[1]);
         }
-        return new Date().getFullYear();
+        // Never attach a legacy M/D header to the browser wall-clock year.
+        // Callers must provide a full transfer/enrollment/DailyPost anchor.
+        return 0;
     }
 
     function getTransferClassNameForKey(classKey, currentClassKey, transferIndex, currentClassName, transferChain) {
@@ -4722,9 +4749,9 @@
         return (transfer && transfer.fromClassName) || classKey || currentClassName;
     }
 
-    function shouldIncludeTransferGrade(classKey, currentClassKey, grade, transferIndex, transferChain, promotionContext) {
+    function shouldIncludeTransferGrade(classKey, currentClassKey, grade, transferIndex, transferChain, promotionContext, dateAnchorKeys) {
         var fallbackYear = getTransferFallbackYear(transferIndex, transferChain);
-        var gradeDateKey = getTransferDateKey(grade && grade.date, fallbackYear, transferChain);
+        var gradeDateKey = getTransferDateKey(grade && grade.date, fallbackYear, transferChain, dateAnchorKeys);
         if (!gradeDateKey) return !(promotionContext && promotionContext.status === "ready");
         var resolved = EbookLifecycleApp.resolveClassAtDate(
             currentClassKey,
@@ -4745,9 +4772,9 @@
         return resolved.classKey === classKey || (!!classAlias && classAlias === resolvedAlias);
     }
 
-    function getTransferGradePresentation(classKey, currentClassKey, grade, transferIndex, currentClassName, className, transferChain) {
+    function getTransferGradePresentation(classKey, currentClassKey, grade, transferIndex, currentClassName, className, transferChain, dateAnchorKeys) {
         var fallbackYear = getTransferFallbackYear(transferIndex, transferChain);
-        var gradeDateKey = getTransferDateKey(grade && grade.date, fallbackYear, transferChain);
+        var gradeDateKey = getTransferDateKey(grade && grade.date, fallbackYear, transferChain, dateAnchorKeys);
         var chain = transferChain || EbookLifecycleApp.buildTransferChain(transferIndex || {}, currentClassKey, { maxDepth: 8 });
         var resolved = gradeDateKey
             ? EbookLifecycleApp.resolveClassAtDate(currentClassKey, chain, gradeDateKey, { fallbackClassKey: classKey })
@@ -4772,9 +4799,65 @@
             .replace(/\d{1,2}[\/.-]\d{1,2}/g, "");
     }
 
-    function getTransferGradeDateDistanceDays(leftValue, rightValue, fallbackYear, transferChain) {
-        var leftKey = getTransferDateKey(leftValue, fallbackYear, transferChain);
-        var rightKey = getTransferDateKey(rightValue, fallbackYear, transferChain);
+    function collectGradeDateAnchorKeys(postsObj, classExamMap, examCatalogEntriesByClassKey, enrollmentIndex, classKeys, transferChain) {
+        var lookup = {};
+        function addDate(value) {
+            var raw = (value === undefined || value === null ? "" : String(value)).trim();
+            if (!/\d{4}[\/.-]\d{1,2}[\/.-]\d{1,2}/.test(raw)) return;
+            var key = EbookLifecycleApp.parseDateKey(raw);
+            if (key) lookup[key] = true;
+        }
+        function visitRows(collection) {
+            if (Array.isArray(collection)) {
+                collection.forEach(function(row) { addDate(row && (row.date || row.targetDate)); });
+                return;
+            }
+            Object.keys(collection || {}).forEach(function(key) {
+                var row = collection[key] || {};
+                addDate(row.date || row.targetDate);
+            });
+        }
+        visitRows(postsObj);
+        Object.keys(classExamMap || {}).forEach(function(classKey) { visitRows(classExamMap[classKey]); });
+        Object.keys(examCatalogEntriesByClassKey || {}).forEach(function(classKey) {
+            visitRows(examCatalogEntriesByClassKey[classKey]);
+        });
+        var enrollmentKey = getStudentEnrollmentDateKey(enrollmentIndex || {}, classKeys || []);
+        if (enrollmentKey) lookup[enrollmentKey] = true;
+        var chain = transferChain && Array.isArray(transferChain.chain) ? transferChain.chain : [];
+        chain.forEach(function(item) {
+            if (item && item.effectiveDateKey) lookup[item.effectiveDateKey] = true;
+            else addDate(item && item.effectiveDate);
+        });
+        return Object.keys(lookup).map(Number).sort(function(a, b) { return a - b; });
+    }
+
+    function collectDailyPostExamDateAnchorKeysById(postsObj) {
+        var lookup = {};
+        var rows = Array.isArray(postsObj)
+            ? postsObj
+            : Object.keys(postsObj || {}).map(function(key) { return postsObj[key]; });
+        rows.forEach(function(row) {
+            var rawDate = row && row.date;
+            if (!/\d{4}[\/.-]\d{1,2}[\/.-]\d{1,2}/.test((rawDate || "").toString())) return;
+            var dateKey = EbookLifecycleApp.parseDateKey(rawDate);
+            if (!dateKey) return;
+            var options = getDailyPostDisplayOptions(row);
+            var quiz = options && options.quiz && typeof options.quiz === "object" ? options.quiz : {};
+            [quiz.slot1Exam, quiz.slot2Exam].forEach(function(mapping, index) {
+                var role = index === 0 ? quiz.slot1Role : quiz.slot2Role;
+                var examId = (mapping && mapping.targetExamId || "").toString().trim();
+                if (!examId || role === "answer") return;
+                if (!lookup[examId]) lookup[examId] = [];
+                if (lookup[examId].indexOf(dateKey) === -1) lookup[examId].push(dateKey);
+            });
+        });
+        return lookup;
+    }
+
+    function getTransferGradeDateDistanceDays(leftValue, rightValue, fallbackYear, transferChain, dateAnchorKeys) {
+        var leftKey = getTransferDateKey(leftValue, fallbackYear, transferChain, dateAnchorKeys);
+        var rightKey = getTransferDateKey(rightValue, fallbackYear, transferChain, dateAnchorKeys);
         if (!leftKey || !rightKey) return null;
         function toUtcDate(key) {
             var text = String(key);
@@ -4831,7 +4914,7 @@
         Object.keys(sourceEntries).forEach(function(examId) {
             var entry = sourceEntries[examId] || {};
             if (normalizeEbookExamLookupText(entry.title || "").toLowerCase() !== titleKey) return;
-            var candidateDateKey = getTransferDateKey(entry.date, fallbackYear, chain);
+            var candidateDateKey = getTransferDateKey(entry.date, fallbackYear, chain, options.dateAnchorKeys || []);
             if (!candidateDateKey) return;
             var resolved = EbookLifecycleApp.resolveClassAtDate(currentClassKey, chain, candidateDateKey, { fallbackClassKey: sourceClassKey });
             var resolvedAlias = getHomeworkDoneCourseAliasKey(resolved.classKey);
@@ -4847,7 +4930,7 @@
                 exactKindCandidates.push(candidate);
                 return;
             }
-            var distanceDays = getTransferGradeDateDistanceDays(entry.date, storedEntry.date || grade.date, fallbackYear, chain);
+            var distanceDays = getTransferGradeDateDistanceDays(entry.date, storedEntry.date || grade.date, fallbackYear, chain, options.dateAnchorKeys || []);
             if (isTransferGradeCompatibleAssessmentKinds(entryKind, kindKey) && distanceDays !== null && distanceDays <= 2) {
                 compatibleAssessmentCandidates.push(candidate);
             }
@@ -4878,8 +4961,11 @@
                 dist: Array.isArray(rawData.dist) ? rawData.dist.slice() : rawData.dist,
                 labels: Array.isArray(rawData.labels) ? rawData.labels.slice() : rawData.labels
             });
-            if (!shouldIncludeTransferGrade(classKey, currentClassKey, eData, transferIndex, transferChain, options.promotionContext)) continue;
-            var presentation = getTransferGradePresentation(classKey, currentClassKey, eData, transferIndex, options.currentClassName || className, className, transferChain);
+            var storedExamIdForAnchor = (options.examIdByColKey || {})[col] || "";
+            var stableDateAnchors = storedExamIdForAnchor && (options.dateAnchorKeysByExamId || {})[storedExamIdForAnchor] || [];
+            var gradeDateAnchorKeys = stableDateAnchors.length ? stableDateAnchors : (options.dateAnchorKeys || []);
+            if (!shouldIncludeTransferGrade(classKey, currentClassKey, eData, transferIndex, transferChain, options.promotionContext, gradeDateAnchorKeys)) continue;
+            var presentation = getTransferGradePresentation(classKey, currentClassKey, eData, transferIndex, options.currentClassName || className, className, transferChain, gradeDateAnchorKeys);
             var displayIdentity = resolveTransferGradeDisplayIdentity({
                 grade: eData,
                 storedClassKey: classKey,
@@ -4889,7 +4975,8 @@
                 examIdByColKey: options.examIdByColKey || {},
                 examCatalogEntriesByClassKey: options.examCatalogEntriesByClassKey || {},
                 transferIndex: transferIndex,
-                transferChain: transferChain
+                transferChain: transferChain,
+                dateAnchorKeys: gradeDateAnchorKeys
             });
             let studentScoreNum = NaN;
             if (eData.score) {
@@ -4969,7 +5056,7 @@
                 isTransferFormerClass: presentation.isTransferFormerClass,
                 date: displayIdentity.date || eData.date,
                 storedDate: displayIdentity.storedDate || eData.date,
-                dateKey: getTransferDateKey(displayIdentity.date || eData.date, getTransferFallbackYear(transferIndex, transferChain), transferChain) || 0,
+                dateKey: getTransferDateKey(displayIdentity.date || eData.date, getTransferFallbackYear(transferIndex, transferChain), transferChain, gradeDateAnchorKeys) || 0,
                 exam: eData.examName,
                 examId: displayIdentity.examId || "",
                 storedExamId: displayIdentity.storedExamId || "",
@@ -4996,7 +5083,7 @@
         return fullGradeList;
     }
 
-    function buildGradeListFromClassExamMap(classExamMap, classKeys, currentClassKey, transferIndex, currentClassName, examIdByClassColKey, examCatalogEntriesByClassKey, transferChain, promotionContext) {
+    function buildGradeListFromClassExamMap(classExamMap, classKeys, currentClassKey, transferIndex, currentClassName, examIdByClassColKey, examCatalogEntriesByClassKey, transferChain, promotionContext, dateAnchorKeys, dateAnchorKeysByExamId) {
         var grades = [];
         var trackedKeys = uniqueClassKeys(classKeys);
         transferChain = transferChain || EbookLifecycleApp.buildTransferChain(transferIndex || {}, currentClassKey, { maxDepth: 8 });
@@ -5010,6 +5097,8 @@
                 className: className,
                 currentClassName: currentClassName,
                 promotionContext: promotionContext,
+                dateAnchorKeys: dateAnchorKeys || [],
+                dateAnchorKeysByExamId: dateAnchorKeysByExamId || {},
                 examIdByColKey: (examIdByClassColKey || {})[classKey] || {},
                 examCatalogEntriesByClassKey: examCatalogEntriesByClassKey || {}
             }));
@@ -5135,17 +5224,31 @@
     function getDailyPostExamMatches(postOrDate, grades, sourceClassKey) {
         var post = postOrDate && typeof postOrDate === "object" ? postOrDate : null;
         var postDate = post ? post.date : postOrDate;
-        var pDate = new Date(postDate);
-        var shortDate = (pDate.getMonth() + 1) + "/" + pDate.getDate();
-        var exactPostDate = (postDate || "").toString();
-        var regex = new RegExp("(^|[^0-9])" + shortDate.replace("/", "\\/") + "([^0-9]|$)", "g");
-        return (grades || []).filter(function(g) {
-            if (!isGradeFromPostSource(g, sourceClassKey)) return false;
-            if (!isDailyPostExamGrade(g)) return false;
-            if (g.date === shortDate || g.date === exactPostDate) return true;
-            regex.lastIndex = 0;
-            return regex.test(g.date || "");
-        });
+        var postParts = getEbookExamLookupDateParts(postDate);
+        if (!postParts) return [];
+        var postDateKey = postParts.year ? (postParts.year * 10000 + postParts.month * 100 + postParts.day) : 0;
+        var options = post && typeof getDailyPostDisplayOptions === "function"
+            ? getDailyPostDisplayOptions(post)
+            : ((post && post.displayOptions && typeof post.displayOptions === "object") ? post.displayOptions : {});
+        var quiz = options && options.quiz && typeof options.quiz === "object" ? options.quiz : {};
+        var mappedExamIds = [quiz.slot1Exam, quiz.slot2Exam].map(function(mapping) {
+            return (mapping && mapping.targetExamId || "").toString().trim();
+        }).filter(Boolean);
+        return (grades || []).map(function(g) {
+            if (!isGradeFromPostSource(g, sourceClassKey) || !isDailyPostExamGrade(g)) return null;
+            var parts = getEbookExamLookupDateParts(g.date);
+            if (!parts || parts.month !== postParts.month || parts.day !== postParts.day) return null;
+            if (!postParts.year) return parts.year ? null : g;
+            if (parts.year) return parts.year === postParts.year ? g : null;
+            // Legacy M/D headers are canonicalized once from full DailyPost,
+            // enrollment and transfer anchors. Never let another exact-year
+            // grade on the same day suppress this independent legacy exam.
+            if (Number(g.dateKey) === postDateKey) return g;
+            var gradeIds = [g.examId, g.storedExamId].map(function(value) {
+                return (value || "").toString().trim();
+            }).filter(Boolean);
+            return gradeIds.some(function(id) { return mappedExamIds.indexOf(id) > -1; }) ? g : null;
+        }).filter(Boolean);
     }
 
     function getRelatedHomeworkScoresForExam(exam, grades) {
@@ -5618,11 +5721,6 @@
             ]);
             result.cohortGradeExamRoot = gradeSources[0];
             result.examIdByClassColKey = gradeSources[1];
-            result.grades = filterItemsByStudentEnrollmentDate(
-                buildGradeListFromClassExamMap(result.cohortGradeExamRoot, result.trackedGradeClassKeys, safeC, result.studentTransferIndex, result.className, result.examIdByClassColKey, result.examCatalogEntriesByClassKey, result.studentTransferChain, result.promotionContext),
-                result.studentEnrollmentIndex,
-                result.trackedClassKeys
-            );
 
             // Fetch Posts
             let postsObj = {};
@@ -5634,15 +5732,38 @@
                 result.cohortDailyPostRoot = null;
                 postsObj = snapP.val() || {};
             }
+            result.dailyPostSourceRoot = postsObj;
+            result.gradeDateAnchorKeys = collectGradeDateAnchorKeys(
+                postsObj,
+                result.cohortGradeExamRoot,
+                result.examCatalogEntriesByClassKey,
+                result.studentEnrollmentIndex,
+                result.trackedClassKeys,
+                result.studentTransferChain
+            );
+            result.gradeDateAnchorKeysByExamId = collectDailyPostExamDateAnchorKeysById(postsObj);
+            result.grades = filterItemsByStudentEnrollmentDate(
+                buildGradeListFromClassExamMap(
+                    result.cohortGradeExamRoot,
+                    result.trackedGradeClassKeys,
+                    safeC,
+                    result.studentTransferIndex,
+                    result.className,
+                    result.examIdByClassColKey,
+                    result.examCatalogEntriesByClassKey,
+                    result.studentTransferChain,
+                    result.promotionContext,
+                    result.gradeDateAnchorKeys,
+                    result.gradeDateAnchorKeysByExamId
+                ),
+                result.studentEnrollmentIndex,
+                result.trackedClassKeys
+            );
             let classPosts = [];
+            let pendingSessionPosts = [];
             let now = new Date();
             for (let rowId in postsObj) {
                 const pRow = postsObj[rowId];
-                if (pRow.reserveTime && pRow.reserveTime.trim() !== "") {
-                    var postReserveDate = parseLocalDateTimeValue(pRow.reserveTime);
-                    if (postReserveDate && postReserveDate > now) continue;
-                }
-                
                 let postObj = {
                     id: pRow.id || rowId,
                     dailyPostId: pRow.dailyPostId || rowId,
@@ -5655,6 +5776,7 @@
                     isTransferFormerClass: pRow.isTransferFormerClass === true,
                     date: pRow.date, title: pRow.title, progress: pRow.progress, hw1: pRow.hw1, hw2: pRow.hw2,
                     makeup: pRow.makeup, quiz: pRow.quiz, range: pRow.range, note: pRow.note,
+                    reserveTime: pRow.reserveTime || '',
                     displayOptions: pRow.displayOptions || null, examData: { main: null, others: [] }
                 };
                 
@@ -5667,10 +5789,15 @@
                         return { main: exam, others: getRelatedHomeworkScoresForExam(exam, result.grades) };
                     });
                 }
+                pendingSessionPosts.push(postObj);
+                var postReserveDate = parseLocalDateTimeValue(pRow.reserveTime);
+                if (postReserveDate && postReserveDate > now) continue;
                 classPosts.push(postObj);
             }
             classPosts.sort((a,b) => new Date(b.date) - new Date(a.date));
             result.dailyPost = filterItemsByStudentEnrollmentDate(classPosts, result.studentEnrollmentIndex, result.trackedClassKeys);
+            pendingSessionPosts.sort((a,b) => new Date(b.date) - new Date(a.date));
+            result.pendingSessionPosts = filterItemsByStudentEnrollmentDate(pendingSessionPosts, result.studentEnrollmentIndex, result.trackedClassKeys);
 
             // Fetch Bulletins
             const globalBulletinKey = safeKey("全校");
@@ -6873,6 +7000,7 @@
                 className: gData.className || '',
                 studentKey: gData.foundUserKey || (ebookAuthSessionInfo && ebookAuthSessionInfo.studentKey) || safeKey(gData.studentName || ''),
                 posts: gData.dailyPost || [],
+                sessionPosts: gData.pendingSessionPosts || gData.dailyPost || [],
                 grades: gData.grades || [],
                 feedbackHistory: gData.feedbackHistory || [],
                 homeworkDone: gData.homeworkDone || {},
@@ -7349,6 +7477,7 @@
                         makeup: sanitizeDashboardDraftPreviewText(post.makeup),
                         range: sanitizeDashboardDraftPreviewText(post.range),
                         note: sanitizeDashboardDraftPreviewText(post.note),
+                        reserveTime: sanitizeDashboardDraftPreviewText(post.reserveTime),
                         displayOptions: parseDailyPostDisplayOptions(post.displayOptions),
                         examData: post.examData || { main: null, others: [] }
                     };
@@ -7431,6 +7560,7 @@
                 studentName: payload.studentName || '家長端預覽',
                 foundUserKey: safeKey(payload.studentName || '家長端預覽'),
                 dailyPost: payload.dailyPosts,
+                pendingSessionPosts: payload.dailyPosts,
                 grades: [],
                 feedbackHistory: [],
                 bulletins: payload.bulletins,
@@ -7872,6 +8002,17 @@
 
                     // 4. 成績資料監聽 (近期成績更新，含轉班前原班成績)
                     function rebuildGradesFromScopedSources() {
+                        gData.gradeDateAnchorKeys = collectGradeDateAnchorKeys(
+                            gData.dailyPostSourceRoot || gData.dailyPost || [],
+                            gData.cohortGradeExamRoot || {},
+                            gData.examCatalogEntriesByClassKey || {},
+                            gData.studentEnrollmentIndex || {},
+                            trackedClassKeys,
+                            gData.studentTransferChain
+                        );
+                        gData.gradeDateAnchorKeysByExamId = collectDailyPostExamDateAnchorKeysById(
+                            gData.dailyPostSourceRoot || gData.dailyPost || []
+                        );
                         gData.grades = filterItemsByStudentEnrollmentDate(
                             buildGradeListFromClassExamMap(
                                 gData.cohortGradeExamRoot || {},
@@ -7882,7 +8023,9 @@
                                 gData.examIdByClassColKey || {},
                                 gData.examCatalogEntriesByClassKey || {},
                                 gData.studentTransferChain,
-                                gData.promotionContext
+                                gData.promotionContext,
+                                gData.gradeDateAnchorKeys,
+                                gData.gradeDateAnchorKeysByExamId
                             ),
                             gData.studentEnrollmentIndex || {},
                             trackedClassKeys
@@ -7919,12 +8062,12 @@
                     const dailyPostSourceCache = { postsObj: null };
                     function rebuildDailyPostsFromScopedData(postsObj) {
                         dailyPostSourceCache.postsObj = postsObj || {};
+                        gData.dailyPostSourceRoot = postsObj || {};
                         let classPosts = [];
+                        let pendingSessionPosts = [];
                         let now = new Date();
                         for (let rowId in postsObj) {
                             const pRow = postsObj[rowId];
-                            var postReserveDate = parseLocalDateTimeValue(pRow.reserveTime);
-                            if (postReserveDate && postReserveDate > now) continue;
                             let postObj = {
                                 id: pRow.id || rowId,
                                 dailyPostId: pRow.dailyPostId || rowId,
@@ -7937,12 +8080,21 @@
                                 isTransferFormerClass: pRow.isTransferFormerClass === true,
                                 date: pRow.date, title: pRow.title, progress: pRow.progress, hw1: pRow.hw1, hw2: pRow.hw2,
                                 makeup: pRow.makeup, quiz: pRow.quiz, range: pRow.range, note: pRow.note,
+                                reserveTime: pRow.reserveTime || '',
                                 displayOptions: pRow.displayOptions || null, examData: { main: null, others: [] }
                             };
+                            pendingSessionPosts.push(postObj);
+                            var postReserveDate = parseLocalDateTimeValue(pRow.reserveTime);
+                            if (postReserveDate && postReserveDate > now) continue;
                             classPosts.push(postObj);
                         }
                         gData.dailyPost = filterItemsByStudentEnrollmentDate(
                             classPosts.sort((a,b) => new Date(b.date) - new Date(a.date)),
+                            gData.studentEnrollmentIndex || {},
+                            trackedClassKeys
+                        );
+                        gData.pendingSessionPosts = filterItemsByStudentEnrollmentDate(
+                            pendingSessionPosts.sort((a,b) => new Date(b.date) - new Date(a.date)),
                             gData.studentEnrollmentIndex || {},
                             trackedClassKeys
                         );
@@ -8002,24 +8154,27 @@
                     });
 
                     function remapDailyPostGrades() {
-                        if (!gData.dailyPost || !gData.grades) return;
-                        gData.dailyPost.forEach(postObj => {
-                            postObj.examData = { main: null, others: [] };
-                            let pDate = new Date(postObj.date);
-                            let shortDate = (pDate.getMonth() + 1) + "/" + pDate.getDate();
-                            
-                            let todayExams = getDailyPostExamMatches(postObj, gData.grades, postObj.sourceClassKey);
-                            if (todayExams.length > 0) {
-                                let todayMainExam = todayExams[0];
-                                postObj.examData.main = todayMainExam;
-                                postObj.examData.others = getRelatedHomeworkScoresForExam(todayMainExam, gData.grades);
-                                postObj.examData.exams = todayExams.map(function(exam) {
-                                    return {
-                                        main: exam,
-                                        others: getRelatedHomeworkScoresForExam(exam, gData.grades)
-                                    };
-                                });
-                            }
+                        if (!gData.grades) return;
+                        var lists = [gData.dailyPost || [], gData.pendingSessionPosts || []];
+                        var seenPosts = [];
+                        lists.forEach(function(list) {
+                            list.forEach(function(postObj) {
+                                if (seenPosts.indexOf(postObj) !== -1) return;
+                                seenPosts.push(postObj);
+                                postObj.examData = { main: null, others: [] };
+                                let todayExams = getDailyPostExamMatches(postObj, gData.grades, postObj.sourceClassKey);
+                                if (todayExams.length > 0) {
+                                    let todayMainExam = todayExams[0];
+                                    postObj.examData.main = todayMainExam;
+                                    postObj.examData.others = getRelatedHomeworkScoresForExam(todayMainExam, gData.grades);
+                                    postObj.examData.exams = todayExams.map(function(exam) {
+                                        return {
+                                            main: exam,
+                                            others: getRelatedHomeworkScoresForExam(exam, gData.grades)
+                                        };
+                                    });
+                                }
+                            });
                         });
                     }
                 }
@@ -8513,23 +8668,6 @@
             return Number(sheetMatch[0]) === Number(reportedMatch[0]) ? "filled" : "teacher_corrected";
         }
 
-        function getExamDateCandidates(exam) {
-            var dateStr = (exam && exam.date ? exam.date : "").toString();
-            var candidates = [];
-            var match = dateStr.match(/(\d{1,2})[\/.-](\d{1,2})/);
-            if (match) {
-                var month = parseInt(match[1], 10);
-                var day = parseInt(match[2], 10);
-                if (month && day) {
-                    candidates.push(month + "/" + day);
-                    candidates.push(String(month).padStart(2, "0") + "/" + String(day).padStart(2, "0"));
-                    candidates.push(month + "-" + day);
-                    candidates.push(String(month).padStart(2, "0") + "-" + String(day).padStart(2, "0"));
-                }
-            }
-            return candidates;
-        }
-
         function getLatestMakeupReportInfo(exam, feedbackHistory) {
             if (!feedbackHistory || feedbackHistory.length === 0) return null;
             var rawScore = (exam.score || "").toString();
@@ -8539,7 +8677,6 @@
                 ? normalizeEbookFeedbackExamId(exam.examId || exam.targetExamId)
                 : '';
 
-            var candidates = getExamDateCandidates(exam);
             function buildReportFromFeedback(fb) {
                 var match = fb.content.match(/(\d+(\.\d+)?)/);
                 if (!match) return null;
@@ -9213,6 +9350,92 @@
             return parseDailyPostDisplayOptions(post && post.displayOptions) || {};
         }
 
+        function parseDailyPostSessionClock(value) {
+            var match = (value || "").toString().trim().match(/^(\d{1,2}):(\d{2})$/);
+            if (!match) return null;
+            var hour = Number(match[1]);
+            var minute = Number(match[2]);
+            if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+            return {
+                hour: hour,
+                minute: minute,
+                total: hour * 60 + minute,
+                label: String(hour).padStart(2, "0") + ":" + String(minute).padStart(2, "0")
+            };
+        }
+
+        function getDailyPostSessionContract(post) {
+            var pendingApi = typeof window !== "undefined" ? window.EbookPendingTasks : null;
+            if (!pendingApi || typeof pendingApi.resolveClassSessionContract !== "function") return null;
+            return pendingApi.resolveClassSessionContract([
+                post && post.sourceClassName,
+                post && post.className,
+                post && post.storedClassName,
+                post && post.sourceClassKey,
+                post && post.storedClassKey
+            ]);
+        }
+
+        function getDailyPostSessionPresentation(post) {
+            var session = getDailyPostDisplayOptions(post).session;
+            if (!session || typeof session !== "object") return null;
+            var status = (session.status || "").toString().trim().toLowerCase();
+            if (status !== "rescheduled" && status !== "cancelled") return null;
+            var rawDate = (post && post.date || "").toString().trim();
+            var match = rawDate.match(/(\d{4})[\/.-](\d{1,2})[\/.-](\d{1,2})/);
+            if (!match) return null;
+            var year = Number(match[1]);
+            var month = Number(match[2]);
+            var day = Number(match[3]);
+            var validation = new Date(Date.UTC(year, month - 1, day));
+            if (validation.getUTCFullYear() !== year || validation.getUTCMonth() !== month - 1 || validation.getUTCDate() !== day) return null;
+            var dateLabel = month + "/" + day + "（" + ["日", "一", "二", "三", "四", "五", "六"][validation.getUTCDay()] + "）";
+            if (status === "cancelled") {
+                return { status: status, label: "本次停課｜" + dateLabel };
+            }
+            var contract = getDailyPostSessionContract(post);
+            var actualDate = (session.actualDate || "").toString().trim().match(/^(\d{4})[\/.-](\d{1,2})[\/.-](\d{1,2})$/);
+            var actualYear = actualDate ? Number(actualDate[1]) : 0;
+            var actualMonth = actualDate ? Number(actualDate[2]) : 0;
+            var actualDay = actualDate ? Number(actualDate[3]) : 0;
+            var actualValidation = actualDate ? new Date(Date.UTC(actualYear, actualMonth - 1, actualDay)) : null;
+            var actualDateValid = !!actualValidation &&
+                actualValidation.getUTCFullYear() === actualYear &&
+                actualValidation.getUTCMonth() === actualMonth - 1 &&
+                actualValidation.getUTCDate() === actualDay;
+            var actualDateKey = actualDateValid ? actualYear * 10000 + actualMonth * 100 + actualDay : 0;
+            var postDateKey = year * 10000 + month * 100 + day;
+            var originalStart = parseDailyPostSessionClock(session.originalStartTime);
+            var originalEnd = parseDailyPostSessionClock(session.originalEndTime);
+            var start = parseDailyPostSessionClock(session.startTime);
+            var end = parseDailyPostSessionClock(session.endTime);
+            var originalWeekdayRaw = session.originalWeekday;
+            var originalWeekdayText = originalWeekdayRaw === undefined || originalWeekdayRaw === null
+                ? ""
+                : originalWeekdayRaw.toString().trim();
+            var originalWeekdayValid = (typeof originalWeekdayRaw === "number" && Number.isInteger(originalWeekdayRaw)) ||
+                (typeof originalWeekdayRaw === "string" && /^[0-6]$/.test(originalWeekdayText));
+            var originalWeekday = originalWeekdayValid ? Number(originalWeekdayRaw) : NaN;
+            if (!contract || !actualDateKey || actualDateKey !== postDateKey ||
+                (session.policyId || "").toString().trim() !== contract.id ||
+                !originalWeekdayValid || originalWeekday !== contract.weekday ||
+                !originalStart || !originalEnd ||
+                originalStart.hour !== contract.startHour || originalStart.minute !== contract.startMinute ||
+                originalEnd.hour !== contract.endHour || originalEnd.minute !== contract.endMinute ||
+                !start || !end || end.total <= start.total) return null;
+            return {
+                status: status,
+                label: "本次調課｜" + dateLabel + start.label + "–" + end.label
+            };
+        }
+
+        function buildDailyPostSessionBadge(post) {
+            var presentation = getDailyPostSessionPresentation(post);
+            if (!presentation) return "";
+            var className = presentation.status === "cancelled" ? "post-session-badge is-cancelled" : "post-session-badge";
+            return "<span class='" + className + "' aria-label='" + escapeHtmlAttr(presentation.label) + "'>" + escapeHtml(presentation.label) + "</span>";
+        }
+
         function getDailyPostHomeworkDoneMode(post) {
             var homework = getDailyPostDisplayOptions(post).homework || {};
             return ["auto", "show", "hide"].indexOf(homework.doneMode) > -1 ? homework.doneMode : "auto";
@@ -9386,24 +9609,36 @@
             return raw.indexOf("回家練習卷") > -1 ? "上週" : "今日";
         }
 
-        function parseEbookComparableDate(value, fallbackYear) {
+        function parseEbookComparableDate(value, fallbackAnchor) {
             var raw = (value === undefined || value === null ? "" : value.toString()).trim();
             if (!raw) return null;
             var full = raw.match(/(\d{4})[\/.-](\d{1,2})[\/.-](\d{1,2})/);
             if (full) {
-                return {
+                var exact = {
                     year: parseInt(full[1], 10),
                     month: parseInt(full[2], 10),
                     day: parseInt(full[3], 10)
                 };
+                return isValidEbookExamLookupDate(exact.year, exact.month, exact.day) ? exact : null;
             }
-            var partial = raw.match(/(\d{1,2})[\/.-](\d{1,2})/);
-            if (!partial || !fallbackYear) return null;
-            return {
-                year: fallbackYear,
-                month: parseInt(partial[1], 10),
-                day: parseInt(partial[2], 10)
-            };
+            var parsed = getEbookExamLookupDateParts(raw);
+            if (!parsed || parsed.year) return null;
+            var anchor = fallbackAnchor && typeof fallbackAnchor === "object"
+                ? fallbackAnchor
+                : { year: parseInt(fallbackAnchor, 10) || 0 };
+            if (!anchor.year) return null;
+            var candidates = [anchor.year - 1, anchor.year, anchor.year + 1].map(function(year) {
+                if (!isValidEbookExamLookupDate(year, parsed.month, parsed.day)) return null;
+                var parts = { year: year, month: parsed.month, day: parsed.day };
+                var distance = anchor.month && anchor.day
+                    ? Math.abs(Date.UTC(year, parsed.month - 1, parsed.day) - Date.UTC(anchor.year, anchor.month - 1, anchor.day))
+                    : (year === anchor.year ? 0 : Math.abs(year - anchor.year));
+                return { parts: parts, distance: distance };
+            }).filter(Boolean).sort(function(left, right) {
+                return left.distance - right.distance || left.parts.year - right.parts.year;
+            });
+            if (!candidates.length || (candidates[1] && candidates[0].distance === candidates[1].distance)) return null;
+            return candidates[0].parts;
         }
 
         function getEbookComparableDateKey(parts) {
@@ -9418,14 +9653,14 @@
 
         function getMakeupResultTargetDate(exam, post) {
             var postParts = parseEbookComparableDate(post && post.date);
-            var examParts = parseEbookComparableDate(exam && exam.date, postParts && postParts.year);
+            var examParts = parseEbookComparableDate(exam && exam.date, postParts);
             return formatEbookComparableDate(examParts) || ((post && post.date) || "");
         }
 
         function isExamOnOrBeforePostDate(exam, post) {
             var postParts = parseEbookComparableDate(post && post.date);
             if (!postParts) return true;
-            var examParts = parseEbookComparableDate(exam && exam.date, postParts.year);
+            var examParts = parseEbookComparableDate(exam && exam.date, postParts);
             if (!examParts) return true;
             return getEbookComparableDateKey(examParts) <= getEbookComparableDateKey(postParts);
         }
@@ -9433,7 +9668,7 @@
         function isExamBeforePostDate(exam, post) {
             var postParts = parseEbookComparableDate(post && post.date);
             if (!postParts) return false;
-            var examParts = parseEbookComparableDate(exam && exam.date, postParts.year);
+            var examParts = parseEbookComparableDate(exam && exam.date, postParts);
             if (!examParts) return false;
             return getEbookComparableDateKey(examParts) < getEbookComparableDateKey(postParts);
         }
@@ -9493,34 +9728,43 @@
             return (value === undefined || value === null ? "" : value.toString()).replace(/\s+/g, "");
         }
 
-        function getEbookExamLookupDateMatch(value) {
+        function isValidEbookExamLookupDate(year, month, day) {
+            var checkYear = Number.isInteger(year) ? year : 2000;
+            if (!Number.isInteger(month) || !Number.isInteger(day) || month < 1 || month > 12 || day < 1 || day > 31) return false;
+            var date = new Date(checkYear, month - 1, day);
+            return date.getFullYear() === checkYear && date.getMonth() === month - 1 && date.getDate() === day;
+        }
+
+        function getEbookExamLookupDateParts(value) {
             var raw = (value === undefined || value === null ? "" : value.toString());
-            var full = raw.match(/\d{4}[\/.-](\d{1,2})[\/.-](\d{1,2})/);
-            if (full) return full;
-            var shortPattern = /(\d{1,2})[\/.-](\d{1,2})/g;
+            var full = raw.match(/(^|[^\d])(\d{4})[\/.-](\d{1,2})[\/.-](\d{1,2})(?!\d)/);
+            if (full) {
+                var year = parseInt(full[2], 10);
+                var fullMonth = parseInt(full[3], 10);
+                var fullDay = parseInt(full[4], 10);
+                return isValidEbookExamLookupDate(year, fullMonth, fullDay)
+                    ? { year: year, month: fullMonth, day: fullDay }
+                    : null;
+            }
+            var shortPattern = /(^|[^\d第])(\d{1,2})([\/.-])(\d{1,2})(?![\d章])/g;
             var match;
             while ((match = shortPattern.exec(raw)) !== null) {
-                var month = parseInt(match[1], 10);
-                var day = parseInt(match[2], 10);
-                if (isNaN(month) || isNaN(day) || month < 1 || month > 12 || day < 1 || day > 31) continue;
-                var before = raw.charAt(match.index - 1);
-                var after = raw.charAt(match.index + match[0].length);
-                if (match[0].indexOf("-") > -1 && (before === "第" || after === "章")) continue;
-                return match;
+                var month = parseInt(match[2], 10);
+                var day = parseInt(match[4], 10);
+                if (isValidEbookExamLookupDate(null, month, day)) return { year: null, month: month, day: day };
             }
             return null;
         }
 
         function ebookExamLookupTextHasDate(value) {
-            return !!getEbookExamLookupDateMatch(value);
+            return !!getEbookExamLookupDateParts(value);
         }
 
         function getEbookExamLookupDateCandidates(value) {
-            var match = getEbookExamLookupDateMatch(value);
-            if (!match) return [];
-            var month = parseInt(match[1], 10);
-            var day = parseInt(match[2], 10);
-            if (isNaN(month) || isNaN(day)) return [];
+            var parts = getEbookExamLookupDateParts(value);
+            if (!parts) return [];
+            var month = parts.month;
+            var day = parts.day;
             var m = month.toString();
             var d = day.toString();
             var mm = m.length === 1 ? "0" + m : m;
@@ -9529,18 +9773,18 @@
         }
 
         function getEbookExamLookupDateKey(value) {
-            var match = getEbookExamLookupDateMatch(value);
-            if (!match) return "";
-            var month = parseInt(match[1], 10);
-            var day = parseInt(match[2], 10);
-            if (isNaN(month) || isNaN(day)) return "";
-            return month + "/" + day;
+            var parts = getEbookExamLookupDateParts(value);
+            if (!parts) return "";
+            return parts.year
+                ? (parts.year + "/" + parts.month + "/" + parts.day)
+                : (parts.month + "/" + parts.day);
         }
 
         function ebookExamLookupDatesMatch(leftValue, rightValue) {
-            var leftKey = getEbookExamLookupDateKey(leftValue);
-            var rightKey = getEbookExamLookupDateKey(rightValue);
-            return !!(leftKey && rightKey && leftKey === rightKey);
+            var left = getEbookExamLookupDateParts(leftValue);
+            var right = getEbookExamLookupDateParts(rightValue);
+            if (!left || !right || left.month !== right.month || left.day !== right.day) return false;
+            return !(left.year && right.year && left.year !== right.year);
         }
 
         function ebookFeedbackMatchesExam(fb, exam) {
@@ -9558,15 +9802,29 @@
         }
 
         function ebookFeedbackMatchesExamDate(fb, exam) {
-            var titleDates = getEbookExamLookupDateCandidates(fb && fb.targetExamTitle);
-            if (titleDates.length) {
-                var fullTitle = normalizeEbookExamLookupText(((exam && exam.date) || "") + " " + ((exam && (exam.exam || exam.examName || exam.title)) || ""));
-                return ebookExamLookupDatesMatch(fb && fb.targetExamTitle, fullTitle);
+            fb = fb || {};
+            var historyAnchor = parseEbookComparableDate(fb.time || fb.createdAt || fb.updatedAt);
+            var targetParts = parseEbookComparableDate(fb.targetDate, historyAnchor);
+            var exactExamParts = parseEbookComparableDate(exam && exam.date);
+            var examParts = exactExamParts || parseEbookComparableDate(exam && exam.date, targetParts || historyAnchor);
+
+            // Persisted targetDate is stronger than a legacy M/D token embedded
+            // in targetExamTitle. Validate it first so a 2025 record cannot
+            // complete a same-title 2026 exam.
+            if (targetParts) {
+                if (!examParts || getEbookComparableDateKey(targetParts) !== getEbookComparableDateKey(examParts)) return false;
             }
-            var targetParts = parseEbookComparableDate(fb && fb.targetDate);
-            if (!targetParts) return true;
-            var examParts = parseEbookComparableDate(exam && exam.date, targetParts.year);
-            return getEbookComparableDateKey(targetParts) === getEbookComparableDateKey(examParts);
+
+            if (ebookExamLookupTextHasDate(fb.targetExamTitle)) {
+                var titleParts = parseEbookComparableDate(fb.targetExamTitle, targetParts || historyAnchor || exactExamParts);
+                var titleExamParts = exactExamParts || examParts || parseEbookComparableDate(exam && exam.date, titleParts);
+                if (titleParts || titleExamParts) {
+                    return !!titleParts && !!titleExamParts &&
+                        getEbookComparableDateKey(titleParts) === getEbookComparableDateKey(titleExamParts);
+                }
+                return ebookExamLookupDatesMatch(fb.targetExamTitle, exam && exam.date);
+            }
+            return true;
         }
 
         function isUniqueEbookFeedbackExamMatch(fb, exam) {
@@ -10212,7 +10470,7 @@
                     "<div id='feedback-attachment-status-" + safeDateId + "' class='feedback-attachment-status'></div></div>";
 
                 // ★★★ v3.9 修正：家長留言 -> 留言內容 ★★★
-                var feedbackHtml = "<div class='feedback-section'>" + uploadHtml + "<div class='section-title'>" + SVG.chat + "留言內容</div><div id='history-" + safeDateId + "'>" + historyHtml + "</div>" + godStickerAdjustmentHtml + adminDirectHtml + studentInputHtml + "</div>"; var headerTitle = escapeHtml(post.date + (post.title ? " " + post.title : "")); var transferBadge = post.isTransferFormerClass ? "<span style='margin-left:8px; background:#fffbeb; color:#92400e; border:1px solid #fde68a; border-radius:999px; padding:2px 8px; font-size:0.78rem; font-weight:900;'>轉班前紀錄｜" + escapeHtml(post.sourceClassName || "原班") + "</span>" : ""; var pendingPostAttrs = " data-pending-post-anchor='1' data-post-id='" + escapeHtmlAttr(post.dailyPostId || post.id || '') + "' data-source-class-key='" + escapeHtmlAttr(post.sourceClassKey || post.storedClassKey || '') + "' data-stored-class-key='" + escapeHtmlAttr(post.storedClassKey || '') + "' data-post-date='" + escapeHtmlAttr(post.date || '') + "'"; html += "<div class='post-card-wrapper'" + pendingPostAttrs + "><div class='post-card'><div class='post-header'><span>" + SVG.calendar + headerTitle + transferBadge + "</span></div>" + gradeHtml + "<div class='content-section'><div class='section-title'>" + SVG.megaphone + "聯絡事項</div>" + contentHtml + "</div>" + feedbackHtml + "</div></div>";
+                var feedbackHtml = "<div class='feedback-section'>" + uploadHtml + "<div class='section-title'>" + SVG.chat + "留言內容</div><div id='history-" + safeDateId + "'>" + historyHtml + "</div>" + godStickerAdjustmentHtml + adminDirectHtml + studentInputHtml + "</div>"; var headerTitle = escapeHtml(post.date + (post.title ? " " + post.title : "")); var sessionBadge = buildDailyPostSessionBadge(post); var transferBadge = post.isTransferFormerClass ? "<span style='margin-left:8px; background:#fffbeb; color:#92400e; border:1px solid #fde68a; border-radius:999px; padding:2px 8px; font-size:0.78rem; font-weight:900;'>轉班前紀錄｜" + escapeHtml(post.sourceClassName || "原班") + "</span>" : ""; var pendingPostAttrs = " data-pending-post-anchor='1' data-post-id='" + escapeHtmlAttr(post.dailyPostId || post.id || '') + "' data-source-class-key='" + escapeHtmlAttr(post.sourceClassKey || post.storedClassKey || '') + "' data-stored-class-key='" + escapeHtmlAttr(post.storedClassKey || '') + "' data-post-date='" + escapeHtmlAttr(post.date || '') + "'"; html += "<div class='post-card-wrapper'" + pendingPostAttrs + "><div class='post-card'><div class='post-header'><span>" + SVG.calendar + headerTitle + sessionBadge + transferBadge + "</span></div>" + gradeHtml + "<div class='content-section'><div class='section-title'>" + SVG.megaphone + "聯絡事項</div>" + contentHtml + "</div>" + feedbackHtml + "</div></div>";
 
             }); container.innerHTML = html;
 
@@ -12967,7 +13225,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     }
                     var targetParts = parseEbookComparableDate(item.date || item.targetDate);
                     if (!targetParts) return true;
-                    var examParts = parseEbookComparableDate(exam && exam.date, targetParts.year);
+                    var examParts = parseEbookComparableDate(exam && exam.date, targetParts);
                     return getEbookComparableDateKey(targetParts) === getEbookComparableDateKey(examParts);
                 }
                 function examMatchesFeedbackTitle(exam) {
@@ -13312,56 +13570,37 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
 
         function parseHomeworkDateValue(hw, fallbackYear) {
             var text = ((hw.rawDate || '') + ' ' + (hw.title || '')).trim();
-            var fullMatch = text.match(/(\d{4})[\/.-](\d{1,2})[\/.-](\d{1,2})/);
-            var year;
-            var month;
-            var day;
-            if (fullMatch) {
-                year = parseInt(fullMatch[1], 10);
-                month = parseInt(fullMatch[2], 10);
-                day = parseInt(fullMatch[3], 10);
-            } else {
-                var shortMatch = text.match(/(^|[^\d])(\d{1,2})[\/.-](\d{1,2})(?!\d)/);
-                if (!shortMatch) return null;
-                year = fallbackYear || new Date().getFullYear();
-                month = parseInt(shortMatch[2], 10);
-                day = parseInt(shortMatch[3], 10);
-            }
-
-            var date = new Date(year, month - 1, day);
-            if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
-            return date;
+            if (!text || !window.EbookLifecycleApp) return null;
+            var dateKey = window.EbookLifecycleApp.parseDateKey(text, {
+                fallbackYear: Number(fallbackYear) || 0,
+                preferFallbackYear: !!Number(fallbackYear)
+            });
+            var canonical = window.EbookLifecycleApp.formatDateKey(dateKey);
+            return canonical ? parseMissingHWDateInput(canonical) : null;
         }
 
         function getHomeworkDateCandidates(hw, rangeConfig) {
             var text = ((hw.rawDate || '') + ' ' + (hw.title || '')).trim();
+            if (!window.EbookLifecycleApp) return [];
             var fullMatch = text.match(/(\d{4})[\/.-](\d{1,2})[\/.-](\d{1,2})/);
             if (fullMatch) {
                 var fullDate = parseHomeworkDateValue(hw, rangeConfig.fallbackYear);
                 return fullDate ? [fullDate] : [];
             }
 
-            var shortMatch = text.match(/(^|[^\d])(\d{1,2})[\/.-](\d{1,2})(?!\d)/);
-            if (!shortMatch) return [];
-
-            var month = parseInt(shortMatch[2], 10);
-            var day = parseInt(shortMatch[3], 10);
-            var yearSeeds = [
-                rangeConfig.startDate ? rangeConfig.startDate.getFullYear() : null,
-                rangeConfig.endDate ? rangeConfig.endDate.getFullYear() : null,
-                rangeConfig.fallbackYear,
-                new Date().getFullYear()
-            ];
-            var seenYears = {};
-            return yearSeeds.reduce(function(dates, year) {
-                if (!year || seenYears[year]) return dates;
-                seenYears[year] = true;
-                var date = new Date(year, month - 1, day);
-                if (date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day) {
-                    dates.push(date);
-                }
-                return dates;
-            }, []);
+            var anchorDateKeys = [rangeConfig.startDate, rangeConfig.endDate].map(function(date) {
+                if (!(date instanceof Date) || Number.isNaN(date.getTime())) return 0;
+                return window.EbookLifecycleApp.parseDateKey(formatMissingHWDate(date));
+            }).filter(Boolean);
+            var dateKey = window.EbookLifecycleApp.parseDateKey(text, anchorDateKeys.length ? {
+                anchorDateKeys: anchorDateKeys
+            } : {
+                fallbackYear: Number(rangeConfig.fallbackYear) || 0,
+                preferFallbackYear: !!Number(rangeConfig.fallbackYear)
+            });
+            var canonical = window.EbookLifecycleApp.formatDateKey(dateKey);
+            var date = canonical ? parseMissingHWDateInput(canonical) : null;
+            return date ? [date] : [];
         }
 
         function filterHomeworkColsByRange(homeworkCols, rangeConfig) {

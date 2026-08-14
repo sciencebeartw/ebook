@@ -40,7 +40,7 @@ function extractFunction(name) {
   return '';
 }
 
-check(html.includes('ebook_pending_tasks_app.js?v=20260812_pending_title_exam_papers_v9'), 'pending UMD module must load with the pending-title and per-paper cache bust before the app');
+check(html.includes('ebook_pending_tasks_app.js?v=20260815_full_year_session_v1'), 'pending UMD module must load with the full-year and class-session cache bust before the app');
 check((html.match(/class="tab-item/g) || []).length === 4, 'student view must have exactly four tabs');
 check(html.includes('id="tab-pending" onclick="switchTab(3)"'), 'pending tab must retain numeric switchTab compatibility at index 3');
 check(html.includes('id="tab-content-3"'), 'pending tab content is missing');
@@ -52,6 +52,7 @@ check(switchTab.includes("getElementById('tab-content-3')"), 'switchTab must sho
 const normalizePreview = extractFunction('normalizeDashboardDraftPreviewPayload');
 check(normalizePreview.includes("rawKind === 'pending' || rawKind === 'pendingTasks'"), 'draft preview must accept kind=pending and kind=pendingTasks');
 check(normalizePreview.includes('normalizePreviewTasks'), 'draft pending tasks must use the pure preview normalizer');
+check(normalizePreview.includes('reserveTime: sanitizeDashboardDraftPreviewText(post.reserveTime)'), 'draft DailyPosts must preserve sanitized reserveTime for timing parity');
 const enterPreview = extractFunction('enterDashboardDraftPreview');
 check(enterPreview.includes("switchTab(3)"), 'pending draft preview must open the pending tab');
 check(enterPreview.includes("status: 'ready'"), 'draft preview must use an explicit local ready policy');
@@ -141,6 +142,11 @@ check(pendingHelpers.includes('getLegacyPendingSkipSourceClassKeys'), 'pending d
 check(pendingHelpers.includes('EbookPromotionApp.getLineageKey'), 'cross-class skip compatibility must be bounded by the verified promotion lineage');
 check(extractFunction('buildPendingTasksForCurrentView').includes('cohortHomeworkDoneRoot: gData.cohortHomeworkDoneRoot || null'), 'pending done state must receive the class-scoped cohort root');
 check(extractFunction('buildPendingTasksForCurrentView').includes('studentKeysByClassKey: gData.studentKeysByClassKey || null'), 'pending done state must receive verified class-scoped student keys');
+check(extractFunction('buildPendingTasksForCurrentView').includes('sessionPosts: gData.pendingSessionPosts || gData.dailyPost || []'), 'pending timing must receive every row already returned by the public scoped snapshot before the local display filter');
+check(extractFunction('rebuildDailyPostsFromScopedData').includes('gData.pendingSessionPosts = filterItemsByStudentEnrollmentDate'), 'realtime DailyPost rebuild must keep a separate enrollment-scoped timing list');
+check(extractFunction('rebuildDailyPostsFromScopedData').includes('gData.dailyPostSourceRoot = postsObj || {}'), 'realtime DailyPost rebuild must refresh the full source root used by date anchors');
+check(extractFunction('remapDailyPostGrades').includes('gData.pendingSessionPosts || []'), 'grade remapping must cover future timing posts as well as visible DailyPosts');
+check(!extractFunction('getHomeworkDateCandidates').includes('new Date().getFullYear'), 'manual homework date filtering must use selected full-date anchors instead of the device wall-clock year');
 
 check(html.includes("data-pending-post-anchor='1'"), 'daily posts need exact pending anchors');
 check(html.includes("data-pending-exam-anchor='1'"), 'exam cards need exact ExamID anchors');

@@ -258,6 +258,7 @@
   function monthDayKey(value) {
     var raw = text(value).trim();
     var full = raw.match(/\d{4}[\/.-](\d{1,2})[\/.-](\d{1,2})/);
+    if (full && !normalizeDateParts(full[0])) return "";
     var partial = full || raw.match(/(^|[^0-9])(\d{1,2})[\/.-](\d{1,2})(?=[^0-9]|$)/);
     if (!full && partial && partial[0].indexOf("-") > -1) {
       var afterPartial = raw.charAt(partial.index + partial[0].length);
@@ -269,16 +270,72 @@
     return month >= 1 && month <= 12 && day >= 1 && day <= 31 ? month + "/" + day : "";
   }
 
+  function dateIdentityParts(value) {
+    var raw = text(value).trim();
+    var full = raw.match(/(^|[^0-9])(\d{4})[\/.-](\d{1,2})[\/.-](\d{1,2})(?!\d)/);
+    if (full) {
+      var exact = normalizeDateParts(full[2] + "-" + full[3] + "-" + full[4]);
+      return exact ? { year: exact.year, month: exact.month, day: exact.day } : null;
+    }
+    var key = monthDayKey(raw);
+    if (!key) return null;
+    var parts = key.split("/");
+    var legacy = normalizeDateParts(parts[0] + "-" + parts[1], 2000);
+    return legacy ? { year: null, month: legacy.month, day: legacy.day } : null;
+  }
+
+  function selectYearAwareDateMatches(items, targetValue, getDateValue) {
+    var target = dateIdentityParts(targetValue);
+    if (!target) return [];
+    var candidates = (items || []).map(function(item) {
+      var parts = dateIdentityParts(getDateValue(item));
+      if (!parts || parts.month !== target.month || parts.day !== target.day) return null;
+      return { item: item, parts: parts };
+    }).filter(Boolean);
+    if (target.year) {
+      var exactYear = candidates.filter(function(candidate) { return candidate.parts.year === target.year; });
+      if (exactYear.length) return exactYear.map(function(candidate) { return candidate.item; });
+      return candidates.filter(function(candidate) { return !candidate.parts.year; }).map(function(candidate) { return candidate.item; });
+    }
+    var legacy = candidates.filter(function(candidate) { return !candidate.parts.year; });
+    if (legacy.length) return legacy.map(function(candidate) { return candidate.item; });
+    var years = {};
+    candidates.forEach(function(candidate) { years[candidate.parts.year] = true; });
+    return Object.keys(years).length === 1 ? candidates.map(function(candidate) { return candidate.item; }) : [];
+  }
+
   function parseReserveTime(value) {
+    if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : new Date(value.getTime());
+    if (typeof value === "number") return Number.isFinite(value) && value > 0 ? new Date(value) : null;
     var raw = text(value).trim();
     if (!raw) return null;
-    var normalized = raw.replace("T", " ").replace(/-/g, "/");
-    var date = new Date(normalized);
+    var match = raw.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+    if (!match) {
+      if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+\-]\d{2}:\d{2})$/.test(raw)) {
+        var zonedDate = new Date(raw);
+        return Number.isNaN(zonedDate.getTime()) ? null : zonedDate;
+      }
+      return null;
+    }
+    var year = Number(match[1]);
+    var month = Number(match[2]);
+    var day = Number(match[3]);
+    var hour = Number(match[4] || 0);
+    var minute = Number(match[5] || 0);
+    var second = Number(match[6] || 0);
+    var validation = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+    if (validation.getUTCFullYear() !== year || validation.getUTCMonth() !== month - 1 ||
+        validation.getUTCDate() !== day || validation.getUTCHours() !== hour ||
+        validation.getUTCMinutes() !== minute || validation.getUTCSeconds() !== second) return null;
+    var date = new Date(Date.UTC(year, month - 1, day, hour - 8, minute, second));
     return Number.isNaN(date.getTime()) ? null : date;
   }
 
   function isPostEffective(post, now) {
-    var reserve = parseReserveTime(post && post.reserveTime);
+    var reserveValue = post && post.reserveTime;
+    var reserveRaw = text(reserveValue).trim();
+    var reserve = parseReserveTime(reserveValue);
+    if (reserveRaw && !reserve) return false;
     return !reserve || reserve.getTime() <= now.getTime();
   }
 
@@ -354,12 +411,22 @@
   }
 
   function findPostForExam(posts, exam, helpers) {
-    var examDate = monthDayKey(exam && exam.date);
     var examSource = text(exam && (exam.sourceClassKey || exam.storedClassKey));
-    return (posts || []).find(function(post) {
-      if (!post || !examDate || monthDayKey(post.date) !== examDate) return false;
+    var sourceMatchesPosts = (posts || []).filter(function(post) {
+      if (!post) return false;
       return sourceMatches(examSource, post.sourceClassKey || post.storedClassKey, helpers);
-    }) || null;
+    });
+    var stableMatches = sourceMatchesPosts.filter(function(post) {
+      return getPostExamMains(post).some(function(postExam) {
+        return hasSameStableExamIdentity(exam, postExam);
+      });
+    });
+    if (stableMatches.length === 1) return stableMatches[0];
+    if (stableMatches.length > 1) return null;
+    var dateMatches = selectYearAwareDateMatches(sourceMatchesPosts, exam && exam.date, function(post) {
+      return post && post.date;
+    });
+    return dateMatches.length === 1 ? dateMatches[0] : null;
   }
 
   function getPostExamMains(post) {
@@ -400,12 +467,11 @@
   function resolveExactExamPost(posts, exam, helpers, options) {
     options = options || {};
     var examIds = [exam && exam.examId, exam && exam.storedExamId].map(normalizeExamId).filter(Boolean);
-    var examDate = monthDayKey(exam && exam.date);
     var examSource = text(exam && (exam.sourceClassKey || exam.storedClassKey)).trim();
-    if (!examIds.length || !examDate || !examSource) return null;
+    if (!examIds.length || !examSource) return null;
     var matches = (posts || []).filter(function(post) {
       var postSource = text(post && (post.sourceClassKey || post.storedClassKey)).trim();
-      if (!post || !getPostRowKey(post) || !postSource || monthDayKey(post.date) !== examDate) return false;
+      if (!post || !getPostRowKey(post) || !postSource) return false;
       if (options.requireQuiz === true && !hasNavigableOriginalExamPaper(post, helpers)) return false;
       if (!sourceMatches(examSource, postSource, helpers)) return false;
       var postExams = getPostExamMains(post);
@@ -420,12 +486,11 @@
 
   function resolveOriginalExamPaperPost(posts, exam, helpers) {
     var examIds = [exam && exam.examId, exam && exam.storedExamId].map(normalizeExamId).filter(Boolean);
-    var examDate = monthDayKey(exam && exam.date);
     var examSource = text(exam && (exam.sourceClassKey || exam.storedClassKey)).trim();
-    if (examIds.length && examDate && examSource) {
+    if (examIds.length && examSource) {
       var mappedMatches = (posts || []).filter(function(post) {
         var postSource = text(post && (post.sourceClassKey || post.storedClassKey)).trim();
-        if (!post || !getPostRowKey(post) || !postSource || monthDayKey(post.date) !== examDate) return false;
+        if (!post || !getPostRowKey(post) || !postSource) return false;
         if (!sourceMatches(examSource, postSource, helpers) || !hasNavigableOriginalExamPaper(post, helpers)) return false;
         var options = helpers && typeof helpers.getDisplayOptions === "function"
           ? helpers.getDisplayOptions(post)
@@ -529,31 +594,410 @@
       return makeupSourceMatches(examSource, post && (post.sourceClassKey || post.storedClassKey), helpers) &&
         isExamBeforePost(exam, post, helpers);
     });
-    return candidates.reduce(function(latest, post) {
-      var parts = normalizeDateParts(post && post.date);
-      if (!parts) return latest;
-      var latestParts = normalizeDateParts(latest && latest.date);
-      return !latestParts || parts.key > latestParts.key ? post : latest;
-    }, null) || candidates[0] || null;
-  }
-
-  function resolveFirstMakeupReminderSourcePost(posts, exam, helpers) {
-    var examSource = text(exam && (exam.sourceClassKey || exam.storedClassKey));
-    var candidates = (posts || []).filter(function(post) {
-      return makeupSourceMatches(examSource, post && (post.sourceClassKey || post.storedClassKey), helpers) &&
-        isExamBeforePost(exam, post, helpers);
-    }).map(function(post) {
+    var dated = candidates.map(function(post) {
       var parts = normalizeDateParts(post && post.date);
       return parts ? { post: post, key: parts.key } : null;
-    }).filter(Boolean).sort(function(left, right) {
-      return left.key - right.key;
+    }).filter(Boolean);
+    if (!dated.length) return null;
+    var latestKey = Math.max.apply(Math, dated.map(function(candidate) { return candidate.key; }));
+    var latest = dated.filter(function(candidate) { return candidate.key === latestKey; });
+    return latest.length === 1 ? latest[0].post : null;
+  }
+
+  // Canonical IDs and class patterns must stay aligned with Dashboard's
+  // ThresholdMakeupTiming contract. A rescheduled DailyPost persists the ID,
+  // original schedule and actual schedule, so every client can validate the
+  // one-off session without guessing from the current calendar.
+  var CLASS_SESSION_CONTRACTS = [
+    { id: "p6_gifted_science_sat_am", pattern: /^\d{3,4}小六資優自然週六上午班$/, weekday: 6, startHour: 9, startMinute: 0, endHour: 12, endMinute: 0 },
+    { id: "p6_gifted_science_sun_pm", pattern: /^\d{3,4}小六資優自然週日下午班$/, weekday: 0, startHour: 14, startMinute: 0, endHour: 17, endMinute: 0 },
+    { id: "p6_gifted_science_sun_night", pattern: /^\d{3,4}小六資優自然週日晚上班$/, weekday: 0, startHour: 18, startMinute: 0, endHour: 21, endMinute: 0 },
+    { id: "g7_advanced_science_sat", pattern: /^\d{3,4}國一自然超前班$/, weekday: 6, startHour: 13, startMinute: 0, endHour: 16, endMinute: 0 },
+    { id: "g8_advanced_science_sat", pattern: /^\d{3,4}國二自然超前班$/, weekday: 6, startHour: 18, startMinute: 0, endHour: 21, endMinute: 0 },
+    { id: "g7_advanced_math_sat", pattern: /^\d{3,4}國一數學超前班$/, weekday: 6, startHour: 18, startMinute: 0, endHour: 21, endMinute: 0 },
+    { id: "g8_advanced_math_sun", pattern: /^\d{3,4}國二數學超前班$/, weekday: 0, startHour: 18, startMinute: 0, endHour: 21, endMinute: 0 },
+    { id: "p6_gifted_math_wed", pattern: /^\d{3,4}(?:小六)?資優數學(?:班)?$/, weekday: 3, startHour: 18, startMinute: 0, endHour: 21, endMinute: 0 }
+  ];
+
+  function compactClassIdentity(value) {
+    // Firebase-safe class keys may replace whitespace with underscores. Do not
+    // erase other punctuation: a malformed/hybrid class name must not become a
+    // valid policy match that Dashboard would reject.
+    return text(value).trim().replace(/[\s_]/g, "");
+  }
+
+  function resolveClassSessionContract(values) {
+    var labels = (Array.isArray(values) ? values : [values]).map(compactClassIdentity).filter(Boolean);
+    var matches = CLASS_SESSION_CONTRACTS.filter(function(contract) {
+      return labels.some(function(label) {
+        return contract.pattern.test(label);
+      });
     });
-    if (!candidates.length) return { post: null, invalid: false };
-    var earliest = candidates[0];
-    if (candidates.filter(function(candidate) { return candidate.key === earliest.key; }).length !== 1) {
-      return { post: null, invalid: true };
+    return matches.length === 1 ? matches[0] : null;
+  }
+
+  function getTrustedPendingNow(options, policy) {
+    var raw = Object.prototype.hasOwnProperty.call(options || {}, "now") ? options.now : null;
+    var explicit = raw instanceof Date ? raw.getTime() : (typeof raw === "number" ? raw : NaN);
+    if (Number.isFinite(explicit) && explicit > 0) return new Date(explicit);
+    var loadedAt = Number(policy && policy.loadedAt);
+    return Number.isFinite(loadedAt) && loadedAt > 0 ? new Date(loadedAt) : null;
+  }
+
+  function getTaipeiDateParts(value) {
+    var timestamp = value instanceof Date ? value.getTime() : Number(value);
+    if (!Number.isFinite(timestamp)) return null;
+    var shifted = new Date(timestamp + 8 * 60 * 60 * 1000);
+    return normalizeDateParts(
+      shifted.getUTCFullYear() + "-" + (shifted.getUTCMonth() + 1) + "-" + shifted.getUTCDate()
+    );
+  }
+
+  function fullDateParts(value) {
+    var identity = dateIdentityParts(value);
+    if (!identity || !identity.year) return null;
+    return normalizeDateParts(identity.year + "-" + identity.month + "-" + identity.day);
+  }
+
+  function resolveThresholdExamDateParts(posts, exam, helpers) {
+    var explicit = fullDateParts(exam && exam.date);
+    if (explicit) return explicit;
+    var target = dateIdentityParts(exam && exam.date);
+    if (!target) return null;
+    var examSource = text(exam && (exam.sourceClassKey || exam.storedClassKey));
+    var sourcePosts = (posts || []).filter(function(post) {
+      return post && sourceMatches(examSource, post.sourceClassKey || post.storedClassKey, helpers);
+    });
+    var stablePosts = sourcePosts.filter(function(post) {
+      return getPostExamMains(post).some(function(postExam) {
+        return hasSameStableExamIdentity(exam, postExam);
+      });
+    });
+    if (stablePosts.length) {
+      var stableDateKeys = {};
+      var hasInvalidStableDate = false;
+      stablePosts.forEach(function(post) {
+        var postParts = fullDateParts(post && post.date);
+        if (!postParts) hasInvalidStableDate = true;
+        else stableDateKeys[postParts.key] = postParts;
+      });
+      var uniqueStableDateKeys = Object.keys(stableDateKeys);
+      return !hasInvalidStableDate && uniqueStableDateKeys.length === 1
+        ? stableDateKeys[uniqueStableDateKeys[0]]
+        : null;
     }
-    return { post: earliest.post, invalid: false };
+    var keys = {};
+    sourcePosts.forEach(function(post) {
+      var postParts = fullDateParts(post && post.date);
+      if (postParts && postParts.month === target.month && postParts.day === target.day) keys[postParts.key] = postParts;
+    });
+    var uniqueKeys = Object.keys(keys);
+    return uniqueKeys.length === 1 ? keys[uniqueKeys[0]] : null;
+  }
+
+  function sessionEndTimestamp(parts, contract) {
+    if (!parts || !contract) return NaN;
+    // Class dates and the contract are fixed to Asia/Taipei (UTC+8), without
+    // relying on the browser/device timezone.
+    return Date.UTC(parts.year, parts.month - 1, parts.day, contract.endHour - 8, contract.endMinute, 0, 0);
+  }
+
+  function parseSessionClock(value) {
+    var match = text(value).trim().match(/^(\d{1,2}):(\d{2})$/);
+    if (!match) return null;
+    var hour = Number(match[1]);
+    var minute = Number(match[2]);
+    return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59
+      ? { hour: hour, minute: minute, total: hour * 60 + minute, label: sessionClockLabel(hour, minute) }
+      : null;
+  }
+
+  function sessionClockLabel(hour, minute) {
+    return String(hour).padStart(2, "0") + ":" + String(minute).padStart(2, "0");
+  }
+
+  function getPostSessionMetadata(post, parts, contract, helpers) {
+    var options = helpers && typeof helpers.getDisplayOptions === "function"
+      ? helpers.getDisplayOptions(post)
+      : ((post && post.displayOptions) || {});
+    var session = options && typeof options === "object" && options.session && typeof options.session === "object"
+      ? options.session
+      : {};
+    var status = text(session.status).trim().toLowerCase();
+    if (status === "cancelled" || status === "supplemental") {
+      return { status: status, valid: true };
+    }
+    if (!status) return { status: "standard", valid: true };
+    if (status !== "rescheduled") return { status: "invalid", valid: false };
+    var actualDate = fullDateParts(session.actualDate);
+    var originalStart = parseSessionClock(session.originalStartTime);
+    var originalEnd = parseSessionClock(session.originalEndTime);
+    var start = parseSessionClock(session.startTime);
+    var end = parseSessionClock(session.endTime);
+    var originalWeekdayRaw = session.originalWeekday;
+    var originalWeekdayText = text(originalWeekdayRaw).trim();
+    var originalWeekdayValid = (typeof originalWeekdayRaw === "number" && Number.isInteger(originalWeekdayRaw)) ||
+      (typeof originalWeekdayRaw === "string" && /^[0-6]$/.test(originalWeekdayText));
+    var originalWeekday = originalWeekdayValid ? Number(originalWeekdayRaw) : NaN;
+    var expectedStart = sessionClockLabel(contract.startHour, contract.startMinute);
+    var expectedEnd = sessionClockLabel(contract.endHour, contract.endMinute);
+    if (!actualDate || !parts || actualDate.key !== parts.key || text(session.policyId).trim() !== contract.id ||
+        !originalWeekdayValid || originalWeekday !== contract.weekday || !originalStart || !originalEnd ||
+        originalStart.label !== expectedStart || originalEnd.label !== expectedEnd ||
+        !start || !end || end.total <= start.total) {
+      return { status: "rescheduled", valid: false };
+    }
+    return {
+      status: "rescheduled",
+      valid: true,
+      startHour: start.hour,
+      startMinute: start.minute,
+      endHour: end.hour,
+      endMinute: end.minute
+    };
+  }
+
+  function resolveSessionForPostDate(posts, parts, contract, helpers) {
+    var activePosts = [];
+    var overrides = [];
+    var invalidOverride = false;
+    (posts || []).forEach(function(post) {
+      var metadata = getPostSessionMetadata(post, parts, contract, helpers);
+      if (metadata.status === "cancelled" || metadata.status === "supplemental") return;
+      activePosts.push(post);
+      if (!metadata.valid) {
+        invalidOverride = true;
+        return;
+      }
+      if (metadata.status !== "rescheduled") return;
+      overrides.push(metadata);
+    });
+    if (invalidOverride) {
+      return { valid: false, ignored: false, reason: "invalid_class_session_override", activePosts: activePosts };
+    }
+    if (!activePosts.length) {
+      return { valid: false, ignored: true, reason: "ignored_non_session_post", activePosts: [] };
+    }
+    var signatures = {};
+    overrides.forEach(function(override) {
+      signatures[
+        sessionClockLabel(override.startHour, override.startMinute) + "|" +
+        sessionClockLabel(override.endHour, override.endMinute)
+      ] = override;
+    });
+    var signatureKeys = Object.keys(signatures);
+    if (signatureKeys.length > 1) {
+      return { valid: false, ignored: false, reason: "ambiguous_class_session_override", activePosts: activePosts };
+    }
+    if (signatureKeys.length === 1) {
+      var override = signatures[signatureKeys[0]];
+      return {
+        valid: true,
+        ignored: false,
+        source: "rescheduled",
+        timestamp: sessionEndTimestamp(parts, override),
+        activePosts: activePosts
+      };
+    }
+    var weekday = new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).getUTCDay();
+    return weekday === contract.weekday
+      ? { valid: true, ignored: false, source: "standard", timestamp: sessionEndTimestamp(parts, contract), activePosts: activePosts }
+      : { valid: false, ignored: false, reason: "class_session_date_mismatch", activePosts: activePosts };
+  }
+
+  function formatFullDateParts(parts) {
+    if (!parts) return "";
+    return String(parts.year).padStart(4, "0") + "-" +
+      String(parts.month).padStart(2, "0") + "-" + String(parts.day).padStart(2, "0");
+  }
+
+  function getPendingTaskSortDateParts(task) {
+    var candidates = [
+      task && task.date,
+      task && task.displayTarget && task.displayTarget.postDate,
+      task && task.paperTarget && task.paperTarget.postDate
+    ];
+    for (var index = 0; index < candidates.length; index += 1) {
+      var parts = fullDateParts(candidates[index]);
+      if (parts) return parts;
+    }
+    return null;
+  }
+
+  function resolveExamClassSessionContract(exam, context) {
+    var sourceLabels = [
+      exam && exam.sourceClassName,
+      exam && exam.className,
+      exam && exam.storedClassName,
+      exam && exam.sourceClassKey,
+      exam && exam.storedClassKey
+    ].filter(function(value) { return !!text(value).trim(); });
+    if (sourceLabels.length) return resolveClassSessionContract(sourceLabels);
+    return resolveClassSessionContract([
+      context && context.className,
+      context && context.classKey
+    ]);
+  }
+
+  function resolveGradeHomeworkTaskEligibility(options, policy, exam, context, helpers) {
+    var trustedNow = getTrustedPendingNow(options, policy);
+    if (!trustedNow) return { allowed: false, reason: "missing_trusted_now" };
+    var timingPosts = Array.isArray(options.sessionPosts) ? options.sessionPosts : (options.posts || []);
+    var examParts = resolveThresholdExamDateParts(timingPosts, exam, helpers);
+    if (!examParts) return { allowed: false, reason: "ambiguous_homework_date" };
+    var contract = resolveExamClassSessionContract(exam, context);
+    if (!contract) return { allowed: false, reason: "missing_class_session" };
+    var examSource = text(exam && (exam.sourceClassKey || exam.storedClassKey)) || (context && context.classKey);
+    var sourcePosts = timingPosts.filter(function(post) {
+      return post && sourceMatches(examSource, post.sourceClassKey || post.storedClassKey, helpers);
+    });
+    // Prefer the exact full-year DailyPost. Only when it does not exist may a
+    // legacy M/D post act as the publication record for this already-resolved
+    // source date. This prevents an older/effective short-date row from
+    // bypassing a future exact-year post in a mixed migration dataset.
+    var matchingPosts = selectYearAwareDateMatches(
+      sourcePosts,
+      formatFullDateParts(examParts),
+      function(post) { return post && post.date; }
+    );
+    if (!matchingPosts.length) {
+      var trustedToday = getTaipeiDateParts(trustedNow);
+      // The student-visible public DailyPost node does not contain scheduled
+      // rows before publication. A same-day/future grade with no matching post
+      // therefore cannot use the historical source-record fallback, or it
+      // would become pending at class end before the contact book is released.
+      if (!trustedToday || examParts.key >= trustedToday.key) {
+        return { allowed: false, reason: "source_daily_post_not_published" };
+      }
+    }
+    var session = resolveSessionForPostDate(matchingPosts.length ? matchingPosts : [{}], examParts, contract, helpers);
+    if (matchingPosts.length) {
+      var activePosts = session.activePosts || [];
+      var hasInvalidReserve = false;
+      var hasEffectivePost = false;
+      activePosts.forEach(function(post) {
+        var reserveValue = post && post.reserveTime;
+        var reserveRaw = text(reserveValue).trim();
+        var reserve = parseReserveTime(reserveValue);
+        if (reserveRaw && !reserve) {
+          hasInvalidReserve = true;
+          return;
+        }
+        if (!reserve || reserve.getTime() <= trustedNow.getTime()) hasEffectivePost = true;
+      });
+      if (hasInvalidReserve) return { allowed: false, reason: "invalid_daily_post_reserve_time" };
+      if (activePosts.length && !hasEffectivePost) return { allowed: false, reason: "source_daily_post_not_published" };
+    }
+    // Historical grade-only rows may have no DailyPost at all. They retain the
+    // source-record fallback, but once a matching post exists its reserveTime
+    // and session metadata are authoritative and must pass the gates above.
+    if (!session.valid) {
+      return {
+        allowed: false,
+        reason: session.ignored ? "ignored_homework_session" : (session.reason || "homework_date_not_class_session")
+      };
+    }
+    var eligibleAt = session.timestamp;
+    if (!Number.isFinite(eligibleAt) || trustedNow.getTime() < eligibleAt) {
+      return { allowed: false, reason: "homework_session_not_ended", eligibleAt: eligibleAt };
+    }
+    return {
+      allowed: true,
+      reason: "eligible",
+      eligibleAt: eligibleAt,
+      sessionKey: contract.id,
+      date: formatFullDateParts(examParts)
+    };
+  }
+
+  function resolveThresholdTaskEligibility(options, policy, exam, context, helpers) {
+    var trustedNow = getTrustedPendingNow(options, policy);
+    if (!trustedNow) return { allowed: false, reason: "missing_trusted_now" };
+    var allPosts = Array.isArray(options.sessionPosts) ? options.sessionPosts : (options.posts || []);
+    var examParts = resolveThresholdExamDateParts(allPosts, exam, helpers);
+    if (!examParts) return { allowed: false, reason: "ambiguous_exam_date" };
+    var contract = resolveExamClassSessionContract(exam, context);
+    if (!contract) return { allowed: false, reason: "missing_class_session" };
+    var examSource = text(exam && (exam.sourceClassKey || exam.storedClassKey)) || (context && context.classKey);
+    var records = [];
+    allPosts.forEach(function(post) {
+      if (!post || !sourceMatches(examSource, post.sourceClassKey || post.storedClassKey, helpers)) return;
+      var postParts = fullDateParts(post.date);
+      if (!postParts || postParts.key <= examParts.key) return;
+      var sessionMetadata = getPostSessionMetadata(post, postParts, contract, helpers);
+      if (sessionMetadata.status === "cancelled" || sessionMetadata.status === "supplemental") return;
+      var reserveValue = post.reserveTime;
+      var reserveRaw = text(reserveValue).trim();
+      var reserve = parseReserveTime(reserveValue);
+      records.push({
+        post: post,
+        parts: postParts,
+        invalidReserve: !!reserveRaw && !reserve,
+        effective: !reserveRaw || (!!reserve && reserve.getTime() <= trustedNow.getTime())
+      });
+    });
+    records.sort(function(left, right) { return left.parts.key - right.parts.key; });
+    if (!records.length) {
+      return { allowed: false, reason: "missing_next_effective_post" };
+    }
+
+    var dateKeys = [];
+    records.forEach(function(record) {
+      if (dateKeys.indexOf(record.parts.key) === -1) dateKeys.push(record.parts.key);
+    });
+    var selected = null;
+    var firstMismatch = null;
+    for (var dateIndex = 0; dateIndex < dateKeys.length; dateIndex += 1) {
+      var dateKey = dateKeys[dateIndex];
+      var sameDate = records.filter(function(record) { return record.parts.key === dateKey; });
+      var session = resolveSessionForPostDate(sameDate.map(function(record) { return record.post; }), sameDate[0].parts, contract, helpers);
+      if (session.ignored) continue;
+      if (session.valid) {
+        if (sameDate.some(function(record) { return record.invalidReserve; })) {
+          return {
+            allowed: false,
+            reason: "invalid_daily_post_reserve_time",
+            nextPostDate: formatFullDateParts(sameDate[0].parts)
+          };
+        }
+        if (!sameDate.some(function(record) { return record.effective; })) {
+          return {
+            allowed: false,
+            reason: "missing_next_effective_post",
+            nextPostDate: formatFullDateParts(sameDate[0].parts)
+          };
+        }
+        selected = { parts: sameDate[0].parts, session: session };
+        break;
+      }
+      if (session.reason === "class_session_date_mismatch") {
+        if (!firstMismatch) firstMismatch = { parts: sameDate[0].parts, reason: session.reason };
+        continue;
+      }
+      return { allowed: false, reason: session.reason || "ambiguous_next_session" };
+    }
+    if (!selected) {
+      return {
+        allowed: false,
+        reason: firstMismatch ? firstMismatch.reason : "missing_next_effective_post",
+        nextPostDate: firstMismatch ? formatFullDateParts(firstMismatch.parts) : ""
+      };
+    }
+    var eligibleAt = selected.session.timestamp;
+    if (!Number.isFinite(eligibleAt) || trustedNow.getTime() < eligibleAt) {
+      return { allowed: false, reason: "next_session_not_ended", eligibleAt: eligibleAt };
+    }
+    var activePosts = selected.session.activePosts || [];
+    var firstPost = activePosts[0] || null;
+    return {
+      allowed: true,
+      reason: activePosts.length === 1 ? "eligible" : "eligible_date_only",
+      examDateKey: examParts.key,
+      nextPost: activePosts.length === 1 ? firstPost : { date: firstPost ? text(firstPost.date) : formatFullDateParts(selected.parts) },
+      sourceDailyPostId: activePosts.length === 1 ? getPostRowKey(firstPost) : "",
+      eligibleAt: eligibleAt,
+      sessionKey: contract.id
+    };
   }
 
   function createTask(base, context) {
@@ -821,7 +1265,8 @@
     var policy = normalizePendingPolicy(options.pendingPolicy);
     if (policy.status !== "ready") return { status: "unavailable", items: [], policy: policy };
 
-    var now = options.now instanceof Date ? options.now : new Date(options.now || Date.now());
+    var now = getTrustedPendingNow(options, policy) ||
+      (options.now instanceof Date ? options.now : new Date(options.now || Date.now()));
     var posts = (options.posts || []).filter(function(post) { return isPostEffective(post, now); });
     var grades = options.grades || [];
     var feedback = options.feedbackHistory || [];
@@ -861,7 +1306,7 @@
       }
       var sourceClassKey = getPostSourceClassKey(post, context);
       var sourceStudentKey = getPostSourceStudentKey(options, post, sourceClassKey, rawStudentKey);
-      doneFlowPosts.push({ dateKey: monthDayKey(post.date), sourceClassKey: sourceClassKey });
+      doneFlowPosts.push({ date: text(post.date), sourceClassKey: sourceClassKey });
       var doneRecord = getHomeworkDoneRecord(options, sourceClassKey, sourceStudentKey, rawStudentKey, dateKey, post, context, posts, helpers);
       var done = !!(doneRecord && doneRecord.status === "done");
       if (done) return;
@@ -908,6 +1353,7 @@
       // exact former daily post homework_done flow above has a backend exception.
       if (!isExamSourceWritable(exam, sourceClassKey, sourceClassName, context, helpers)) return;
       var colKey = exam && exam.colIndex !== undefined && exam.colIndex !== null ? "col_" + exam.colIndex : "";
+      var stableExamId = normalizeExamId(exam && (exam.storedExamId || exam.examId));
       var linkedPost = findPostForExam(posts, exam, helpers);
 
       if (isHomework) {
@@ -915,11 +1361,15 @@
           ? helpers.shouldUseHomeworkDoneFlowForClass(sourceClassName)
           : false;
         if (examUsesDoneFlow) return;
-        var gradeDateKey = monthDayKey(exam && exam.date);
-        if (doneFlowPosts.some(function(donePost) {
-          return donePost.dateKey === gradeDateKey && sourceMatches(sourceClassKey, donePost.sourceClassKey, helpers);
+        var matchingDonePosts = selectYearAwareDateMatches(doneFlowPosts, exam && exam.date, function(donePost) {
+          return donePost && donePost.date;
+        });
+        if (matchingDonePosts.some(function(donePost) {
+          return sourceMatches(sourceClassKey, donePost.sourceClassKey, helpers);
         })) return;
         if (isCompletedHomeworkScore(exam && exam.score)) return;
+        var homeworkEligibility = resolveGradeHomeworkTaskEligibility(options, policy, exam, context, helpers);
+        if (!homeworkEligibility.allowed) return;
         pushIfActive(tasks, createTask({
           kind: "homework_score",
           itemType: "homework",
@@ -928,8 +1378,12 @@
           date: text(exam && exam.date),
           sourceClassKey: sourceClassKey,
           sourceClassName: sourceClassName,
-          sourceItemId: colKey || normalizeExamId(exam && (exam.storedExamId || exam.examId)),
-          reminderSourceDate: text((linkedPost && linkedPost.date) || (exam && exam.date)),
+          sourceItemId: stableExamId || colKey,
+          legacySourceItemIds: stableExamId && colKey ? [colKey] : [],
+          homeworkEligibleAt: homeworkEligibility.eligibleAt,
+          homeworkSessionKey: homeworkEligibility.sessionKey,
+          sourceDailyPostId: getPostRowKey(linkedPost),
+          reminderSourceDate: homeworkEligibility.date,
           displayTarget: {
             tab: linkedPost ? "contact" : "grades",
             dailyPostId: getPostRowKey(linkedPost),
@@ -971,7 +1425,8 @@
           date: text(exam && exam.date),
           sourceClassKey: sourceClassKey,
           sourceClassName: sourceClassName,
-          sourceItemId: normalizeExamId(exam && (exam.storedExamId || exam.examId)) || colKey,
+          sourceItemId: stableExamId || colKey,
+          legacySourceItemIds: stableExamId && colKey ? [colKey] : [],
           reminderSourceDateInvalid: absencePaperResolution.invalid === true,
           reminderSourceDate: text(
             (absencePaperPost && absencePaperPost.date) ||
@@ -1021,20 +1476,20 @@
         : null;
       if (!threshold.value || scoreNum === null || scoreNum >= threshold.value || hasResultColor(exam, helpers) || resultReport) return;
 
+      // A low score is not actionable at exam time. It becomes a pending
+      // makeup only after the next effective DailyPost for the same class has
+      // reached that class's scheduled end time. All missing/ambiguous inputs
+      // deliberately hide the task instead of notifying early.
+      var thresholdEligibility = resolveThresholdTaskEligibility(options, policy, exam, context, helpers);
+      if (!thresholdEligibility.allowed) return;
+
       var reportHost = threshold.isGuidance ? null : findMakeupReportHostPost(posts, exam, helpers);
       var mappedPaperResolution = threshold.isGuidance
         ? { post: null, invalid: false }
         : resolveMappedMakeupPost(posts, exam, helpers);
       var mappedPaperPost = mappedPaperResolution.post;
-      var firstReminderResolution = threshold.isGuidance
-        ? { post: null, invalid: false }
-        : resolveFirstMakeupReminderSourcePost(posts, exam, helpers);
-      var firstReminderHost = firstReminderResolution.post;
       var reminderSourceDate = text(
-        (mappedPaperPost && mappedPaperPost.date) ||
-        (firstReminderHost && firstReminderHost.date) ||
-        (linkedPost && linkedPost.date) ||
-        (exam && exam.date)
+        thresholdEligibility.nextPost && thresholdEligibility.nextPost.date
       );
       var taskKind = threshold.isGuidance ? "guidance" : (reportHost ? "makeup_result" : "makeup");
       var taskLabel = threshold.isGuidance ? "輔導待完成" : (reportHost ? "補考結果待回報" : "補考待完成");
@@ -1046,9 +1501,12 @@
         date: text(exam && exam.date),
         sourceClassKey: sourceClassKey,
         sourceClassName: sourceClassName,
-        sourceItemId: normalizeExamId(exam && (exam.storedExamId || exam.examId)) || colKey,
-        reminderSourceDateInvalid: mappedPaperResolution.invalid === true ||
-          (!mappedPaperPost && firstReminderResolution.invalid === true),
+        sourceItemId: stableExamId || colKey,
+        legacySourceItemIds: stableExamId && colKey ? [colKey] : [],
+        thresholdEligibleAt: thresholdEligibility.eligibleAt,
+        thresholdSessionKey: thresholdEligibility.sessionKey,
+        sourceDailyPostId: thresholdEligibility.sourceDailyPostId,
+        reminderSourceDateInvalid: false,
         reminderSourceDate: reminderSourceDate,
         displayTarget: {
           tab: linkedPost ? "contact" : "grades",
@@ -1093,8 +1551,12 @@
     });
 
     tasks.sort(function(a, b) {
-      var left = normalizeDateParts(a.date, now.getFullYear());
-      var right = normalizeDateParts(b.date, now.getFullYear());
+      // Never order legacy M/D labels by the browser's wall-clock year. Prefer
+      // an exact task/header date, then the exact DailyPost anchor; unresolved
+      // historical items keep a deterministic label order instead of being
+      // silently moved into the current calendar year.
+      var left = getPendingTaskSortDateParts(a);
+      var right = getPendingTaskSortDateParts(b);
       var diff = (right ? right.key : 0) - (left ? left.key : 0);
       return diff || text(a.neutralLabel).localeCompare(text(b.neutralLabel), "zh-Hant");
     });
@@ -1151,6 +1613,11 @@
     resolveHomeworkDoneRecord: resolveHomeworkDoneRecord,
     buildPendingTasks: buildPendingTasks,
     normalizePreviewTasks: normalizePreviewTasks,
-    monthDayKey: monthDayKey
+    monthDayKey: monthDayKey,
+    dateIdentityParts: dateIdentityParts,
+    selectYearAwareDateMatches: selectYearAwareDateMatches,
+    resolveClassSessionContract: resolveClassSessionContract,
+    resolveGradeHomeworkTaskEligibility: resolveGradeHomeworkTaskEligibility,
+    resolveThresholdTaskEligibility: resolveThresholdTaskEligibility
   };
 });

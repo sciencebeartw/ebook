@@ -34,7 +34,9 @@ const context = {
   isDailyPostExamGrade: grade => /小考|複習考/.test(`${grade.date || ""}${grade.exam || ""}`),
 };
 vm.createContext(context);
-vm.runInContext(extractFunction("getDailyPostExamMatches"), context);
+["isValidEbookExamLookupDate", "getEbookExamLookupDateParts", "getDailyPostExamMatches"].forEach(name => {
+  vm.runInContext(extractFunction(name), context);
+});
 
 const grades = [
   { date: "5/3小考", exam: "生物第一章", score: "98", sourceClassKey: "class-a" },
@@ -49,7 +51,7 @@ const july12Post = {
 };
 assert.deepStrictEqual(Array.from(context.getDailyPostExamMatches(july12Post, grades, "class-a")), [], "a newly published post must not borrow an older same-chapter exam");
 
-const withTodayExam = grades.concat([{ date: "7/12小考", exam: "理化第一章", score: "95", sourceClassKey: "class-a" }]);
+const withTodayExam = grades.concat([{ date: "7/12小考", dateKey: 20260712, exam: "理化第一章", score: "95", sourceClassKey: "class-a" }]);
 const matched = Array.from(context.getDailyPostExamMatches(july12Post, withTodayExam, "class-a"));
 assert.strictEqual(matched.length, 1);
 assert.strictEqual(matched[0].score, "95");

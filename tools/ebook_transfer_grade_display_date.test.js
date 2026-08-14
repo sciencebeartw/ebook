@@ -32,6 +32,8 @@ const context = vm.createContext({
 });
 [
   "normalizeEbookExamLookupText",
+  "isValidEbookExamLookupDate",
+  "getEbookExamLookupDateParts",
   "getHomeworkDoneCourseAliasKey",
   "listActiveIncomingTransfers",
   "getTransferDateKey",
@@ -100,7 +102,7 @@ assert.strictEqual(caiQuiz.storedExamId, "sunQuiz", "仍須保留實際儲存 ex
 assert.strictEqual(caiQuiz.mapped, true);
 const linkedSaturdayPostGrades = context.getDailyPostExamMatches(
   { date: "2026/07/18" },
-  [Object.assign({ sourceClassKey: saturday }, caiQuiz)],
+  [Object.assign({ sourceClassKey: saturday, dateKey: 20260718 }, caiQuiz)],
   saturday
 );
 assert.strictEqual(linkedSaturdayPostGrades.length, 1, "映射後的成績必須重新掛回 7/18 原班聯絡簿");

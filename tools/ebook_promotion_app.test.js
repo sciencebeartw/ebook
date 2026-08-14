@@ -351,6 +351,7 @@ const januaryBoundary = Promotion.normalizePromotionContext({
 assert.strictEqual(Promotion.resolvePromotionScopeAtDate(januaryBoundary, '12/20小考', 'grades').logicalClassKey, 'A');
 assert.strictEqual(Promotion.resolvePromotionScopeAtDate(januaryBoundary, '1/10小考', 'grades').logicalClassKey, 'B');
 assert.strictEqual(Promotion.parseDateKeyWithAnchors('2026/08/01小考', [20260704]), 20260801);
+assert.strictEqual(Promotion.parseDateKeyWithAnchors('2026/02/29小考', [20240229]), 0, 'an invalid full-year promotion date must not fall back to legacy M/D');
 assert.strictEqual(
   Promotion.parseDateKeyWithAnchors('7/2小考', [20240101]),
   0,

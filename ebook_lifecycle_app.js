@@ -56,9 +56,17 @@
     return isValidDateParts(year, month, day) ? { year: year, month: month, day: day } : null;
   }
 
+  function hasFullDateToken(value) {
+    var text = (value === undefined || value === null ? '' : String(value)).trim();
+    return /(\d{4})[\/.\-](\d{1,2})[\/.\-](\d{1,2})/.test(text);
+  }
+
   function parsePartialDateParts(value) {
     var text = (value === undefined || value === null ? '' : String(value)).trim();
-    if (parseFullDateParts(text)) return null;
+    // A malformed full-year token is not legacy M/D data. In particular,
+    // 2026/2/29 must not fall through and become the valid 2/29 of another
+    // anchor year.
+    if (hasFullDateToken(text)) return null;
     var pattern = /(^|[^0-9])(\d{1,2})([\/.\-])(\d{1,2})(?=[^0-9]|$)/g;
     var match;
     while ((match = pattern.exec(text)) !== null) {
@@ -100,7 +108,7 @@
     if (fallbackYear) candidateYears.push(fallbackYear);
     candidateYears = uniqueStrings(candidateYears).map(Number);
 
-    var bestKey = null;
+    var bestKeys = [];
     var bestDistance = Infinity;
     candidateYears.forEach(function(year) {
       var candidateKey = datePartsToKey(year, partial.month, partial.day);
@@ -109,17 +117,23 @@
       var distance = Math.min.apply(Math, anchorKeys.map(function(anchorKey) {
         return Math.abs(candidateMs - dateKeyToUtcMs(anchorKey));
       }));
-      if (distance < bestDistance || (distance === bestDistance && (bestKey === null || candidateKey < bestKey))) {
+      if (distance < bestDistance) {
         bestDistance = distance;
-        bestKey = candidateKey;
+        bestKeys = [candidateKey];
+      } else if (distance === bestDistance && bestKeys.indexOf(candidateKey) === -1) {
+        bestKeys.push(candidateKey);
       }
     });
-    return bestKey;
+    // A short M/D value at an exact cross-year midpoint is ambiguous. Picking
+    // the older year would silently attach lifecycle data to the wrong cohort;
+    // callers must supply a stronger full-date anchor instead.
+    return bestKeys.length === 1 ? bestKeys[0] : null;
   }
 
   function parseDateKey(value, options) {
     var full = parseFullDateParts(value);
     if (full) return datePartsToKey(full.year, full.month, full.day);
+    if (hasFullDateToken(value)) return null;
     var partial = parsePartialDateParts(value);
     return partial ? inferPartialDateKey(partial, options) : null;
   }
