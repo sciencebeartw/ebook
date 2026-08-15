@@ -45,7 +45,7 @@ assert.deepStrictEqual(JSON.parse(JSON.stringify(info)), {
   numericScore: "92",
   hasAbsenceMarker: true
 });
-assert.strictEqual(context.getGodScoreHumanLabel("92假"), "92（請假補登）");
+assert.strictEqual(context.getGodScoreHumanLabel("92假"), "92（請假回報）");
 
 context.window.adminModeScoreEditContext.absent = {
   currentScore: "92假",
@@ -55,9 +55,9 @@ let html = context.buildGodScoreEditBox("absent");
 assert.match(html, /type='number'/);
 assert.match(html, /value='92'/);
 assert.doesNotMatch(html, /value='92假'/);
-assert.match(html, /保留「請假補登」註記/);
+assert.match(html, /保留「請假回報」註記/);
 assert.match(html, /checked/);
-assert.match(html, /目前 92（請假補登）/);
+assert.match(html, /目前 92（請假回報）/);
 
 context.window.adminModeScoreEditContext.regular = {
   currentScore: "85",
@@ -69,7 +69,7 @@ assert.doesNotMatch(html, /god-score-edit-absence-/);
 
 const displayLogic = extractFunction("getDisplayLogic");
 assert.match(displayLogic, /data-absence-score-tag='1'/);
-assert.match(displayLogic, /請假補登/);
+assert.match(displayLogic, /請假回報/);
 assert.match(displayLogic, /result\.mainScore = sheetNum/);
 
 const writeCorrection = extractFunction("writeGodScoreCorrection");
