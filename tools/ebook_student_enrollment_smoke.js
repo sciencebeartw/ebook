@@ -201,7 +201,7 @@ const matchingAbsence = context.getDisplayLogic({
   score: '91假',
   scoreNum: 91,
 }, []);
-if (matchingAbsence.teacherCorrected || matchingAbsence.showReviewing || !matchingAbsence.statusHtml.includes('請假回報')) {
+if (matchingAbsence.teacherCorrected || matchingAbsence.showReviewing || !matchingAbsence.statusHtml.includes('請假補登')) {
   throw new Error('a matching Sheet score must remain an ordinary completed absence writeback');
 }
 

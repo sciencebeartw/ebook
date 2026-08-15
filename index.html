@@ -2399,6 +2399,30 @@
             line-height: 1.35;
         }
 
+        .god-score-edit-absence-option {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-height: 44px;
+            margin-top: 8px;
+            padding: 7px 10px;
+            border-radius: 9px;
+            background: #fff;
+            color: #475569;
+            font-size: 0.88rem;
+            font-weight: 800;
+            text-align: center;
+        }
+
+        .god-score-edit-absence-option input {
+            width: 20px;
+            height: 20px;
+            margin: 0;
+            accent-color: #2563eb;
+            flex: 0 0 auto;
+        }
+
         @media (max-width: 520px) {
             .god-score-edit-row {
                 flex-direction: column;
@@ -8902,7 +8926,7 @@
                 if (rawScore.indexOf("假") > -1) {
                     result.effectiveNum = sheetNum;
                     result.mainScore = sheetNum;
-                    result.statusHtml += "<div class='home-exam-tag'>(請假回報)</div>";
+                    result.statusHtml += "<div class='home-exam-tag' data-absence-score-tag='1'>(請假補登)</div>";
                     if (overrideNum !== null && overrideNum !== sheetNum) {
                         result.teacherCorrected = true;
                         result.reportedScoreNum = overrideNum;
@@ -10106,7 +10130,8 @@
                 scoreReportHtml = "<div class='score-report-section'><div style='font-weight:bold; color:#c0392b; margin-bottom:10px; font-size:1.35rem;'>" + SVG.edit + "回報" + getDailyPostExamTimePrefix(exam) + getDailyPostExamLabel(exam) + "缺考分數</div><div class='input-box'><input type='number' class='score-input' id='" + scoreInputId + "' placeholder='輸入分數'><button class='score-btn' onclick=\"submitScoreReport('" + safeDate + "', '" + post.date + "', '" + (hasExamColIndex ? exam.colIndex : "") + "', '" + escapeInlineJs(exam.exam || "") + "')\">送出</button></div></div>";
             }
             var editableScore = getGodEditableScore(exam);
-            if (canUseAdminModeReview() && hasExamColIndex && !isHomeworkExam && editableScore) {
+            var editableScoreInfo = getGodEditableScoreInfo(editableScore);
+            if (canUseAdminModeReview() && hasExamColIndex && !isHomeworkExam && editableScoreInfo) {
                 var scoreEditContextKey = makeDomSafeId("score_edit_" + safeDate + "_" + exam.colIndex);
                 window.adminModeScoreEditContext[scoreEditContextKey] = {
                     targetDate: post.date,
@@ -10116,7 +10141,10 @@
                     examColIndex: exam.colIndex,
                     title: exam.exam || "",
                     targetExamId: exam.storedExamId || exam.examId || exam.targetExamId || "",
-                    currentScore: editableScore
+                    currentScore: editableScoreInfo.storedScore,
+                    currentNumericScore: editableScoreInfo.numericScore,
+                    hasAbsenceMarker: editableScoreInfo.hasAbsenceMarker,
+                    canEditAbsenceMarker: editableScoreInfo.hasAbsenceMarker
                 };
                 scoreReportHtml += buildGodScoreEditBox(scoreEditContextKey);
             }
@@ -10686,8 +10714,9 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
 
                 var oldScoreEditHtml = "";
                 var editableOldScore = getGodEditableScore(item);
+                var editableOldScoreInfo = getGodEditableScoreInfo(editableOldScore);
                 var hasOldExamColIndex = item.colIndex !== undefined && item.colIndex !== null && item.colIndex !== "";
-                if (canUseAdminModeReview() && hasOldExamColIndex && !isHomeworkColumnTitle((item.date || "") + (item.exam || "")) && editableOldScore) {
+                if (canUseAdminModeReview() && hasOldExamColIndex && !isHomeworkColumnTitle((item.date || "") + (item.exam || "")) && editableOldScoreInfo) {
                     var oldScoreEditContextKey = makeDomSafeId("old_score_edit_" + (item.date || "") + "_" + item.colIndex);
                     window.adminModeScoreEditContext[oldScoreEditContextKey] = {
                         targetDate: item.storedDate || item.date || "",
@@ -10697,7 +10726,10 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                         examColIndex: item.colIndex,
                         title: item.exam || "",
                         targetExamId: item.storedExamId || item.examId || item.targetExamId || "",
-                        currentScore: editableOldScore
+                        currentScore: editableOldScoreInfo.storedScore,
+                        currentNumericScore: editableOldScoreInfo.numericScore,
+                        hasAbsenceMarker: editableOldScoreInfo.hasAbsenceMarker,
+                        canEditAbsenceMarker: editableOldScoreInfo.hasAbsenceMarker
                     };
                     oldScoreEditHtml = buildGodScoreEditBox(oldScoreEditContextKey);
                 }
@@ -12003,15 +12035,38 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             return Number.isFinite(scoreNumber) && scoreNumber >= 0 && scoreNumber <= 100 ? raw : '';
         }
 
+        function getGodEditableScoreInfo(scoreValue) {
+            var raw = scoreValue === undefined || scoreValue === null ? '' : String(scoreValue).trim();
+            var match = raw.match(/^(\d+(?:\.\d+)?)(假)?$/);
+            var scoreNumber = match ? Number(match[1]) : NaN;
+            if (!match || !Number.isFinite(scoreNumber) || scoreNumber < 0 || scoreNumber > 100) return null;
+            return {
+                storedScore: raw,
+                numericScore: match[1],
+                hasAbsenceMarker: !!match[2]
+            };
+        }
+
+        function getGodScoreHumanLabel(scoreValue) {
+            var info = getGodEditableScoreInfo(scoreValue);
+            return info ? (info.numericScore + (info.hasAbsenceMarker ? '（請假補登）' : '')) : String(scoreValue || '');
+        }
+
         function buildGodScoreEditBox(contextKey) {
             var context = window.adminModeScoreEditContext && window.adminModeScoreEditContext[contextKey];
             if (!context) return '';
+            var currentInfo = getGodEditableScoreInfo(context.currentScore);
+            if (!currentInfo) return '';
+            var absenceOption = context.canEditAbsenceMarker
+                ? ("<label class='god-score-edit-absence-option'><input type='checkbox' id='god-score-edit-absence-" + contextKey + "'" + (currentInfo.hasAbsenceMarker ? " checked" : "") + ">保留「請假補登」註記</label>")
+                : '';
             return "<div class='god-score-edit-box'>" +
-                "<div class='god-score-edit-title'>老師修改分數｜目前 " + escapeAdminHtml(context.currentScore) + "</div>" +
+                "<div class='god-score-edit-title'>老師修改分數｜目前 " + escapeAdminHtml(getGodScoreHumanLabel(context.currentScore)) + "</div>" +
                 "<div class='god-score-edit-row'>" +
-                "<input type='text' inputmode='decimal' class='god-score-edit-input' id='god-score-edit-input-" + contextKey + "' value='" + escapeAdminHtml(context.currentScore) + "' aria-label='修改分數' autocomplete='off'>" +
+                "<input type='number' inputmode='decimal' step='0.1' min='0' max='100' class='god-score-edit-input' id='god-score-edit-input-" + contextKey + "' value='" + escapeAdminHtml(currentInfo.numericScore) + "' aria-label='修改分數' autocomplete='off'>" +
                 "<button type='button' class='god-score-edit-btn' onclick=\"writeGodScoreCorrection(this, '" + contextKey + "')\">修改分數</button>" +
                 "</div>" +
+                absenceOption +
                 "<div class='god-score-edit-status' id='god-score-edit-status-" + contextKey + "'></div>" +
                 "</div>";
         }
@@ -12084,17 +12139,20 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }
             var context = window.adminModeScoreEditContext && window.adminModeScoreEditContext[contextKey];
             var input = document.getElementById('god-score-edit-input-' + contextKey);
+            var absenceInput = document.getElementById('god-score-edit-absence-' + contextKey);
             var status = document.getElementById('god-score-edit-status-' + contextKey);
-            var nextScore = input ? input.value.trim() : '';
+            var nextNumericScore = input ? input.value.trim() : '';
+            var keepAbsenceMarker = !!(context && context.canEditAbsenceMarker && absenceInput && absenceInput.checked);
+            var nextScore = nextNumericScore + (keepAbsenceMarker ? '假' : '');
             if (!context || !context.targetDate || context.examColIndex === undefined || context.examColIndex === null || !context.title) {
                 swalAlert('找不到考試欄位資料', '請重新整理後再試。', 'warning');
                 return;
             }
-            if (!/^\d+(\.\d+)?(假)?$/.test(nextScore)) {
-                swalAlert('分數格式不正確', '請輸入 0 到 100 的數字；缺考補登可保留「假」，例如 85假。', 'warning');
+            if (!/^\d+(\.\d+)?$/.test(nextNumericScore)) {
+                swalAlert('分數格式不正確', '請輸入 0 到 100 的數字；請假補登註記請使用下方勾選框。', 'warning');
                 return;
             }
-            var scoreNumber = parseFloat(nextScore);
+            var scoreNumber = parseFloat(nextNumericScore);
             if (!Number.isFinite(scoreNumber) || scoreNumber < 0 || scoreNumber > 100) {
                 swalAlert('分數超出範圍', '分數請填 0 到 100。', 'warning');
                 return;
@@ -12108,13 +12166,13 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }
 
             var confirmText = gData.studentName + '｜' + context.targetDate + '｜' + context.title +
-                '\n\n原分數：' + context.currentScore + '\n新分數：' + nextScore +
+                '\n\n原分數：' + getGodScoreHumanLabel(context.currentScore) + '\n新分數：' + getGodScoreHumanLabel(nextScore) +
                 '\n\n確定要覆寫 Google Sheet 的這一格嗎？';
             var ok = await swalConfirm('確認修改分數', confirmText);
             if (!ok) return;
 
-            var row = btn ? btn.parentElement : null;
-            var controls = row ? row.querySelectorAll('button, input') : [];
+            var editBox = btn ? btn.closest('.god-score-edit-box') : null;
+            var controls = editBox ? editBox.querySelectorAll('button, input') : [];
             controls.forEach(function(el) { el.disabled = true; });
             var originalText = btn ? btn.innerText : '';
             if (btn) btn.innerText = '修改中...';
@@ -12153,22 +12211,37 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     sourceSurface: 'ebook_god_score_correction'
                 });
                 context.currentScore = nextScore;
-                if (input) input.value = nextScore;
-                var box = btn ? btn.closest('.grade-section') : null;
+                context.currentNumericScore = nextNumericScore;
+                context.hasAbsenceMarker = keepAbsenceMarker;
+                if (input) input.value = nextNumericScore;
+                var box = btn ? (btn.closest('.grade-section') || btn.closest('.score-card')) : null;
                 var scoreNode = box ? box.querySelector('.main-score > span:first-child') : null;
-                if (scoreNode) scoreNode.textContent = nextScore;
+                if (scoreNode) scoreNode.textContent = nextNumericScore;
+                var oldScoreNode = box ? box.querySelector('.score-val') : null;
+                if (oldScoreNode && oldScoreNode.firstChild) oldScoreNode.firstChild.nodeValue = nextNumericScore;
+                var absenceTag = box ? box.querySelector('[data-absence-score-tag="1"]') : null;
+                if (keepAbsenceMarker && !absenceTag && box) {
+                    absenceTag = document.createElement('div');
+                    absenceTag.className = 'home-exam-tag';
+                    absenceTag.setAttribute('data-absence-score-tag', '1');
+                    absenceTag.textContent = '(請假補登)';
+                    var scoreContainer = box.querySelector('.main-score') || box.querySelector('.score-val');
+                    if (scoreContainer && scoreContainer.parentNode) scoreContainer.parentNode.insertBefore(absenceTag, scoreContainer.nextSibling);
+                } else if (!keepAbsenceMarker && absenceTag) {
+                    absenceTag.remove();
+                }
                 var title = btn && btn.closest('.god-score-edit-box') ? btn.closest('.god-score-edit-box').querySelector('.god-score-edit-title') : null;
-                if (title) title.textContent = '老師修改分數｜目前 ' + nextScore;
+                if (title) title.textContent = '老師修改分數｜目前 ' + getGodScoreHumanLabel(nextScore);
                 if (status) {
                     var gasResult = actionResult && actionResult.result ? actionResult.result : {};
                     var isReplay = gasResult.idempotentReplay === true;
                     var firebaseSynced = gasResult.firebaseSynced === true;
                     status.style.color = (isReplay || firebaseSynced) ? '#16a34a' : '#b45309';
                     status.innerText = isReplay
-                        ? '已確認先前的修改完成，分數為 ' + nextScore + '。'
+                        ? '已確認先前的修改完成，分數為 ' + getGodScoreHumanLabel(nextScore) + '。'
                         : (firebaseSynced
-                            ? '已修改為 ' + nextScore + '，並完成單欄雲端同步。'
-                            : '已修改 Google Sheet 為 ' + nextScore + '；雲端單欄同步待補。');
+                            ? '已修改為 ' + getGodScoreHumanLabel(nextScore) + '，並完成單欄雲端同步。'
+                            : 'Google Sheet 已修改為 ' + getGodScoreHumanLabel(nextScore) + '；系統正在背景補上雲端顯示，可繼續處理其他學生。');
                 }
             } catch (err) {
                 if (status) {
