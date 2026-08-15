@@ -107,6 +107,25 @@ assert.deepStrictEqual(
   "an explicit DailyPost ExamID mapping may safely recover an otherwise ambiguous legacy date"
 );
 
+const prePublishedPostWithoutExamId = {
+  date: "2026-08-15",
+  sourceClassKey: "class-a",
+  displayOptions: { quiz: { slot1Exam: null, slot2Exam: null } },
+};
+assert.deepStrictEqual(
+  context.getDailyPostExamMatches(prePublishedPostWithoutExamId, [], "class-a"),
+  [],
+  "a pre-published DailyPost remains valid before score registration creates an ExamID"
+);
+assert.deepStrictEqual(
+  context.getDailyPostExamMatches(prePublishedPostWithoutExamId, [
+    { id: "late-current", examId: "exam-late", date: "2026/8/15小考", sourceClassKey: "class-a" },
+    { id: "late-old", examId: "exam-old", date: "2025/8/15小考", sourceClassKey: "class-a" },
+  ], "class-a").map(item => item.id),
+  ["late-current"],
+  "eBook must auto-link a same-class same-date exam that appears after the DailyPost was saved, without resaving the post"
+);
+
 assert.strictEqual(context.getTransferFallbackYear({}, { chain: [] }), 0, "missing full anchors must never fall back to the browser year");
 assert.strictEqual(context.getTransferDateKey("8/15小考", 0, { chain: [] }, [20260801]), 20260815);
 assert.strictEqual(context.getTransferDateKey("8/15小考", 0, { chain: [] }, [20250815, 20260815]), 0, "cross-year legacy ambiguity fails closed");

@@ -10159,6 +10159,7 @@
                 function getPostExamTypes(text) {
                     var raw = (text || "").toString();
                     var types = [];
+                    if (raw.indexOf("複習") > -1) types.push("複習考");
                     if (raw.indexOf("小考") > -1) types.push("小考");
                     if (raw.indexOf("隨堂") > -1) types.push("隨堂考");
                     if (raw.indexOf("鑑定") > -1) types.push("鑑定考");
@@ -10189,6 +10190,15 @@
                     var exams = Array.isArray(examData.exams) && examData.exams.length
                         ? examData.exams.map(function(item) { return item && (item.main || item); }).filter(Boolean)
                         : [examData.main].filter(Boolean);
+                    if (index === 0 || index === 1) {
+                        var quizLines = splitPostMultiLinkValue(postData && postData.quiz);
+                        var desiredType = getPostLineExamType(quizLines[index] || "");
+                        if (desiredType) {
+                            exams = exams.filter(function(exam) {
+                                return getPostLineExamType([exam && exam.date, exam && exam.exam, exam && exam.title].join(" ")) === desiredType;
+                            });
+                        }
+                    }
                     if (exams.length !== 1) return null;
                     var exam = exams[0];
                     if (!(exam.examId || exam.storedExamId)) return null;
@@ -10219,6 +10229,7 @@
                 }
                 function getPostLineExamType(line) {
                     var raw = (line || "").toString();
+                    if (raw.indexOf("複習") > -1) return "複習考";
                     if (raw.indexOf("鑑定") > -1) return "鑑定考";
                     if (raw.indexOf("隨堂") > -1) return "隨堂考";
                     if (raw.indexOf("小考") > -1) return "小考";
