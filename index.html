@@ -524,6 +524,46 @@
             box-shadow: 0 4px 10px rgba(76, 175, 80, 0.3);
         }
 
+        .remember-login-row {
+            width: 100%;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin: -2px 0 16px;
+            padding: 12px 14px;
+            box-sizing: border-box;
+            border: 1px solid #dbe7df;
+            border-radius: 12px;
+            background: #f7fbf8;
+            color: #334155;
+            cursor: pointer;
+            text-align: left;
+        }
+
+        .remember-login-row input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            min-width: 20px;
+            margin: 1px 0 0;
+            padding: 0;
+            accent-color: var(--primary);
+        }
+
+        .remember-login-copy {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            font-size: 0.95rem;
+            font-weight: 800;
+            line-height: 1.4;
+        }
+
+        .remember-login-copy small {
+            color: #64748b;
+            font-size: 0.78rem;
+            font-weight: 600;
+        }
+
         .error-msg {
             color: #e74c3c;
             margin-top: 15px;
@@ -4064,15 +4104,17 @@
 
   <!-- Webhook API & Firebase Polyfill (Replace google.script.run) -->
   <script>
-    const ebookFirebaseApp = firebase.apps.some(function(app) { return app.name === "ebook"; })
-      ? firebase.app("ebook")
-      : firebase.initializeApp(firebaseConfig, "ebook");
+    const qParams = new URLSearchParams(window.location.search);
+    const ebookSubjectParam = qParams.get('subject') === 'math' ? 'math' : 'science';
+    const ebookFirebaseAppName = 'ebook-' + ebookSubjectParam;
+    const ebookFirebaseApp = firebase.apps.some(function(app) { return app.name === ebookFirebaseAppName; })
+      ? firebase.app(ebookFirebaseAppName)
+      : firebase.initializeApp(firebaseConfig, ebookFirebaseAppName);
     const db = ebookFirebaseApp.database();
     const ebookAuth = ebookFirebaseApp.auth();
     const ebookFunctions = ebookFirebaseApp.functions();
     const ebookStorage = ebookFirebaseApp.storage();
-    const qParams = new URLSearchParams(window.location.search);
-    const BEAR_SUBJECT = qParams.get('subject') ? '/' + qParams.get('subject') : '/science';
+    const BEAR_SUBJECT = '/' + ebookSubjectParam;
     let ebookGodSessionId = qParams.get('godSession') || '';
     let ebookGodSessionInfo = null;
     let isStudentPreviewMode = false;
@@ -4082,6 +4124,7 @@
     let ebookGodSessionHeartbeatTimer = null;
     let ebookAuthSessionInfo = null;
     let activeEbookPromotionContext = null;
+    let ebookRememberedRestoreInProgress = false;
     const pendingEbookRequestIds = {};
     const PENDING_REMINDER_SESSION_STORAGE_PREFIX = 'sciencebear.ebook.pendingReminderShown.v1:';
 
@@ -5872,15 +5915,23 @@
 
     function createApiMethods(onSuccess, onErr) {
       return {
-        getStudentData: async function(u, p) {
+        getStudentData: async function(u, p, rememberDevice) {
            try {
                const loginFn = ebookFunctions.httpsCallable('createEbookStudentSession');
-               const loginResult = await loginFn({ subjectKey: BEAR_SUBJECT.replace('/', ''), studentName: u, password: p });
+               const shouldRemember = rememberDevice === true;
+               const loginResult = await loginFn({
+                   subjectKey: BEAR_SUBJECT.replace('/', ''),
+                   studentName: u,
+                   password: p,
+                   rememberDevice: shouldRemember
+               });
                const session = loginResult && loginResult.data ? loginResult.data : null;
                if (!session || !session.firebaseCustomToken || !session.className || !session.studentKey) {
                    throw new Error('登入服務沒有回傳完整的學生身分');
                }
-               await ebookAuth.setPersistence(firebase.auth.Auth.Persistence.NONE);
+               await ebookAuth.setPersistence(session.rememberDevice === true
+                   ? firebase.auth.Auth.Persistence.LOCAL
+                   : firebase.auth.Auth.Persistence.NONE);
                await ebookAuth.signInWithCustomToken(session.firebaseCustomToken);
                ebookAuthSessionInfo = session;
                const loaded = await Promise.all([
@@ -6267,8 +6318,15 @@
                 });
             </script>
 
-            <div class="input-group"><input type="text" id="sName" placeholder="請輸入學生姓名 (或管理者帳號)"></div>
-            <div class="input-group"><input type="password" id="sPass" placeholder="請輸入密碼 (或家長手機)"></div>
+            <div class="input-group"><input type="text" id="sName" name="username" autocomplete="username" placeholder="請輸入學生姓名 (或管理者帳號)"></div>
+            <div class="input-group"><input type="password" id="sPass" name="password" autocomplete="current-password" placeholder="請輸入密碼 (或家長手機)"></div>
+            <label class="remember-login-row" for="rememberStudentLogin">
+                <input type="checkbox" id="rememberStudentLogin" checked>
+                <span class="remember-login-copy">
+                    在這支手機保持登入
+                    <small>不保存家長電話明碼；滑掉主畫面 App 後可自動登入</small>
+                </span>
+            </label>
             <button class="login-btn" onclick="doLogin()">登入查看</button>
             <div class="forgot-pwd">忘記密碼請洽山熊科學</div>
             <div id="pwaHomeGuideEntry" class="pwa-home-guide-entry">
@@ -7829,15 +7887,92 @@
             return "連線錯誤：" + message;
         }
 
+        function waitForInitialEbookAuthUser(timeoutMs) {
+            return new Promise(function(resolve) {
+                var settled = false;
+                var unsubscribe = function() {};
+                var timer = setTimeout(function() {
+                    if (settled) return;
+                    settled = true;
+                    unsubscribe();
+                    resolve(ebookAuth.currentUser || null);
+                }, Math.max(1000, Number(timeoutMs) || 5000));
+                unsubscribe = ebookAuth.onAuthStateChanged(function(user) {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timer);
+                    unsubscribe();
+                    resolve(user || null);
+                }, function() {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timer);
+                    unsubscribe();
+                    resolve(null);
+                });
+            });
+        }
+
+        function shouldRevokeRememberedLoginForError(error) {
+            var code = String((error && error.code) || '').toLowerCase();
+            return code === 'functions/unauthenticated' || code === 'unauthenticated' ||
+                code === 'functions/permission-denied' || code === 'permission-denied';
+        }
+
+        async function restoreRememberedStudentLogin() {
+            if (ebookRememberedRestoreInProgress || ebookGodSessionId || isDashboardDraftPreviewMode) return false;
+            ebookRememberedRestoreInProgress = true;
+            try {
+                showEbookSessionBootstrapLoader('確認登入狀態');
+                var currentUser = await waitForInitialEbookAuthUser(8000);
+                if (!currentUser) return false;
+                showEbookSessionBootstrapLoader('自動登入');
+                var resumeFn = ebookFunctions.httpsCallable('resumeEbookStudentSession');
+                var resumeResult = await resumeFn({ subjectKey: BEAR_SUBJECT.replace('/', '') });
+                var session = resumeResult && resumeResult.data ? resumeResult.data : null;
+                if (!session || !session.firebaseCustomToken || !session.className || !session.studentKey) {
+                    throw new Error('自動登入服務沒有回傳完整的學生身分');
+                }
+                await ebookAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+                await ebookAuth.signInWithCustomToken(session.firebaseCustomToken);
+                ebookAuthSessionInfo = session;
+                var loaded = await Promise.all([
+                    executeFirebaseRead(session.studentName, '', true, session.className, session.studentKey),
+                    loadEbookPendingTaskPolicy()
+                ]);
+                loaded[0].pendingPolicy = loaded[1];
+                ebookAuthSessionInfo.pendingPolicy = loaded[1];
+                enterStudentView(loaded[0], 'remembered_session');
+                return true;
+            } catch (error) {
+                console.warn('eBook remembered login unavailable:', error);
+                var shouldRevoke = shouldRevokeRememberedLoginForError(error);
+                if (shouldRevoke) await ebookAuth.signOut().catch(function() {});
+                resetEbookSessionBootstrapLoader();
+                document.getElementById('full-loader').style.display = 'none';
+                document.getElementById('loginMsg').innerText = shouldRevoke
+                    ? '為保護學生資料，自動登入已失效，請重新輸入一次。'
+                    : '自動登入暫時連不上，登入資料仍保留；請稍後重新開啟。';
+                return false;
+            } finally {
+                ebookRememberedRestoreInProgress = false;
+                if (!gData) {
+                    resetEbookSessionBootstrapLoader();
+                    document.getElementById('full-loader').style.display = 'none';
+                }
+            }
+        }
+
         function doLogin() {
             var name = document.getElementById('sName').value; var pass = document.getElementById('sPass').value;
+            var rememberDevice = !!(document.getElementById('rememberStudentLogin') && document.getElementById('rememberStudentLogin').checked);
             if (!name || !pass) { document.getElementById('loginMsg').innerText = "請輸入完整資訊"; return; }
             document.getElementById('loader-login').style.display = 'block';
             document.getElementById('loginMsg').innerText = "";
             google.script.run.withSuccessHandler(function (result) { loginSuccess(result, pass); }).withFailureHandler(function (e) {
                 document.getElementById('loader-login').style.display = 'none';
                 document.getElementById('loginMsg').innerText = getStudentLoginFailureMessage(e);
-            }).getStudentData(name, pass);
+            }).getStudentData(name, pass, rememberDevice);
         }
         function loginSuccess(result, pass) {
             document.getElementById('loader-login').style.display = 'none';
@@ -7865,7 +8000,7 @@
             pendingTasksState = { status: 'unavailable', items: [] };
             pendingEntryNoticeReady = false;
             pendingEntryReminderHandled = false;
-            if (pass !== "admin_view" && pass !== "god_session" && pass !== "student_preview" && pass !== "dashboard_draft_preview") gPass = pass; // ★ 防止預覽模式覆蓋真正的密碼
+            if (pass !== "admin_view" && pass !== "god_session" && pass !== "student_preview" && pass !== "dashboard_draft_preview" && pass !== "remembered_session") gPass = pass; // ★ 防止預覽／自動登入模式覆蓋真正的密碼
 
             // ★ v4.0 登入記錄：fire-and-forget，不阻塞 UI
             if (pass !== "admin_view" && pass !== "god_session" && pass !== "student_preview" && pass !== "dashboard_draft_preview" && !result.isAdmin) {
@@ -14003,7 +14138,10 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
 
             if (bypassAdmin && bypassCls && bypassName) {
                 swalAlert('舊上帝視角連結已停用', '請從行政中心重新點學生姓名開啟安全上帝視角。', 'warning');
+                return;
             }
+
+            restoreRememberedStudentLogin();
         });
     </script>
 </div></body>

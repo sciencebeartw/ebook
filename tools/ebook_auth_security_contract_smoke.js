@@ -107,9 +107,10 @@ function parseCommentedJson(filePath) {
 
 // 1. The eBook must own an isolated named Firebase app and include Auth before use.
 const authSdkIndex = html.indexOf('firebase-auth.js');
-const appInitIndex = html.indexOf('firebase.initializeApp(firebaseConfig, "ebook")');
+const appInitIndex = html.indexOf('firebase.initializeApp(firebaseConfig, ebookFirebaseAppName)');
 check(authSdkIndex !== -1 && appInitIndex !== -1 && authSdkIndex < appInitIndex, 'Firebase Auth SDK must load before named eBook app initialization');
-checkIncludes(html, 'firebase.app("ebook")', 'existing named eBook app must be reused');
+checkIncludes(html, "const ebookFirebaseAppName = 'ebook-' + ebookSubjectParam;", 'science and math remembered Auth state must use separate named apps');
+checkIncludes(html, 'firebase.app(ebookFirebaseAppName)', 'existing subject-scoped named eBook app must be reused');
 checkIncludes(html, 'const db = ebookFirebaseApp.database();', 'RTDB must come from the named app');
 checkIncludes(html, 'const ebookAuth = ebookFirebaseApp.auth();', 'Auth must come from the named app');
 checkIncludes(html, 'const ebookFunctions = ebookFirebaseApp.functions();', 'Functions must come from the named app');
@@ -123,9 +124,23 @@ const loginCallIndex = getStudentData.indexOf("httpsCallable('createEbookStudent
 const customTokenIndex = getStudentData.indexOf('signInWithCustomToken(session.firebaseCustomToken)');
 const exactStudentReadIndex = getStudentData.indexOf("executeFirebaseRead(u, '', true, session.className, session.studentKey)");
 check(loginCallIndex !== -1 && customTokenIndex > loginCallIndex && exactStudentReadIndex > customTokenIndex, 'student flow must be callable login -> custom-token sign-in -> exact student read');
-checkIncludes(getStudentData, 'firebase.auth.Auth.Persistence.NONE', 'student Auth persistence must not survive the page session');
+checkIncludes(getStudentData, 'firebase.auth.Auth.Persistence.LOCAL', 'remembered student login must use device-local Firebase Auth persistence');
+checkIncludes(getStudentData, 'firebase.auth.Auth.Persistence.NONE', 'unchecked student login must remain limited to the page session');
+checkIncludes(getStudentData, 'rememberDevice: shouldRemember', 'student login must send only the remember-device choice, never a stored password');
 check(!getStudentData.includes("/studentLoginIndex/"), 'main student login flow must not read studentLoginIndex from the browser');
 check(!getStudentData.includes("BEAR_SUBJECT + '/students'"), 'main student login flow must not contain a root students fallback');
+check(!/localStorage\.setItem\([^\n]*(?:sPass|password|studentName|sName)/.test(html), 'student name and password must not be saved to localStorage');
+
+const rememberedRestore = extractFunction(html, 'restoreRememberedStudentLogin');
+checkIncludes(rememberedRestore, "httpsCallable('resumeEbookStudentSession')", 'remembered login must resume through an authenticated callable');
+checkIncludes(rememberedRestore, 'firebase.auth.Auth.Persistence.LOCAL', 'remembered restore must preserve Firebase Auth only on the current device');
+checkIncludes(rememberedRestore, "executeFirebaseRead(session.studentName, '', true, session.className, session.studentKey)", 'remembered restore must reload one exact verified student');
+checkIncludes(rememberedRestore, 'await ebookAuth.signOut()', 'failed remembered restore must clear the stale local Firebase user');
+checkIncludes(rememberedRestore, 'shouldRevokeRememberedLoginForError(error)', 'remembered restore must distinguish revoked identity from a transient network failure');
+const rememberedRevocation = extractFunction(html, 'shouldRevokeRememberedLoginForError');
+checkIncludes(rememberedRevocation, 'functions/unauthenticated', 'expired remembered sessions must clear stale local auth');
+checkIncludes(rememberedRevocation, 'functions/permission-denied', 'changed student identity must clear stale local auth');
+check(!rememberedRevocation.includes('unavailable'), 'transient unavailable errors must preserve remembered auth for a later retry');
 
 const executeFirebaseRead = extractFunction(html, 'executeFirebaseRead');
 checkIncludes(executeFirebaseRead, 'if (targetClass && targetStudentKey)', 'exact target identity must be required before student data load');
@@ -139,17 +154,19 @@ checkIncludes(enrollmentIndexLoader, 'throw new Error(', 'enrollment index read 
 const executeCallSites = [...html.matchAll(/executeFirebaseRead\(([^\n;]*)\)/g)]
   .map(match => match[1])
   .filter(args => !args.includes('studentName, password, bypassPwd'));
-check(executeCallSites.length === 3, `expected exactly three authenticated executeFirebaseRead call sites, found ${executeCallSites.length}`);
+check(executeCallSites.length === 4, `expected exactly four authenticated executeFirebaseRead call sites, found ${executeCallSites.length}`);
 executeCallSites.forEach(args => {
   check(args.split(',').length >= 5, `executeFirebaseRead call must include target class and student key: ${args}`);
 });
 
 const credentialLookup = extractFunction(functionsSource, 'findEbookStudentByCredentials');
-checkIncludes(credentialLookup, '`${subjectKey}/studentLoginIndex/${nameKey}`', 'Function login must use the scoped login index');
-checkIncludes(credentialLookup, '`${subjectKey}/students/${classKey}/${studentKey}`', 'Function login must verify each exact indexed student');
-check(!credentialLookup.includes('`${subjectKey}/students`'), 'Function credential lookup must not read the full students root');
+const canonicalStudentLookup = extractFunction(functionsSource, 'loadCanonicalEbookStudentCandidates');
+checkIncludes(canonicalStudentLookup, '`${subjectKey}/studentLoginIndex/${nameKey}`', 'Function login must use the scoped login index');
+checkIncludes(canonicalStudentLookup, '`${subjectKey}/students/${classKey}/${studentKey}`', 'Function login must verify each exact indexed student');
+check(!canonicalStudentLookup.includes('`${subjectKey}/students`'), 'Function credential lookup must not read the full students root');
+checkIncludes(credentialLookup, 'loadCanonicalEbookStudentCandidates(subjectKey, studentName)', 'password login and remembered login must share canonical promotion-aware candidates');
 check(
-  credentialLookup.indexOf('canonicalizeEbookLoginCandidates') < credentialLookup.indexOf('isStudentLoginMatch'),
+  functionsSource.indexOf('canonicalizeEbookLoginCandidates') < functionsSource.indexOf('isStudentLoginMatch'),
   'lifecycle canonical current class must be selected before password verification'
 );
 const exactAdminStudentLookup = extractFunction(functionsSource, 'findEbookStudent');
@@ -160,7 +177,21 @@ checkIncludes(createAuthSession, '`${EBOOK_AUTH_SESSION_BASE}/${uid}`', 'server 
 checkIncludes(createAuthSession, 'ebookAccess: true', 'custom token must carry ebookAccess');
 checkIncludes(createAuthSession, 'ebookExpiresAt: expiresAt', 'custom token must carry business-session expiry for Storage');
 const createStudentSession = extractBalancedBlock(functionsSource, 'exports.createEbookStudentSession');
-checkIncludes(createStudentSession, 'getEbookStudentAuthUid(', 'student login must reuse a stable non-reversible Firebase Auth UID');
+checkIncludes(createStudentSession, 'getEbookStudentAuthUid(', 'student login must reuse a stable non-reversible Firebase Auth UID so password changes revoke every device');
+checkIncludes(createStudentSession, 'EBOOK_REMEMBERED_SESSION_TTL_MS', 'remembered login TTL must be selected only by the server');
+checkIncludes(createStudentSession, 'requestedRememberDevice && !!student.identityPhone', 'remembered login must require a stable server-side student identity');
+checkIncludes(createStudentSession, 'rememberDevice,', 'remember-device choice must be stored in the protected server session');
+const resumeStudentSession = extractBalancedBlock(functionsSource, 'exports.resumeEbookStudentSession');
+checkIncludes(resumeStudentSession, 'context.auth.token.ebookAccess !== true', 'remembered resume must require an authenticated eBook Firebase user');
+checkIncludes(resumeStudentSession, 'session.rememberDevice !== true', 'ordinary session-only logins must not become remembered sessions');
+checkIncludes(resumeStudentSession, 'Number(session.expiresAt || 0) <= now', 'expired remembered sessions must fail closed');
+checkIncludes(resumeStudentSession, 'loadCanonicalEbookStudentCandidates(subjectKey, session.studentName)', 'remembered resume must use the same promotion-aware scoped identity resolver as password login');
+checkIncludes(resumeStudentSession, 'identityMatches.length !== 1', 'remembered resume must revoke when the stable student identity is missing or ambiguous');
+checkIncludes(resumeStudentSession, 'new functions.https.HttpsError("unavailable"', 'transient server lookup failures must not revoke remembered identity');
+checkIncludes(resumeStudentSession, 'await sessionRef.remove()', 'invalid remembered identity must revoke the protected session');
+checkIncludes(resumeStudentSession, 'admin.auth().deleteUser(uid)', 'invalid remembered identity must revoke Firebase refresh tokens');
+checkIncludes(resumeStudentSession, 'now + EBOOK_REMEMBERED_SESSION_TTL_MS', 'valid remembered activity must roll the bounded server expiry');
+checkIncludes(functionsSource, 'const EBOOK_REMEMBERED_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;', 'remembered login must use the fixed 30-day server bound');
 checkIncludes(functionsSource, 'exports.pruneExpiredEbookSessions', 'expired eBook sessions must have scheduled cleanup');
 checkIncludes(functionsSource, 'admin.auth().deleteUsers(authUids)', 'cleanup must remove ephemeral Firebase Auth users as well as RTDB sessions');
 

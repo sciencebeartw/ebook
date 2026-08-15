@@ -34,12 +34,22 @@ function extractFunction(name) {
 const context = {};
 vm.createContext(context);
 vm.runInContext(extractFunction('getStudentLoginFailureMessage'), context);
+vm.runInContext(extractFunction('shouldRevokeRememberedLoginForError'), context);
 
 if (context.getStudentLoginFailureMessage({ message: 'PERMISSION_DENIED: 此班級目前未開放電子聯絡簿' }) !== '此班級目前未開放電子聯絡簿。') {
   throw new Error('blocked classes must show the dedicated eBook availability message');
 }
 if (context.getStudentLoginFailureMessage({ message: 'network unavailable' }) !== '連線錯誤：network unavailable') {
   throw new Error('unrelated login failures must keep the connection error message');
+}
+if (!context.shouldRevokeRememberedLoginForError({ code: 'functions/unauthenticated' })) {
+  throw new Error('expired remembered sessions must revoke local auth');
+}
+if (!context.shouldRevokeRememberedLoginForError({ code: 'functions/permission-denied' })) {
+  throw new Error('identity changes must revoke local auth');
+}
+if (context.shouldRevokeRememberedLoginForError({ code: 'functions/unavailable' })) {
+  throw new Error('temporary network failures must preserve remembered auth');
 }
 
 console.log('ebook_login_eligibility_smoke.js passed');
