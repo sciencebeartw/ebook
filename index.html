@@ -527,8 +527,9 @@
         .remember-login-row {
             width: 100%;
             display: flex;
-            align-items: flex-start;
-            gap: 10px;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
             margin: -2px 0 16px;
             padding: 12px 14px;
             box-sizing: border-box;
@@ -537,31 +538,37 @@
             background: #f7fbf8;
             color: #334155;
             cursor: pointer;
-            text-align: left;
+            text-align: center;
+        }
+
+        .remember-login-title-line {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-size: 0.95rem;
+            font-weight: 800;
+            line-height: 1.4;
         }
 
         .remember-login-row input[type="checkbox"] {
             width: 20px;
             height: 20px;
             min-width: 20px;
-            margin: 1px 0 0;
+            margin: 0;
             padding: 0;
             accent-color: var(--primary);
         }
 
-        .remember-login-copy {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-            font-size: 0.95rem;
-            font-weight: 800;
-            line-height: 1.4;
-        }
-
-        .remember-login-copy small {
+        .remember-login-hint {
+            display: block;
+            max-width: 100%;
             color: #64748b;
             font-size: 0.78rem;
             font-weight: 600;
+            line-height: 1.4;
+            text-align: center;
         }
 
         .error-msg {
@@ -6321,11 +6328,11 @@
             <div class="input-group"><input type="text" id="sName" name="username" autocomplete="username" placeholder="請輸入學生姓名 (或管理者帳號)"></div>
             <div class="input-group"><input type="password" id="sPass" name="password" autocomplete="current-password" placeholder="請輸入密碼 (或家長手機)"></div>
             <label class="remember-login-row" for="rememberStudentLogin">
-                <input type="checkbox" id="rememberStudentLogin" checked>
-                <span class="remember-login-copy">
-                    在這支手機保持登入
-                    <small>不保存家長電話明碼；滑掉主畫面 App 後可自動登入</small>
+                <span class="remember-login-title-line">
+                    <input type="checkbox" id="rememberStudentLogin" checked>
+                    <span>在這支手機保持登入</span>
                 </span>
+                <small class="remember-login-hint">不保存家長電話明碼；滑掉主畫面 App 後可自動登入</small>
             </label>
             <button class="login-btn" onclick="doLogin()">登入查看</button>
             <div class="forgot-pwd">忘記密碼請洽山熊科學</div>
