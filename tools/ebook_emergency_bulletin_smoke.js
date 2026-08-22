@@ -97,6 +97,7 @@ const elements = {
   emergencyExpiresAt: { textContent: '' },
 };
 const context = {
+  BULLETIN_MARQUEE_COLOR_KEYS: ['blue', 'rose', 'amber', 'emerald', 'violet'],
   BEAR_SUBJECT: '/science',
   gData: { className: '115國一自然超前班', studentName: '學生甲' },
   isDashboardDraftPreviewMode: false,
@@ -116,6 +117,9 @@ vm.createContext(context);
 [
   'parseLocalDateTimeValue',
   'isBulletinEffective',
+  'parseBulletinDisplayOptions',
+  'normalizeBulletinMarqueeColor',
+  'getBulletinDisplayChannels',
   'buildEmergencyIdentity',
   'formatEmergencyExpiryText',
   'hideEmergencyModal',

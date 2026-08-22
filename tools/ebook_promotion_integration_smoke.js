@@ -80,6 +80,10 @@ const container = { innerHTML: '' };
 const sandbox = {
   isDashboardDraftPreviewMode: false,
   isBulletinEffective: () => true,
+  getBulletinDisplayChannels(bulletin) {
+    const options = bulletin && bulletin.displayOptions ? bulletin.displayOptions : {};
+    return { bulletin: options.bulletin !== false };
+  },
   escapeHtml(value) {
     return String(value === undefined || value === null ? '' : value)
       .replace(/&/g, '&amp;')
@@ -105,6 +109,7 @@ vm.runInContext(`${renderSource}; this.renderBulletins = renderBulletins;`, sand
 
 sandbox.renderBulletins([
   { id: 'current', time: '2026/08/11 10:00', type: '一般', title: '目前公告', content: '目前內容' },
+  { id: 'marquee-only', time: '2026/08/12 10:00', type: '一般', title: '純跑馬燈', content: '只在頂端顯示', displayOptions: { bulletin: false } },
 ], [
   {
     id: 'former',
@@ -118,8 +123,9 @@ sandbox.renderBulletins([
 ]);
 
 assert.deepStrictEqual(calls.tabs.map(item => item.id), ['current']);
-assert.deepStrictEqual(calls.sticky.map(item => item.id), ['current']);
-assert.deepStrictEqual(calls.emergency.map(item => item.id), ['current']);
+assert.deepStrictEqual(calls.sticky.map(item => item.id), ['marquee-only', 'current']);
+assert.deepStrictEqual(calls.emergency.map(item => item.id), ['marquee-only', 'current']);
+assert.doesNotMatch(container.innerHTML, /純跑馬燈/, 'marquee-only announcements must not render as bulletin cards');
 assert.match(container.innerHTML, /過往班級公告/);
 assert.match(container.innerHTML, /過往班級 · &lt;img src=x onerror=alert\(1\)&gt;/);
 assert.doesNotMatch(container.innerHTML, /<script>|<img src=x/);

@@ -1579,37 +1579,43 @@
             padding: 12px 15px 5px 15px;
         }
         .sticky-notice-banner {
-            background: rgba(255, 255, 255, 0.9);
+            --marquee-bg: rgba(239, 246, 255, 0.96);
+            --marquee-accent: #2563eb;
+            --marquee-accent-soft: #60a5fa;
+            --marquee-accent-dark: #1d4ed8;
+            --marquee-text: #1e3a8a;
+            --marquee-glow-rgb: 37, 99, 235;
+            background: var(--marquee-bg);
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
-            border: 2px solid #3b82f6; /* 加粗邊框 */
+            border: 2px solid var(--marquee-accent); /* 加粗邊框 */
             border-radius: 16px;
             padding: 12px 18px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            box-shadow: 0 0 15px rgba(59, 130, 246, 0.3); /* 加入外發光 */
+            box-shadow: 0 0 15px rgba(var(--marquee-glow-rgb), 0.3); /* 加入外發光 */
             animation: slideDownIn 0.6s cubic-bezier(0.16, 1, 0.3, 1), bannerPulse 3s infinite ease-in-out;
             position: relative;
             overflow: hidden;
             cursor: pointer;
         }
         @keyframes bannerPulse {
-            0%, 100% { box-shadow: 0 0 15px rgba(59, 130, 246, 0.3); border-color: #3b82f6; }
-            50% { box-shadow: 0 0 25px rgba(59, 130, 246, 0.5); border-color: #60a5fa; }
+            0%, 100% { box-shadow: 0 0 15px rgba(var(--marquee-glow-rgb), 0.3); border-color: var(--marquee-accent); }
+            50% { box-shadow: 0 0 25px rgba(var(--marquee-glow-rgb), 0.5); border-color: var(--marquee-accent-soft); }
         }
         .sticky-notice-banner::before {
             content: '';
             position: absolute;
             left: 0; top: 0; bottom: 0;
             width: 5px;
-            background: linear-gradient(to bottom, #3b82f6, #2563eb);
+            background: linear-gradient(to bottom, var(--marquee-accent-soft), var(--marquee-accent-dark));
             z-index: 10;
         }
         .sticky-notice-content {
             display: flex;
             align-items: center;
-            color: #1e40af;
+            color: var(--marquee-text);
             font-size: 1.15rem;
             font-weight: 700;
             flex: 1;
@@ -1651,6 +1657,44 @@
             flex-shrink: 0;
         }
         .sticky-notice-close:hover { background: #e2e8f0; color: #0f172a; }
+
+        .sticky-notice-banner.marquee-only { cursor: default; }
+
+        .sticky-notice-banner.marquee-color-rose {
+            --marquee-bg: rgba(255, 241, 242, 0.96);
+            --marquee-accent: #e11d48;
+            --marquee-accent-soft: #fb7185;
+            --marquee-accent-dark: #be123c;
+            --marquee-text: #9f1239;
+            --marquee-glow-rgb: 225, 29, 72;
+        }
+
+        .sticky-notice-banner.marquee-color-amber {
+            --marquee-bg: rgba(255, 251, 235, 0.97);
+            --marquee-accent: #d97706;
+            --marquee-accent-soft: #fbbf24;
+            --marquee-accent-dark: #b45309;
+            --marquee-text: #92400e;
+            --marquee-glow-rgb: 217, 119, 6;
+        }
+
+        .sticky-notice-banner.marquee-color-emerald {
+            --marquee-bg: rgba(236, 253, 245, 0.97);
+            --marquee-accent: #059669;
+            --marquee-accent-soft: #34d399;
+            --marquee-accent-dark: #047857;
+            --marquee-text: #065f46;
+            --marquee-glow-rgb: 5, 150, 105;
+        }
+
+        .sticky-notice-banner.marquee-color-violet {
+            --marquee-bg: rgba(245, 243, 255, 0.97);
+            --marquee-accent: #7c3aed;
+            --marquee-accent-soft: #a78bfa;
+            --marquee-accent-dark: #6d28d9;
+            --marquee-text: #5b21b6;
+            --marquee-glow-rgb: 124, 58, 237;
+        }
 
         /* 分頁雷達波特效 (Radar Ripple) */
         .tab-item { position: relative; }
@@ -7622,7 +7666,8 @@
                         btnName: sanitizeDashboardDraftPreviewText(bulletin.btnName),
                         btnUrl: sanitizeDashboardDraftPreviewText(bulletin.btnUrl),
                         reserveTime: sanitizeDashboardDraftPreviewText(bulletin.reserveTime),
-                        expiresAt: sanitizeDashboardDraftPreviewText(bulletin.expiresAt)
+                        expiresAt: sanitizeDashboardDraftPreviewText(bulletin.expiresAt),
+                        displayOptions: sanitizeDashboardDraftPreviewText(bulletin.displayOptions)
                     };
                 })
             };
@@ -11599,6 +11644,9 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             activeHistoricalList.sort(function(a, b) {
                 return (b.time || '').localeCompare(a.time || '');
             });
+            var bulletinList = activeList.filter(function(b) {
+                return getBulletinDisplayChannels(b).bulletin;
+            });
 
             function renderBulletinCards(items, historical) {
                 var cards = "";
@@ -11630,8 +11678,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 return cards;
             }
 
-            var html = activeList.length
-                ? renderBulletinCards(activeList, false)
+            var html = bulletinList.length
+                ? renderBulletinCards(bulletinList, false)
                 : "<div style='text-align:center; padding:30px; color:#999;'>目前沒有本班公告</div>";
             if (activeHistoricalList.length) {
                 html += '<section class="bulletin-history-section" aria-labelledby="bulletinHistoryHeading">' +
@@ -11643,7 +11691,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             container.innerHTML = html;
 
             // 只有目前班級／全校公告可以觸發未讀、跑馬燈與緊急彈窗；過往班級公告永遠只供查閱。
-            updateBulletinTabs(activeList);
+            updateBulletinTabs(bulletinList);
             renderStickyNotice(activeList);
             checkEmergency(activeList);
 
@@ -11684,6 +11732,39 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }
         }
 
+        var BULLETIN_MARQUEE_COLOR_KEYS = ['blue', 'rose', 'amber', 'emerald', 'violet'];
+
+        function parseBulletinDisplayOptions(value) {
+            if (!value) return {};
+            if (typeof value === 'object') return value;
+            try {
+                var parsed = JSON.parse(String(value));
+                return parsed && typeof parsed === 'object' ? parsed : {};
+            } catch (error) {
+                return {};
+            }
+        }
+
+        function normalizeBulletinMarqueeColor(value) {
+            var key = String(value || '').toLowerCase();
+            return BULLETIN_MARQUEE_COLOR_KEYS.indexOf(key) > -1 ? key : 'blue';
+        }
+
+        function getBulletinDisplayChannels(bulletin) {
+            bulletin = bulletin || {};
+            var options = parseBulletinDisplayOptions(bulletin.displayOptions);
+            var hasBulletin = Object.prototype.hasOwnProperty.call(options, 'bulletin');
+            var hasPopup = Object.prototype.hasOwnProperty.call(options, 'popup');
+            var hasMarquee = Object.prototype.hasOwnProperty.call(options, 'marquee');
+            return {
+                bulletin: hasBulletin ? options.bulletin === true : true,
+                popup: hasPopup ? options.popup === true : bulletin.type === '緊急',
+                marquee: hasMarquee ? options.marquee === true : bulletin.type === '跑馬燈',
+                marqueeColor: normalizeBulletinMarqueeColor(options.marqueeColor),
+                isExplicit: hasBulletin || hasPopup || hasMarquee || Object.prototype.hasOwnProperty.call(options, 'marqueeColor')
+            };
+        }
+
         function renderStickyNotice(list) {
             var container = document.getElementById('sticky-notice-container');
             if (!container) return;
@@ -11696,11 +11777,11 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             // 1. 確保名單是最新在前的（雖然 renderBulletins 已經排過，這裡再確認一次更安全）
             var sortedList = [...list].sort(function(a, b) { return b.time.localeCompare(a.time); });
 
-            // 2. 依照優先權找公告：跑馬燈 > 一般
-            var sticky = sortedList.find(function(b) { return b.type === '跑馬燈'; });
+            // 2. 依照優先權找公告：明確指定跑馬燈 > 舊版跑馬燈 > 最新一般公告
+            var sticky = sortedList.find(function(b) { return getBulletinDisplayChannels(b).marquee; });
             if (!sticky) {
                 sticky = sortedList.find(function(b) { 
-                    return b.type === '一般' && b.title && b.title.trim() !== ''; 
+                    return getBulletinDisplayChannels(b).bulletin && b.type === '一般' && b.title && b.title.trim() !== '';
                 });
             }
             
@@ -11710,17 +11791,22 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 return;
             }
             
-            var stickyId = 'sticky_' + makeDomSafeId(sticky.id || (sticky.time || '').replace(/[: /]/g, '_'));
-            if (!isDashboardDraftPreviewMode && localStorage.getItem(stickyId) === 'dismissed') { container.innerHTML = ''; return; }
+            var stickyChannels = getBulletinDisplayChannels(sticky);
+            var stickyBaseId = makeDomSafeId(sticky.id || (sticky.time || '').replace(/[: /]/g, '_'));
+            var stickyId = 'sticky_v2_' + makeDomSafeId([stickyBaseId, sticky.time || '', stickyChannels.marqueeColor].join('_'));
+            var legacyStickyId = 'sticky_' + stickyBaseId;
+            if (!isDashboardDraftPreviewMode && (localStorage.getItem(stickyId) === 'dismissed' || (!stickyChannels.isExplicit && localStorage.getItem(legacyStickyId) === 'dismissed'))) { container.innerHTML = ''; return; }
             
             // 4. 內容處理：如果沒內容就只顯示標題，避免出現多餘的冒號
             var cleanTitle = sticky.title.trim();
             var cleanContent = (sticky.content && sticky.content.trim() !== '') ? sticky.content.trim().replace(/\n/g, ' ') : '';
             var displayContent = cleanContent ? (cleanTitle + '：' + cleanContent) : cleanTitle;
             var displayContentHtml = renderEbookRichTextFormat(escapeHtml(displayContent));
+            var stickyClass = 'sticky-notice-banner marquee-color-' + stickyChannels.marqueeColor + (stickyChannels.bulletin ? '' : ' marquee-only');
+            var stickyClickAction = stickyChannels.bulletin ? ' onclick="switchTab(2)"' : '';
             
             container.innerHTML = `
-                <div class="sticky-notice-banner" id="active-sticky-banner" onclick="switchTab(2)">
+                <div class="${stickyClass}" id="active-sticky-banner"${stickyClickAction}>
                     <div class="sticky-notice-content">
                         ${SVG.bulb}
                         <div class="sticky-notice-text-wrapper">
@@ -11794,7 +11880,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 if (pendingEntryNoticeReady) maybeShowPendingEntryReminder();
                 return false;
             }
-            var emergency = activeList.find(b => b.type === "緊急");
+            var emergency = activeList.find(function(b) { return getBulletinDisplayChannels(b).popup; });
             if (emergency) {
                 var emergencyIdentity = buildEmergencyIdentity(emergency);
                 if (emergencyShownIdentityForCurrentEntry === emergencyIdentity) return !!activeEmergencyAnnouncement;

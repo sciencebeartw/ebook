@@ -254,6 +254,7 @@ check(richTextHtml.includes('&lt;img'), 'parseBtn must render malicious HTML as 
 const stickyContainer = { innerHTML: '' };
 const stickySandbox = {
   SVG: { bulb: '💡' },
+  BULLETIN_MARQUEE_COLOR_KEYS: ['blue', 'rose', 'amber', 'emerald', 'violet'],
   isDashboardDraftPreviewMode: false,
   document: {
     getElementById(id) { return id === 'sticky-notice-container' ? stickyContainer : null; },
@@ -265,7 +266,12 @@ const stickySandbox = {
   makeDomSafeId(value) { return String(value || '').replace(/[^a-zA-Z0-9_-]/g, '_'); },
 };
 vm.createContext(stickySandbox);
-vm.runInContext(extractFunction('renderStickyNotice'), stickySandbox);
+[
+  'parseBulletinDisplayOptions',
+  'normalizeBulletinMarqueeColor',
+  'getBulletinDisplayChannels',
+  'renderStickyNotice',
+].forEach(name => vm.runInContext(extractFunction(name), stickySandbox));
 try {
   stickySandbox.renderStickyNotice([{
     id: `notice');globalThis.${MARKER}=8;//`,
