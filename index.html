@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Deploy marker: ebook-realtime-exam-catalog-sync-20260822 -->
+<!-- Deploy marker: ebook-pending-report-edit-and-compact-tools-20260823 -->
 <html>
 
 <head>
@@ -2378,6 +2378,36 @@
             border: 2px dashed #e74c3c;
         }
 
+        .pending-report-edit-btn {
+            min-height: 44px;
+            margin: 2px auto 0;
+            padding: 7px 18px;
+            border: 1px solid currentColor;
+            border-radius: 22px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            background: #fff;
+            color: #3498db;
+            font-size: 0.9rem;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .pending-report-edit-btn.orange {
+            margin-top: 10px;
+            color: #c2410c;
+        }
+
+        .pending-report-edit-btn[hidden] {
+            display: none;
+        }
+
+        .pending-report-editor[hidden] {
+            display: none;
+        }
+
         .god-score-edit-box {
             margin: 14px 0 0;
             padding: 12px;
@@ -3239,6 +3269,110 @@
             margin-bottom: 20px;
             text-align: center;
             transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .compact-student-tool {
+            overflow: hidden;
+            margin-bottom: 9px;
+            border: 1.5px solid #86efac;
+            border-radius: 13px;
+            background: #f0fdf4;
+        }
+
+        .compact-student-tool.orange {
+            border-color: #fdba74;
+            background: #fff7ed;
+        }
+
+        .compact-student-tool.red {
+            border-color: #fca5a5;
+            background: #fef2f2;
+        }
+
+        .compact-student-tool > summary {
+            min-height: 59px;
+            box-sizing: border-box;
+            padding: 9px 11px 9px 13px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            list-style: none;
+            cursor: pointer;
+        }
+
+        .compact-student-tool > summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .compact-student-tool-copy {
+            min-width: 0;
+            display: grid;
+            gap: 2px;
+            text-align: left;
+        }
+
+        .compact-student-tool-copy strong {
+            color: #166534;
+            font-size: 1rem;
+            font-weight: 900;
+        }
+
+        .compact-student-tool.orange .compact-student-tool-copy strong {
+            color: #c2410c;
+        }
+
+        .compact-student-tool.red .compact-student-tool-copy strong {
+            color: #b91c1c;
+        }
+
+        .compact-student-tool-copy small {
+            overflow: hidden;
+            color: #64748b;
+            font-size: 0.78rem;
+            font-weight: 700;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+
+        .compact-student-tool-action {
+            display: inline-flex;
+            flex: 0 0 auto;
+            align-items: center;
+            gap: 5px;
+            color: #15803d;
+            font-size: 0.72rem;
+            font-weight: 900;
+            white-space: nowrap;
+        }
+
+        .compact-student-tool.orange .compact-student-tool-action {
+            color: #c2410c;
+        }
+
+        .compact-student-tool.red .compact-student-tool-action {
+            color: #b91c1c;
+        }
+
+        .compact-student-tool-action::after {
+            content: "⌄";
+            font-size: 1rem;
+            line-height: 1;
+            transition: transform 0.2s ease;
+        }
+
+        .compact-student-tool[open] .compact-student-tool-action::after {
+            transform: rotate(180deg);
+        }
+
+        .compact-student-tool-body {
+            padding: 0 11px 11px;
+        }
+
+        .compact-student-tool-body > .student-upload-box,
+        .compact-student-tool-body > .sticker-apply-box,
+        .compact-student-tool-body > .penalty-apply-box {
+            margin-bottom: 0;
         }
 
         .student-upload-box.is-dragover {
@@ -10317,15 +10451,31 @@
             return null;
         }
 
-        function isPendingMakeupResultExam(exam, history, currentExamColMap) {
+        function shouldShowMakeupResultReportExam(exam, history, currentExamColMap) {
             if (!exam || exam.colIndex === undefined || exam.colIndex === null) return false;
             if (currentExamColMap && currentExamColMap[String(exam.colIndex)]) return false;
             if (!isMakeupExamTitle(((exam.date || "") + " " + (exam.exam || "")).trim())) return false;
             if (getMakeupColorInfo(exam.cellColor)) return false;
-            if (getLatestMakeupResultReportInfo(exam, history)) return false;
             if (!exam.makeupThreshold || exam.makeupThreshold <= 0) return false;
             var logic = getDisplayLogic(exam, history);
             return logic && logic.effectiveNum !== null && logic.effectiveNum < exam.makeupThreshold;
+        }
+
+        function buildMakeupWrongCountWidgetHtml(domId, submitId, targetDate, exam, title, wrongCount, isUpdate) {
+            var valueAttr = wrongCount === undefined || wrongCount === null || wrongCount === ""
+                ? ""
+                : " value='" + escapeHtmlAttr(wrongCount) + "'";
+            var submitLabel = isUpdate ? "更新錯題數" : "送出錯題數";
+            return "<div class='makeup-wrong-count-widget'>" +
+                "<div class='makeup-result-prompt'><span class='makeup-result-prompt-icon'>?</span><span>補考後錯了幾題？</span></div>" +
+                "<div class='makeup-wrong-count-row'>" +
+                "<button type='button' class='makeup-wrong-step-btn' onclick=\"adjustMakeupWrongCount('" + domId + "', -1)\">-</button>" +
+                "<label class='makeup-wrong-count-field' for='" + domId + "'><span>錯</span><input type='number' min='0' max='100' step='1' inputmode='numeric' pattern='[0-9]*' class='makeup-wrong-count-input' id='" + domId + "' placeholder='0' aria-label='補考錯題數'" + valueAttr + "><span>題</span></label>" +
+                "<button type='button' class='makeup-wrong-step-btn' onclick=\"adjustMakeupWrongCount('" + domId + "', 1)\">+</button>" +
+                "</div>" +
+                "<button type='button' class='makeup-wrong-submit-btn' id='" + submitId + "' onclick=\"submitMakeupResultReport('" + domId + "', '" + escapeInlineJs(targetDate) + "', '" + exam.colIndex + "', '" + escapeInlineJs(title || "") + "', '" + submitId + "', " + (isUpdate ? "true" : "false") + ")\">" + submitLabel + "</button>" +
+                "<div class='makeup-wrong-count-hint'>可手動輸入，也可用 +/- 微調</div>" +
+                "</div>";
         }
 
         function buildPendingMakeupResultReportHtml(post, history, examCards, latestPostDate) {
@@ -10337,7 +10487,7 @@
                 if (exam && exam.colIndex !== undefined && exam.colIndex !== null) currentExamColMap[String(exam.colIndex)] = true;
             });
             var pending = gData.grades.filter(function(exam) {
-                return isExamBeforePostDate(exam, post) && isPendingMakeupResultExam(exam, history, currentExamColMap);
+                return isExamBeforePostDate(exam, post) && shouldShowMakeupResultReportExam(exam, history, currentExamColMap);
             });
             if (pending.length === 0) return "";
 
@@ -10356,23 +10506,26 @@
                     "<div class='makeup-result-report-meta'>原本成績：" + escapeHtml(scoreText) + "｜補考標準：" + escapeHtml(exam.makeupThreshold) + "</div>";
                 if (report) {
                     var reportLabel = report.isWrongCountReport ? "補考結果回報：錯題數" : "已回報";
-                    html += "<div class='makeup-result-report-status'>" + escapeHtml(reportLabel) + "｜" + escapeHtml(report.reportedResultText || report.reportedScoreText) + "，等待老師登記補考結果。</div>";
-                } else {
-                    html += "<div class='makeup-wrong-count-widget'>" +
-                        "<div class='makeup-result-prompt'><span class='makeup-result-prompt-icon'>?</span><span>補考後錯了幾題？</span></div>" +
-                        "<div class='makeup-wrong-count-row'>" +
-                        "<button type='button' class='makeup-wrong-step-btn' onclick=\"adjustMakeupWrongCount('" + domId + "', -1)\">-</button>" +
-                        "<label class='makeup-wrong-count-field' for='" + domId + "'><span>錯</span><input type='number' min='0' max='100' step='1' inputmode='numeric' pattern='[0-9]*' class='makeup-wrong-count-input' id='" + domId + "' placeholder='0' aria-label='補考錯題數'><span>題</span></label>" +
-                        "<button type='button' class='makeup-wrong-step-btn' onclick=\"adjustMakeupWrongCount('" + domId + "', 1)\">+</button>" +
-                        "</div>" +
-                        "<button type='button' class='makeup-wrong-submit-btn' id='" + submitId + "' onclick=\"submitMakeupResultReport('" + domId + "', '" + escapeInlineJs(targetDate) + "', '" + exam.colIndex + "', '" + escapeInlineJs(title || "") + "', '" + submitId + "')\">送出錯題數</button>" +
-                        "<div class='makeup-wrong-count-hint'>可手動輸入，也可用 +/- 微調</div>" +
+                    var editorId = domId + "-editor";
+                    html += "<div class='makeup-result-report-status'>" + escapeHtml(reportLabel) + "｜" + escapeHtml(report.reportedResultText || report.reportedScoreText) + "，等待老師登記補考結果。</div>" +
+                        "<button type='button' class='pending-report-edit-btn orange' onclick=\"showPendingReportEditor('" + editorId + "', '" + domId + "', this)\">" + SVG.edit + "修改錯題數</button>" +
+                        "<div class='pending-report-editor' id='" + editorId + "' hidden>" +
+                        buildMakeupWrongCountWidgetHtml(domId, submitId, targetDate, exam, title, getMakeupResultWrongCount(report.content), true) +
                         "</div>";
+                } else {
+                    html += buildMakeupWrongCountWidgetHtml(domId, submitId, targetDate, exam, title, "", false);
                 }
                 html += "</div>";
             });
             html += "</div>";
             return html;
+        }
+
+        function buildAbsenceScoreReportFormHtml(post, exam, safeDate, scoreInputId, hasExamColIndex, reportedScore, isUpdate) {
+            var valueAttr = reportedScore === undefined || reportedScore === null || reportedScore === ""
+                ? ""
+                : " value='" + escapeHtmlAttr(reportedScore) + "'";
+            return "<div class='score-report-section'><div style='font-weight:bold; color:#c0392b; margin-bottom:10px; font-size:1.35rem;'>" + SVG.edit + "回報" + getDailyPostExamTimePrefix(exam) + getDailyPostExamLabel(exam) + "缺考分數</div><div class='input-box'><input type='number' class='score-input' id='" + scoreInputId + "' placeholder='輸入分數'" + valueAttr + "><button class='score-btn' onclick=\"submitScoreReport('" + safeDate + "', '" + post.date + "', '" + (hasExamColIndex ? exam.colIndex : "") + "', '" + escapeInlineJs(exam.exam || "") + "', " + (isUpdate ? "true" : "false") + ")\">" + (isUpdate ? "更新" : "送出") + "</button></div></div>";
         }
 
         function buildDailyPostExamCard(post, exam, others, history) {
@@ -10396,7 +10549,16 @@
             var hasExamColIndex = exam.colIndex !== undefined && exam.colIndex !== null && exam.colIndex !== "";
             var scoreInputId = "score-in-" + safeDate + (hasExamColIndex ? ("-" + exam.colIndex) : "");
             if (logic.needsReport && !logic.showReviewing && !isAdminMode) {
-                scoreReportHtml = "<div class='score-report-section'><div style='font-weight:bold; color:#c0392b; margin-bottom:10px; font-size:1.35rem;'>" + SVG.edit + "回報" + getDailyPostExamTimePrefix(exam) + getDailyPostExamLabel(exam) + "缺考分數</div><div class='input-box'><input type='number' class='score-input' id='" + scoreInputId + "' placeholder='輸入分數'><button class='score-btn' onclick=\"submitScoreReport('" + safeDate + "', '" + post.date + "', '" + (hasExamColIndex ? exam.colIndex : "") + "', '" + escapeInlineJs(exam.exam || "") + "')\">送出</button></div></div>";
+                scoreReportHtml = buildAbsenceScoreReportFormHtml(post, exam, safeDate, scoreInputId, hasExamColIndex, "", false);
+            } else if (logic.showReviewing && !isAdminMode) {
+                var absenceReport = getLatestMakeupReportInfo(exam, history);
+                if (absenceReport) {
+                    var absenceEditorId = makeDomSafeId("absence-report-editor-" + safeDate + "-" + (hasExamColIndex ? exam.colIndex : "legacy"));
+                    scoreReportHtml = "<button type='button' class='pending-report-edit-btn' onclick=\"showPendingReportEditor('" + absenceEditorId + "', '" + scoreInputId + "', this)\">" + SVG.edit + "修改回報</button>" +
+                        "<div class='pending-report-editor' id='" + absenceEditorId + "' hidden>" +
+                        buildAbsenceScoreReportFormHtml(post, exam, safeDate, scoreInputId, hasExamColIndex, absenceReport.reportedScoreText, true) +
+                        "</div>";
+                }
             }
             var editableScore = getGodEditableScore(exam);
             var editableScoreInfo = getGodEditableScoreInfo(editableScore);
@@ -10944,7 +11106,9 @@
 
                 var isLatestStickerPost = post.date === latestStickerPostDate;
                 var stickerStudentToolsHtml = isLatestStickerPost ? `
-        <div class="sticker-apply-box">
+        <details class="compact-student-tool orange">
+            <summary><span class="compact-student-tool-copy"><strong>棒卡申請</strong><small>申請課堂表現、即時練習等得棒</small></span><span class="compact-student-tool-action">點一下展開</span></summary>
+            <div class="compact-student-tool-body"><div class="sticker-apply-box">
             <span class="sticker-apply-title">${SVG.starLg} 棒卡申請</span>
             <div class="sticker-apply-row">
                 <select class="sticker-reason-select" id="sticker-reason-${safeDateId}" onchange="onStickerReasonChange('${safeDateId}')">
@@ -10965,8 +11129,11 @@
             </div>
             <input type="text" class="sticker-reason-custom" id="sticker-custom-${safeDateId}" placeholder="請輸入得棒名目...">
             <div class="sticker-hint">申請後由老師審核，通過後計入總棒數 ${SVG.star}</div>
-        </div>
-        <div class="penalty-apply-box">
+            </div></div>
+        </details>
+        <details class="compact-student-tool red">
+            <summary><span class="compact-student-tool-copy"><strong>我會改進</strong><small>主動回報本週要改進的事項</small></span><span class="compact-student-tool-action">點一下展開</span></summary>
+            <div class="compact-student-tool-body"><div class="penalty-apply-box">
             <span class="penalty-apply-title">${SVG.penalty} 我會改進</span>
             <div class="sticker-apply-row">
                 <select class="penalty-reason-select" id="penalty-reason-${safeDateId}" onchange="onPenaltyReasonChange('${safeDateId}')">
@@ -10985,10 +11152,13 @@
             </div>
             <input type="text" class="sticker-reason-custom" id="penalty-custom-${safeDateId}" placeholder="請輸入改進事項..." style="border-color: #fca5a5; color: #7f1d1d;">
             <div class="penalty-hint">${SVG.warning} 送出後由老師審核，並自總棒數中扣除。勇敢負責是成長的第一步！</div>
-        </div>
+            </div></div>
+        </details>
     ` : `<div class="sticker-hint" style="margin:10px 0;">棒卡申請與自我處分只開放最新一份聯絡簿。</div>`;
                 var uploadHtml = `
-        <div class="student-upload-box" ondragenter="handleStudentUploadDrag(event)" ondragover="handleStudentUploadDrag(event)" ondragleave="handleStudentUploadDragLeave(event)" ondrop="handleStudentUploadDrop(event, '${post.date}')">
+        <details class="compact-student-tool">
+            <summary><span class="compact-student-tool-copy"><strong>作業／筆記上傳區</strong><small>上傳照片、檔案或補充說明</small></span><span class="compact-student-tool-action">點一下展開</span></summary>
+            <div class="compact-student-tool-body"><div class="student-upload-box" ondragenter="handleStudentUploadDrag(event)" ondragover="handleStudentUploadDrag(event)" ondragleave="handleStudentUploadDragLeave(event)" ondrop="handleStudentUploadDrop(event, '${post.date}')">
             <span class="upload-title"><svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' style='vertical-align:middle;margin-right:4px'><polyline points='16 16 12 12 8 16'/><line x1='12' y1='12' x2='12' y2='21'/><path d='M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3'/></svg>作業/筆記上傳區</span>
             <div style="font-size:0.82rem; color:#64748b; font-weight:bold; margin-bottom:8px;">先選檔案，可補充一句說明，確認後再一起送出。</div>
             <div class="upload-btn-wrapper">
@@ -11001,7 +11171,8 @@
                 <button type="button" id="homework-upload-submit-${safeDateId}" class="student-upload-submit" onclick="submitStudentHomeworkUpload('${post.date}')" disabled>送出作業與留言</button>
             </div>
             <div id="upload-status-${safeDateId}" class="upload-status"></div>
-        </div>
+            </div></div>
+        </details>
         ${stickerStudentToolsHtml}
     `;
                 if (isAdminMode || isDashboardDraftPreviewMode) uploadHtml = "";
@@ -11733,8 +11904,21 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }).submitFeedback(form);
         }
 
-        async function submitScoreReport(safeId, realDate, examColIndex, examTitle) {
-            if (!(await confirmStudentPreviewAction("回報缺考分數"))) return;
+        function showPendingReportEditor(editorId, inputId, triggerButton) {
+            var editor = document.getElementById(editorId);
+            if (!editor) return;
+            editor.hidden = false;
+            if (triggerButton) triggerButton.hidden = true;
+            var input = document.getElementById(inputId);
+            if (input) {
+                input.focus();
+                if (typeof input.select === "function") input.select();
+            }
+        }
+
+        async function submitScoreReport(safeId, realDate, examColIndex, examTitle, isUpdate) {
+            var submitLabel = isUpdate ? "更新" : "送出";
+            if (!(await confirmStudentPreviewAction(isUpdate ? "更新缺考分數回報" : "回報缺考分數"))) return;
             var hasExamColIndex = examColIndex !== undefined && examColIndex !== null && examColIndex !== "";
             var inputId = 'score-in-' + safeId + (hasExamColIndex ? ('-' + examColIndex) : '');
             var val = document.getElementById(inputId).value; 
@@ -11746,7 +11930,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 form = { className: gData.className, sourceClassName: resolveStudentActionSourceClassName(realDate), studentName: gData.studentName, targetDate: realDate, type: FEEDBACK_TYPE_LABELS.makeup, content: val };
             } catch (sourceErr) {
                 swalAlert('無法回報缺考分數', sourceErr.message || String(sourceErr), 'warning');
-                clearEbookSubmitLoading(btn, "送出");
+                clearEbookSubmitLoading(btn, submitLabel);
                 return;
             }
             if (hasExamColIndex) {
@@ -11760,17 +11944,17 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             google.script.run.withSuccessHandler(function (res) { 
                 if (!res || res.success !== true) {
                     swalAlert("回報失敗", getSubmitFailureMessage(res), 'warning');
-                    clearEbookSubmitLoading(btn, "送出");
+                    clearEbookSubmitLoading(btn, submitLabel);
                     return;
                 }
                 var inputEl = document.getElementById(inputId);
                 if (inputEl) inputEl.value = "";
                 clearEbookSubmitLoading(btn, "已送出", true);
                 appendLocalScoreReportFeedback(form, res);
-                swalAlert("已回報缺考分數", "分數已送出，等待老師回填大表。", "success");
+                swalAlert(isUpdate ? "已更新缺考分數" : "已回報缺考分數", "分數已送出，等待老師回填大表。", "success");
             }).withFailureHandler(function (e) { 
                 swalAlert("回報失敗", friendlySubmitError(e), 'warning');
-                clearEbookSubmitLoading(btn, "送出");
+                clearEbookSubmitLoading(btn, submitLabel);
             }).submitFeedback(form); 
         }
 
@@ -11792,8 +11976,9 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             });
         }
 
-        async function submitMakeupResultReport(inputId, realDate, examColIndex, examTitle, submitButtonId) {
-            if (!(await confirmStudentPreviewAction("回報補考結果錯題數"))) return;
+        async function submitMakeupResultReport(inputId, realDate, examColIndex, examTitle, submitButtonId, isUpdate) {
+            var submitLabel = isUpdate ? "更新錯題數" : "送出錯題數";
+            if (!(await confirmStudentPreviewAction(isUpdate ? "更新補考結果錯題數" : "回報補考結果錯題數"))) return;
             var input = document.getElementById(inputId);
             var val = input ? input.value.trim() : "";
             if (!val) {
@@ -11850,17 +12035,17 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 if (!res || res.success !== true) {
                     swalAlert("回報失敗", getSubmitFailureMessage(res), 'warning');
                     setMakeupWrongCountWidgetDisabled(input, false);
-                    clearEbookSubmitLoading(btn, "送出錯題數");
+                    clearEbookSubmitLoading(btn, submitLabel);
                     return;
                 }
                 if (input) input.value = "";
                 clearEbookSubmitLoading(btn, "已送出", true);
                 appendLocalScoreReportFeedback(form, res);
-                swalAlert("已回報補考結果", "錯題數已送出，等待老師登記補考結果。", "success");
+                swalAlert(isUpdate ? "已更新補考結果" : "已回報補考結果", "錯題數已送出，等待老師登記補考結果。", "success");
             }).withFailureHandler(function (e) {
                 swalAlert("回報失敗", friendlySubmitError(e), 'warning');
                 setMakeupWrongCountWidgetDisabled(input, false);
-                clearEbookSubmitLoading(btn, "送出錯題數");
+                clearEbookSubmitLoading(btn, submitLabel);
             }).submitFeedback(form);
         }
         function openPwdModal() { document.getElementById('pwdModal').style.display = 'flex'; }
