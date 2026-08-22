@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Deploy marker: ebook-realtime-exam-catalog-sync-20260822 -->
 <html>
 
 <head>
@@ -4873,6 +4874,22 @@
             .replace(/\d{1,2}[\/.-]\d{1,2}/g, "");
     }
 
+    function getVerifiedStoredGradeExamId(grade, colKey, classKey, examIdByColKey, examCatalogEntriesByClassKey) {
+        var candidateId = (examIdByColKey || {})[colKey] || "";
+        if (!candidateId) return "";
+        var classEntries = (examCatalogEntriesByClassKey || {})[classKey] || {};
+        var entry = classEntries[candidateId];
+        if (!entry) return "";
+        if (entry.colKey && String(entry.colKey) !== String(colKey)) return "";
+        var gradeDate = normalizeEbookExamLookupText(grade && grade.date || "");
+        var entryDate = normalizeEbookExamLookupText(entry.date || "");
+        if (gradeDate && entryDate && gradeDate !== entryDate) return "";
+        var gradeTitle = normalizeEbookExamLookupText(grade && (grade.examName || grade.exam || grade.title) || "").toLowerCase();
+        var entryTitle = normalizeEbookExamLookupText(entry.title || entry.examName || "").toLowerCase();
+        if (gradeTitle && entryTitle && gradeTitle !== entryTitle) return "";
+        return candidateId;
+    }
+
     function collectGradeDateAnchorKeys(postsObj, classExamMap, examCatalogEntriesByClassKey, enrollmentIndex, classKeys, transferChain) {
         var lookup = {};
         function addDate(value) {
@@ -4957,7 +4974,13 @@
         var presentation = options.presentation || {};
         var colKey = options.colKey || "";
         var examIdByColKey = options.examIdByColKey || {};
-        var storedExamId = examIdByColKey[colKey] || "";
+        var storedExamId = getVerifiedStoredGradeExamId(
+            grade,
+            colKey,
+            storedClassKey,
+            examIdByColKey,
+            options.examCatalogEntriesByClassKey || {}
+        );
         var fallback = {
             date: grade.date || "",
             examId: storedExamId,
@@ -5261,11 +5284,25 @@
         return mergeGradeExamNodeMap(nodeMap, classKeys, studentKey, studentKeysByClassKey, transferChain, currentClassKey, promotionContext);
     }
 
-    async function loadExamIdByClassColKey(classKeys, catalogEntriesByClassKey) {
+    function normalizeExamCatalogClassSnapshot(value) {
         var helper = window.BearExamIdentity;
         if (!helper || typeof helper.normalizeCatalog !== "function") {
             throw new Error("examID helper 尚未載入，請重新整理後再試");
         }
+        var catalog = helper.normalizeCatalog(value || {});
+        if (!catalog.success) throw new Error("考試身分目錄不完整，請通知老師檢查 examID");
+        var byColKey = {};
+        Object.keys(catalog.entries || {}).forEach(function(examId) {
+            var entry = catalog.entries[examId] || {};
+            if (entry.colKey) byColKey[entry.colKey] = examId;
+        });
+        return {
+            byColKey: byColKey,
+            entries: catalog.entries || {}
+        };
+    }
+
+    async function loadExamIdByClassColKey(classKeys, catalogEntriesByClassKey) {
         var snaps = await Promise.all(uniqueClassKeys(classKeys).map(function(classKey) {
             return db.ref(`${BEAR_SUBJECT}/meta/examCatalog/${classKey}`).once("value").then(function(snap) {
                 return { key: classKey, value: snap.val() || {} };
@@ -5273,16 +5310,11 @@
         }));
         var result = {};
         snaps.forEach(function(item) {
-            var catalog = helper.normalizeCatalog(item.value || {});
-            if (!catalog.success) throw new Error("考試身分目錄不完整，請通知老師檢查 examID");
-            result[item.key] = {};
+            var normalized = normalizeExamCatalogClassSnapshot(item.value || {});
+            result[item.key] = normalized.byColKey;
             if (catalogEntriesByClassKey && typeof catalogEntriesByClassKey === "object") {
-                catalogEntriesByClassKey[item.key] = catalog.entries || {};
+                catalogEntriesByClassKey[item.key] = normalized.entries;
             }
-            Object.keys(catalog.entries || {}).forEach(function(examId) {
-                var entry = catalog.entries[examId] || {};
-                if (entry.colKey) result[item.key][entry.colKey] = examId;
-            });
         });
         return result;
     }
@@ -8222,6 +8254,22 @@
                                 );
                                 rebuildGradesFromScopedSources();
                             });
+                        });
+                    });
+                    trackedGradeClassKeys.forEach(function(classKey) {
+                        watchRealtimeValue(BEAR_SUBJECT + '/meta/examCatalog/' + classKey, function(snap) {
+                            try {
+                                var normalizedCatalog = normalizeExamCatalogClassSnapshot(snap.val() || {});
+                                if (!gData.examIdByClassColKey) gData.examIdByClassColKey = {};
+                                if (!gData.examCatalogEntriesByClassKey) gData.examCatalogEntriesByClassKey = {};
+                                gData.examIdByClassColKey[classKey] = normalizedCatalog.byColKey;
+                                gData.examCatalogEntriesByClassKey[classKey] = normalizedCatalog.entries;
+                                rebuildGradesFromScopedSources();
+                            } catch (catalogError) {
+                                console.warn('ExamID 目錄即時同步失敗：' + classKey, catalogError);
+                            }
+                        }, function(error) {
+                            console.warn('ExamID 目錄即時監聽失敗：' + classKey, error);
                         });
                     });
 

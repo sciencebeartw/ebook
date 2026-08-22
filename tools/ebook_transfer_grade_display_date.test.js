@@ -41,6 +41,7 @@ const context = vm.createContext({
   "getTransferGradeCatalogKind",
   "getTransferGradeDateDistanceDays",
   "isTransferGradeCompatibleAssessmentKinds",
+  "getVerifiedStoredGradeExamId",
   "resolveTransferGradeDisplayIdentity",
   "isGradeFromPostSource",
   "getDailyPostExamMatches",
