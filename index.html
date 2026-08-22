@@ -4131,7 +4131,7 @@
   <script src="ebook_lifecycle_app.js?v=20260815_full_year_date_v1"></script>
   <script src="ebook_promotion_app.js?v=20260812_legacy_transfer_student_key"></script>
   <script src="gifted_homework_full_scores.js?v=20260720_geo3_question_count_v2"></script>
-  <script src="ebook_pending_tasks_app.js?v=20260815_full_year_session_v1"></script>
+  <script src="ebook_pending_tasks_app.js?v=20260822_gifted_batch_makeup_auto_link_v1"></script>
 
   <!-- Webhook API & Firebase Polyfill (Replace google.script.run) -->
   <script>
@@ -10389,8 +10389,26 @@
                     var mappedExamId = (makeup.targetExamId || '').toString().trim();
                     var mappedSource = (makeup.sourceClassKey || '').toString().trim();
                     var postSource = ((postData && (postData.sourceClassKey || postData.storedClassKey)) || '').toString().trim();
-                    if (!mappedExamId || !mappedSource || !postSource || mappedSource !== postSource) return null;
-                    return { examId: mappedExamId, storedExamId: mappedExamId, colIndex: '' };
+                    if (mappedExamId && mappedSource && postSource && mappedSource === postSource) {
+                        return { examId: mappedExamId, storedExamId: mappedExamId, colIndex: '' };
+                    }
+                    if (!mappedExamId && window.EbookPendingTasks &&
+                        typeof window.EbookPendingTasks.resolveGiftedScienceMakeupExamForPost === 'function') {
+                        var inferredExam = window.EbookPendingTasks.resolveGiftedScienceMakeupExamForPost(
+                            posts,
+                            gData && gData.grades || [],
+                            postData,
+                            getPendingTaskHelpers()
+                        );
+                        if (inferredExam && (inferredExam.examId || inferredExam.storedExamId)) {
+                            return {
+                                examId: inferredExam.examId || '',
+                                storedExamId: inferredExam.storedExamId || inferredExam.examId || '',
+                                colIndex: inferredExam.colIndex
+                            };
+                        }
+                    }
+                    return null;
                 }
                 function splitPostMultiLinkValue(value) {
                     return (value || "").toString().split(/\n+/).map(function(line) {

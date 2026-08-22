@@ -1476,8 +1476,50 @@ const lowResult = Pending.buildPendingTasks(baseOptions({ posts: [lowExamPost, l
 assert.strictEqual(lowResult.items.length, 1);
 assert.strictEqual(lowResult.items[0].kind, 'makeup_result');
 assert.strictEqual(lowResult.items[0].reportTarget.dailyPostId, latestPost.id);
-assert.strictEqual(lowResult.items[0].paperTarget, null, 'legacy paper text/date must never be guessed as a mapping');
+assert.strictEqual(lowResult.items[0].paperTarget.dailyPostId, oldUnmappedPaper.id, 'gifted-science makeup paper auto-links to the prior formal post when exactly one eligible exam exists');
+assert.strictEqual(lowResult.items[0].paperTarget.examId, lowExam.examId);
 assert.ok(lowResult.items[0].legacySkipIdentities.some(identity => identity.sourceItemId === 'col_31'), 'ExamID threshold makeup keeps its legacy col_N skip identity');
+
+[
+  '115小六資優自然週六上午班',
+  '115小六資優自然週日下午班',
+  '115小六資優自然週日晚上班',
+].forEach(className => {
+  const classExam = Object.assign({}, lowExam, { sourceClassKey: className, storedClassKey: className });
+  const classExamPost = Object.assign({}, lowExamPost, { sourceClassKey: className });
+  const classMakeupPost = Object.assign({}, oldUnmappedPaper, { sourceClassKey: className });
+  assert.strictEqual(
+    Pending.resolveGiftedScienceMakeupExamForPost([classExamPost, classMakeupPost], [classExam], classMakeupPost, baseOptions().helpers),
+    classExam,
+    `${className} must support the same unique prior-exam fallback`,
+  );
+});
+
+const secondLowExam = Object.assign({}, lowExam, {
+  examId: 'display_exam_low_2',
+  storedExamId: 'stored_exam_low_2',
+  colIndex: 32,
+  exam: '理化第 2 章',
+});
+const ambiguousGiftedResult = Pending.buildPendingTasks(baseOptions({
+  posts: [lowExamPost, latestPost, oldUnmappedPaper],
+  grades: [lowExam, secondLowExam],
+}));
+assert.strictEqual(ambiguousGiftedResult.items[0].paperTarget, null, 'two eligible exams on the prior formal post must fail closed');
+
+const unrelatedClassExam = Object.assign({}, lowExam, {
+  sourceClassKey: '115國二自然超前班',
+  storedClassKey: '115國二自然超前班',
+});
+const unrelatedClassPaper = Object.assign({}, oldUnmappedPaper, {
+  sourceClassKey: '115國二自然超前班',
+});
+assert.strictEqual(Pending.resolveGiftedScienceMakeupExamForPost(
+  [Object.assign({}, lowExamPost, { sourceClassKey: '115國二自然超前班' }), unrelatedClassPaper],
+  [unrelatedClassExam],
+  unrelatedClassPaper,
+  baseOptions().helpers,
+), null, 'the auto-link exception must stay limited to the three gifted-science classes');
 
 const mappedPaper = {
   id: 'mapped_paper',

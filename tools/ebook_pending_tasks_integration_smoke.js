@@ -40,7 +40,7 @@ function extractFunction(name) {
   return '';
 }
 
-check(html.includes('ebook_pending_tasks_app.js?v=20260815_full_year_session_v1'), 'pending UMD module must load with the full-year and class-session cache bust before the app');
+check(html.includes('ebook_pending_tasks_app.js?v=20260822_gifted_batch_makeup_auto_link_v1'), 'pending UMD module must load with the gifted batch makeup cache bust before the app');
 check((html.match(/class="tab-item/g) || []).length === 4, 'student view must have exactly four tabs');
 check(html.includes('id="tab-pending" onclick="switchTab(3)"'), 'pending tab must retain numeric switchTab compatibility at index 3');
 check(html.includes('id="tab-content-3"'), 'pending tab content is missing');
@@ -152,6 +152,7 @@ check(html.includes("data-pending-post-anchor='1'"), 'daily posts need exact pen
 check(html.includes("data-pending-exam-anchor='1'"), 'exam cards need exact ExamID anchors');
 check(html.includes("data-pending-makeup-result-anchor='1'"), 'makeup result widget needs an exact anchor');
 check(html.includes("buildPendingExamAnchorAttrs('data-pending-paper-anchor'"), 'explicitly mapped makeup paper section needs an exact ExamID anchor');
+check(html.includes('resolveGiftedScienceMakeupExamForPost('), 'legacy gifted-science batch posts must render an exact inferred makeup-paper anchor when the prior exam is unique');
 check(html.includes("buildPendingExamAnchorAttrs('data-pending-exam-paper-anchor'"), 'original quiz section needs an exact ExamID anchor');
 const makeupExtra = extractFunction('buildPostMakeupExtra');
 const postInfoBlock = extractFunction('renderPostInfoBlock');

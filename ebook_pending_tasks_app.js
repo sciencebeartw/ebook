@@ -559,7 +559,63 @@
     return !leftText || !rightText || sourceMatches(leftText, rightText, helpers);
   }
 
-  function resolveMappedMakeupPost(posts, exam, helpers) {
+  function isGiftedScienceAutoMakeupClass(value) {
+    return /^\d{3,4}小六資優自然週(?:六上午|日下午|日晚(?:上|間))班$/.test(text(value).trim());
+  }
+
+  function isMakeupEligibleExam(exam) {
+    var raw = [exam && exam.date, exam && exam.exam, exam && exam.title].map(text).join(" ");
+    if (raw.indexOf("隨堂") > -1) return false;
+    return raw.indexOf("小考") > -1 || raw.indexOf("鑑定") > -1 || raw.indexOf("複習") > -1;
+  }
+
+  function getPostSessionStatus(post, helpers) {
+    var options = helpers && typeof helpers.getDisplayOptions === "function"
+      ? helpers.getDisplayOptions(post)
+      : ((post && post.displayOptions) || {});
+    var session = options && typeof options === "object" && options.session && typeof options.session === "object"
+      ? options.session
+      : {};
+    return text(session.status).trim().toLowerCase();
+  }
+
+  function getPreviousFormalPost(posts, targetPost, helpers) {
+    var targetParts = normalizeDateParts(targetPost && targetPost.date);
+    var targetSource = text(targetPost && (targetPost.sourceClassKey || targetPost.storedClassKey)).trim();
+    if (!targetParts || !targetSource) return null;
+    var candidates = (posts || []).map(function(post) {
+      if (!post || post === targetPost) return null;
+      var postSource = text(post.sourceClassKey || post.storedClassKey).trim();
+      if (!postSource || postSource !== targetSource) return null;
+      var status = getPostSessionStatus(post, helpers);
+      if (status === "supplemental" || status === "cancelled") return null;
+      var parts = normalizeDateParts(post.date, targetParts.year);
+      return parts && parts.key < targetParts.key ? { post: post, parts: parts } : null;
+    }).filter(Boolean).sort(function(a, b) { return b.parts.key - a.parts.key; });
+    return candidates.length ? candidates[0].post : null;
+  }
+
+  function resolveGiftedScienceMakeupExamForPost(posts, grades, post, helpers) {
+    var postSource = text(post && (post.sourceClassKey || post.storedClassKey)).trim();
+    if (!postSource || !isGiftedScienceAutoMakeupClass(postSource) || !text(post && post.makeup).trim()) return null;
+    var makeup = getMakeupOptions(post, helpers);
+    if (normalizeExamId(makeup.targetExamId || makeup.examId)) return null;
+    var previous = getPreviousFormalPost(posts, post, helpers);
+    if (!previous) return null;
+    var candidatesById = {};
+    (grades || []).forEach(function(exam) {
+      var examSource = text(exam && (exam.sourceClassKey || exam.storedClassKey)).trim();
+      if (!examSource || examSource !== postSource || !isMakeupEligibleExam(exam)) return;
+      var examId = normalizeExamId(exam && (exam.examId || exam.storedExamId));
+      if (!examId) return;
+      var matches = selectYearAwareDateMatches([exam], previous.date, function(item) { return item && item.date; });
+      if (matches.length === 1) candidatesById[examId] = exam;
+    });
+    var ids = Object.keys(candidatesById);
+    return ids.length === 1 ? candidatesById[ids[0]] : null;
+  }
+
+  function resolveMappedMakeupPost(posts, exam, helpers, grades) {
     var ids = [exam && exam.examId, exam && exam.storedExamId]
       .map(normalizeExamId)
       .filter(Boolean);
@@ -577,15 +633,24 @@
       return !!mappedId && ids.indexOf(mappedId) > -1 && !!text(post.makeup).trim();
     });
     if (matches.length > 1) return { post: null, invalid: true };
-    if (!matches.length) return { post: null, invalid: false };
-    var mappedSource = text(getMakeupOptions(matches[0], helpers).sourceClassKey).trim();
-    if (!examSource || !mappedSource || mappedSource !== examSource) {
-      return { post: null, invalid: true };
+    if (matches.length === 1) {
+      var mappedSource = text(getMakeupOptions(matches[0], helpers).sourceClassKey).trim();
+      if (!examSource || !mappedSource || mappedSource !== examSource) {
+        return { post: null, invalid: true };
+      }
+      if (!isExamBeforePost(exam, matches[0], helpers)) {
+        return { post: null, invalid: true };
+      }
+      return { post: matches[0], invalid: false };
     }
-    if (!isExamBeforePost(exam, matches[0], helpers)) {
-      return { post: null, invalid: true };
-    }
-    return { post: matches[0], invalid: false };
+    var inferredMatches = (posts || []).filter(function(post) {
+      var inferredExam = resolveGiftedScienceMakeupExamForPost(posts, grades, post, helpers);
+      return inferredExam && hasSameStableExamIdentity(exam, inferredExam);
+    });
+    if (inferredMatches.length > 1) return { post: null, invalid: true };
+    return inferredMatches.length === 1
+      ? { post: inferredMatches[0], invalid: false, inferred: true }
+      : { post: null, invalid: false };
   }
 
   function findMakeupReportHostPost(posts, exam, helpers) {
@@ -1413,7 +1478,7 @@
         var guidanceAbsence = helpers && typeof helpers.isMathGuidanceExam === "function" && helpers.isMathGuidanceExam(exam);
         var absencePaperResolution = guidanceAbsence
           ? { post: null, invalid: false }
-          : resolveMappedMakeupPost(posts, exam, helpers);
+          : resolveMappedMakeupPost(posts, exam, helpers, grades);
         var absencePaperPost = absencePaperResolution.post;
         var exactAbsenceExamPost = resolveExactExamPost(posts, exam, helpers);
         var originalExamPaperPost = guidanceAbsence ? null : resolveOriginalExamPaperPost(posts, exam, helpers);
@@ -1486,7 +1551,7 @@
       var reportHost = threshold.isGuidance ? null : findMakeupReportHostPost(posts, exam, helpers);
       var mappedPaperResolution = threshold.isGuidance
         ? { post: null, invalid: false }
-        : resolveMappedMakeupPost(posts, exam, helpers);
+        : resolveMappedMakeupPost(posts, exam, helpers, grades);
       var mappedPaperPost = mappedPaperResolution.post;
       var reminderSourceDate = text(
         thresholdEligibility.nextPost && thresholdEligibility.nextPost.date
@@ -1618,6 +1683,7 @@
     selectYearAwareDateMatches: selectYearAwareDateMatches,
     resolveClassSessionContract: resolveClassSessionContract,
     resolveGradeHomeworkTaskEligibility: resolveGradeHomeworkTaskEligibility,
-    resolveThresholdTaskEligibility: resolveThresholdTaskEligibility
+    resolveThresholdTaskEligibility: resolveThresholdTaskEligibility,
+    resolveGiftedScienceMakeupExamForPost: resolveGiftedScienceMakeupExamForPost
   };
 });
