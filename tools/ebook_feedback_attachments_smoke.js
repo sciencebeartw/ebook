@@ -47,8 +47,20 @@ check(
 check(
   html.includes("document.getElementById('feedback-send-' + safeId)") &&
     html.includes('renderStudentHomeworkDraft(post.date);') &&
-    html.includes('renderStudentFeedbackAttachmentDraft(post.date);'),
+    html.includes('Object.keys(studentFeedbackComposerContexts || {})') &&
+    html.includes('renderStudentFeedbackAttachmentDraft(contextKey);'),
   'existing text-only sends and staged drafts should survive the new composer layout and live rerenders'
+);
+check(
+  html.includes('registerStudentFeedbackComposer("new_" + safeDateId') &&
+    html.includes('registerStudentFeedbackComposer("thread_student_" + threadDomKey') &&
+    html.includes('form.replyToFeedbackKey = feedbackOptions.replyToFeedbackKey'),
+  'new-message and in-thread composers should keep separate drafts and persist explicit reply metadata'
+);
+check(
+  html.includes("context.replyToFeedbackKey ? 'student-feedback-thread' : 'student-feedback'") &&
+    html.includes('buildStudentThreadReplyBox'),
+  'student thread replies should reuse binary attachment uploads for text, files, or attachment-only replies'
 );
 
 if (failures.length) {

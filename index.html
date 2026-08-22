@@ -2760,6 +2760,97 @@
             text-align: right;
         }
 
+        /* ★★★ FB / IG / Threads 式雙向留言串 ★★★ */
+        .feedback-thread {
+            min-width: 0;
+            margin-bottom: 16px;
+        }
+
+        .feedback-thread > .history-msg {
+            margin-bottom: 6px;
+        }
+
+        .feedback-thread .history-msg,
+        .feedback-thread .history-msg-body {
+            min-width: 0;
+        }
+
+        .feedback-thread .history-msg-body {
+            overflow-wrap: anywhere;
+        }
+
+        .feedback-thread-replies {
+            min-width: 0;
+            margin: 6px 0 4px 42px;
+            padding-left: 12px;
+            border-left: 2px solid #dbe4ee;
+        }
+
+        .feedback-thread-replies[hidden] {
+            display: none;
+        }
+
+        .feedback-thread-replies .history-msg {
+            margin-bottom: 8px;
+            font-size: 1.05rem;
+        }
+
+        .feedback-thread-replies .history-msg-avatar {
+            width: 30px;
+            height: 30px;
+            font-size: 0.85rem;
+        }
+
+        .feedback-thread-toggle {
+            min-height: 40px;
+            margin: 0 0 4px 46px;
+            padding: 6px 10px;
+            border: 0;
+            border-radius: 999px;
+            background: transparent;
+            color: #64748b;
+            font-size: 0.9rem;
+            font-weight: 900;
+            cursor: pointer;
+        }
+
+        .feedback-thread-toggle:hover,
+        .feedback-thread-toggle:focus-visible {
+            background: #f1f5f9;
+            color: var(--primary-dark);
+            outline: none;
+        }
+
+        .feedback-thread-composer {
+            min-width: 0;
+            margin: 6px 0 0 46px;
+            padding: 9px;
+            border: 1px solid #dbe4ee;
+            border-radius: 14px;
+            background: rgba(248, 250, 252, 0.86);
+        }
+
+        .feedback-thread-composer-title {
+            margin: 0 4px 7px;
+            color: #64748b;
+            font-size: 0.82rem;
+            font-weight: 900;
+        }
+
+        .feedback-thread-composer .input-box {
+            margin-top: 0;
+        }
+
+        .feedback-thread-composer .fb-input {
+            min-height: 44px;
+            font-size: 1rem;
+        }
+
+        .feedback-thread-composer .fb-btn {
+            min-height: 44px;
+            font-size: 1rem;
+        }
+
         .input-box {
             display: flex;
             gap: 10px;
@@ -2991,6 +3082,57 @@
         }
 
         @media (max-width: 600px) {
+            .history-msg {
+                gap: 8px;
+                font-size: 1.08rem;
+            }
+
+            .history-msg-avatar {
+                width: 32px;
+                height: 32px;
+                font-size: 0.9rem;
+            }
+
+            .history-msg-body {
+                padding: 9px 11px;
+            }
+
+            .feedback-thread-replies {
+                margin-left: 18px;
+                padding-left: 8px;
+            }
+
+            .feedback-thread-replies .history-msg {
+                font-size: 0.98rem;
+            }
+
+            .feedback-thread-toggle,
+            .feedback-thread-composer {
+                margin-left: 18px;
+            }
+
+            .feedback-thread-toggle {
+                min-height: 44px;
+            }
+
+            .feedback-thread-composer-main {
+                flex-wrap: wrap;
+            }
+
+            .feedback-thread-composer-main .fb-input {
+                flex: 1 0 100%;
+                width: 100%;
+            }
+
+            .feedback-thread-composer-main .feedback-attachment-picker,
+            .feedback-thread-composer-main .fb-btn {
+                min-height: 44px;
+            }
+
+            .feedback-thread-composer-main .fb-btn {
+                flex: 1;
+            }
+
             .admin-reply-row input {
                 flex: 1 0 100%;
                 width: 100%;
@@ -4177,6 +4319,7 @@
   <script src="ebook_promotion_app.js?v=20260812_legacy_transfer_student_key"></script>
   <script src="gifted_homework_full_scores.js?v=20260720_geo3_question_count_v2"></script>
   <script src="ebook_pending_tasks_app.js?v=20260822_gifted_batch_makeup_auto_link_v1"></script>
+  <script src="ebook_feedback_threads_app.js?v=20260822_feedback_threads_v1"></script>
 
   <!-- Webhook API & Firebase Polyfill (Replace google.script.run) -->
   <script>
@@ -9070,8 +9213,11 @@
         var uploadBatchNote = "";
         var studentHomeworkUploadDrafts = {};
         var studentFeedbackAttachmentDrafts = {};
+        var studentFeedbackComposerContexts = {};
         var adminReplyAttachmentDrafts = {};
         var adminDirectAttachmentDrafts = {};
+        var ebookExpandedFeedbackThreads = {};
+        var ebookFeedbackThreadDomContext = {};
         var FEEDBACK_ATTACHMENT_MAX_FILES = 5;
         var isFeedbackAttachmentUploading = false;
 
@@ -9445,9 +9591,20 @@
             });
         }
 
-        function stageStudentFeedbackAttachments(input, dateStr) {
+        function registerStudentFeedbackComposer(contextKey, context) {
+            var key = makeDomSafeId(contextKey || "");
+            if (!key) return "";
+            studentFeedbackComposerContexts[key] = Object.assign({}, context || {}, { contextKey: key });
+            if (!studentFeedbackAttachmentDrafts[key]) studentFeedbackAttachmentDrafts[key] = { files: [] };
+            return key;
+        }
+
+        function stageStudentFeedbackAttachments(input, contextKey, dateStr) {
             var files = input && input.files ? Array.from(input.files) : [];
-            var key = getSafeDateId(dateStr);
+            var key = makeDomSafeId(contextKey || getSafeDateId(dateStr));
+            if (!studentFeedbackComposerContexts[key]) {
+                registerStudentFeedbackComposer(key, { targetDate: dateStr || "", replyToFeedbackKey: "" });
+            }
             var accepted = validateAttachmentFiles(files, STUDENT_UPLOAD_MAX_BYTES);
             var existing = studentFeedbackAttachmentDrafts[key] || { files: [] };
             if ((existing.files || []).length + accepted.length > FEEDBACK_ATTACHMENT_MAX_FILES) {
@@ -9457,35 +9614,41 @@
             existing.files = mergeDraftFiles(existing.files, accepted, FEEDBACK_ATTACHMENT_MAX_FILES);
             studentFeedbackAttachmentDrafts[key] = existing;
             if (input) input.value = '';
-            renderStudentFeedbackAttachmentDraft(dateStr);
+            renderStudentFeedbackAttachmentDraft(key);
         }
 
-        function renderStudentFeedbackAttachmentDraft(dateStr) {
-            var key = getSafeDateId(dateStr);
+        function renderStudentFeedbackAttachmentDraft(contextKey) {
+            var key = makeDomSafeId(contextKey || "");
             var draft = studentFeedbackAttachmentDrafts[key] || { files: [] };
             var files = draft.files || [];
-            renderAttachmentDraftList('feedback-attachments-' + key, files, 'removeStudentFeedbackAttachment', dateStr);
+            renderAttachmentDraftList('feedback-attachments-' + key, files, 'removeStudentFeedbackAttachment', key);
             var input = document.getElementById('input-' + key);
             if (input && document.activeElement !== input) input.value = draft.text || '';
         }
 
-        function updateStudentFeedbackDraftText(dateStr, value) {
-            var key = getSafeDateId(dateStr);
+        function updateStudentFeedbackDraftText(contextKey, value) {
+            var key = makeDomSafeId(contextKey || "");
             var draft = studentFeedbackAttachmentDrafts[key] || { files: [] };
             draft.text = String(value || '');
             studentFeedbackAttachmentDrafts[key] = draft;
         }
 
-        function removeStudentFeedbackAttachment(dateStr, index) {
-            var key = getSafeDateId(dateStr);
+        function removeStudentFeedbackAttachment(contextKey, index) {
+            var key = makeDomSafeId(contextKey || "");
             var draft = studentFeedbackAttachmentDrafts[key] || { files: [] };
             discardUploadedFeedbackDraft(draft);
             draft.files.splice(index, 1);
             studentFeedbackAttachmentDrafts[key] = draft;
-            renderStudentFeedbackAttachmentDraft(dateStr);
+            renderStudentFeedbackAttachmentDraft(key);
         }
 
-        async function sendStudentFeedbackWithAttachments(safeId, realDate) {
+        async function sendStudentFeedbackWithAttachments(contextKey, fallbackDate) {
+            var safeId = makeDomSafeId(contextKey || "");
+            var context = studentFeedbackComposerContexts[safeId] || {
+                targetDate: fallbackDate || "",
+                replyToFeedbackKey: ""
+            };
+            var realDate = context.targetDate || fallbackDate || "";
             var input = document.getElementById('input-' + safeId);
             var btn = document.getElementById('feedback-send-' + safeId);
             var status = document.getElementById('feedback-attachment-status-' + safeId);
@@ -9495,14 +9658,22 @@
                 swalAlert('請輸入留言或選擇附件', '', 'warning');
                 return;
             }
+            var feedbackOptions = {
+                replyToFeedbackKey: context.replyToFeedbackKey || "",
+                sourceClassName: context.sourceClassName || "",
+                sourceClassKey: context.sourceClassKey || "",
+                storedStudentKey: context.storedStudentKey || "",
+                submitLabel: context.submitLabel || (context.replyToFeedbackKey ? "回覆" : "新增留言")
+            };
             if (!draft.files.length) {
                 sendFeedback(safeId, realDate, '學生留言', null, function() {
                     studentFeedbackAttachmentDrafts[safeId] = { files: [] };
-                });
+                }, null, false, feedbackOptions);
                 return;
             }
             if (isFeedbackAttachmentUploading || (btn && btn.disabled)) return;
             if (!(await confirmStudentPreviewAction('送出留言與附件'))) return;
+            var submitLabel = feedbackOptions.submitLabel;
             isFeedbackAttachmentUploading = true;
             if (btn) {
                 btn.disabled = true;
@@ -9512,18 +9683,23 @@
             try {
                 var uploaded = Array.isArray(draft.uploaded) && draft.uploaded.length === draft.files.length
                     ? draft.uploaded
-                    : await uploadFeedbackAttachmentFiles(draft.files, 'student-feedback', realDate, status);
+                    : await uploadFeedbackAttachmentFiles(
+                        draft.files,
+                        context.replyToFeedbackKey ? 'student-feedback-thread' : 'student-feedback',
+                        realDate,
+                        status
+                    );
                 draft.uploaded = uploaded;
                 var content = buildFeedbackContentWithAttachments(text, uploaded);
                 if (content.length > 4800) throw new Error('留言與附件連結太長，請減少附件後再試。');
                 if (status) status.innerText = '附件完成，正在送出留言...';
                 feedbackSubmitStarted = true;
                 await new Promise(function(resolve, reject) {
-                    sendFeedback(safeId, realDate, '學生留言', content, resolve, reject, true);
+                    sendFeedback(safeId, realDate, '學生留言', content, resolve, reject, true, feedbackOptions);
                 });
                 studentFeedbackAttachmentDrafts[safeId] = { files: [] };
                 if (input) input.value = '';
-                renderStudentFeedbackAttachmentDraft(realDate);
+                renderStudentFeedbackAttachmentDraft(safeId);
                 if (status) status.innerText = '';
                 swalAlert('已送出', '留言與附件已一起送出。', 'success');
             } catch (err) {
@@ -9535,7 +9711,7 @@
                 isFeedbackAttachmentUploading = false;
                 if (btn) {
                     btn.disabled = false;
-                    btn.innerText = '送出';
+                    btn.innerText = submitLabel;
                 }
             }
         }
@@ -10319,6 +10495,8 @@
             window.adminModeMakeupContext = {};
             window.adminModeScoreEditContext = window.adminModeScoreEditContext || {};
             window.adminModeDirectMessageContext = {};
+            studentFeedbackComposerContexts = {};
+            ebookFeedbackThreadDomContext = {};
             function getPostScopedHistory(postData) {
                 var postSourceClassKey = postData.sourceClassKey || "";
                 return (history || []).filter(function(h) {
@@ -10357,7 +10535,8 @@
                     text = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
                     var withBr = text.replace(/\n/g, '<br>');
                     // ★★★ v3.9.1 新增：引用區塊解析 ★★★
-                    withBr = withBr.replace(/\[quote:([^\]]+)\](.*?)\[\/quote\]/gi, function(match, type, qContent) {
+                    withBr = withBr.replace(/\[quote(?::([^\]]+))?\](.*?)\[\/quote\]/gi, function(match, type, qContent) {
+                        type = type || "留言";
                         var contentClean = qContent.trim().replace(/<br>/g, "\n");
                         // 檢查被 quote 的內容是否為舊版 JSON
                         var d = null;
@@ -10615,14 +10794,46 @@
                     fields.push({ label: item.label, val: item.val, extra: extra, linkMode: getDailyPostHomeworkLinkMode(post, item.key) });
                 });
                 fields = fields.concat(buildPostMakeupFields(post, buildPendingMakeupResultReportHtml(post, sourceHistory, examCards, latestPostDate)), [{ label: "下次考試範圍", val: post.range }, { label: "補充資訊", val: post.note }]);
-                fields.forEach(function (f) { contentHtml += renderPostInfoBlock(f); }); var historyHtml = ""; myHistory.forEach(function (h) { if (!isMakeupScoreReportType(h.type) && h.type !== FEEDBACK_TYPE_LABELS.makeupResult) { var displayType = (h.type === FEEDBACK_TYPE_LABELS.parent || h.type === FEEDBACK_TYPE_LABELS.parentStudent || h.type === FEEDBACK_TYPE_LABELS.student) ? "學生留言" : h.type; var isTeacher = (!isStudentSideFeedbackType(h.type) && !isMakeupScoreReportType(h.type));
+                fields.forEach(function (f) { contentHtml += renderPostInfoBlock(f); });
+
+                var historyHtml = "";
+                var safeDateId = post.date.replace(/\//g, '-');
+                var feedbackThreadApi = window.EbookFeedbackThreads;
+                var feedbackModel = feedbackThreadApi && typeof feedbackThreadApi.buildFeedbackThreads === "function"
+                    ? feedbackThreadApi.buildFeedbackThreads(myHistory)
+                    : { blocks: myHistory.map(function(item, index) { return { kind: "operational", item: item, sourceIndex: index }; }) };
+                var studentName = (gData && gData.studentName) ? gData.studentName : "學";
+                var studentAvatarChar = studentName.length >= 2 ? studentName.charAt(studentName.length - 2) : studentName.charAt(0);
+                var teacherAvatarChar = getTeacherInfo(gData && gData.className ? gData.className : "").name;
+
+                function isTeacherFeedbackEntry(item) {
+                    if (feedbackThreadApi && typeof feedbackThreadApi.isTeacherFeedback === "function") {
+                        return feedbackThreadApi.isTeacherFeedback(item);
+                    }
+                    return !isStudentSideFeedbackType(item && item.type) && !isMakeupScoreReportType(item && item.type);
+                }
+
+                function buildConversationMessageHtml(entry, nested) {
+                    var item = entry && entry.item ? entry.item : {};
+                    var isTeacher = isTeacherFeedbackEntry(item);
+                    var avatarClass = isTeacher ? "avatar-teacher" : "avatar-student";
+                    var bodyClass = isTeacher ? "teacher-body" : "";
+                    var avatarChar = isTeacher ? teacherAvatarChar : studentAvatarChar;
+                    var content = entry && entry.displayContent !== undefined ? entry.displayContent : item.content;
+                    return "<div class='history-msg" + (nested ? " feedback-thread-reply" : "") + "' data-feedback-key='" + escapeHtmlAttr(entry && entry.key || "") + "'>" +
+                        "<div class='history-msg-avatar " + avatarClass + "'>" + escapeHtml(avatarChar) + "</div>" +
+                        "<div class='history-msg-body " + bodyClass + "'>" + parseBtn(content || "") +
+                        "<div class='history-msg-time'>" + escapeHtml((item.time || "").substring(5, 16)) + "</div></div></div>";
+                }
+
+                (feedbackModel.blocks || []).forEach(function(block) {
+                    if (block.kind === "operational") {
+                        var h = block.item || {};
+                        if (isMakeupScoreReportType(h.type) || h.type === FEEDBACK_TYPE_LABELS.makeupResult) return;
+                        var isTeacher = isTeacherFeedbackEntry(h);
                         var avatarClass = isTeacher ? "avatar-teacher" : "avatar-student";
                         var bodyClass = isTeacher ? "teacher-body" : "";
-                        var sName = (gData && gData.studentName) ? gData.studentName : "學";
-                        var sChar = sName.length >= 2 ? sName.charAt(sName.length - 2) : sName.charAt(0);
-                        var classInfo = getTeacherInfo(gData && gData.className ? gData.className : "");
-                        var tName = classInfo.name;
-                        var avatarChar = isTeacher ? tName : sChar;
+                        var avatarChar = isTeacher ? teacherAvatarChar : studentAvatarChar;
                         if (h.type === FEEDBACK_TYPE_LABELS.sticker) {
                             var stickerData = {};
                             try { stickerData = JSON.parse(h.content); } catch(e) { stickerData = { reason: h.content, count: '?', status: "待審核" }; }
@@ -10631,14 +10842,13 @@
                             var safeStickerReason = escapeHtml(stickerData.reason || "");
                             var statusKind = getStickerReviewStatusKind(statusLabel);
                             var statusClass = statusKind === "approved" ? "approved" : (statusKind === "rejected" ? "rejected" : "");
-                            
                             var isPenalty = parseInt(stickerData.count) < 0;
                             var isTeacherSticker = isTeacherStickerAdjustment(stickerData);
                             var bodyCls = isPenalty ? "penalty-body" : "sticker-body";
                             var badgeCls = isPenalty ? "penalty-badge" : "sticker-badge";
                             var icon = isPenalty ? SVG.penalty : SVG.star;
                             var stickerAvatarClass = isTeacherSticker ? "avatar-teacher" : "avatar-student";
-                            var stickerAvatarChar = isTeacherSticker ? tName : avatarChar;
+                            var stickerAvatarChar = isTeacherSticker ? teacherAvatarChar : avatarChar;
                             var stickerReviewHtml = "";
                             if (canUseAdminModeReview() && statusLabel === "待審核" && h.fbKey) {
                                 var stickerContextKey = makeDomSafeId("sticker_" + post.date + "_" + h.fbKey);
@@ -10653,27 +10863,84 @@
                                 };
                                 stickerReviewHtml = buildGodStickerReviewActions(stickerContextKey);
                             }
-                            
                             historyHtml += "<div class='history-msg'><div class='history-msg-avatar " + stickerAvatarClass + "'>" + escapeHtml(stickerAvatarChar) + "</div><div class='history-msg-body " + bodyCls + "'><span>" + icon + safeStickerReason + "</span><span class='" + badgeCls + "'>" + escapeHtml(formatStickerCountText(stickerData.count)) + "</span><br><span class='sticker-status " + statusClass + "'>" + (statusKind === "approved" ? SVG.check : (statusKind === "rejected" ? SVG.cross : SVG.hourglass)) + safeStatusLabel + "</span><div class='history-msg-time'>" + escapeHtml((h.time || "").substring(5, 16)) + "</div>" + stickerReviewHtml + "</div></div>";
                         } else {
-                            var adminReplyHtml = "";
-                            if (canUseAdminModeReply() && !isTeacher) {
-                                var contextKey = makeDomSafeId(post.date + "_" + (h.fbKey || h.time || Math.random().toString(36).slice(2)));
-                                window.adminModeReplyContext[contextKey] = {
-                                    fbKey: h.fbKey || "",
-                                    targetDate: post.date,
-                                    type: displayType,
-                                    content: h.content || "",
-                                    storedClassName: h.storedClassName || h.sourceClassName || post.storedClassName || post.sourceClassName || gData.className,
-                                    storedClassKey: h.storedClassKey || h.sourceClassKey || post.sourceClassKey || "",
-                                    storedStudentKey: h.storedStudentKey || post.sourceStudentKey || "",
-                                    sourceClassName: h.sourceClassName || post.storedClassName || post.sourceClassName || gData.className,
-                                    sourceClassKey: h.sourceClassKey || post.sourceClassKey || ""
-                                };
-                                adminReplyHtml = buildAdminReplyBox(contextKey);
-                            }
-                            historyHtml += "<div class='history-msg'><div class='history-msg-avatar " + avatarClass + "'>" + escapeHtml(avatarChar) + "</div><div class='history-msg-body " + bodyClass + "'>" + parseBtn(h.content) + "<div class='history-msg-time'>" + escapeHtml((h.time || "").substring(5, 16)) + "</div>" + adminReplyHtml + "</div></div>";
-                        } }}); var inputPlaceholder = "留言給老師..."; var safeDateId = post.date.replace(/\//g, '-');
+                            historyHtml += "<div class='history-msg'><div class='history-msg-avatar " + avatarClass + "'>" + escapeHtml(avatarChar) + "</div><div class='history-msg-body " + bodyClass + "'>" + parseBtn(h.content || "") + "<div class='history-msg-time'>" + escapeHtml((h.time || "").substring(5, 16)) + "</div></div></div>";
+                        }
+                        return;
+                    }
+
+                    var thread = block.thread;
+                    if (!thread || !thread.root) return;
+                    var rootItem = thread.root.item || {};
+                    var threadDomKey = makeDomSafeId(
+                        "feedback_thread_" + safeDateId + "_" + thread.id + "_" +
+                        (rootItem.storedClassKey || rootItem.sourceClassKey || "") + "_" +
+                        (rootItem.storedStudentKey || "")
+                    );
+                    var replies = thread.replies || [];
+                    var isCollapsible = replies.length > 2;
+                    var isExpanded = ebookExpandedFeedbackThreads[threadDomKey] === true;
+                    ebookFeedbackThreadDomContext[threadDomKey] = {
+                        threadId: threadDomKey,
+                        replyCount: replies.length
+                    };
+                    var repliesHtml = replies.map(function(reply) {
+                        return buildConversationMessageHtml(reply, true);
+                    }).join("");
+                    var toggleHtml = isCollapsible
+                        ? ("<button type='button' id='feedback-thread-toggle-" + threadDomKey + "' class='feedback-thread-toggle' aria-expanded='" + (isExpanded ? "true" : "false") + "' aria-controls='feedback-thread-replies-" + threadDomKey + "' onclick=\"toggleEbookFeedbackThreadReplies('" + threadDomKey + "')\">" + (isExpanded ? "收合回覆" : ("查看 " + replies.length + " 則回覆")) + "</button>")
+                        : "";
+                    var repliesContainer = replies.length
+                        ? ("<div id='feedback-thread-replies-" + threadDomKey + "' class='feedback-thread-replies'" + (isCollapsible && !isExpanded ? " hidden" : "") + ">" + repliesHtml + "</div>")
+                        : "";
+                    var composerHtml = "";
+
+                    if (!isAdminMode && !isDashboardDraftPreviewMode && !post.isTransferFormerClass && feedbackThreadApi && thread.root.key) {
+                        var studentTarget = feedbackThreadApi.getLatestReplyableKeyedMessage(thread);
+                        if (studentTarget && studentTarget.key) {
+                            var studentTargetItem = studentTarget.item || {};
+                            var studentContextKey = registerStudentFeedbackComposer("thread_student_" + threadDomKey, {
+                                targetDate: post.date,
+                                replyToFeedbackKey: studentTarget.key,
+                                threadRootFeedbackKey: thread.root.key,
+                                sourceClassName: studentTargetItem.storedClassName || studentTargetItem.sourceClassName || post.storedClassName || post.sourceClassName || gData.className,
+                                sourceClassKey: studentTargetItem.storedClassKey || studentTargetItem.sourceClassKey || post.storedClassKey || post.sourceClassKey || "",
+                                storedStudentKey: studentTargetItem.storedStudentKey || post.sourceStudentKey || "",
+                                submitLabel: "回覆"
+                            });
+                            composerHtml = buildStudentThreadReplyBox(studentContextKey);
+                        }
+                    } else if (canUseAdminModeReply() && feedbackThreadApi && thread.root.key) {
+                        var teacherTarget = feedbackThreadApi.getLatestStudentMessage(thread);
+                        if (teacherTarget && teacherTarget.key) {
+                            var teacherContextKey = makeDomSafeId("thread_god_" + threadDomKey);
+                            var targetItem = teacherTarget.item || {};
+                            var displayType = (targetItem.type === FEEDBACK_TYPE_LABELS.parent || targetItem.type === FEEDBACK_TYPE_LABELS.parentStudent || targetItem.type === FEEDBACK_TYPE_LABELS.student) ? "學生留言" : targetItem.type;
+                            window.adminModeReplyContext[teacherContextKey] = {
+                                fbKey: teacherTarget.key,
+                                targetDate: post.date,
+                                type: displayType,
+                                content: targetItem.content || "",
+                                storedClassName: targetItem.storedClassName || targetItem.sourceClassName || post.storedClassName || post.sourceClassName || gData.className,
+                                storedClassKey: targetItem.storedClassKey || targetItem.sourceClassKey || post.sourceClassKey || "",
+                                storedStudentKey: targetItem.storedStudentKey || post.sourceStudentKey || "",
+                                sourceClassName: targetItem.sourceClassName || post.storedClassName || post.sourceClassName || gData.className,
+                                sourceClassKey: targetItem.sourceClassKey || post.sourceClassKey || ""
+                            };
+                            composerHtml = buildAdminReplyBox(teacherContextKey, {
+                                threadComposer: true,
+                                title: "老師回覆此串",
+                                placeholder: "在這則留言串中回覆學生"
+                            });
+                        }
+                    }
+
+                    historyHtml += "<section class='feedback-thread' data-feedback-thread-id='" + escapeHtmlAttr(thread.id) + "'>" +
+                        buildConversationMessageHtml(thread.root, false) + toggleHtml + repliesContainer + composerHtml + "</section>";
+                });
+
+                var inputPlaceholder = "新增一則留言給老師...";
 
                 var isLatestStickerPost = post.date === latestStickerPostDate;
                 var stickerStudentToolsHtml = isLatestStickerPost ? `
@@ -10753,13 +11020,21 @@
                     window.adminModeStickerAdjustmentContext[adjustmentContextKey] = { targetDate: post.date, sourceClassName: post.storedClassName || post.sourceClassName || post.className || gData.className, sourceClassKey: post.storedClassKey || post.sourceClassKey || "", storedStudentKey: post.sourceStudentKey || "" };
                     godStickerAdjustmentHtml = buildGodStickerAdjustmentBox(adjustmentContextKey);
                 }
-                var studentInputHtml = (isAdminMode || isDashboardDraftPreviewMode || post.isTransferFormerClass) ? "" :
-                    "<div class='input-box'><div class='feedback-composer-main'>" +
-                    "<input type='text' class='fb-input' id='input-" + safeDateId + "' oninput=\"updateStudentFeedbackDraftText('" + post.date + "', this.value)\" placeholder='" + inputPlaceholder + "'>" +
-                    "<label class='feedback-attachment-picker' title='加入附件' aria-label='加入附件'>📎<input type='file' multiple onchange=\"stageStudentFeedbackAttachments(this, '" + post.date + "')\"></label>" +
-                    "<button type='button' class='fb-btn' id='feedback-send-" + safeDateId + "' onclick=\"sendStudentFeedbackWithAttachments('" + safeDateId + "', '" + post.date + "')\">送出</button>" +
-                    "</div><div id='feedback-attachments-" + safeDateId + "' class='feedback-attachment-list'></div>" +
-                    "<div id='feedback-attachment-status-" + safeDateId + "' class='feedback-attachment-status'></div></div>";
+                var newMessageContextKey = "";
+                if (!isAdminMode && !isDashboardDraftPreviewMode && !post.isTransferFormerClass) {
+                    newMessageContextKey = registerStudentFeedbackComposer("new_" + safeDateId, {
+                        targetDate: post.date,
+                        replyToFeedbackKey: "",
+                        submitLabel: "新增留言"
+                    });
+                }
+                var studentInputHtml = !newMessageContextKey ? "" :
+                    "<div class='input-box feedback-new-message-composer'><div class='feedback-composer-main'>" +
+                    "<input type='text' class='fb-input' id='input-" + newMessageContextKey + "' oninput=\"updateStudentFeedbackDraftText('" + newMessageContextKey + "', this.value)\" placeholder='" + inputPlaceholder + "'>" +
+                    "<label class='feedback-attachment-picker' title='加入照片或檔案' aria-label='加入照片或檔案'>📎<input type='file' multiple onchange=\"stageStudentFeedbackAttachments(this, '" + newMessageContextKey + "', '" + post.date + "')\"></label>" +
+                    "<button type='button' class='fb-btn' id='feedback-send-" + newMessageContextKey + "' onclick=\"sendStudentFeedbackWithAttachments('" + newMessageContextKey + "', '" + post.date + "')\">新增留言</button>" +
+                    "</div><div id='feedback-attachments-" + newMessageContextKey + "' class='feedback-attachment-list'></div>" +
+                    "<div id='feedback-attachment-status-" + newMessageContextKey + "' class='feedback-attachment-status'></div></div>";
 
                 // ★★★ v3.9 修正：家長留言 -> 留言內容 ★★★
                 var feedbackHtml = "<div class='feedback-section'>" + uploadHtml + "<div class='section-title'>" + SVG.chat + "留言內容</div><div id='history-" + safeDateId + "'>" + historyHtml + "</div>" + godStickerAdjustmentHtml + adminDirectHtml + studentInputHtml + "</div>"; var headerTitle = escapeHtml(post.date + (post.title ? " " + post.title : "")); var sessionBadge = buildDailyPostSessionBadge(post); var transferBadge = post.isTransferFormerClass ? "<span style='margin-left:8px; background:#fffbeb; color:#92400e; border:1px solid #fde68a; border-radius:999px; padding:2px 8px; font-size:0.78rem; font-weight:900;'>轉班前紀錄｜" + escapeHtml(post.sourceClassName || "原班") + "</span>" : ""; var pendingPostAttrs = " data-pending-post-anchor='1' data-post-id='" + escapeHtmlAttr(post.dailyPostId || post.id || '') + "' data-source-class-key='" + escapeHtmlAttr(post.sourceClassKey || post.storedClassKey || '') + "' data-stored-class-key='" + escapeHtmlAttr(post.storedClassKey || '') + "' data-post-date='" + escapeHtmlAttr(post.date || '') + "'"; html += "<div class='post-card-wrapper'" + pendingPostAttrs + "><div class='post-card'><div class='post-header'><span>" + SVG.calendar + headerTitle + sessionBadge + transferBadge + "</span></div>" + gradeHtml + "<div class='content-section'><div class='section-title'>" + SVG.megaphone + "聯絡事項</div>" + contentHtml + "</div>" + feedbackHtml + "</div></div>";
@@ -10769,7 +11044,9 @@
             posts.forEach(function(post) {
                 if (isAdminMode || isDashboardDraftPreviewMode || post.isTransferFormerClass) return;
                 renderStudentHomeworkDraft(post.date);
-                renderStudentFeedbackAttachmentDraft(post.date);
+            });
+            Object.keys(studentFeedbackComposerContexts || {}).forEach(function(contextKey) {
+                renderStudentFeedbackAttachmentDraft(contextKey);
             });
             Object.keys(window.adminModeReplyContext || {}).forEach(function(contextKey) {
                 renderAdminModeAttachmentDraft(contextKey, false);
@@ -11401,8 +11678,10 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }).submitFeedback(form);
         }
 
-        async function sendFeedback(safeId, realDate, type, contentOverride, callback, failureCallback, skipStudentPreviewConfirm) {
+        async function sendFeedback(safeId, realDate, type, contentOverride, callback, failureCallback, skipStudentPreviewConfirm, feedbackOptions) {
             if (!skipStudentPreviewConfirm && !(await confirmStudentPreviewAction(type === "作業上傳" ? "上傳作業" : "送出留言"))) return;
+            feedbackOptions = feedbackOptions || {};
+            var submitLabel = feedbackOptions.submitLabel || "送出";
             var inputId = 'input-' + safeId;
             var val = contentOverride || document.getElementById(inputId).value;
             if (!val) return;
@@ -11412,10 +11691,22 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
 
             var form;
             try {
-                form = { className: gData.className, sourceClassName: resolveStudentActionSourceClassName(realDate), studentName: gData.studentName, targetDate: realDate, type: type, content: val };
+                form = {
+                    className: gData.className,
+                    sourceClassName: feedbackOptions.sourceClassName || resolveStudentActionSourceClassName(realDate),
+                    studentName: gData.studentName,
+                    targetDate: realDate,
+                    type: type,
+                    content: val
+                };
+                if (feedbackOptions.replyToFeedbackKey) {
+                    form.replyToFeedbackKey = feedbackOptions.replyToFeedbackKey;
+                }
+                if (feedbackOptions.sourceClassKey) form.sourceClassKey = feedbackOptions.sourceClassKey;
+                if (feedbackOptions.storedStudentKey) form.storedStudentKey = feedbackOptions.storedStudentKey;
             } catch (sourceErr) {
                 swalAlert('無法送出', sourceErr.message || String(sourceErr), 'warning');
-                clearEbookSubmitLoading(btn, "送出");
+                clearEbookSubmitLoading(btn, submitLabel);
                 if (failureCallback) failureCallback(sourceErr);
                 return;
             }
@@ -11423,7 +11714,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             google.script.run.withSuccessHandler(function (res) {
                 if (!res || res.success !== true) {
                     swalAlert("送出失敗", getSubmitFailureMessage(res), 'warning');
-                    clearEbookSubmitLoading(btn, "送出");
+                    clearEbookSubmitLoading(btn, submitLabel);
                     if (failureCallback) failureCallback(res);
                     return;
                 }
@@ -11431,13 +11722,13 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 if (!contentOverride) {
                     var el = document.getElementById(inputId);
                     if (el) el.value = "";
-                    clearEbookSubmitLoading(btn, "送出");
+                    clearEbookSubmitLoading(btn, submitLabel);
                     alert("已送出！");
                 }
                 if (callback) callback();
             }).withFailureHandler(function (e) {
                 swalAlert("送出失敗", friendlySubmitError(e), 'warning');
-                clearEbookSubmitLoading(btn, "送出");
+                clearEbookSubmitLoading(btn, submitLabel);
                 if (failureCallback) failureCallback(e);
             }).submitFeedback(form);
         }
@@ -12077,11 +12368,39 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }
         }
 
-        function buildAdminReplyBox(contextKey) {
-            return "<div class='admin-reply-box'>" +
-                "<div class='admin-reply-title'>老師回覆</div>" +
+        function buildStudentThreadReplyBox(contextKey) {
+            var context = studentFeedbackComposerContexts[contextKey] || {};
+            var targetDate = context.targetDate || "";
+            return "<div class='feedback-thread-composer'>" +
+                "<div class='feedback-thread-composer-title'>回覆這則留言</div>" +
+                "<div class='input-box'><div class='feedback-composer-main feedback-thread-composer-main'>" +
+                "<input type='text' class='fb-input' id='input-" + contextKey + "' oninput=\"updateStudentFeedbackDraftText('" + contextKey + "', this.value)\" placeholder='在這則留言下回覆老師...'>" +
+                "<label class='feedback-attachment-picker' title='加入照片或檔案' aria-label='加入照片或檔案'>📎<input type='file' multiple onchange=\"stageStudentFeedbackAttachments(this, '" + contextKey + "', '" + escapeInlineJs(targetDate) + "')\"></label>" +
+                "<button type='button' class='fb-btn' id='feedback-send-" + contextKey + "' onclick=\"sendStudentFeedbackWithAttachments('" + contextKey + "', '" + escapeInlineJs(targetDate) + "')\">回覆</button>" +
+                "</div><div id='feedback-attachments-" + contextKey + "' class='feedback-attachment-list'></div>" +
+                "<div id='feedback-attachment-status-" + contextKey + "' class='feedback-attachment-status'></div></div></div>";
+        }
+
+        function toggleEbookFeedbackThreadReplies(domKey) {
+            var context = ebookFeedbackThreadDomContext[domKey];
+            if (!context) return;
+            var replies = document.getElementById('feedback-thread-replies-' + domKey);
+            var button = document.getElementById('feedback-thread-toggle-' + domKey);
+            if (!replies || !button) return;
+            var expanded = replies.hasAttribute('hidden');
+            if (expanded) replies.removeAttribute('hidden');
+            else replies.setAttribute('hidden', '');
+            ebookExpandedFeedbackThreads[context.threadId] = expanded;
+            button.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+            button.innerText = expanded ? '收合回覆' : ('查看 ' + context.replyCount + ' 則回覆');
+        }
+
+        function buildAdminReplyBox(contextKey, options) {
+            options = options || {};
+            return "<div class='admin-reply-box" + (options.threadComposer ? " feedback-thread-composer" : "") + "'>" +
+                "<div class='admin-reply-title'>" + escapeAdminHtml(options.title || "老師回覆") + "</div>" +
                 "<div class='admin-reply-row'>" +
-                "<input type='text' id='admin-reply-input-" + contextKey + "' placeholder='以老師身分回覆這則留言'>" +
+                "<input type='text' id='admin-reply-input-" + contextKey + "' placeholder='" + escapeAdminHtml(options.placeholder || "以老師身分回覆這則留言") + "'>" +
                 "<label class='feedback-attachment-picker' title='加入答案或附件' aria-label='加入答案或附件'>📎<input type='file' multiple onchange=\"stageAdminModeReplyAttachments(this, '" + contextKey + "')\"></label>" +
                 "<button type='button' id='admin-reply-send-" + contextKey + "' onclick=\"sendAdminModeReply('" + contextKey + "')\">回覆</button>" +
                 "<div id='admin-reply-attachments-" + contextKey + "' class='feedback-attachment-list'></div>" +

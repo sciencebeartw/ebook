@@ -123,6 +123,11 @@ const maliciousKey = `fb');globalThis.${MARKER}=5;//`;
 const maliciousTime = `2026/07/11 16:18');globalThis.${MARKER}=6;//`;
 check(!html.includes("statusDiv.innerHTML = SVG.hourglass + ' 正在上傳：' + file.name"), 'local upload filenames must not be concatenated into innerHTML');
 check(html.includes("document.createTextNode(' 正在上傳：' + file.name + '...')"), 'local upload filenames must be rendered through a text node');
+check(
+  html.includes('withBr = withBr.replace(/\\[quote(?::([^\\]]+))?\\](.*?)\\[\\/quote\\]/gi') &&
+    html.includes('type = type || "留言";'),
+  'daily feedback rendering must safely recognize both typed and untyped legacy quote blocks'
+);
 const stickerFeedback = {
   fbKey: maliciousKey,
   type: '棒卡申請',
