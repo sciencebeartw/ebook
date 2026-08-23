@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Deploy marker: ebook-bulletin-popup-tones-and-date-visibility-20260823 -->
+<!-- Deploy marker: ebook-bulletin-queue-permanent-required-until-v4-20260823 -->
 <html>
 
 <head>
@@ -6039,6 +6039,7 @@
                 btnUrl: b.btnUrl || "",
                 reserveTime: b.reserveTime || "",
                 expiresAt: b.expiresAt || "",
+                displayOptions: b.displayOptions || null,
                 sourceClassKey: options.classKey || "",
                 sourceClassName: options.className || b.className || "",
                 isHistoricalPromotionBulletin: options.historical === true,
@@ -6687,6 +6688,7 @@
                 <div class="emergency-footer">
                     <button type="button" class="emergency-btn" id="popupCloseButton" onclick="closeEmergencyModal()">知道了，關閉公告</button>
                     <button type="button" class="emergency-btn emergency-btn-secondary" id="popupDismissButton" onclick="dismissActivePopupAnnouncement()" hidden>看過了，本裝置不再提醒</button>
+                    <div class="emergency-expiry-notice" id="emergencyReminderRule" role="note" aria-label="彈窗提醒規則" hidden></div>
                     <div class="emergency-expiry-notice" role="note" aria-label="公告顯示期限">
                         <span class="emergency-expiry-label">公告顯示期限</span>
                         <span class="emergency-expiry-text" id="emergencyExpiresAt"></span>
@@ -7377,8 +7379,9 @@
         };
 
         var gData = null, gPass = "", isAdminMode = false, currentEditingPost = null, currentPostMode = "create", currentFocusInput = null;
-        var emergencyShownIdentityForCurrentEntry = '';
         var activeEmergencyAnnouncement = null;
+        var popupAnnouncementQueue = [];
+        var popupShownIdentitiesForCurrentEntry = {};
         var currentEditingBulletin = null;
         var activeRealtimeListeners = [];
         var EBOOK_BACKGROUND_RTDB_PAUSE_MS = 5 * 60 * 1000;
@@ -7977,7 +7980,9 @@
                         btnUrl: sanitizeDashboardDraftPreviewText(bulletin.btnUrl),
                         reserveTime: sanitizeDashboardDraftPreviewText(bulletin.reserveTime),
                         expiresAt: sanitizeDashboardDraftPreviewText(bulletin.expiresAt),
-                        displayOptions: sanitizeDashboardDraftPreviewText(bulletin.displayOptions)
+                        displayOptions: bulletin.displayOptions && typeof bulletin.displayOptions === 'object'
+                            ? JSON.stringify(bulletin.displayOptions)
+                            : sanitizeDashboardDraftPreviewText(bulletin.displayOptions)
                     };
                 })
             };
@@ -8021,6 +8026,7 @@
             pendingEntryNoticeReady = false;
             pendingEntryReminderHandled = false;
             pendingReminderShownSessionIdentity = '';
+            resetPopupQueueForEntry();
             document.body.classList.add('draft-preview-mode');
             document.getElementById('full-loader').style.display = 'none';
             document.getElementById('login-screen').style.display = 'none';
@@ -8413,8 +8419,7 @@
             if (result.pendingPolicy === undefined) result.pendingPolicy = activeSession.pendingPolicy || null;
             gData = result;
             activeEbookPromotionContext = result.promotionContext || null;
-            emergencyShownIdentityForCurrentEntry = '';
-            activeEmergencyAnnouncement = null;
+            resetPopupQueueForEntry();
             pendingTasksState = { status: 'unavailable', items: [] };
             pendingEntryNoticeReady = false;
             pendingEntryReminderHandled = false;
@@ -9185,6 +9190,7 @@
             pendingEntryNoticeReady = false;
             pendingEntryReminderHandled = false;
             pendingReminderShownSessionIdentity = '';
+            resetPopupQueueForEntry();
             document.getElementById('sName').value = ""; document.getElementById('sPass').value = ""; document.getElementById('loginMsg').innerText = "";
             document.getElementById('tab-content-0').innerHTML = ""; document.getElementById('tab-content-1').innerHTML = ""; document.getElementById('tab-content-2').innerHTML = ""; document.getElementById('tab-content-3').innerHTML = "";
             document.getElementById('main-screen').style.display = 'none'; document.getElementById('admin-screen').style.display = 'none';
@@ -12278,6 +12284,9 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var hasMarquee = Object.prototype.hasOwnProperty.call(options, 'marquee');
             var hasPopupTone = Object.prototype.hasOwnProperty.call(options, 'popupTone');
             var hasShowDate = Object.prototype.hasOwnProperty.call(options, 'showDate');
+            var hasShowPopupExpiry = Object.prototype.hasOwnProperty.call(options, 'showPopupExpiry');
+            var hasPopupDismissMode = Object.prototype.hasOwnProperty.call(options, 'popupDismissMode');
+            var hasPopupDismissibleAfter = Object.prototype.hasOwnProperty.call(options, 'popupDismissibleAfter');
             var popupEnabled = hasPopup ? options.popup === true : bulletin.type === '緊急';
             // 舊版所有彈窗均為紅色且每次進入提醒；缺少 popupTone 時維持既有安全語意。
             var legacyPopupFallback = bulletin.type === '緊急' || (hasPopup && popupEnabled) ? 'urgent' : 'info';
@@ -12286,9 +12295,12 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 popup: popupEnabled,
                 popupTone: normalizeBulletinPopupTone(options.popupTone, legacyPopupFallback),
                 showDate: hasShowDate ? options.showDate !== false : true,
+                showPopupExpiry: hasShowPopupExpiry ? options.showPopupExpiry !== false : true,
+                popupDismissMode: options.popupDismissMode === 'required-until' ? 'required-until' : 'dismissible',
+                popupDismissibleAfter: (options.popupDismissibleAfter || '').toString().trim(),
                 marquee: hasMarquee ? options.marquee === true : bulletin.type === '跑馬燈',
                 marqueeColor: normalizeBulletinMarqueeColor(options.marqueeColor),
-                isExplicit: hasBulletin || hasPopup || hasMarquee || hasPopupTone || hasShowDate || Object.prototype.hasOwnProperty.call(options, 'marqueeColor')
+                isExplicit: hasBulletin || hasPopup || hasMarquee || hasPopupTone || hasShowDate || hasShowPopupExpiry || hasPopupDismissMode || hasPopupDismissibleAfter || Object.prototype.hasOwnProperty.call(options, 'marqueeColor')
             };
         }
 
@@ -12390,17 +12402,29 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         function buildPopupDismissKey(announcement) {
             var popup = announcement || {};
             var channels = getBulletinDisplayChannels(popup);
-            return [
+            var keyParts = [
                 'ebookPopupDismissedV1',
                 buildEmergencyIdentity(popup),
                 encodeURIComponent((popup.expiresAt || '').toString()),
                 encodeURIComponent(channels.popupTone || 'info')
-            ].join(':');
+            ];
+            // 未設定新規則的舊公告沿用原 key，避免已略過的彈窗在升級後無故重現。
+            if (channels.popupDismissibleAfter) keyParts.push(encodeURIComponent(channels.popupDismissibleAfter));
+            return keyParts.join(':');
+        }
+
+        function isPopupDismissibleNow(announcement, now) {
+            var channels = getBulletinDisplayChannels(announcement || {});
+            if (channels.popupTone === 'urgent') return false;
+            if (channels.popupDismissMode !== 'required-until' || !channels.popupDismissibleAfter) return true;
+            var dismissibleAfter = parseLocalDateTimeValue(channels.popupDismissibleAfter);
+            if (!dismissibleAfter) return true;
+            return dismissibleAfter.getTime() <= (now instanceof Date ? now : new Date()).getTime();
         }
 
         function isPopupDismissedOnThisDevice(announcement) {
             var popup = announcement || {};
-            if (isDashboardDraftPreviewMode || getBulletinDisplayChannels(popup).popupTone === 'urgent') return false;
+            if (isDashboardDraftPreviewMode || !isPopupDismissibleNow(popup)) return false;
             try {
                 return localStorage.getItem(buildPopupDismissKey(popup)) === 'dismissed';
             } catch (error) {
@@ -12410,8 +12434,24 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
 
         function formatEmergencyExpiryText(value) {
             var raw = (value || '').toString().trim();
-            if (!raw) return '本公告未設定有效期限';
+            if (!raw) return '本公告永久有效';
             return '本公告有效至 ' + raw.replace(/^(\d{4})-(\d{1,2})-(\d{1,2})/, '$1/$2/$3');
+        }
+
+        function formatPopupDismissRuleText(announcement) {
+            var channels = getBulletinDisplayChannels(announcement || {});
+            if (channels.popupTone === 'urgent') return '此為重要通知，每次登入都會顯示。';
+            if (channels.popupDismissMode !== 'required-until' || !channels.popupDismissibleAfter) return '';
+            var formatted = channels.popupDismissibleAfter.replace(/^(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})/, '$1/$2/$3 $4:$5');
+            return isPopupDismissibleNow(announcement)
+                ? '已到可略過時間；可選擇本裝置不再提醒。'
+                : '將於 ' + formatted + ' 前每次登入顯示，之後才可略過。';
+        }
+
+        function resetPopupQueueForEntry() {
+            popupAnnouncementQueue = [];
+            popupShownIdentitiesForCurrentEntry = {};
+            activeEmergencyAnnouncement = null;
         }
 
         function hideEmergencyModal() {
@@ -12420,57 +12460,84 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             activeEmergencyAnnouncement = null;
         }
 
-        function checkEmergency(list) {
+        function showNextPopupAnnouncement() {
             var modal = document.getElementById('emergencyModal');
+            if (activeEmergencyAnnouncement) return true;
+            var emergency = popupAnnouncementQueue.shift();
+            if (!emergency) {
+                hideEmergencyModal();
+                if (pendingEntryNoticeReady) maybeShowPendingEntryReminder();
+                return false;
+            }
+            var popupTone = getBulletinDisplayChannels(emergency).popupTone;
+            popupShownIdentitiesForCurrentEntry[buildEmergencyIdentity(emergency)] = true;
+            activeEmergencyAnnouncement = emergency;
+            var emergencyTitle = document.getElementById('emergencyTitle');
+            var popupTitleIcon = popupTone === 'urgent' ? '⚠️' : (popupTone === 'notice' ? '🔔' : 'ℹ️');
+            var popupFallbackTitle = popupTone === 'urgent' ? '重要通知' : (popupTone === 'notice' ? '注意通知' : '溫馨提醒');
+            if (emergencyTitle) emergencyTitle.textContent = popupTitleIcon + ' ' + ((emergency.title || popupFallbackTitle).toString().trim() || popupFallbackTitle);
+            document.getElementById('emergencyContent').innerHTML = parseBtn(emergency.content);
+            var displayChannels = getBulletinDisplayChannels(emergency);
+            var expiryLabel = document.getElementById('emergencyExpiresAt');
+            if (expiryLabel) {
+                expiryLabel.hidden = displayChannels.showPopupExpiry === false;
+                expiryLabel.textContent = displayChannels.showPopupExpiry === false ? '' : formatEmergencyExpiryText(emergency.expiresAt);
+            }
+            var hasNextPopup = popupAnnouncementQueue.length > 0;
+            var dismissibleNow = isPopupDismissibleNow(emergency);
+            var closeButton = document.getElementById('popupCloseButton');
+            if (closeButton) {
+                closeButton.textContent = popupTone === 'urgent'
+                    ? (hasNextPopup ? '知道了，查看下一則' : '知道了，關閉公告')
+                    : (dismissibleNow
+                        ? (hasNextPopup ? '這次先關閉，查看下一則' : '這次先關閉')
+                        : (hasNextPopup ? '知道了，查看下一則' : '知道了，下次登入仍會提醒'));
+            }
+            var dismissButton = document.getElementById('popupDismissButton');
+            if (dismissButton) dismissButton.hidden = !dismissibleNow;
+            var reminderRule = document.getElementById('emergencyReminderRule');
+            if (reminderRule) {
+                reminderRule.textContent = formatPopupDismissRuleText(emergency);
+                reminderRule.hidden = !reminderRule.textContent;
+            }
+            if (modal) {
+                modal.dataset.popupTone = popupTone;
+                modal.style.display = 'flex';
+            }
+            return true;
+        }
+
+        function checkEmergency(list) {
             var activeList = isDashboardDraftPreviewMode ? (list || []) : (list || []).filter(function(b) { return isBulletinEffective(b); });
-            if (activeList.length === 0) {
-                hideEmergencyModal();
-                if (pendingEntryNoticeReady) maybeShowPendingEntryReminder();
-                return false;
-            }
-            var popupCandidates = activeList.filter(function(b) { return getBulletinDisplayChannels(b).popup; });
-            var emergency = popupCandidates.find(function(b) {
-                return getBulletinDisplayChannels(b).popupTone === 'urgent';
-            }) || popupCandidates.find(function(b) {
-                return !isPopupDismissedOnThisDevice(b);
+            var queuedIdentities = {};
+            popupAnnouncementQueue.forEach(function(b) { queuedIdentities[buildEmergencyIdentity(b)] = true; });
+            var activeIdentity = activeEmergencyAnnouncement ? buildEmergencyIdentity(activeEmergencyAnnouncement) : '';
+            var popupCandidates = activeList.filter(function(b) {
+                return getBulletinDisplayChannels(b).popup && !isPopupDismissedOnThisDevice(b);
             });
-            if (emergency) {
-                var popupTone = getBulletinDisplayChannels(emergency).popupTone;
-                var emergencyIdentity = buildEmergencyIdentity(emergency);
-                if (emergencyShownIdentityForCurrentEntry === emergencyIdentity) return !!activeEmergencyAnnouncement;
-                emergencyShownIdentityForCurrentEntry = emergencyIdentity;
-                activeEmergencyAnnouncement = emergency;
-                var emergencyTitle = document.getElementById('emergencyTitle');
-                var popupTitleIcon = popupTone === 'urgent' ? '⚠️' : (popupTone === 'notice' ? '🔔' : 'ℹ️');
-                var popupFallbackTitle = popupTone === 'urgent' ? '重要通知' : (popupTone === 'notice' ? '注意通知' : '溫馨提醒');
-                if (emergencyTitle) emergencyTitle.textContent = popupTitleIcon + ' ' + ((emergency.title || popupFallbackTitle).toString().trim() || popupFallbackTitle);
-                document.getElementById('emergencyContent').innerHTML = parseBtn(emergency.content);
-                var expiryLabel = document.getElementById('emergencyExpiresAt');
-                if (expiryLabel) expiryLabel.textContent = formatEmergencyExpiryText(emergency.expiresAt);
-                var closeButton = document.getElementById('popupCloseButton');
-                if (closeButton) closeButton.textContent = popupTone === 'urgent' ? '知道了，關閉公告' : '這次先關閉';
-                var dismissButton = document.getElementById('popupDismissButton');
-                if (dismissButton) dismissButton.hidden = popupTone === 'urgent';
-                if (modal) {
-                    modal.dataset.popupTone = popupTone;
-                    modal.style.display = 'flex';
-                }
-                return true;
-            } else {
-                hideEmergencyModal();
-                if (pendingEntryNoticeReady) maybeShowPendingEntryReminder();
-                return false;
-            }
+            popupCandidates.sort(function(a, b) {
+                var aUrgent = getBulletinDisplayChannels(a).popupTone === 'urgent' ? 1 : 0;
+                var bUrgent = getBulletinDisplayChannels(b).popupTone === 'urgent' ? 1 : 0;
+                if (aUrgent !== bUrgent) return bUrgent - aUrgent;
+                return (b.time || '').localeCompare(a.time || '');
+            });
+            popupCandidates.forEach(function(candidate) {
+                var identity = buildEmergencyIdentity(candidate);
+                if (identity === activeIdentity || queuedIdentities[identity] || popupShownIdentitiesForCurrentEntry[identity]) return;
+                queuedIdentities[identity] = true;
+                popupAnnouncementQueue.push(candidate);
+            });
+            return showNextPopupAnnouncement();
         }
 
         function closeEmergencyModal() {
             hideEmergencyModal();
-            maybeShowPendingEntryReminder();
+            showNextPopupAnnouncement();
         }
 
         function dismissActivePopupAnnouncement() {
             var popup = activeEmergencyAnnouncement;
-            if (popup && getBulletinDisplayChannels(popup).popupTone !== 'urgent' && !isDashboardDraftPreviewMode) {
+            if (popup && isPopupDismissibleNow(popup) && !isDashboardDraftPreviewMode) {
                 try {
                     localStorage.setItem(buildPopupDismissKey(popup), 'dismissed');
                 } catch (error) {
@@ -12478,7 +12545,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 }
             }
             hideEmergencyModal();
-            maybeShowPendingEntryReminder();
+            showNextPopupAnnouncement();
         }
 
         var currentMakeupExamData = null;

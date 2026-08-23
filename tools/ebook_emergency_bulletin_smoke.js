@@ -95,6 +95,7 @@ const elements = {
   emergencyTitle: { textContent: '' },
   emergencyContent: { innerHTML: '' },
   emergencyExpiresAt: { textContent: '' },
+  emergencyReminderRule: { textContent: '', hidden: true },
   popupCloseButton: { textContent: '' },
   popupDismissButton: { hidden: true },
 };
@@ -105,8 +106,9 @@ const context = {
   gData: { className: '115國一自然超前班', studentName: '學生甲' },
   isDashboardDraftPreviewMode: false,
   pendingEntryNoticeReady: false,
-  emergencyShownIdentityForCurrentEntry: '',
   activeEmergencyAnnouncement: null,
+  popupAnnouncementQueue: [],
+  popupShownIdentitiesForCurrentEntry: {},
   maybeShowPendingEntryReminder() { pendingReminderAttempts += 1; },
   localStorage: {
     getItem(key) { return storage.has(key) ? storage.get(key) : null; },
@@ -127,9 +129,13 @@ vm.createContext(context);
   'getBulletinDisplayChannels',
   'buildEmergencyIdentity',
   'buildPopupDismissKey',
+  'isPopupDismissibleNow',
   'isPopupDismissedOnThisDevice',
   'formatEmergencyExpiryText',
+  'formatPopupDismissRuleText',
+  'resetPopupQueueForEntry',
   'hideEmergencyModal',
+  'showNextPopupAnnouncement',
   'checkEmergency',
   'closeEmergencyModal',
   'dismissActivePopupAnnouncement',
@@ -154,6 +160,7 @@ assert.equal(elements.popupCloseButton.textContent, '知道了，關閉公告');
 assert.equal(elements.popupDismissButton.hidden, true, 'urgent popup must never offer a persistent dismissal');
 assert.equal(elements.emergencyExpiresAt.textContent, '本公告有效至 2099/07/18 14:00');
 
+context.pendingEntryNoticeReady = true;
 context.closeEmergencyModal();
 assert.equal(elements.emergencyModal.style.display, 'none');
 assert.equal(pendingReminderAttempts, 1, 'pending reminder may continue only after the emergency closes');
@@ -162,34 +169,34 @@ assert.equal(storage.size, 0, 'the default close action must not persist a dismi
 context.checkEmergency([emergency]);
 assert.equal(elements.emergencyModal.style.display, 'none', 'the same live app entry must not immediately reopen the popup');
 
-context.emergencyShownIdentityForCurrentEntry = '';
+context.resetPopupQueueForEntry();
 context.checkEmergency([emergency]);
 assert.equal(elements.emergencyModal.style.display, 'flex', 'the next entry must always remind again');
 context.closeEmergencyModal();
 
 const firstStudentKey = context.buildEmergencyIdentity(emergency);
 storage.set(firstStudentKey, JSON.stringify({ dismissed: true, expiresAt: emergency.expiresAt }));
-context.emergencyShownIdentityForCurrentEntry = '';
+context.resetPopupQueueForEntry();
 context.checkEmergency([emergency]);
 assert.equal(elements.emergencyModal.style.display, 'flex', 'legacy dismissal records must no longer suppress the popup');
 context.closeEmergencyModal();
 
 context.gData = { className: '115國一自然超前班', studentName: '學生乙' };
-context.emergencyShownIdentityForCurrentEntry = '';
+context.resetPopupQueueForEntry();
 context.checkEmergency([emergency]);
 assert.equal(elements.emergencyModal.style.display, 'flex', 'a different student on the same browser must still see the notice');
 assert.notEqual(context.buildEmergencyIdentity(emergency), firstStudentKey, 'entry identities must differ by student');
 context.closeEmergencyModal();
 
 context.gData = { className: '115國一自然超前班', studentName: '學生甲' };
-context.emergencyShownIdentityForCurrentEntry = '';
+context.resetPopupQueueForEntry();
 const extendedEmergency = Object.assign({}, emergency, { expiresAt: '2099-07-19 14:00' });
 context.checkEmergency([extendedEmergency]);
 assert.equal(elements.emergencyModal.style.display, 'flex', 'an updated announcement must still display');
 context.closeEmergencyModal();
 
 context.isDashboardDraftPreviewMode = true;
-context.emergencyShownIdentityForCurrentEntry = '';
+context.resetPopupQueueForEntry();
 context.checkEmergency([emergency]);
 assert.equal(elements.emergencyModal.style.display, 'flex', 'Dashboard draft preview must always show the emergency popup');
 context.closeEmergencyModal();
@@ -208,7 +215,7 @@ const ordinary = {
   displayOptions: { version: 2, bulletin: true, popup: true, popupTone: 'notice', marquee: true, marqueeColor: 'amber' },
 };
 
-context.emergencyShownIdentityForCurrentEntry = '';
+context.resetPopupQueueForEntry();
 context.checkEmergency([ordinary]);
 assert.equal(elements.emergencyModal.style.display, 'flex', 'an undismissed normal popup must open on entry');
 assert.equal(elements.emergencyTitle.textContent, '🔔 下課接送提醒');
@@ -216,23 +223,72 @@ assert.equal(elements.emergencyModal.dataset.popupTone, 'notice');
 assert.equal(elements.popupCloseButton.textContent, '這次先關閉');
 assert.equal(elements.popupDismissButton.hidden, false, 'normal popup must offer the device-only dismissal');
 
+const forcedRoutine = Object.assign({}, ordinary, {
+  id: 'bulletin-normal-required',
+  time: '2026/08/23 09:30',
+  displayOptions: { version: 4, bulletin: true, popup: true, popupTone: 'notice', popupDismissMode: 'required-until', popupDismissibleAfter: '2099-08-30 12:00', marquee: false, marqueeColor: 'amber' },
+});
+context.resetPopupQueueForEntry();
+context.checkEmergency([forcedRoutine]);
+assert.equal(elements.popupDismissButton.hidden, true, 'a routine popup must not be dismissible before its configured cutoff');
+assert.equal(elements.popupCloseButton.textContent, '知道了，下次登入仍會提醒');
+assert.match(elements.emergencyReminderRule.textContent, /前每次登入顯示，之後才可略過/);
+context.dismissActivePopupAnnouncement();
+assert.equal(storage.has(context.buildPopupDismissKey(forcedRoutine)), false, 'calling dismiss early must never persist a dismissal');
+context.resetPopupQueueForEntry();
+context.checkEmergency([forcedRoutine]);
+assert.equal(elements.emergencyModal.style.display, 'flex', 'the mandatory routine popup must return on the next entry');
+context.closeEmergencyModal();
+
+const elapsedRoutine = Object.assign({}, forcedRoutine, {
+  id: 'bulletin-normal-elapsed',
+  displayOptions: Object.assign({}, forcedRoutine.displayOptions, { popupDismissibleAfter: '2000-01-01 00:00' }),
+});
+context.resetPopupQueueForEntry();
+context.checkEmergency([elapsedRoutine]);
+assert.equal(elements.popupDismissButton.hidden, false, 'the device-only dismissal must appear after the configured cutoff');
+assert.match(elements.emergencyReminderRule.textContent, /已到可略過時間/);
+context.closeEmergencyModal();
+
 const beforeNormalCloseStorageSize = storage.size;
 context.closeEmergencyModal();
 assert.equal(storage.size, beforeNormalCloseStorageSize, 'closing only this entry must not persist a dismissal');
-context.emergencyShownIdentityForCurrentEntry = '';
+context.resetPopupQueueForEntry();
 context.checkEmergency([ordinary]);
 assert.equal(elements.emergencyModal.style.display, 'flex', 'normal popup must return on the next entry unless explicitly dismissed');
 
 context.dismissActivePopupAnnouncement();
 assert.equal(storage.get(context.buildPopupDismissKey(ordinary)), 'dismissed', 'normal dismissal must be scoped to this announcement and browser');
-context.emergencyShownIdentityForCurrentEntry = '';
+context.resetPopupQueueForEntry();
 context.checkEmergency([ordinary]);
 assert.equal(elements.emergencyModal.style.display, 'none', 'dismissed normal popup must stay hidden on this browser');
 
 context.gData = { className: '115國一自然超前班', studentName: '學生乙' };
-context.emergencyShownIdentityForCurrentEntry = '';
+context.resetPopupQueueForEntry();
 context.checkEmergency([ordinary]);
 assert.equal(elements.emergencyModal.style.display, 'flex', 'a different student on the same browser must still see the normal popup');
 context.closeEmergencyModal();
+
+const permanent = Object.assign({}, ordinary, {
+  id: 'bulletin-normal-2',
+  time: '2026/08/23 10:00',
+  title: '永久班規提醒',
+  expiresAt: '',
+  displayOptions: { version: 3, bulletin: true, popup: true, popupTone: 'info', showDate: true, showPopupExpiry: false, marquee: false, marqueeColor: 'blue' },
+});
+context.gData = { className: '115國一自然超前班', studentName: '學生丙' };
+context.resetPopupQueueForEntry();
+context.checkEmergency([ordinary, permanent]);
+assert.equal(elements.emergencyTitle.textContent, 'ℹ️ 永久班規提醒', 'the newest routine popup must appear first');
+assert.equal(elements.popupCloseButton.textContent, '這次先關閉，查看下一則', 'the first popup must explain that another notice follows');
+assert.equal(elements.emergencyExpiresAt.hidden, true, 'showPopupExpiry=false must hide popup expiry metadata independently of the card date');
+assert.equal(elements.emergencyExpiresAt.textContent, '', 'hidden popup expiry metadata must not remain in the accessibility tree');
+context.closeEmergencyModal();
+assert.equal(elements.emergencyTitle.textContent, '🔔 下課接送提醒', 'closing the first popup must advance to the next active popup');
+assert.equal(elements.emergencyModal.style.display, 'flex', 'the popup queue must stay open for the next active notice');
+assert.equal(elements.emergencyExpiresAt.hidden, false, 'a later popup may restore visible expiry metadata');
+context.closeEmergencyModal();
+assert.equal(elements.emergencyModal.style.display, 'none', 'the modal closes only after the popup queue is exhausted');
+assert.equal(context.formatEmergencyExpiryText(''), '本公告永久有效', 'an empty expiry must have an explicit permanent meaning');
 
 console.log('ebook emergency bulletin smoke passed');

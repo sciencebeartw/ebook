@@ -93,8 +93,9 @@ check(html.includes('schedulePendingTasksRecompute();'), 'existing realtime call
 
 const emergency = extractFunction('checkEmergency');
 const closeEmergency = extractFunction('closeEmergencyModal');
-check(emergency.includes('return true'), 'emergency check must report that the emergency modal has priority');
-check(closeEmergency.includes('maybeShowPendingEntryReminder'), 'pending reminder must wait until emergency is closed');
+const showNextEmergency = extractFunction('showNextPopupAnnouncement');
+check(emergency.includes('return showNextPopupAnnouncement()') && showNextEmergency.includes('return true'), 'emergency check must report that the popup queue has priority');
+check(closeEmergency.includes('showNextPopupAnnouncement'), 'pending reminder must wait until every queued popup is closed');
 const pendingReminder = extractFunction('maybeShowPendingEntryReminder');
 const pendingIdentity = extractFunction('getPendingReminderSessionIdentity');
 const pendingRender = extractFunction('renderPendingTasks');
