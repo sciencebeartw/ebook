@@ -135,6 +135,7 @@ vm.createContext(context);
   'buildPopupDismissKey',
   'isPopupDismissibleNow',
   'isPopupDismissedOnThisDevice',
+  'formatPopupDatetimeText',
   'formatEmergencyExpiryText',
   'resetPopupQueueForEntry',
   'hideEmergencyModal',
@@ -234,7 +235,9 @@ const forcedRoutine = Object.assign({}, ordinary, {
 context.resetPopupQueueForEntry();
 context.checkEmergency([forcedRoutine]);
 assert.equal(elements.popupDismissButton.hidden, true, 'a routine popup must not be dismissible before its configured cutoff');
-assert.equal(elements.popupCloseButton.textContent, '知道了，下次登入仍會提醒');
+assert.equal(elements.popupCloseButton.textContent, '知道了，關閉公告', 'a mandatory routine popup must use the same concise close label as an urgent popup');
+assert.equal(elements.emergencyExpiresAt.textContent, '本公告有效至 2099/08/31 23:59，於 2099/08/30 12:00 後可略過',
+  'visible popup metadata must combine the announcement lifetime and the dismissal cutoff');
 context.dismissActivePopupAnnouncement();
 assert.equal(storage.has(context.buildPopupDismissKey(forcedRoutine)), false, 'calling dismiss early must never persist a dismissal');
 context.resetPopupQueueForEntry();
@@ -290,6 +293,28 @@ assert.equal(elements.emergencyModal.style.display, 'flex', 'the popup queue mus
 assert.equal(elements.emergencyExpiryNotice.hidden, false, 'a later popup may restore the complete expiry block');
 context.closeEmergencyModal();
 assert.equal(elements.emergencyModal.style.display, 'none', 'the modal closes only after the popup queue is exhausted');
-assert.equal(context.formatEmergencyExpiryText(''), '本公告永久有效', 'an empty expiry must have an explicit permanent meaning');
+assert.equal(context.formatEmergencyExpiryText({ expiresAt: '' }), '本公告永久有效', 'an empty expiry must have an explicit permanent meaning');
+assert.equal(context.formatEmergencyExpiryText({
+  expiresAt: '',
+  type: '一般',
+  displayOptions: { version: 4, popup: true, popupTone: 'notice', popupDismissMode: 'required-until', popupDismissibleAfter: '2026-08-30 12:00' },
+}), '本公告永久有效，於 2026/08/30 12:00 後可略過',
+  'a permanent routine announcement must tell families when its reminder can be skipped');
+assert.equal(context.formatEmergencyExpiryText(Object.assign({}, emergency, {
+  displayOptions: { version: 4, popup: true, popupTone: 'urgent', popupDismissMode: 'required-until', popupDismissibleAfter: '2099-07-17 14:00' },
+})), '本公告有效至 2099/07/18 14:00',
+  'urgent announcements must show only their effective lifetime');
+
+context.resetPopupQueueForEntry();
+context.checkEmergency([
+  Object.assign({}, forcedRoutine, { id: 'mandatory-older', time: '2099/08/23 09:00' }),
+  Object.assign({}, emergency, { id: 'urgent-newer', time: '2099/08/23 10:00' }),
+]);
+assert.equal(elements.popupCloseButton.textContent, '知道了，顯示下一則',
+  'a non-dismissible popup with another queued announcement must use the concise next label');
+context.closeEmergencyModal();
+assert.equal(elements.popupCloseButton.textContent, '知道了，關閉公告',
+  'the final non-dismissible popup must return to the concise close label');
+context.closeEmergencyModal();
 
 console.log('ebook emergency bulletin smoke passed');

@@ -12432,10 +12432,19 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }
         }
 
-        function formatEmergencyExpiryText(value) {
-            var raw = (value || '').toString().trim();
-            if (!raw) return '本公告永久有效';
-            return '本公告有效至 ' + raw.replace(/^(\d{4})-(\d{1,2})-(\d{1,2})/, '$1/$2/$3');
+        function formatPopupDatetimeText(value) {
+            return (value || '').toString().trim().replace(/^(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})/, '$1/$2/$3 $4:$5');
+        }
+
+        function formatEmergencyExpiryText(announcement) {
+            var popup = announcement || {};
+            var rawExpiry = (popup.expiresAt || '').toString().trim();
+            var text = rawExpiry ? ('本公告有效至 ' + formatPopupDatetimeText(rawExpiry)) : '本公告永久有效';
+            var channels = getBulletinDisplayChannels(popup);
+            if (channels.popupTone !== 'urgent' && channels.popupDismissMode === 'required-until' && channels.popupDismissibleAfter) {
+                text += '，於 ' + formatPopupDatetimeText(channels.popupDismissibleAfter) + ' 後可略過';
+            }
+            return text;
         }
 
         function resetPopupQueueForEntry() {
@@ -12472,16 +12481,14 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var expiryLabel = document.getElementById('emergencyExpiresAt');
             var showPopupExpiry = displayChannels.showPopupExpiry !== false;
             if (expiryNotice) expiryNotice.hidden = !showPopupExpiry;
-            if (expiryLabel) expiryLabel.textContent = showPopupExpiry ? formatEmergencyExpiryText(emergency.expiresAt) : '';
+            if (expiryLabel) expiryLabel.textContent = showPopupExpiry ? formatEmergencyExpiryText(emergency) : '';
             var hasNextPopup = popupAnnouncementQueue.length > 0;
             var dismissibleNow = isPopupDismissibleNow(emergency);
             var closeButton = document.getElementById('popupCloseButton');
             if (closeButton) {
-                closeButton.textContent = popupTone === 'urgent'
-                    ? (hasNextPopup ? '知道了，查看下一則' : '知道了，關閉公告')
-                    : (dismissibleNow
-                        ? (hasNextPopup ? '這次先關閉，查看下一則' : '這次先關閉')
-                        : (hasNextPopup ? '知道了，查看下一則' : '知道了，下次登入仍會提醒'));
+                closeButton.textContent = !dismissibleNow
+                    ? (hasNextPopup ? '知道了，顯示下一則' : '知道了，關閉公告')
+                    : (hasNextPopup ? '這次先關閉，查看下一則' : '這次先關閉');
             }
             var dismissButton = document.getElementById('popupDismissButton');
             if (dismissButton) dismissButton.hidden = !dismissibleNow;
