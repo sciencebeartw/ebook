@@ -260,6 +260,7 @@ const stickyContainer = { innerHTML: '' };
 const stickySandbox = {
   SVG: { bulb: '💡' },
   BULLETIN_MARQUEE_COLOR_KEYS: ['blue', 'rose', 'amber', 'emerald', 'violet'],
+  BULLETIN_POPUP_TONE_KEYS: ['info', 'notice', 'urgent'],
   isDashboardDraftPreviewMode: false,
   document: {
     getElementById(id) { return id === 'sticky-notice-container' ? stickyContainer : null; },
@@ -274,6 +275,7 @@ vm.createContext(stickySandbox);
 [
   'parseBulletinDisplayOptions',
   'normalizeBulletinMarqueeColor',
+  'normalizeBulletinPopupTone',
   'getBulletinDisplayChannels',
   'renderStickyNotice',
 ].forEach(name => vm.runInContext(extractFunction(name), stickySandbox));

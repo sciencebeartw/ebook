@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Deploy marker: ebook-pending-report-edit-and-compact-tools-20260823 -->
+<!-- Deploy marker: ebook-bulletin-popup-tones-and-date-visibility-20260823 -->
 <html>
 
 <head>
@@ -4206,8 +4206,14 @@
             padding-bottom: 20px;
         }
 
-        /* 緊急彈窗樣式 - Modern */
+        /* 公告彈窗：藍／黃可略過，紅色重要通知每次進入提醒 */
         .emergency-modal {
+            --popup-accent: #dc2626;
+            --popup-accent-light: #ef4444;
+            --popup-accent-soft: #fecaca;
+            --popup-accent-pale: #fff7f7;
+            --popup-accent-dark: #991b1b;
+            --popup-shadow-rgb: 239, 68, 68;
             display: none;
             position: fixed;
             top: 0; left: 0;
@@ -4221,6 +4227,22 @@
             padding: 24px;
             box-sizing: border-box;
         }
+        .emergency-modal[data-popup-tone="info"] {
+            --popup-accent: #2563eb;
+            --popup-accent-light: #3b82f6;
+            --popup-accent-soft: #bfdbfe;
+            --popup-accent-pale: #eff6ff;
+            --popup-accent-dark: #1e40af;
+            --popup-shadow-rgb: 37, 99, 235;
+        }
+        .emergency-modal[data-popup-tone="notice"] {
+            --popup-accent: #d97706;
+            --popup-accent-light: #f59e0b;
+            --popup-accent-soft: #fde68a;
+            --popup-accent-pale: #fffbeb;
+            --popup-accent-dark: #92400e;
+            --popup-shadow-rgb: 217, 119, 6;
+        }
         .emergency-box {
             background: white;
             width: 100%;
@@ -4228,7 +4250,7 @@
             max-height: calc(100vh - 48px);
             border-radius: 24px;
             overflow: hidden;
-            border-top: 6px solid #ef4444;
+            border-top: 6px solid var(--popup-accent);
             box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
             animation: popIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             display: flex;
@@ -4242,7 +4264,7 @@
             background: white;
             padding: 28px 20px 10px;
             text-align: center;
-            color: #dc2626;
+            color: var(--popup-accent);
             font-weight: 900;
             font-size: 1.7rem;
         }
@@ -4264,7 +4286,7 @@
             flex-shrink: 0;
         }
         .emergency-btn {
-            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            background: linear-gradient(135deg, var(--popup-accent-light) 0%, var(--popup-accent) 100%);
             color: white;
             border: none;
             padding: 16px 30px;
@@ -4273,14 +4295,14 @@
             font-weight: 800;
             cursor: pointer;
             width: 100%;
-            box-shadow: 0 8px 20px rgba(239, 68, 68, 0.35);
+            box-shadow: 0 8px 20px rgba(var(--popup-shadow-rgb), 0.32);
             transition: all 0.2s;
             letter-spacing: 2px;
             min-height: 52px;
         }
         .emergency-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 12px 24px rgba(239, 68, 68, 0.5);
+            box-shadow: 0 12px 24px rgba(var(--popup-shadow-rgb), 0.44);
         }
         .emergency-btn:disabled {
             opacity: 0.55;
@@ -4288,10 +4310,20 @@
             transform: none;
             box-shadow: none;
         }
+        .emergency-btn-secondary {
+            background: var(--popup-accent-pale);
+            color: var(--popup-accent-dark);
+            border: 2px solid var(--popup-accent-soft);
+            box-shadow: none;
+        }
+        .emergency-btn-secondary:hover {
+            box-shadow: 0 8px 18px rgba(var(--popup-shadow-rgb), 0.18);
+        }
+        .emergency-btn-secondary[hidden] { display: none; }
         .emergency-expiry-notice {
-            background: white;
-            color: #b91c1c;
-            border: 2px solid #fecaca;
+            background: var(--popup-accent-pale);
+            color: var(--popup-accent-dark);
+            border: 2px solid var(--popup-accent-soft);
             border-radius: 50px;
             box-shadow: none;
             letter-spacing: 0;
@@ -4312,7 +4344,7 @@
             line-height: 1.25;
         }
         .emergency-expiry-text {
-            color: #9a3412;
+            color: var(--popup-accent-dark);
             font-size: 0.78rem;
             font-weight: 700;
             line-height: 1.25;
@@ -6647,13 +6679,14 @@
             </div>
         </div>
 
-        <!-- 緊急彈窗 -->
+        <!-- 公告彈窗：一般／注意可略過，重要／緊急每次進入提醒 -->
         <div id="emergencyModal" class="emergency-modal" role="dialog" aria-modal="true" aria-labelledby="emergencyTitle" aria-describedby="emergencyContent emergencyExpiresAt">
             <div class="emergency-box">
                 <div class="emergency-header" id="emergencyTitle">⚠️ 緊急公告</div>
                 <div class="emergency-body" id="emergencyContent"></div>
                 <div class="emergency-footer">
-                    <button type="button" class="emergency-btn" onclick="closeEmergencyModal()">知道了，關閉公告</button>
+                    <button type="button" class="emergency-btn" id="popupCloseButton" onclick="closeEmergencyModal()">知道了，關閉公告</button>
+                    <button type="button" class="emergency-btn emergency-btn-secondary" id="popupDismissButton" onclick="dismissActivePopupAnnouncement()" hidden>看過了，本裝置不再提醒</button>
                     <div class="emergency-expiry-notice" role="note" aria-label="公告顯示期限">
                         <span class="emergency-expiry-label">公告顯示期限</span>
                         <span class="emergency-expiry-text" id="emergencyExpiresAt"></span>
@@ -12135,6 +12168,10 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 var displayLabel = historical
                     ? ("過往班級 · " + (b.sourceClassName || b.className || "原班級"))
                     : (b.label || b.type || "公告").toString().trim();
+                var bulletinDisplay = getBulletinDisplayChannels(b);
+                var bulletinDateHtml = bulletinDisplay.showDate
+                    ? `<div class="bulletin-date">${escapeHtml((b.time || '').substring(5, 16))}</div>`
+                    : "";
 
                 var btnHtml = "";
                 if (b.btnName && b.btnUrl) {
@@ -12145,7 +12182,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             <div class="${cardClass}">
                 <div class="bulletin-header">
                     <div><span class="bulletin-tag ${tagClass}">${escapeHtml(displayLabel)}</span><span class="bulletin-title">${escapeHtml(b.title)}</span></div>
-                    <div class="bulletin-date">${escapeHtml((b.time || '').substring(5, 16))}</div>
+                    ${bulletinDateHtml}
                 </div>
                 <div class="bulletin-content">${parseBtn(b.content)}</div>
                 ${btnHtml}
@@ -12209,6 +12246,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         }
 
         var BULLETIN_MARQUEE_COLOR_KEYS = ['blue', 'rose', 'amber', 'emerald', 'violet'];
+        var BULLETIN_POPUP_TONE_KEYS = ['info', 'notice', 'urgent'];
 
         function parseBulletinDisplayOptions(value) {
             if (!value) return {};
@@ -12226,18 +12264,31 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             return BULLETIN_MARQUEE_COLOR_KEYS.indexOf(key) > -1 ? key : 'blue';
         }
 
+        function normalizeBulletinPopupTone(value, fallback) {
+            var key = String(value || '').toLowerCase();
+            if (BULLETIN_POPUP_TONE_KEYS.indexOf(key) > -1) return key;
+            return fallback === 'urgent' ? 'urgent' : 'info';
+        }
+
         function getBulletinDisplayChannels(bulletin) {
             bulletin = bulletin || {};
             var options = parseBulletinDisplayOptions(bulletin.displayOptions);
             var hasBulletin = Object.prototype.hasOwnProperty.call(options, 'bulletin');
             var hasPopup = Object.prototype.hasOwnProperty.call(options, 'popup');
             var hasMarquee = Object.prototype.hasOwnProperty.call(options, 'marquee');
+            var hasPopupTone = Object.prototype.hasOwnProperty.call(options, 'popupTone');
+            var hasShowDate = Object.prototype.hasOwnProperty.call(options, 'showDate');
+            var popupEnabled = hasPopup ? options.popup === true : bulletin.type === '緊急';
+            // 舊版所有彈窗均為紅色且每次進入提醒；缺少 popupTone 時維持既有安全語意。
+            var legacyPopupFallback = bulletin.type === '緊急' || (hasPopup && popupEnabled) ? 'urgent' : 'info';
             return {
                 bulletin: hasBulletin ? options.bulletin === true : true,
-                popup: hasPopup ? options.popup === true : bulletin.type === '緊急',
+                popup: popupEnabled,
+                popupTone: normalizeBulletinPopupTone(options.popupTone, legacyPopupFallback),
+                showDate: hasShowDate ? options.showDate !== false : true,
                 marquee: hasMarquee ? options.marquee === true : bulletin.type === '跑馬燈',
                 marqueeColor: normalizeBulletinMarqueeColor(options.marqueeColor),
-                isExplicit: hasBulletin || hasPopup || hasMarquee || Object.prototype.hasOwnProperty.call(options, 'marqueeColor')
+                isExplicit: hasBulletin || hasPopup || hasMarquee || hasPopupTone || hasShowDate || Object.prototype.hasOwnProperty.call(options, 'marqueeColor')
             };
         }
 
@@ -12336,6 +12387,27 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }).join(':');
         }
 
+        function buildPopupDismissKey(announcement) {
+            var popup = announcement || {};
+            var channels = getBulletinDisplayChannels(popup);
+            return [
+                'ebookPopupDismissedV1',
+                buildEmergencyIdentity(popup),
+                encodeURIComponent((popup.expiresAt || '').toString()),
+                encodeURIComponent(channels.popupTone || 'info')
+            ].join(':');
+        }
+
+        function isPopupDismissedOnThisDevice(announcement) {
+            var popup = announcement || {};
+            if (isDashboardDraftPreviewMode || getBulletinDisplayChannels(popup).popupTone === 'urgent') return false;
+            try {
+                return localStorage.getItem(buildPopupDismissKey(popup)) === 'dismissed';
+            } catch (error) {
+                return false;
+            }
+        }
+
         function formatEmergencyExpiryText(value) {
             var raw = (value || '').toString().trim();
             if (!raw) return '本公告未設定有效期限';
@@ -12356,18 +12428,31 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 if (pendingEntryNoticeReady) maybeShowPendingEntryReminder();
                 return false;
             }
-            var emergency = activeList.find(function(b) { return getBulletinDisplayChannels(b).popup; });
+            var popupCandidates = activeList.filter(function(b) { return getBulletinDisplayChannels(b).popup; });
+            var emergency = popupCandidates.find(function(b) {
+                return getBulletinDisplayChannels(b).popupTone === 'urgent';
+            }) || popupCandidates.find(function(b) {
+                return !isPopupDismissedOnThisDevice(b);
+            });
             if (emergency) {
+                var popupTone = getBulletinDisplayChannels(emergency).popupTone;
                 var emergencyIdentity = buildEmergencyIdentity(emergency);
                 if (emergencyShownIdentityForCurrentEntry === emergencyIdentity) return !!activeEmergencyAnnouncement;
                 emergencyShownIdentityForCurrentEntry = emergencyIdentity;
                 activeEmergencyAnnouncement = emergency;
                 var emergencyTitle = document.getElementById('emergencyTitle');
-                if (emergencyTitle) emergencyTitle.textContent = '⚠️ ' + ((emergency.title || '緊急公告').toString().trim() || '緊急公告');
+                var popupTitleIcon = popupTone === 'urgent' ? '⚠️' : (popupTone === 'notice' ? '🔔' : 'ℹ️');
+                var popupFallbackTitle = popupTone === 'urgent' ? '重要通知' : (popupTone === 'notice' ? '注意通知' : '溫馨提醒');
+                if (emergencyTitle) emergencyTitle.textContent = popupTitleIcon + ' ' + ((emergency.title || popupFallbackTitle).toString().trim() || popupFallbackTitle);
                 document.getElementById('emergencyContent').innerHTML = parseBtn(emergency.content);
                 var expiryLabel = document.getElementById('emergencyExpiresAt');
                 if (expiryLabel) expiryLabel.textContent = formatEmergencyExpiryText(emergency.expiresAt);
+                var closeButton = document.getElementById('popupCloseButton');
+                if (closeButton) closeButton.textContent = popupTone === 'urgent' ? '知道了，關閉公告' : '這次先關閉';
+                var dismissButton = document.getElementById('popupDismissButton');
+                if (dismissButton) dismissButton.hidden = popupTone === 'urgent';
                 if (modal) {
+                    modal.dataset.popupTone = popupTone;
                     modal.style.display = 'flex';
                 }
                 return true;
@@ -12379,6 +12464,19 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         }
 
         function closeEmergencyModal() {
+            hideEmergencyModal();
+            maybeShowPendingEntryReminder();
+        }
+
+        function dismissActivePopupAnnouncement() {
+            var popup = activeEmergencyAnnouncement;
+            if (popup && getBulletinDisplayChannels(popup).popupTone !== 'urgent' && !isDashboardDraftPreviewMode) {
+                try {
+                    localStorage.setItem(buildPopupDismissKey(popup), 'dismissed');
+                } catch (error) {
+                    // Safari 私密瀏覽或儲存空間受限時，維持可關閉但下次仍提醒。
+                }
+            }
             hideEmergencyModal();
             maybeShowPendingEntryReminder();
         }
