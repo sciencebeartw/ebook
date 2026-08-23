@@ -4339,6 +4339,7 @@
             gap: 2px;
             cursor: default;
         }
+        .emergency-expiry-notice[hidden] { display: none; }
         .emergency-expiry-label {
             font-size: 0.98rem;
             line-height: 1.25;
@@ -6681,15 +6682,14 @@
         </div>
 
         <!-- 公告彈窗：一般／注意可略過，重要／緊急每次進入提醒 -->
-        <div id="emergencyModal" class="emergency-modal" role="dialog" aria-modal="true" aria-labelledby="emergencyTitle" aria-describedby="emergencyContent emergencyExpiresAt">
+        <div id="emergencyModal" class="emergency-modal" role="dialog" aria-modal="true" aria-labelledby="emergencyTitle" aria-describedby="emergencyContent">
             <div class="emergency-box">
                 <div class="emergency-header" id="emergencyTitle">⚠️ 緊急公告</div>
                 <div class="emergency-body" id="emergencyContent"></div>
                 <div class="emergency-footer">
                     <button type="button" class="emergency-btn" id="popupCloseButton" onclick="closeEmergencyModal()">知道了，關閉公告</button>
                     <button type="button" class="emergency-btn emergency-btn-secondary" id="popupDismissButton" onclick="dismissActivePopupAnnouncement()" hidden>看過了，本裝置不再提醒</button>
-                    <div class="emergency-expiry-notice" id="emergencyReminderRule" role="note" aria-label="彈窗提醒規則" hidden></div>
-                    <div class="emergency-expiry-notice" role="note" aria-label="公告顯示期限">
+                    <div class="emergency-expiry-notice" id="emergencyExpiryNotice" role="note" aria-label="公告顯示期限">
                         <span class="emergency-expiry-label">公告顯示期限</span>
                         <span class="emergency-expiry-text" id="emergencyExpiresAt"></span>
                     </div>
@@ -12438,16 +12438,6 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             return '本公告有效至 ' + raw.replace(/^(\d{4})-(\d{1,2})-(\d{1,2})/, '$1/$2/$3');
         }
 
-        function formatPopupDismissRuleText(announcement) {
-            var channels = getBulletinDisplayChannels(announcement || {});
-            if (channels.popupTone === 'urgent') return '此為重要通知，每次登入都會顯示。';
-            if (channels.popupDismissMode !== 'required-until' || !channels.popupDismissibleAfter) return '';
-            var formatted = channels.popupDismissibleAfter.replace(/^(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})/, '$1/$2/$3 $4:$5');
-            return isPopupDismissibleNow(announcement)
-                ? '已到可略過時間；可選擇本裝置不再提醒。'
-                : '將於 ' + formatted + ' 前每次登入顯示，之後才可略過。';
-        }
-
         function resetPopupQueueForEntry() {
             popupAnnouncementQueue = [];
             popupShownIdentitiesForCurrentEntry = {};
@@ -12478,11 +12468,11 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             if (emergencyTitle) emergencyTitle.textContent = popupTitleIcon + ' ' + ((emergency.title || popupFallbackTitle).toString().trim() || popupFallbackTitle);
             document.getElementById('emergencyContent').innerHTML = parseBtn(emergency.content);
             var displayChannels = getBulletinDisplayChannels(emergency);
+            var expiryNotice = document.getElementById('emergencyExpiryNotice');
             var expiryLabel = document.getElementById('emergencyExpiresAt');
-            if (expiryLabel) {
-                expiryLabel.hidden = displayChannels.showPopupExpiry === false;
-                expiryLabel.textContent = displayChannels.showPopupExpiry === false ? '' : formatEmergencyExpiryText(emergency.expiresAt);
-            }
+            var showPopupExpiry = displayChannels.showPopupExpiry !== false;
+            if (expiryNotice) expiryNotice.hidden = !showPopupExpiry;
+            if (expiryLabel) expiryLabel.textContent = showPopupExpiry ? formatEmergencyExpiryText(emergency.expiresAt) : '';
             var hasNextPopup = popupAnnouncementQueue.length > 0;
             var dismissibleNow = isPopupDismissibleNow(emergency);
             var closeButton = document.getElementById('popupCloseButton');
@@ -12495,11 +12485,6 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }
             var dismissButton = document.getElementById('popupDismissButton');
             if (dismissButton) dismissButton.hidden = !dismissibleNow;
-            var reminderRule = document.getElementById('emergencyReminderRule');
-            if (reminderRule) {
-                reminderRule.textContent = formatPopupDismissRuleText(emergency);
-                reminderRule.hidden = !reminderRule.textContent;
-            }
             if (modal) {
                 modal.dataset.popupTone = popupTone;
                 modal.style.display = 'flex';

@@ -87,6 +87,10 @@ assert.match(html, /id="popupDismissButton"[\s\S]{0,160}hidden/, 'the dismissal 
 assert.match(html, /本公告有效至/, 'the popup must display its effective-until label');
 assert.match(html, /class="emergency-expiry-notice"[\s\S]*id="emergencyExpiresAt"[\s\S]*<\/div>/,
   'the effective-until label must remain in a compact non-interactive notice');
+assert.match(html, /\.emergency-expiry-notice\[hidden\]\s*\{\s*display:\s*none;/,
+  'hidden popup metadata containers must not leave empty pills behind');
+assert.doesNotMatch(html, /彈窗提醒規則|此為重要通知，每次登入都會顯示|已到可略過時間/,
+  'popup recurrence rules are admin behavior and must not be shown to families');
 
 const storage = new Map();
 let pendingReminderAttempts = 0;
@@ -94,8 +98,8 @@ const elements = {
   emergencyModal: { style: { display: 'none' }, dataset: {} },
   emergencyTitle: { textContent: '' },
   emergencyContent: { innerHTML: '' },
+  emergencyExpiryNotice: { hidden: false },
   emergencyExpiresAt: { textContent: '' },
-  emergencyReminderRule: { textContent: '', hidden: true },
   popupCloseButton: { textContent: '' },
   popupDismissButton: { hidden: true },
 };
@@ -132,7 +136,6 @@ vm.createContext(context);
   'isPopupDismissibleNow',
   'isPopupDismissedOnThisDevice',
   'formatEmergencyExpiryText',
-  'formatPopupDismissRuleText',
   'resetPopupQueueForEntry',
   'hideEmergencyModal',
   'showNextPopupAnnouncement',
@@ -232,7 +235,6 @@ context.resetPopupQueueForEntry();
 context.checkEmergency([forcedRoutine]);
 assert.equal(elements.popupDismissButton.hidden, true, 'a routine popup must not be dismissible before its configured cutoff');
 assert.equal(elements.popupCloseButton.textContent, '知道了，下次登入仍會提醒');
-assert.match(elements.emergencyReminderRule.textContent, /前每次登入顯示，之後才可略過/);
 context.dismissActivePopupAnnouncement();
 assert.equal(storage.has(context.buildPopupDismissKey(forcedRoutine)), false, 'calling dismiss early must never persist a dismissal');
 context.resetPopupQueueForEntry();
@@ -247,7 +249,6 @@ const elapsedRoutine = Object.assign({}, forcedRoutine, {
 context.resetPopupQueueForEntry();
 context.checkEmergency([elapsedRoutine]);
 assert.equal(elements.popupDismissButton.hidden, false, 'the device-only dismissal must appear after the configured cutoff');
-assert.match(elements.emergencyReminderRule.textContent, /已到可略過時間/);
 context.closeEmergencyModal();
 
 const beforeNormalCloseStorageSize = storage.size;
@@ -281,12 +282,12 @@ context.resetPopupQueueForEntry();
 context.checkEmergency([ordinary, permanent]);
 assert.equal(elements.emergencyTitle.textContent, 'ℹ️ 永久班規提醒', 'the newest routine popup must appear first');
 assert.equal(elements.popupCloseButton.textContent, '這次先關閉，查看下一則', 'the first popup must explain that another notice follows');
-assert.equal(elements.emergencyExpiresAt.hidden, true, 'showPopupExpiry=false must hide popup expiry metadata independently of the card date');
+assert.equal(elements.emergencyExpiryNotice.hidden, true, 'showPopupExpiry=false must hide the complete popup expiry block independently of the card date');
 assert.equal(elements.emergencyExpiresAt.textContent, '', 'hidden popup expiry metadata must not remain in the accessibility tree');
 context.closeEmergencyModal();
 assert.equal(elements.emergencyTitle.textContent, '🔔 下課接送提醒', 'closing the first popup must advance to the next active popup');
 assert.equal(elements.emergencyModal.style.display, 'flex', 'the popup queue must stay open for the next active notice');
-assert.equal(elements.emergencyExpiresAt.hidden, false, 'a later popup may restore visible expiry metadata');
+assert.equal(elements.emergencyExpiryNotice.hidden, false, 'a later popup may restore the complete expiry block');
 context.closeEmergencyModal();
 assert.equal(elements.emergencyModal.style.display, 'none', 'the modal closes only after the popup queue is exhausted');
 assert.equal(context.formatEmergencyExpiryText(''), '本公告永久有效', 'an empty expiry must have an explicit permanent meaning');

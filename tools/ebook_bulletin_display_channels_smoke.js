@@ -117,8 +117,8 @@ assert.match(html, /displayOptions:\s*bulletin\.displayOptions && typeof bulleti
   'Dashboard draft preview must preserve the new display options');
 assert.match(html, /expiresAt: b\.expiresAt \|\| "",\s*displayOptions: b\.displayOptions \|\| null/,
   'student and god-session bulletin reads must preserve persisted display options');
-assert.match(html, /expiryLabel\.hidden = displayChannels\.showPopupExpiry === false/,
-  'popup expiry visibility must use its own independent option');
+assert.match(html, /if \(expiryNotice\) expiryNotice\.hidden = !showPopupExpiry/,
+  'popup expiry visibility must hide the complete metadata block with its independent option');
 assert.match(html, /function isPopupDismissibleNow\(/,
   'student, teacher and god-session popup rendering must share the mandatory-until rule');
 
