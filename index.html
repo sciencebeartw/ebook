@@ -2321,6 +2321,30 @@
             color: white;
         }
 
+        .btn-general-tag {
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+            background: linear-gradient(135deg, #64748b 0%, #334155 100%);
+            color: white;
+            padding: 12px 15px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 1.15rem;
+            font-weight: bold;
+            border: none;
+            margin: 8px 0;
+            text-align: center;
+            box-shadow: 0 3px 6px rgba(51, 65, 85, 0.28);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .btn-general-tag:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 12px rgba(51, 65, 85, 0.42);
+            color: white;
+        }
+
         .doc-link-wrap {
             display: block;
             width: 100%;
@@ -2329,7 +2353,8 @@
 
         .doc-link-wrap .btn-link,
         .doc-link-wrap .btn-important-tag,
-        .doc-link-wrap .btn-supplement-tag {
+        .doc-link-wrap .btn-supplement-tag,
+        .doc-link-wrap .btn-general-tag {
             margin-bottom: 4px;
         }
 
@@ -7358,7 +7383,7 @@
         }
 
         function compactParsedButtonBreaks(html) {
-            return (html || "").replace(/<br>\s*(?=(?:<span class="doc-link-wrap"|<a [^>]*class="(?:btn-link|btn-important-tag|btn-supplement-tag|btn-small-tag)"))/g, "");
+            return (html || "").replace(/<br>\s*(?=(?:<span class="doc-link-wrap"|<a [^>]*class="(?:btn-link|btn-important-tag|btn-supplement-tag|btn-general-tag|btn-small-tag)"))/g, "");
         }
 
         // ★★★ 全域工具函式：解析連結 (v3.9.2) ★★★
@@ -10084,19 +10109,42 @@
         function getDailyPostHomeworkLinkMode(post, slotKey) {
             var homework = getDailyPostDisplayOptions(post).homework || {};
             var mode = homework[slotKey + "LinkMode"];
-            return ["auto", "general", "homework", "supplement"].indexOf(mode) > -1 ? mode : "auto";
+            return ["auto", "general", "homework", "supplement", "custom"].indexOf(mode) > -1 ? mode : "auto";
         }
 
         function getDailyPostNoteLinkMode(post) {
             var links = getDailyPostDisplayOptions(post).links || {};
             var mode = links.noteLinkMode;
-            return ["auto", "general", "homework", "supplement"].indexOf(mode) > -1 ? mode : "auto";
+            return ["auto", "general", "homework", "supplement", "custom"].indexOf(mode) > -1 ? mode : "auto";
         }
 
-        function getDailyPostLinkDisplayName(name, linkMode) {
+        function getDailyPostHomeworkCustomLabel(post, slotKey) {
+            var homework = getDailyPostDisplayOptions(post).homework || {};
+            return (homework[slotKey + "CustomLabel"] || "").toString().trim().slice(0, 24);
+        }
+
+        function getDailyPostNoteCustomLabel(post) {
+            var links = getDailyPostDisplayOptions(post).links || {};
+            return (links.noteCustomLabel || "").toString().trim().slice(0, 24);
+        }
+
+        function prependDailyPostLinkPurpose(name, purpose) {
             var label = (name || "連結").toString();
-            if (linkMode !== "supplement" || /補充(?:教材|資料|資訊)?/.test(label)) return label;
-            return "補充教材｜" + label;
+            var prefix = (purpose || "").toString().trim();
+            if (!prefix || label.indexOf(prefix + "｜") === 0) return label;
+            return prefix + "｜" + label;
+        }
+
+        function getDailyPostLinkDisplayName(name, linkMode, customLabel) {
+            if (linkMode === "supplement") return prependDailyPostLinkPurpose(name, "補充教材");
+            if (linkMode === "general") return prependDailyPostLinkPurpose(name, "一般連結");
+            if (linkMode === "custom") return prependDailyPostLinkPurpose(name, escapeHtml(customLabel || "自訂連結"));
+            return (name || "連結").toString();
+        }
+
+        function getDailyPostExamLinkDisplayName(name, purpose) {
+            var label = (name || "考卷").toString().replace(/^(?:小考|隨堂考|鑑定考|複習考|補考)[：:]\s*/, "");
+            return prependDailyPostLinkPurpose(label, purpose || "考卷");
         }
 
         function getDailyPostHomeworkNoteMode(post) {
@@ -10767,7 +10815,7 @@
                 var contentHtml = "";
 
                 // ★★★ v3.9 修正：連結解析邏輯 (支援小標籤) ★★★
-                var parseBtn = function (text, linkMode) {
+                var parseBtn = function (text, linkMode, customLabel, linkPrefix) {
                     if (!text) return "";
                     // 先對 HTML 特殊字元做跳脫 防範 XSS
                     text = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -10820,10 +10868,14 @@
                         parsed += renderEbookRichTextFormat(withBr.slice(lastIndex, linkMatch.index));
                         var name = linkMatch[1];
                         var url = linkMatch[2];
-                        if (linkMode === "homework") {
+                        if (linkPrefix) {
+                            parsed += renderParsedLink(getDailyPostExamLinkDisplayName(name, linkPrefix), url, "btn-link", "📄 ");
+                        } else if (linkMode === "homework") {
                             parsed += renderParsedLink(name, url, "btn-important-tag", "");
                         } else if (linkMode === "supplement") {
-                            parsed += renderParsedLink(getDailyPostLinkDisplayName(name, linkMode), url, "btn-supplement-tag", SVG.clip);
+                            parsed += renderParsedLink(getDailyPostLinkDisplayName(name, linkMode, customLabel), url, "btn-supplement-tag", SVG.clip);
+                        } else if (linkMode === "general" || linkMode === "custom") {
+                            parsed += renderParsedLink(getDailyPostLinkDisplayName(name, linkMode, customLabel), url, "btn-general-tag", "🔗 ");
                         } else if (linkMode !== "general" && (name.indexOf("作業") > -1 || name.indexOf("上傳") > -1)) {
                             parsed += renderParsedLink(name, url, "btn-important-tag", SVG.upload);
                         } else if (linkMode !== "general" && name.indexOf("附件") > -1) {
@@ -10935,6 +10987,15 @@
                     if (raw.indexOf("小考") > -1) return "小考";
                     return "";
                 }
+                function getPostExamLinkPrefix(type, role) {
+                    var examType = (type || "考卷").toString();
+                    if (role === "answer") return examType === "考卷" ? "考卷解答" : (examType + "解答");
+                    if (examType === "小考") return "小考卷";
+                    if (examType === "隨堂考") return "隨堂考卷";
+                    if (examType === "鑑定考") return "鑑定考卷";
+                    if (examType === "複習考") return "複習考卷";
+                    return "考卷";
+                }
                 function buildPostQuizFields(postData) {
                     var quizText = postData.quiz || "";
                     var lines = splitPostMultiLinkValue(quizText);
@@ -10950,6 +11011,7 @@
                                 label: role === "answer" ? ("今日" + type + "解答") : (type === "考卷" ? "今日考卷" : ("今日" + type + "考卷")),
                                 val: line,
                                 extra: "",
+                                linkPrefix: getPostExamLinkPrefix(type, role),
                                 pendingExamPaper: role === "answer" ? null : getPostPendingExamPaperIdentity(postData, index)
                             };
                         });
@@ -10967,11 +11029,13 @@
                         groups[label].push(line);
                     });
                     if (order.length <= 1) {
-                        return [{ label: getPostQuizFieldLabel(postData), val: quizText, extra: buildScienceQuizAnswerNote(postData), pendingExamPaper: legacyPendingExamPaperIdentity }];
+                        var singleType = getPostLineExamType(quizText) || "考卷";
+                        return [{ label: getPostQuizFieldLabel(postData), val: quizText, extra: buildScienceQuizAnswerNote(postData), linkPrefix: getPostExamLinkPrefix(singleType, "question"), pendingExamPaper: legacyPendingExamPaperIdentity }];
                     }
                     var html = order.map(function(label) {
                         var subtitle = label === "今日考卷" ? "其他考卷" : label;
-                        return "<div class='info-subsection'><span class='info-subtitle'>" + subtitle + "</span>" + parseBtn(groups[label].join("\n")) + buildScienceQuizAnswerNote({ quiz: groups[label].join("\n"), title: postData.title, progress: postData.progress }) + "</div>";
+                        var groupType = label === "今日考卷" ? "考卷" : label;
+                        return "<div class='info-subsection'><span class='info-subtitle'>" + subtitle + "</span>" + parseBtn(groups[label].join("\n"), "auto", "", getPostExamLinkPrefix(groupType, "question")) + buildScienceQuizAnswerNote({ quiz: groups[label].join("\n"), title: postData.title, progress: postData.progress }) + "</div>";
                     }).join("");
                     return [{ label: "今日考卷", val: "", extra: html, pendingExamPaper: legacyPendingExamPaperIdentity }];
                 }
@@ -10979,8 +11043,8 @@
                     var lines = splitPostMultiLinkValue(postData.makeup || "");
                     var parts = [];
                     var pendingPaperAttr = buildPendingExamAnchorAttrs('data-pending-paper-anchor', getPostMappedMakeupIdentity(postData));
-                    if (lines[0]) parts.push("<div class='info-subsection'" + pendingPaperAttr + "><span class='info-subtitle'>考卷題目</span>" + parseBtn(lines[0]) + "</div>");
-                    if (lines.length > 1) parts.push("<div class='info-subsection'><span class='info-subtitle'>考卷答案</span>" + parseBtn(lines.slice(1).join("\n")) + "</div>");
+                    if (lines[0]) parts.push("<div class='info-subsection'" + pendingPaperAttr + "><span class='info-subtitle'>考卷題目</span>" + parseBtn(lines[0], "auto", "", "補考題目") + "</div>");
+                    if (lines.length > 1) parts.push("<div class='info-subsection'><span class='info-subtitle'>考卷答案</span>" + parseBtn(lines.slice(1).join("\n"), "auto", "", "補考答案") + "</div>");
                     if (extraHtml) parts.push(extraHtml);
                     return parts.join("");
                 }
@@ -11001,7 +11065,7 @@
                         ? buildPendingExamAnchorAttrs('data-pending-exam-paper-anchor', f.pendingExamPaper)
                         : "";
                     var pendingHomeworkAttr = kind === 'homework' ? " data-pending-homework-anchor='1'" : "";
-                    return "<section class='info-block info-kind-" + kind + "'" + pendingExamPaperAttr + pendingHomeworkAttr + "><div class='info-label'>" + f.label + "</div>" + noteHtml + "<div class='info-content'>" + parseBtn(f.val || "", f.linkMode || "auto") + (f.extra || "") + "</div></section>";
+                    return "<section class='info-block info-kind-" + kind + "'" + pendingExamPaperAttr + pendingHomeworkAttr + "><div class='info-label'>" + f.label + "</div>" + noteHtml + "<div class='info-content'>" + parseBtn(f.val || "", f.linkMode || "auto", f.customLabel || "", f.linkPrefix || "") + (f.extra || "") + "</div></section>";
                 }
                 function buildPostMakeupFields(postData, extraHtml) {
                     var lines = splitPostMultiLinkValue(postData.makeup || "");
@@ -11031,9 +11095,9 @@
                     var homeworkNoteMode = getDailyPostHomeworkNoteMode(post);
                     var extra = homeworkNoteMode === "show" && hwIdx !== homeworkItems.length - 1 ? "" : buildHomeworkUploadNote(post, item.val);
                     if (hwIdx === homeworkItems.length - 1) extra += buildHomeworkDoneButton(post);
-                    fields.push({ label: item.label, val: item.val, extra: extra, linkMode: getDailyPostHomeworkLinkMode(post, item.key) });
+                    fields.push({ label: item.label, val: item.val, extra: extra, linkMode: getDailyPostHomeworkLinkMode(post, item.key), customLabel: getDailyPostHomeworkCustomLabel(post, item.key) });
                 });
-                fields = fields.concat(buildPostMakeupFields(post, buildPendingMakeupResultReportHtml(post, sourceHistory, examCards, latestPostDate)), [{ label: "下次考試範圍", val: post.range }, { label: "補充資訊", val: post.note, linkMode: getDailyPostNoteLinkMode(post) }]);
+                fields = fields.concat(buildPostMakeupFields(post, buildPendingMakeupResultReportHtml(post, sourceHistory, examCards, latestPostDate)), [{ label: "下次考試範圍", val: post.range }, { label: "補充資訊", val: post.note, linkMode: getDailyPostNoteLinkMode(post), customLabel: getDailyPostNoteCustomLabel(post) }]);
                 fields.forEach(function (f) { contentHtml += renderPostInfoBlock(f); });
 
                 var historyHtml = "";

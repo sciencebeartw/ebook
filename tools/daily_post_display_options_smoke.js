@@ -22,7 +22,7 @@ function extractFunction(name) {
 
 const context = {
   BEAR_SUBJECT: '/science',
-  escapeHtml: value => String(value),
+  escapeHtml: value => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
   escapeHtmlAttr: value => String(value),
   window: { EbookPendingTasks: Pending },
 };
@@ -41,7 +41,11 @@ vm.createContext(context);
   'shouldUseHomeworkDoneFlowForPost',
   'getDailyPostHomeworkLinkMode',
   'getDailyPostNoteLinkMode',
+  'getDailyPostHomeworkCustomLabel',
+  'getDailyPostNoteCustomLabel',
+  'prependDailyPostLinkPurpose',
   'getDailyPostLinkDisplayName',
+  'getDailyPostExamLinkDisplayName',
   'getDailyPostHomeworkNoteMode',
   'getDailyPostQuizOptions'
 ].forEach((name) => vm.runInContext(extractFunction(name), context));
@@ -67,11 +71,30 @@ if (context.getDailyPostNoteLinkMode({ displayOptions: { links: { noteLinkMode: 
 if (context.getDailyPostNoteLinkMode({ displayOptions: { links: { noteLinkMode: 'unknown' } } }) !== 'auto') {
   throw new Error('unknown supplemental information link modes must fail closed to auto');
 }
+if (context.getDailyPostHomeworkLinkMode({ displayOptions: { homework: { hw1LinkMode: 'custom' } } }, 'hw1') !== 'custom') {
+  throw new Error('homework fields should allow an explicit custom link purpose');
+}
+const customPost = { displayOptions: { homework: { hw1CustomLabel: '線上表單' }, links: { noteCustomLabel: '參考網站' } } };
+if (context.getDailyPostHomeworkCustomLabel(customPost, 'hw1') !== '線上表單' || context.getDailyPostNoteCustomLabel(customPost) !== '參考網站') {
+  throw new Error('custom link labels must survive displayOptions parsing');
+}
 if (context.getDailyPostLinkDisplayName('透鏡成像作圖', 'supplement') !== '補充教材｜透鏡成像作圖') {
   throw new Error('supplemental buttons must expose their purpose without relying on color alone');
 }
 if (context.getDailyPostLinkDisplayName('補充教材｜透鏡成像作圖', 'supplement') !== '補充教材｜透鏡成像作圖') {
   throw new Error('supplemental buttons must not duplicate an existing semantic prefix');
+}
+if (context.getDailyPostLinkDisplayName('報名頁面', 'general') !== '一般連結｜報名頁面') {
+  throw new Error('general links must expose their purpose without sharing the exam label');
+}
+if (context.getDailyPostLinkDisplayName('活動說明', 'custom', '行前通知') !== '行前通知｜活動說明') {
+  throw new Error('custom links must expose the teacher-defined purpose');
+}
+if (context.getDailyPostLinkDisplayName('活動說明', 'custom', '<img src=x>') !== '&lt;img src=x&gt;｜活動說明') {
+  throw new Error('custom link labels must be escaped before entering the rendered button HTML');
+}
+if (context.getDailyPostExamLinkDisplayName('小考：理化第六章.pdf', '小考卷') !== '小考卷｜理化第六章.pdf') {
+  throw new Error('exam links must replace the stored type marker with a parent-facing exam prefix');
 }
 if (context.getDailyPostHomeworkNoteMode({ displayOptions: { homework: { noteMode: 'hide' } } }) !== 'hide') {
   throw new Error('homework correction note should support an explicit hide mode');
@@ -151,7 +174,12 @@ if (renderSource.indexOf('var gradeHtml = examCards.map') === -1 ||
 [
   'linkMode === "homework"',
   'linkMode === "supplement"',
+  'linkMode === "general" || linkMode === "custom"',
   'btn-supplement-tag',
+  'btn-general-tag',
+  'getPostExamLinkPrefix(type, role)',
+  '"補考題目"',
+  '"補考答案"',
   'linkMode: getDailyPostNoteLinkMode(post)',
   '本次已附解答，請完成後自行核對並訂正。',
   'buildHomeworkUploadNote(post, item.val)',
@@ -165,7 +193,11 @@ if (renderSource.indexOf('var gradeHtml = examCards.map') === -1 ||
 [
   'noteLinkMode',
   '"supplement"',
+  '"custom"',
   'btn-supplement-tag',
+  'btn-general-tag',
+  '一般連結',
+  '小考卷',
   '補充教材｜'
 ].forEach((needle) => {
   if (!legacyRenderer.includes(needle)) throw new Error(`Missing legacy renderer supplemental link behavior: ${needle}`);

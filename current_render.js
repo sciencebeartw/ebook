@@ -12,10 +12,38 @@ function renderDailyPosts(posts, history) {
                 var mode = fieldKey === "note"
                     ? ((options.links || {}).noteLinkMode || "auto")
                     : ((options.homework || {})[fieldKey + "LinkMode"] || "auto");
-                return ["auto", "general", "homework", "supplement"].indexOf(mode) > -1 ? mode : "auto";
+                return ["auto", "general", "homework", "supplement", "custom"].indexOf(mode) > -1 ? mode : "auto";
             };
 
-            var parseBtn = function (text, linkMode) {
+            var getCustomLabel = function (post, fieldKey) {
+                var options = post && post.displayOptions;
+                if (typeof options === "string") {
+                    try { options = JSON.parse(options); } catch (e) { options = {}; }
+                }
+                options = options && typeof options === "object" ? options : {};
+                var label = fieldKey === "note"
+                    ? ((options.links || {}).noteCustomLabel || "")
+                    : ((options.homework || {})[fieldKey + "CustomLabel"] || "");
+                return label.toString().trim().slice(0, 24);
+            };
+
+            var prependPurpose = function (name, purpose) {
+                var label = (name || "連結").toString();
+                var prefix = (purpose || "").toString().trim();
+                if (!prefix || label.indexOf(prefix + "｜") === 0) return label;
+                return prefix + "｜" + label;
+            };
+
+            var getExamPrefix = function (text) {
+                var raw = (text || "").toString();
+                if (raw.indexOf("複習") > -1) return "複習考卷";
+                if (raw.indexOf("鑑定") > -1) return "鑑定考卷";
+                if (raw.indexOf("隨堂") > -1) return "隨堂考卷";
+                if (raw.indexOf("小考") > -1) return "小考卷";
+                return "考卷";
+            };
+
+            var parseBtn = function (text, linkMode, customLabel, linkPrefix) {
                 if (!text) return "";
                 text = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
                 var withBr = text.replace(/\n/g, '<br>');
@@ -23,9 +51,16 @@ function renderDailyPosts(posts, history) {
                     return `<div class="quote-box"><div class="quote-type">${type}</div><div class="quote-content">${qContent}</div></div>`;
                 });
                 return withBr.replace(/\[(.*?)\](http[s]?:\/\/[^\s<]+)/g, function (match, name, url) {
-                    if (linkMode === "supplement") {
+                    if (linkPrefix) {
+                        var examName = name.replace(/^(?:小考|隨堂考|鑑定考|複習考|補考)[：:]\s*/, "");
+                        return `<a href="${url}" target="_blank" class="btn-link">📄 ${prependPurpose(examName, linkPrefix)}</a>`;
+                    } else if (linkMode === "supplement") {
                         var displayName = /補充(?:教材|資料|資訊)?/.test(name) ? name : ("補充教材｜" + name);
                         return `<a href="${url}" target="_blank" class="btn-supplement-tag">📎 ${displayName}</a>`;
+                    } else if (linkMode === "general" || linkMode === "custom") {
+                        var rawPrefix = linkMode === "general" ? "一般連結" : (customLabel || "自訂連結");
+                        var safePrefix = rawPrefix.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                        return `<a href="${url}" target="_blank" class="btn-general-tag">🔗 ${prependPurpose(name, safePrefix)}</a>`;
                     } else if (linkMode === "homework") {
                         return `<a href="${url}" target="_blank" class="btn-important-tag">${name}</a>`;
                     } else if (linkMode !== "general" && (name.indexOf("附件") > -1 || name.indexOf("作業") > -1)) {
@@ -82,12 +117,12 @@ function renderDailyPosts(posts, history) {
                 var labelHw1 = "今日作業"; if (post.hw2 && post.hw2.toString().trim() !== "") labelHw1 = "今日作業一"; 
                 var fields = [
                     { label: "課程進度", val: post.progress }, 
-                    { label: "小考考卷", val: post.quiz }, 
-                    { label: labelHw1, val: post.hw1, linkMode: getLinkMode(post, "hw1") },
-                    { label: "今日作業二", val: post.hw2, linkMode: getLinkMode(post, "hw2") },
-                    { label: "補考考卷", val: post.makeup }, 
+                    { label: "小考考卷", val: post.quiz, linkPrefix: getExamPrefix(post.quiz) },
+                    { label: labelHw1, val: post.hw1, linkMode: getLinkMode(post, "hw1"), customLabel: getCustomLabel(post, "hw1") },
+                    { label: "今日作業二", val: post.hw2, linkMode: getLinkMode(post, "hw2"), customLabel: getCustomLabel(post, "hw2") },
+                    { label: "補考考卷", val: post.makeup, linkPrefix: "補考題目" },
                     { label: "下週範圍", val: post.range }, 
-                    { label: "補充資訊", val: post.note, linkMode: getLinkMode(post, "note") }
+                    { label: "補充資訊", val: post.note, linkMode: getLinkMode(post, "note"), customLabel: getCustomLabel(post, "note") }
                 ]; 
 
                 function getPostInfoKind(label) {
@@ -102,7 +137,7 @@ function renderDailyPosts(posts, history) {
                 
                 var feedDescInner = "";
                 fields.forEach(function (f) { 
-                    if (f.val) feedDescInner += `<section class="info-block info-kind-${getPostInfoKind(f.label)}"><div class="info-label">${f.label}</div><div class="info-content">${parseBtn(f.val, f.linkMode || "auto")}</div></section>`;
+                    if (f.val) feedDescInner += `<section class="info-block info-kind-${getPostInfoKind(f.label)}"><div class="info-label">${f.label}</div><div class="info-content">${parseBtn(f.val, f.linkMode || "auto", f.customLabel || "", f.linkPrefix || "")}</div></section>`;
                 }); 
 
                 var pDateShort = post.date.substring(5).replace("-", "/"); var pDateFull = post.date.replace(/-/g, "/"); 
