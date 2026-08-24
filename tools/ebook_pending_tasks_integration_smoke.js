@@ -79,11 +79,11 @@ check(loadPolicy.includes("status: 'unavailable'"), 'policy errors must fail clo
 const apiFactory = extractFunction('createApiMethods');
 check((apiFactory.match(/loadEbookPendingTaskPolicy\(\)/g) || []).length >= 2, 'login and manual refresh must each request a fresh policy');
 check(apiFactory.includes('res.pendingPolicy = loaded[1]'), 'fresh policy must overwrite the view policy');
-check(apiFactory.includes('!ebookGodSessionId || isStudentPreviewMode'), 'manual refresh must reload policy for both direct students and student_preview');
-check(apiFactory.includes('getTeacherGodHiddenPendingPolicy()'), 'teacher god mode must receive a hidden pending policy without calling the student callable');
+check(!apiFactory.includes('!ebookGodSessionId || isStudentPreviewMode'), 'manual refresh must not exclude teacher god sessions from the scoped pending policy');
+check(apiFactory.includes('const shouldReloadPendingPolicy = !!ebookAuthSessionInfo'), 'student, student preview, and teacher god sessions must refresh the same scoped pending policy');
+check(!apiFactory.includes('getTeacherGodHiddenPendingPolicy()'), 'teacher god mode must not replace the student pending tab with a hidden policy');
 const enterGodSession = extractFunction('enterEbookGodSession');
-check(enterGodSession.includes('? await loadEbookPendingTaskPolicy()'), 'student_preview must load policy after custom-token sign-in');
-check(enterGodSession.includes(': getTeacherGodHiddenPendingPolicy()'), 'teacher god mode must hide pending instead of showing unavailable');
+check(enterGodSession.includes('session.pendingPolicy = await loadEbookPendingTaskPolicy()'), 'student preview and teacher god mode must load the same scoped policy after custom-token sign-in');
 check(extractFunction('renewEbookGodSession').includes('ebookGodSessionInfo.pendingPolicy = previousPendingPolicy'), 'heartbeat renewals must preserve the already loaded preview policy');
 
 const scheduler = extractFunction('schedulePendingTasksRecompute');

@@ -4662,19 +4662,6 @@
       }
     }
 
-    function getTeacherGodHiddenPendingPolicy() {
-      return {
-        status: 'ready',
-        loadedAt: 0,
-        showPending: false,
-        loginReminder: false,
-        reminderDue: false,
-        reminderDueAt: '',
-        reminderDueDateKey: '',
-        items: []
-      };
-    }
-
     function ebookAdminFeatureRetired(onSuccess) {
       if (onSuccess) onSuccess({ success: false, msg: "eBook 內建管理功能已退場，請回行政中心操作。" });
     }
@@ -6422,9 +6409,7 @@
                if (!allowGodSession) throw new Error('上帝視角連線未驗證，請從行政中心重新開啟');
                const studentKey = (ebookGodSessionInfo && ebookGodSessionInfo.studentKey) || '';
                const res = await executeFirebaseRead(u, pwd, true, cls, studentKey);
-               res.pendingPolicy = isStudentPreviewMode
-                   ? ((ebookGodSessionInfo && ebookGodSessionInfo.pendingPolicy) || null)
-                   : getTeacherGodHiddenPendingPolicy();
+               res.pendingPolicy = (ebookGodSessionInfo && ebookGodSessionInfo.pendingPolicy) || null;
                if(onSuccess) onSuccess(res);
            } catch(e){ if(onErr) onErr(e); }
         },
@@ -6434,10 +6419,8 @@
                if (!session || !session.className || !session.studentName || !session.studentKey || !ebookAuth.currentUser) {
                    throw new Error('登入已失效，請重新登入');
                }
-               const shouldReloadPendingPolicy = !!ebookAuthSessionInfo && (!ebookGodSessionId || isStudentPreviewMode);
-               const fallbackPendingPolicy = ebookGodSessionId && !isStudentPreviewMode
-                   ? getTeacherGodHiddenPendingPolicy()
-                   : (session.pendingPolicy || null);
+               const shouldReloadPendingPolicy = !!ebookAuthSessionInfo;
+               const fallbackPendingPolicy = session.pendingPolicy || null;
                const loaded = await Promise.all([
                    executeFirebaseRead(session.studentName, '', true, session.className, session.studentKey),
                    shouldReloadPendingPolicy ? loadEbookPendingTaskPolicy() : Promise.resolve(fallbackPendingPolicy)
@@ -12786,9 +12769,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 isStudentPreviewMode = !!(session.viewMode === 'student_preview' || (session.permissions && session.permissions.studentPreview === true));
                 isAdminMode = !isStudentPreviewMode;
                 showEbookSessionBootstrapLoader(isStudentPreviewMode ? '學生視角' : '上帝視角');
-                session.pendingPolicy = isStudentPreviewMode
-                    ? await loadEbookPendingTaskPolicy()
-                    : getTeacherGodHiddenPendingPolicy();
+                session.pendingPolicy = await loadEbookPendingTaskPolicy();
                 ebookGodSessionInfo = session;
                 ebookAuthSessionInfo = session;
                 startEbookGodSessionHeartbeat();
