@@ -3,7 +3,19 @@ function renderDailyPosts(posts, history) {
             if (!posts || posts.length === 0) { container.innerHTML = "<div style='text-align:center; padding:30px; color:#999;'>目前沒有聯絡簿資料</div>"; return; } 
             var html = ""; 
 
-            var parseBtn = function (text) {
+            var getLinkMode = function (post, fieldKey) {
+                var options = post && post.displayOptions;
+                if (typeof options === "string") {
+                    try { options = JSON.parse(options); } catch (e) { options = {}; }
+                }
+                options = options && typeof options === "object" ? options : {};
+                var mode = fieldKey === "note"
+                    ? ((options.links || {}).noteLinkMode || "auto")
+                    : ((options.homework || {})[fieldKey + "LinkMode"] || "auto");
+                return ["auto", "general", "homework", "supplement"].indexOf(mode) > -1 ? mode : "auto";
+            };
+
+            var parseBtn = function (text, linkMode) {
                 if (!text) return "";
                 text = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
                 var withBr = text.replace(/\n/g, '<br>');
@@ -11,7 +23,12 @@ function renderDailyPosts(posts, history) {
                     return `<div class="quote-box"><div class="quote-type">${type}</div><div class="quote-content">${qContent}</div></div>`;
                 });
                 return withBr.replace(/\[(.*?)\](http[s]?:\/\/[^\s<]+)/g, function (match, name, url) {
-                    if (name.indexOf("附件") > -1 || name.indexOf("作業") > -1) {
+                    if (linkMode === "supplement") {
+                        var displayName = /補充(?:教材|資料|資訊)?/.test(name) ? name : ("補充教材｜" + name);
+                        return `<a href="${url}" target="_blank" class="btn-supplement-tag">📎 ${displayName}</a>`;
+                    } else if (linkMode === "homework") {
+                        return `<a href="${url}" target="_blank" class="btn-important-tag">${name}</a>`;
+                    } else if (linkMode !== "general" && (name.indexOf("附件") > -1 || name.indexOf("作業") > -1)) {
                         return `<a href="${url}" target="_blank" class="btn-small-tag">📎 ${name}</a>`;
                     } else {
                         return `<a href="${url}" target="_blank" class="btn-link">${name}</a>`;
@@ -66,11 +83,11 @@ function renderDailyPosts(posts, history) {
                 var fields = [
                     { label: "課程進度", val: post.progress }, 
                     { label: "小考考卷", val: post.quiz }, 
-                    { label: labelHw1, val: post.hw1 }, 
-                    { label: "今日作業二", val: post.hw2 }, 
+                    { label: labelHw1, val: post.hw1, linkMode: getLinkMode(post, "hw1") },
+                    { label: "今日作業二", val: post.hw2, linkMode: getLinkMode(post, "hw2") },
                     { label: "補考考卷", val: post.makeup }, 
                     { label: "下週範圍", val: post.range }, 
-                    { label: "補充資訊", val: post.note }
+                    { label: "補充資訊", val: post.note, linkMode: getLinkMode(post, "note") }
                 ]; 
 
                 function getPostInfoKind(label) {
@@ -85,7 +102,7 @@ function renderDailyPosts(posts, history) {
                 
                 var feedDescInner = "";
                 fields.forEach(function (f) { 
-                    if (f.val) feedDescInner += `<section class="info-block info-kind-${getPostInfoKind(f.label)}"><div class="info-label">${f.label}</div><div class="info-content">${parseBtn(f.val)}</div></section>`;
+                    if (f.val) feedDescInner += `<section class="info-block info-kind-${getPostInfoKind(f.label)}"><div class="info-label">${f.label}</div><div class="info-content">${parseBtn(f.val, f.linkMode || "auto")}</div></section>`;
                 }); 
 
                 var pDateShort = post.date.substring(5).replace("-", "/"); var pDateFull = post.date.replace(/-/g, "/"); 

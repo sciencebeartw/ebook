@@ -4,6 +4,7 @@ const vm = require('vm');
 const Pending = require('../ebook_pending_tasks_app.js');
 
 const html = fs.readFileSync(path.resolve(__dirname, '..', 'index.html'), 'utf8');
+const legacyRenderer = fs.readFileSync(path.resolve(__dirname, '..', 'current_render.js'), 'utf8');
 
 function extractFunction(name) {
   const marker = `function ${name}`;
@@ -39,6 +40,8 @@ vm.createContext(context);
   'getDailyPostHomeworkDoneMode',
   'shouldUseHomeworkDoneFlowForPost',
   'getDailyPostHomeworkLinkMode',
+  'getDailyPostNoteLinkMode',
+  'getDailyPostLinkDisplayName',
   'getDailyPostHomeworkNoteMode',
   'getDailyPostQuizOptions'
 ].forEach((name) => vm.runInContext(extractFunction(name), context));
@@ -54,6 +57,21 @@ if (context.shouldUseHomeworkDoneFlowForPost({ displayOptions: { homework: { don
 }
 if (context.getDailyPostHomeworkLinkMode({ displayOptions: { homework: { hw1LinkMode: 'homework' } } }, 'hw1') !== 'homework') {
   throw new Error('homework resource link mode should be preserved');
+}
+if (context.getDailyPostHomeworkLinkMode({ displayOptions: { homework: { hw1LinkMode: 'supplement' } } }, 'hw1') !== 'supplement') {
+  throw new Error('homework fields should allow the supplemental material link mode');
+}
+if (context.getDailyPostNoteLinkMode({ displayOptions: { links: { noteLinkMode: 'supplement' } } }) !== 'supplement') {
+  throw new Error('supplemental information link mode should be preserved');
+}
+if (context.getDailyPostNoteLinkMode({ displayOptions: { links: { noteLinkMode: 'unknown' } } }) !== 'auto') {
+  throw new Error('unknown supplemental information link modes must fail closed to auto');
+}
+if (context.getDailyPostLinkDisplayName('透鏡成像作圖', 'supplement') !== '補充教材｜透鏡成像作圖') {
+  throw new Error('supplemental buttons must expose their purpose without relying on color alone');
+}
+if (context.getDailyPostLinkDisplayName('補充教材｜透鏡成像作圖', 'supplement') !== '補充教材｜透鏡成像作圖') {
+  throw new Error('supplemental buttons must not duplicate an existing semantic prefix');
 }
 if (context.getDailyPostHomeworkNoteMode({ displayOptions: { homework: { noteMode: 'hide' } } }) !== 'hide') {
   throw new Error('homework correction note should support an explicit hide mode');
@@ -132,6 +150,9 @@ if (renderSource.indexOf('var gradeHtml = examCards.map') === -1 ||
 
 [
   'linkMode === "homework"',
+  'linkMode === "supplement"',
+  'btn-supplement-tag',
+  'linkMode: getDailyPostNoteLinkMode(post)',
   '本次已附解答，請完成後自行核對並訂正。',
   'buildHomeworkUploadNote(post, item.val)',
   'displayOptions: parseDailyPostDisplayOptions(post.displayOptions)',
@@ -139,6 +160,15 @@ if (renderSource.indexOf('var gradeHtml = examCards.map') === -1 ||
   '.post-session-badge'
 ].forEach((needle) => {
   if (!html.includes(needle)) throw new Error(`Missing eBook display behavior: ${needle}`);
+});
+
+[
+  'noteLinkMode',
+  '"supplement"',
+  'btn-supplement-tag',
+  '補充教材｜'
+].forEach((needle) => {
+  if (!legacyRenderer.includes(needle)) throw new Error(`Missing legacy renderer supplemental link behavior: ${needle}`);
 });
 
 console.log('ebook daily post display options smoke passed');
