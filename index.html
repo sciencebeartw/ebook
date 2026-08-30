@@ -5988,13 +5988,14 @@
     function getTeacherInfo(className) {
         // First check subject
         if (BEAR_SUBJECT === '/math') {
-            if (className && (className.includes("小六資優數學") || className.includes("小六資優數"))) {
+            var normalizedClassName = (className || '').toString().replace(/[\s_]/g, '');
+            if (/^(?:\d{3,4})?(?:小六)?資優數學(?:班)?$/.test(normalizedClassName) || /^(?:\d{3,4})?小六資優數$/.test(normalizedClassName)) {
                 return { name: "東", fullName: "小東老師" };
             }
             if (className && className.includes("數學超前")) {
                 return { name: "翔", fullName: "李翔老師" };
             }
-            return { name: "師", fullName: "數學老師" };
+            return { name: "數學", fullName: "數學老師" };
         }
         // Default to Science (Nature)
         return { name: "喵", fullName: "阿喵老師" };
