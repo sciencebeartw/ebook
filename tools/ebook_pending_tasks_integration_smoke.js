@@ -106,8 +106,9 @@ check(pendingReminder.includes('wasPendingReminderShownInBrowserSession'), 'a sa
 check(pendingReminder.includes('markPendingReminderShownInBrowserSession'), 'shown reminders must persist for the current browser-tab session');
 check(pendingReminder.includes('gData.pendingPolicy.loginReminder === false'), 'loginReminder=false must suppress reminder styling and popup');
 check(pendingReminder.includes('getReminderDueItems(pendingTasksState)'), 'popup count must use only server-due items');
-check(pendingReminder.includes("'溫馨小提醒'"), 'pending popup title must use the approved neutral wording');
-check(pendingReminder.includes("'還有 ' + reminderDueItems.length + ' 項課務尚待完成，記得儘快處理喔！'"), 'pending popup must use the approved fixed reminder copy');
+check(pendingReminder.includes("'逾期未完成提醒'"), 'pending popup title must identify the due-only reminder');
+check(pendingReminder.includes("'目前有 ' + reminderDueItems.length + ' 項課務已逾期，請記得儘快處理。'"), 'pending popup must identify the overdue count');
+check(pendingReminder.includes("' 項尚未逾期的待完成事項。'"), 'mixed pending popup must also identify the neutral pending count');
 check(pendingReminder.includes('swalAlert(') && !pendingReminder.includes('Swal.fire'), 'pending popup must use the shared swalAlert wrapper');
 check(pendingReminder.includes("'查看待完成'"), 'pending popup button must clearly navigate to pending');
 check(pendingReminder.includes("iconColor: '#e11d48'") && pendingReminder.includes("confirmButtonColor: '#e11d48'"), 'pending popup icon and action must use the warning red');
@@ -121,7 +122,9 @@ check(!directLoginBlock.includes('clearPendingReminderBrowserSessionMarks()'), '
 check(pendingRender.includes('gData.pendingPolicy.showPending !== false'), 'showPending=false must hide the pending tab and count');
 check(pendingRender.includes('getReminderDueItems(pendingTasksState)'), 'red rendering must use the same due-item classifier as the popup');
 check(pendingRender.includes("classList.toggle('is-reminder-due', reminderDue)"), 'render must add and remove red state as due items change');
-check(pendingRender.includes('reminderDue ? reminderDueItems.length : items.length'), 'red badge must count due items without hiding future pending items');
+check(pendingRender.includes("badge.textContent = isReady && items.length ? String(items.length) : ''"), 'pending badge must always count every visible pending item');
+check(pendingRender.includes('逾期未完成 " + reminderDueItems.length + " 項') && pendingRender.includes('待完成 " + openPendingCount + " 項'), 'mixed page summary must separate overdue and neutral pending counts');
+check(pendingRender.includes('if (left.isDue !== right.isDue) return left.isDue ? -1 : 1'), 'overdue cards must sort before neutral pending cards');
 check(html.includes('#tab-pending.is-reminder-due') && html.includes('.pending-card.is-reminder-due'), 'due-only red tab and card styles are missing');
 check(html.includes('--pending-accent: #f59e0b;') && html.includes('--pending-surface: #fffbeb;'), 'pre-due pending state must use the shared amber palette');
 check(html.includes('--pending-ink: #6f2f08;'), 'pending amber state must use the accessible warm-brown ink token');
@@ -129,7 +132,7 @@ check(html.includes('#tab-pending.active:not(.is-reminder-due)') && html.include
 check(html.includes('background: linear-gradient(135deg, var(--pending-accent-light) 0%, var(--pending-accent) 100%);'), 'pre-due pending actions must use the accessible shared amber palette');
 check(html.includes('color: var(--pending-ink);'), 'amber actions and headings must use readable warm-brown text');
 check(html.includes('.pending-action-btn.secondary') && html.includes('background: #fff7e0;'), 'secondary paper actions must use a quieter pale-amber hierarchy');
-check(html.includes("<div class='pending-card-status'>記得儘快處理</div>"), 'due cards must use the approved natural reminder copy');
+check(html.includes("<div class='pending-card-status'>\" + (taskReminderDue ? \"逾期未完成\" : \"待完成\") + \"</div>"), 'every card must expose its overdue or pending status in text');
 check(!html.includes("<div class='pending-card-status'>提醒時間已到</div>"), 'due cards must not expose the mechanical reminder-time status');
 check(html.includes('.pending-card.is-reminder-due .pending-action-btn'), 'due-card actions must use the same reminder color family as the card state');
 check(html.includes('background: linear-gradient(135deg, #e11d48 0%, #be123c 100%);'), 'due actions must keep white text on the accessible deep-red gradient');
@@ -297,7 +300,10 @@ async function checkPendingReminderBehavior() {
     isAdminMode: false,
     isDashboardDraftPreviewMode: false,
     gData: { pendingPolicy: { loginReminder: true } },
-    pendingTasksState: { status: 'ready', items: [{ taskId: 'due-task', title: 'private title' }] },
+    pendingTasksState: { status: 'ready', items: [
+      { taskId: 'due-task', title: 'private title' },
+      { taskId: 'future-task', title: 'future private title' },
+    ] },
     pendingReminderShownSessionIdentity: '',
     getPendingReminderDeliveryIdentity: () => 'stable-login-session|due-slot',
     wasPendingReminderShownInBrowserSession: identity => persistedReminderIdentities.has(identity),
@@ -305,7 +311,8 @@ async function checkPendingReminderBehavior() {
     window: { EbookPendingTasks: { getReminderDueItems: () => [{ taskId: 'due-task' }] } },
     swalAlert(title, text, icon, confirmText, options) {
       alertCalls += 1;
-      check(title === '溫馨小提醒', 'behavior popup title must remain neutral');
+      check(title === '逾期未完成提醒', 'behavior popup title must identify the overdue state');
+      check(text === '目前有 1 項課務已逾期，請記得儘快處理。\n另外還有 1 項尚未逾期的待完成事項。', 'behavior popup must explain both overdue and neutral pending counts');
       check(!text.includes('private title'), 'behavior popup must not expose individual task details');
       check(icon === 'warning' && confirmText === '查看待完成', 'behavior popup must use the expected warning action');
       check(options && options.iconColor === '#e11d48' && options.confirmButtonColor === '#e11d48', 'behavior popup must apply warning red options through swalAlert');

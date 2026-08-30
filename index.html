@@ -1425,10 +1425,32 @@
             font-weight: 800;
             line-height: 1.55;
         }
+        .pending-page-summary {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 5px;
+            font-size: 0.98rem;
+            font-weight: 950;
+        }
+        .pending-summary-separator {
+            color: #94a3b8;
+        }
+        .pending-summary-due {
+            color: #be123c;
+        }
+        .pending-summary-open {
+            color: var(--pending-ink);
+        }
+        .pending-page-note {
+            margin-top: 3px;
+            color: #64748b;
+            font-size: 0.84rem;
+            font-weight: 750;
+        }
         .pending-page.is-reminder-due .pending-page-intro {
             border-color: #fecdd3;
             background: #fff1f2;
-            color: #9f1239;
         }
         .pending-list {
             display: grid;
@@ -1452,10 +1474,14 @@
             margin-top: 8px;
             padding: 4px 9px;
             border-radius: 999px;
-            background: #fff1f2;
-            color: #be123c;
+            background: var(--pending-badge);
+            color: var(--pending-ink);
             font-size: 0.78rem;
             font-weight: 900;
+        }
+        .pending-card.is-reminder-due .pending-card-status {
+            background: #fff1f2;
+            color: #be123c;
         }
         .pending-reminder-swal {
             border: 2px solid #fecdd3;
@@ -1463,6 +1489,10 @@
         }
         .pending-reminder-swal-title {
             color: #be123c;
+        }
+        .pending-reminder-swal-copy {
+            white-space: pre-line;
+            line-height: 1.7;
         }
         .pending-card-head {
             display: flex;
@@ -7611,15 +7641,23 @@
                 if (item && item.taskId) result[item.taskId] = true;
                 return result;
             }, {});
-            badge.textContent = isReady && items.length ? String(reminderDue ? reminderDueItems.length : items.length) : '';
+            var openPendingCount = Math.max(0, items.length - reminderDueItems.length);
+            badge.textContent = isReady && items.length ? String(items.length) : '';
             badge.classList.toggle('is-visible', isReady && items.length > 0);
             tab.classList.toggle('is-reminder-due', reminderDue);
-            tab.setAttribute('aria-label', reminderDue ? '待完成，有 ' + reminderDueItems.length + ' 項需要留意' : '待完成');
+            tab.setAttribute('aria-label', reminderDue
+                ? '待完成，共 ' + items.length + ' 項，其中 ' + reminderDueItems.length + ' 項逾期未完成'
+                : (items.length ? '待完成，共 ' + items.length + ' 項' : '待完成'));
 
             var html = "<div class='pending-page" + (reminderDue ? " is-reminder-due" : "") + "'>" +
-                "<div class='pending-page-intro'>" + (reminderDue
-                    ? "目前有 " + reminderDueItems.length + " 項待完成的課務項目需要留意。完成回報或老師登記後，項目會自動從清單移除。"
-                    : "這裡整理目前尚待完成的課務項目。完成回報或老師登記後，項目會自動從清單移除。") + "</div>";
+                "<div class='pending-page-intro'>" + (isReady && items.length
+                    ? "<div class='pending-page-summary'>" + (reminderDue
+                        ? "<span class='pending-summary-due'>逾期未完成 " + reminderDueItems.length + " 項</span>" +
+                            "<span class='pending-summary-separator' aria-hidden='true'>｜</span>" +
+                            "<span class='pending-summary-open'>待完成 " + openPendingCount + " 項</span>"
+                        : "<span class='pending-summary-open'>待完成 " + items.length + " 項</span>") + "</div>"
+                    : "<div class='pending-page-summary'><span class='pending-summary-open'>待完成</span></div>") +
+                    "<div class='pending-page-note'>完成回報或老師登記後，項目會自動從清單移除。</div></div>";
             if (!isReady) {
                 html += "<div class='pending-unavailable'>待完成資料目前無法安全確認。為避免顯示錯誤清單，這次不會顯示數量，請重新整理後再試。</div></div>";
                 container.innerHTML = html;
@@ -7631,7 +7669,13 @@
                 return;
             }
             html += "<div class='pending-list'>";
-            items.forEach(function(task) {
+            var displayItems = items.map(function(task, index) {
+                return { task: task, index: index, isDue: !!reminderDueTaskIds[task && task.taskId] };
+            }).sort(function(left, right) {
+                if (left.isDue !== right.isDue) return left.isDue ? -1 : 1;
+                return left.index - right.index;
+            }).map(function(entry) { return entry.task; });
+            displayItems.forEach(function(task) {
                 var primaryTargetKind = getPendingTaskPrimaryTargetKind(task);
                 var taskReminderDue = !!reminderDueTaskIds[task.taskId];
                 var pendingTitle = window.EbookPendingTasks &&
@@ -7650,7 +7694,7 @@
                     "<div class='pending-card-head'><div class='pending-card-label'>" + escapeHtml(task.neutralLabel || '待完成項目') + "</div>" +
                     "<div class='pending-card-date'>" + escapeHtml(task.date || '') + "</div></div>" +
                     "<div class='pending-card-title'>" + escapeHtml(pendingTitle) + "</div>" +
-                    (taskReminderDue ? "<div class='pending-card-status'>記得儘快處理</div>" : '') +
+                    "<div class='pending-card-status'>" + (taskReminderDue ? "逾期未完成" : "待完成") + "</div>" +
                     (task.sourceClassName && task.sourceClassName !== (gData && gData.className) ? "<div class='pending-card-source'>來源：" + escapeHtml(task.sourceClassName) + "</div>" : '') +
                     "<div class='pending-card-actions'>" +
                     buildPendingTaskActionButton(task, primaryTargetKind, getPendingTaskPrimaryActionLabel(task), '') +
@@ -7838,6 +7882,10 @@
                 ? window.EbookPendingTasks.getReminderDueItems(pendingTasksState)
                 : [];
             if (!reminderDueItems.length) return;
+            var allPendingItems = pendingTasksState && Array.isArray(pendingTasksState.items)
+                ? pendingTasksState.items
+                : [];
+            var openPendingCount = Math.max(0, allPendingItems.length - reminderDueItems.length);
             var identity = getPendingReminderDeliveryIdentity();
             if (identity && (pendingReminderShownSessionIdentity === identity || wasPendingReminderShownInBrowserSession(identity))) {
                 pendingEntryReminderHandled = true;
@@ -7848,8 +7896,9 @@
             pendingReminderShownSessionIdentity = identity;
             markPendingReminderShownInBrowserSession(identity);
             swalAlert(
-                '溫馨小提醒',
-                '還有 ' + reminderDueItems.length + ' 項課務尚待完成，記得儘快處理喔！',
+                '逾期未完成提醒',
+                '目前有 ' + reminderDueItems.length + ' 項課務已逾期，請記得儘快處理。' +
+                    (openPendingCount ? '\n另外還有 ' + openPendingCount + ' 項尚未逾期的待完成事項。' : ''),
                 'warning',
                 '查看待完成',
                 {
@@ -7857,7 +7906,8 @@
                     confirmButtonColor: '#e11d48',
                     customClass: {
                         popup: 'pending-reminder-swal',
-                        title: 'pending-reminder-swal-title'
+                        title: 'pending-reminder-swal-title',
+                        htmlContainer: 'pending-reminder-swal-copy'
                     }
                 }
             ).then(function(result) {
