@@ -31,6 +31,7 @@ function extractFunction(name) {
 const context = { BEAR_SUBJECT: '/math' };
 vm.createContext(context);
 vm.runInContext(extractFunction('getTeacherInfo'), context);
+vm.runInContext(extractFunction('getEbookClassTitle'), context);
 
 for (const className of ['115資優數學', '115小六資優數學', '115小六資優數學班']) {
   assert.deepEqual(JSON.parse(JSON.stringify(context.getTeacherInfo(className))), { name: '東', fullName: '小東老師' });
@@ -39,4 +40,9 @@ for (const className of ['115國一數學超前班', '115國二數學超前班',
   assert.deepEqual(JSON.parse(JSON.stringify(context.getTeacherInfo(className))), { name: '翔', fullName: '李翔老師' });
 }
 assert.deepEqual(JSON.parse(JSON.stringify(context.getTeacherInfo('115國一進度數學'))), { name: '數學', fullName: '數學老師' });
+assert.equal(context.getEbookClassTitle('115數學超前'), '國一數學超前班');
+assert.equal(context.getEbookClassTitle('115資優數學'), '小六資優數學');
+assert.equal(context.getEbookClassTitle('115國二數學超前班'), '國二數學超前班');
+assert.match(html, /headClass'\)[.]innerText = getEbookClassTitle\(payload[.]className\)/);
+assert.match(html, /headClass'\)[.]innerText = getEbookClassTitle\(result[.]className\)/);
 console.log('eBook math teacher mapping smoke passed');

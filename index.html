@@ -6001,6 +6001,16 @@
         return { name: "喵", fullName: "阿喵老師" };
     }
 
+    function getEbookClassTitle(className) {
+        var raw = (className || '').toString().trim();
+        var normalized = raw.replace(/[\s_]/g, '');
+        if (BEAR_SUBJECT === '/math') {
+            if (normalized === '115數學超前' || normalized === '115數學超前班') return '國一數學超前班';
+            if (normalized === '115資優數學' || normalized === '115小六資優數學' || normalized === '115小六資優數學班') return '小六資優數學';
+        }
+        return raw.replace(/^\d{3,4}/, '');
+    }
+
     function isHomePracticeScoreTitle(title) {
         return (title || "").toString().indexOf("回家練習卷") > -1;
     }
@@ -8067,7 +8077,7 @@
             document.getElementById('admin-screen').style.display = 'none';
             document.getElementById('main-screen').style.display = 'block';
             document.getElementById('headName').innerText = payload.studentName || '家長端預覽';
-            document.getElementById('headClass').innerText = payload.className.replace(/\d+/g, '');
+            document.getElementById('headClass').innerText = getEbookClassTitle(payload.className);
             document.getElementById('headStickerCount').innerText = '0';
             var previewBanner = '<div class="draft-preview-banner">Dashboard 發佈前預覽：這裡使用 eBook 家長端畫面渲染。外部連結可以點開檢查；留言、上傳、補考回報、棒卡與改密碼已停用。</div>';
             gData = {
@@ -8467,7 +8477,7 @@
             document.getElementById('admin-screen').style.display = 'none';
             document.getElementById('main-screen').style.display = 'block';
             document.getElementById('headName').innerText = result.studentName;
-            document.getElementById('headClass').innerText = result.className.replace(/\d+/g, '');
+            document.getElementById('headClass').innerText = getEbookClassTitle(result.className);
             var initStickerCount = result.stickers || 0; // fallback if FB not ready
             document.getElementById('headStickers').style.display = 'inline-flex';
             document.getElementById('headStickerCount').innerText = initStickerCount;
