@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Deploy marker: ebook-score-max-200-20260831 -->
 <!-- Deploy marker: ebook-bulletin-queue-permanent-required-until-v4-20260823 -->
 <html>
 
@@ -12986,18 +12987,20 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 "</div></div>";
         }
 
+        var EBOOK_SCORE_MAX = 200;
+
         function getGodEditableScore(exam) {
             var raw = exam && exam.score !== undefined && exam.score !== null ? String(exam.score).trim() : '';
             if (!/^\d+(\.\d+)?(假)?$/.test(raw)) return '';
             var scoreNumber = parseFloat(raw);
-            return Number.isFinite(scoreNumber) && scoreNumber >= 0 && scoreNumber <= 100 ? raw : '';
+            return Number.isFinite(scoreNumber) && scoreNumber >= 0 && scoreNumber <= EBOOK_SCORE_MAX ? raw : '';
         }
 
         function getGodEditableScoreInfo(scoreValue) {
             var raw = scoreValue === undefined || scoreValue === null ? '' : String(scoreValue).trim();
             var match = raw.match(/^(\d+(?:\.\d+)?)(假)?$/);
             var scoreNumber = match ? Number(match[1]) : NaN;
-            if (!match || !Number.isFinite(scoreNumber) || scoreNumber < 0 || scoreNumber > 100) return null;
+            if (!match || !Number.isFinite(scoreNumber) || scoreNumber < 0 || scoreNumber > EBOOK_SCORE_MAX) return null;
             return {
                 storedScore: raw,
                 numericScore: match[1],
@@ -13021,7 +13024,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             return "<div class='god-score-edit-box'>" +
                 "<div class='god-score-edit-title'>老師修改分數｜目前 " + escapeAdminHtml(getGodScoreHumanLabel(context.currentScore)) + "</div>" +
                 "<div class='god-score-edit-row'>" +
-                "<input type='number' inputmode='decimal' step='0.1' min='0' max='100' class='god-score-edit-input' id='god-score-edit-input-" + contextKey + "' value='" + escapeAdminHtml(currentInfo.numericScore) + "' aria-label='修改分數' autocomplete='off'>" +
+                "<input type='number' inputmode='decimal' step='0.1' min='0' max='" + EBOOK_SCORE_MAX + "' class='god-score-edit-input' id='god-score-edit-input-" + contextKey + "' value='" + escapeAdminHtml(currentInfo.numericScore) + "' aria-label='修改分數' autocomplete='off'>" +
                 "<button type='button' class='god-score-edit-btn' onclick=\"writeGodScoreCorrection(this, '" + contextKey + "')\">修改分數</button>" +
                 "</div>" +
                 absenceOption +
@@ -13060,7 +13063,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 scoreHtml = "<div style='background:#fff; border:1px solid #fecaca; border-radius:10px; padding:10px; margin-bottom:10px;'>" +
                     "<div style='font-size:0.9rem; font-weight:900; color:#dc2626; margin-bottom:8px;'>老師直接回填缺考分數</div>" +
                     "<div class='god-direct-score-row'>" +
-                    "<input type='number' inputmode='decimal' step='0.1' min='0' max='100' class='god-direct-score-input' id='god-direct-score-input-" + contextKey + "' placeholder='輸入分數' aria-label='老師回填缺考分數'>" +
+                    "<input type='number' inputmode='decimal' step='0.1' min='0' max='" + EBOOK_SCORE_MAX + "' class='god-direct-score-input' id='god-direct-score-input-" + contextKey + "' placeholder='輸入分數' aria-label='老師回填缺考分數'>" +
                     "<button type='button' class='admin-btn btn-green god-direct-score-btn' onclick=\"writeGodDirectMakeupScore(this, '" + contextKey + "')\">回填</button>" +
                     "</div></div>";
             }
@@ -13107,12 +13110,12 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 return;
             }
             if (!/^\d+(\.\d+)?$/.test(nextNumericScore)) {
-                swalAlert('分數格式不正確', '請輸入 0 到 100 的數字；請假回報註記請使用下方勾選框。', 'warning');
+                swalAlert('分數格式不正確', '請輸入 0 到 ' + EBOOK_SCORE_MAX + ' 的數字；請假回報註記請使用下方勾選框。', 'warning');
                 return;
             }
             var scoreNumber = parseFloat(nextNumericScore);
-            if (!Number.isFinite(scoreNumber) || scoreNumber < 0 || scoreNumber > 100) {
-                swalAlert('分數超出範圍', '分數請填 0 到 100。', 'warning');
+            if (!Number.isFinite(scoreNumber) || scoreNumber < 0 || scoreNumber > EBOOK_SCORE_MAX) {
+                swalAlert('分數超出範圍', '分數請填 0 到 ' + EBOOK_SCORE_MAX + '。', 'warning');
                 return;
             }
             if (nextScore === context.currentScore) {
@@ -13708,8 +13711,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 return;
             }
             var scoreNum = parseFloat(scoreText);
-            if (isNaN(scoreNum) || scoreNum < 0 || scoreNum > 100) {
-                swalAlert('分數超出範圍', '分數請填 0 到 100。', 'warning');
+            if (isNaN(scoreNum) || scoreNum < 0 || scoreNum > EBOOK_SCORE_MAX) {
+                swalAlert('分數超出範圍', '分數請填 0 到 ' + EBOOK_SCORE_MAX + '。', 'warning');
                 return;
             }
             var finalScore = scoreText + '假';

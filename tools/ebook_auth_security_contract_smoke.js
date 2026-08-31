@@ -334,7 +334,10 @@ checkIncludes(scoreCorrectionUi, 'createStableEbookRequestId', 'god score correc
 const scoreWriteTargetFn = extractFunction(functionsSource, 'assertEbookScoreWriteTarget');
 checkIncludes(scoreWriteTargetFn, 'payload.teacherScoreCorrection === true', 'score write target validation must distinguish corrections from absence writeback');
 checkIncludes(scoreWriteTargetFn, 'rawScore !== expectedCurrentScore', 'score correction must reject stale overwrite attempts');
-checkIncludes(scoreWriteTargetFn, 'correctionNumber > 100', 'score correction must enforce the 0 to 100 range server-side');
+checkIncludes(functionsSource, 'const EBOOK_SCORE_MAX = 200', 'score writeback must support bounded bonus-point exams');
+checkIncludes(scoreWriteTargetFn, 'correctionNumber > EBOOK_SCORE_MAX', 'score correction must enforce the shared server-side ceiling');
+checkIncludes(scoreWriteTargetFn, 'scoreNumber > EBOOK_SCORE_MAX', 'absence score writeback must enforce the shared server-side ceiling');
+checkIncludes(html, 'var EBOOK_SCORE_MAX = 200', 'teacher score UI must expose the same bounded score ceiling');
 
 function checkStableGodUi(functionSource, label) {
   check(!/clientRequestId:\s*createClientRequestId\(/.test(functionSource), `${label} must not generate a fresh ID for every retry`);

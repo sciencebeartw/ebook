@@ -32,6 +32,7 @@ function extractFunction(name) {
 const context = vm.createContext({
   Number,
   String,
+  EBOOK_SCORE_MAX: 200,
   window: { adminModeScoreEditContext: {} },
   escapeAdminHtml: value => String(value)
 });
@@ -46,6 +47,8 @@ assert.deepStrictEqual(JSON.parse(JSON.stringify(info)), {
   hasAbsenceMarker: true
 });
 assert.strictEqual(context.getGodScoreHumanLabel("92假"), "92（請假回報）");
+assert.strictEqual(context.getGodEditableScoreInfo("105假").numericScore, "105");
+assert.strictEqual(context.getGodEditableScoreInfo("201假"), null);
 
 context.window.adminModeScoreEditContext.absent = {
   currentScore: "92假",
@@ -53,6 +56,7 @@ context.window.adminModeScoreEditContext.absent = {
 };
 let html = context.buildGodScoreEditBox("absent");
 assert.match(html, /type='number'/);
+assert.match(html, /max='200'/);
 assert.match(html, /value='92'/);
 assert.doesNotMatch(html, /value='92假'/);
 assert.match(html, /保留「請假回報」註記/);
