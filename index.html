@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Deploy marker: feedback-supersession-and-attachment-safety-20260905 -->
 <!-- Deploy marker: ebook-score-max-200-20260831 -->
 <!-- Deploy marker: ebook-bulletin-queue-permanent-required-until-v4-20260823 -->
 <html>
@@ -9490,14 +9491,10 @@
         var isFeedbackAttachmentUploading = false;
 
         function cleanupStudentUploadBatch() {
-            var paths = uploadBatchPaths.slice();
+            // 留言送出失敗可能只是回應遺失，不能刪除可能已被作業引用的圖片。
             uploadBatchPaths = [];
             uploadBatchUrls = [];
-            return Promise.all(paths.map(function(path) {
-                return ebookStorage.ref(path).delete().catch(function(err) {
-                    console.warn('清理未完成作業附件失敗:', path, err);
-                });
-            }));
+            return Promise.resolve();
         }
 
         function formatUploadSize(bytes) {
@@ -9849,14 +9846,9 @@
         }
 
         function discardUploadedFeedbackDraft(draft) {
-            var uploaded = draft && Array.isArray(draft.uploaded) ? draft.uploaded.slice() : [];
+            // 回覆可能已寫入、但客戶端未收到成功結果；草稿移除不能推論雲端檔案未使用。
+            // 僅解除本機草稿引用。確定尚未送出的一批上傳失敗仍由 upload helper 清理。
             if (draft) draft.uploaded = [];
-            uploaded.forEach(function(item) {
-                if (!item || !item.path) return;
-                ebookStorage.ref(item.path).delete().catch(function(err) {
-                    console.warn('清理未送出留言附件失敗:', item.path, err);
-                });
-            });
         }
 
         function registerStudentFeedbackComposer(contextKey, context) {
@@ -9868,6 +9860,10 @@
         }
 
         function stageStudentFeedbackAttachments(input, contextKey, dateStr) {
+            if (isFeedbackAttachmentUploading) {
+                swalAlert('正在送出', '請等這則留言送出完成後再變更附件。', 'info');
+                return;
+            }
             var files = input && input.files ? Array.from(input.files) : [];
             var key = makeDomSafeId(contextKey || getSafeDateId(dateStr));
             if (!studentFeedbackComposerContexts[key]) {
@@ -9902,6 +9898,10 @@
         }
 
         function removeStudentFeedbackAttachment(contextKey, index) {
+            if (isFeedbackAttachmentUploading) {
+                swalAlert('正在送出', '請等這則留言送出完成後再變更附件。', 'info');
+                return;
+            }
             var key = makeDomSafeId(contextKey || "");
             var draft = studentFeedbackAttachmentDrafts[key] || { files: [] };
             discardUploadedFeedbackDraft(draft);
