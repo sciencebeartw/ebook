@@ -4629,7 +4629,7 @@
          payload.clientRequestId = pendingEbookRequestIds[requestFingerprint] || createClientRequestId(action);
          pendingEbookRequestIds[requestFingerprint] = payload.clientRequestId;
       }
-      ebookFunctions.httpsCallable("runEbookStudentAction")({ action: action, data: payload })
+      ebookFunctions.httpsCallable("runEbookStudentAction", { timeout: 180000 })({ action: action, data: payload })
       .then(function(callResult) {
          var result = callResult && callResult.data ? callResult.data.result : null;
          if (result && result.success === true) delete pendingEbookRequestIds[requestFingerprint];
@@ -12747,7 +12747,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         }
 
         function getGodSessionCallable(name) {
-            return ebookFunctions.httpsCallable(name);
+            return ebookFunctions.httpsCallable(name, name === 'runEbookGodAdminAction' ? { timeout: 180000 } : undefined);
         }
 
         function markEbookGodSessionActivity() {

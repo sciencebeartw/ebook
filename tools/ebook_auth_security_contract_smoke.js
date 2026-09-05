@@ -196,7 +196,7 @@ checkIncludes(functionsSource, 'exports.pruneExpiredEbookSessions', 'expired eBo
 checkIncludes(functionsSource, 'admin.auth().deleteUsers(authUids)', 'cleanup must remove ephemeral Firebase Auth users as well as RTDB sessions');
 
 // 3. All student writes must use the authenticated callable and stable request IDs.
-checkIncludes(html, 'ebookFunctions.httpsCallable("runEbookStudentAction")', 'student writes must call runEbookStudentAction');
+checkIncludes(html, 'ebookFunctions.httpsCallable("runEbookStudentAction", { timeout: 180000 })', 'student writes must call runEbookStudentAction and wait for the durable sheet lane');
 check(!html.includes('const SCRIPT_URLS ='), 'browser must not call the privileged GAS endpoint directly');
 checkIncludes(functionsSource, 'exports.runEbookStudentAction', 'runEbookStudentAction callable must be exported');
 const runStudentAction = extractBalancedBlock(functionsSource, 'exports.runEbookStudentAction');
@@ -271,7 +271,8 @@ checkIncludes(html, 'uploadBatchPaths.push(res.path || path)', 'successful uploa
 const uploadHelper = extractFunction(html, 'uploadToFirebase');
 checkIncludes(uploadHelper, 'path: path', 'upload helper must return the exact uploaded Storage path');
 const cleanupUpload = extractFunction(html, 'cleanupStudentUploadBatch');
-checkIncludes(cleanupUpload, 'ebookStorage.ref(path).delete()', 'rollback must delete each uploaded path');
+checkIncludes(cleanupUpload, 'uploadBatchPaths = []', 'ambiguous feedback failure must forget local batch state without deleting possibly referenced uploads');
+check(!cleanupUpload.includes('ebookStorage.ref(path).delete()'), 'ambiguous feedback failure must not delete uploads that the durable write may already reference');
 const processUploadQueue = extractFunction(html, 'processUploadQueue');
 checkIncludes(processUploadQueue, 'cleanupStudentUploadBatch()', 'feedback write failure must trigger attachment rollback');
 
