@@ -168,10 +168,11 @@ const renderSource = html.slice(renderStart, renderEnd > renderStart ? renderEnd
 if (renderSource.indexOf('var gradeHtml = examCards.map') === -1 ||
     renderSource.indexOf('var sessionBadge = buildDailyPostSessionBadge(post)') === -1 ||
     renderSource.indexOf('headerTitle + sessionBadge + transferBadge') === -1 ||
-    renderSource.indexOf('var headerTitle = buildDailyPostHeaderTitle(post)') === -1) {
+    renderSource.indexOf('var headerTitle = buildDailyPostHeaderTitle(post, SVG.calendar)') === -1) {
   throw new Error('session badge must remain a header-only addition independent of grade/paper card rendering');
 }
 
+vm.runInContext(extractFunction('getEbookClassTitle'), context);
 const headerSource = extractFunction('buildDailyPostHeaderTitle');
 vm.runInContext(headerSource, context);
 const numberedDefaultHeader = context.buildDailyPostHeaderTitle({
@@ -180,9 +181,12 @@ const numberedDefaultHeader = context.buildDailyPostHeaderTitle({
   className: '115小六資優自然週六上午班',
 });
 if (!numberedDefaultHeader.includes("post-lesson-badge") ||
+    !numberedDefaultHeader.includes('post-header-date-group') ||
+    !numberedDefaultHeader.includes('post-header-meta') ||
+    !numberedDefaultHeader.includes('post-header-class-name') ||
     !numberedDefaultHeader.includes('第2期第9堂') ||
     !numberedDefaultHeader.includes('小六資優自然週六上午班')) {
-  throw new Error('numbered post header must show the 12-lesson term badge and retain the full class title');
+  throw new Error('numbered post header must separate the large date, 12-lesson term badge, and class title');
 }
 const termBoundaryHeader = context.buildDailyPostHeaderTitle({ date: '2026/10/17', title: '第25堂｜小六資優自然週六上午班' });
 if (!termBoundaryHeader.includes('第3期第1堂')) {
@@ -215,7 +219,10 @@ if (!legacyHeader.includes('原有標題') || legacyHeader.includes('post-lesson
   'buildHomeworkUploadNote(post, item.val)',
   'displayOptions: parseDailyPostDisplayOptions(post.displayOptions)',
   'var sessionBadge = buildDailyPostSessionBadge(post)',
-  'buildDailyPostHeaderTitle(post)',
+  'buildDailyPostHeaderTitle(post, SVG.calendar)',
+  '.post-header-date-group',
+  '.post-header-meta',
+  '.post-header-class-name',
   '.post-lesson-badge',
   '.post-session-badge'
 ].forEach((needle) => {
