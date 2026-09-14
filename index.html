@@ -10219,7 +10219,10 @@
 
             var lessonNumber = Number(lessonMatch[1]);
             var remainingTitle = (lessonMatch[2] || "").trim();
-            var lessonHtml = "<span class='post-lesson-badge' aria-label='第 " + lessonNumber + " 堂'>第" + lessonNumber + "堂</span>";
+            var termNumber = Math.ceil(lessonNumber / 12);
+            var lessonInTerm = ((lessonNumber - 1) % 12) + 1;
+            var lessonLabel = "第" + termNumber + "期第" + lessonInTerm + "堂";
+            var lessonHtml = "<span class='post-lesson-badge' aria-label='" + lessonLabel + "'>" + lessonLabel + "</span>";
             var customTitleHtml = remainingTitle
                 ? "<span class='post-header-custom-title'>" + escapeHtml(remainingTitle) + "</span>"
                 : "";

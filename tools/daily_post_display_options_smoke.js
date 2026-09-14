@@ -180,9 +180,13 @@ const numberedDefaultHeader = context.buildDailyPostHeaderTitle({
   className: '115小六資優自然週六上午班',
 });
 if (!numberedDefaultHeader.includes("post-lesson-badge") ||
-    !numberedDefaultHeader.includes('第21堂') ||
+    !numberedDefaultHeader.includes('第2期第9堂') ||
     !numberedDefaultHeader.includes('小六資優自然週六上午班')) {
-  throw new Error('numbered post header must use a lesson badge and retain the full class title');
+  throw new Error('numbered post header must show the 12-lesson term badge and retain the full class title');
+}
+const termBoundaryHeader = context.buildDailyPostHeaderTitle({ date: '2026/10/17', title: '第25堂｜小六資優自然週六上午班' });
+if (!termBoundaryHeader.includes('第3期第1堂')) {
+  throw new Error('lesson 25 must start term 3 at lesson 1');
 }
 const numberedCustomHeader = context.buildDailyPostHeaderTitle({
   date: '2026/09/19',
