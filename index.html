@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Deploy marker: holiday-session-workflow-20260914 -->
+<!-- Deploy marker: holiday-session-workflow-20260914; holiday-transfer-note-fix-20260915 -->
 <!-- Deploy marker: ebook-home-practice-missing-and-makeup-fields-20260914 -->
 <!-- Deploy marker: feedback-supersession-and-attachment-safety-20260905 -->
 <!-- Deploy marker: ebook-score-max-200-20260831 -->
@@ -26,7 +26,7 @@
     <!-- External Resources -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
     <script src="class_session_plan.js?v=holiday-20260914"></script>
-    <script src="holiday_practice_app.js?v=holiday-20260914"></script>
+    <script src="holiday_practice_app.js?v=holiday-transfer-20260915"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         [data-holiday-card] .holiday-unlock-btn { background: linear-gradient(135deg, #7c3aed, #6d28d9); box-shadow: 0 3px 8px rgba(109,40,217,.22); }
@@ -5465,6 +5465,7 @@
             sourceColKey: colKey,
             mapped: false
         };
+        if (grade.assessmentKind === 'holiday_self_marked') return fallback;
         var sourceClassKey = presentation.sourceClassKey || storedClassKey;
         if (!presentation.isTransferFormerClass || !sourceClassKey || sourceClassKey === storedClassKey) return fallback;
 
@@ -5621,7 +5622,7 @@
             const isMissing = isNaN(studentScoreNum) && (eData.score || "").indexOf("尚未繳交") === -1;
 
             fullGradeList.push({
-                assessmentKind: eData.assessmentKind || '', sourceAssignmentId: eData.sourceAssignmentId || '', dueAt: eData.dueAt || 0,
+                assessmentKind: eData.assessmentKind || '', sourceAssignmentId: eData.sourceAssignmentId || '', dueAt: eData.dueAt || 0, originClassName: eData.originClassName || '',
                 className: presentation.className,
                 sourceClassKey: presentation.sourceClassKey,
                 sourceClassName: presentation.sourceClassName,
@@ -11200,8 +11201,15 @@
                     if (/補充|備註/.test(text)) return 'note';
                     return 'progress';
                 }
+                function hasPostInfoContent(value) {
+                    var template = document.createElement('template');
+                    template.innerHTML = String(value == null ? '' : value);
+                    var text = (template.content.textContent || '').replace(/[\s\u200b-\u200d\ufeff]/g, '');
+                    return !!text || !!template.content.querySelector('img[src], video[src], audio[src], iframe[src], object[data], embed[src], source[src], svg, canvas, hr');
+                }
                 function renderPostInfoBlock(f) {
                     if (!f.val && !f.extra) return "";
+                    if (f.label === '補充資訊' && !hasPostInfoContent(f.val) && !hasPostInfoContent(f.extra)) return "";
                     var kind = getPostInfoKind(f.label);
                     var noteHtml = f.labelNote ? "<span class='info-label-note'>" + f.labelNote + "</span>" : "";
                     var pendingExamPaperAttr = kind === 'quiz'

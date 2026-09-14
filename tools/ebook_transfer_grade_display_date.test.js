@@ -216,3 +216,7 @@ assert.match(html, /targetExamId:\s*item\.storedExamId \|\| item\.examId/);
 assert.match(html, /targetExamId:\s*exam\.storedExamId \|\| exam\.examId/);
 
 console.log("ebook transfer grade display date tests passed");
+
+const holidayExact = resolveCai({ date: '7/19回家練習卷', examName: '理化第2章', assessmentKind: 'holiday_self_marked', sourceAssignmentId: 'holiday_exact' }, 'col_20');
+assert.strictEqual(holidayExact.date, '7/19回家練習卷', 'self-marked assignment date must never be guessed from a similarly titled old quiz');
+assert.strictEqual(holidayExact.mapped, false);

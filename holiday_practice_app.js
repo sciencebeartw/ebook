@@ -124,8 +124,8 @@
             return '<div class="homework-done-box" id="holiday-card-' + esc(a.assignmentId) + '" data-holiday-card="1">' + body(post) + '</div>';
         },
         contextMap: function() { return contexts; },
-        assignmentForExam: function(exam) { return ((contexts[exam.storedClassName || exam.sourceClassName || gData.className] || {}).assignments || {})[exam.sourceAssignmentId] || exam; },
-        progressForExam: function(exam) { return ((contexts[exam.storedClassName || exam.sourceClassName || gData.className] || {}).progress || {})[exam.sourceAssignmentId] || null; }
+        assignmentForExam: function(exam) { return ((contexts[exam.originClassName || exam.storedClassName || exam.sourceClassName || gData.className] || {}).assignments || {})[exam.sourceAssignmentId] || exam; },
+        progressForExam: function(exam) { return ((contexts[exam.originClassName || exam.storedClassName || exam.sourceClassName || gData.className] || {}).progress || {})[exam.sourceAssignmentId] || null; }
     };
     root.getHolidayProgressForExam = root.HolidayPracticeApp.progressForExam;
 })(window);
