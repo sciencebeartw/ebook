@@ -200,6 +200,18 @@ const numberedCustomHeader = context.buildDailyPostHeaderTitle({
 if (!numberedCustomHeader.includes('post-header-custom-title') || !numberedCustomHeader.includes('中秋前一週')) {
   throw new Error('numbered post header must retain a meaningful custom title');
 }
+['國一', '國二'].forEach(grade => {
+  const advancedClassName = `115${grade}自然超前班`;
+  const advancedHeader = context.buildDailyPostHeaderTitle({
+    date: '2026/09/19',
+    title: `第21堂｜${grade}自然超前`,
+    className: advancedClassName,
+  });
+  if (advancedHeader.includes('post-header-custom-title') ||
+      advancedHeader.split(`${grade}自然超前`).length !== 2) {
+    throw new Error(`${grade}自然超前班名稱不可重複成為自訂標題`);
+  }
+});
 const legacyHeader = context.buildDailyPostHeaderTitle({ date: '2026/09/12', title: '原有標題' });
 if (!legacyHeader.includes('原有標題') || legacyHeader.includes('post-lesson-badge')) {
   throw new Error('legacy unnumbered post titles must remain unchanged');

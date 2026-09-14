@@ -10350,8 +10350,8 @@
                 displayClassName = getEbookClassTitle(remainingTitle);
                 remainingTitle = "";
             }
-            var comparableClassName = displayClassName.replace(/[\s_]/g, "");
-            var comparableRemainingTitle = getEbookClassTitle(remainingTitle).replace(/[\s_]/g, "");
+            var comparableClassName = displayClassName.replace(/[\s_]/g, "").replace(/班$/, "");
+            var comparableRemainingTitle = getEbookClassTitle(remainingTitle).replace(/[\s_]/g, "").replace(/班$/, "");
             if (comparableRemainingTitle && comparableRemainingTitle === comparableClassName) remainingTitle = "";
 
             var classHtml = displayClassName

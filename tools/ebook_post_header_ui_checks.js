@@ -86,6 +86,21 @@ async (page) => {
       if (document.documentElement.scrollWidth > innerWidth) {
         throw new Error('轉班前紀錄使標題產生橫向溢位');
       }
+
+      ['國一', '國二'].forEach(grade => {
+        const advancedPost = Object.assign({}, post, {
+          title: `第21堂｜${grade}自然超前`,
+          className: `115${grade}自然超前班`,
+          sourceClassName: `115${grade}自然超前班`,
+          isTransferFormerClass: false,
+        });
+        renderDailyPosts([advancedPost], history);
+        const headerText = document.querySelector('.post-header').textContent;
+        if (document.querySelector('.post-header-custom-title') ||
+            headerText.split(`${grade}自然超前`).length !== 2) {
+          throw new Error(`${grade}自然超前班標題重複`);
+        }
+      });
       renderDailyPosts([post], history);
 
       return {
