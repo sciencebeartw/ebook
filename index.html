@@ -1948,7 +1948,7 @@
 
             .post-header-main {
                 display: grid;
-                grid-template-columns: max-content max-content;
+                grid-template-columns: max-content minmax(0, 1fr);
                 justify-content: start;
                 gap: 7px 8px;
                 align-items: center;
@@ -1965,6 +1965,15 @@
             .post-header-context-row {
                 grid-column: 1 / -1;
                 justify-content: flex-start;
+            }
+
+            .post-header-context-row.is-without-lesson {
+                grid-column: 2;
+                white-space: nowrap;
+            }
+
+            .post-header-context-row.is-without-lesson .post-header-class-name {
+                overflow-wrap: normal;
             }
 
             .post-header-class-name {
@@ -10365,8 +10374,9 @@
             var customTitleHtml = remainingTitle
                 ? "<span class='post-header-custom-title'>｜" + escapeHtml(remainingTitle) + "</span>"
                 : "";
+            var contextClassName = "post-header-context-row" + (lessonHtml ? "" : " is-without-lesson");
             var contextHtml = classHtml || customTitleHtml
-                ? "<span class='post-header-context-row'>" + classHtml + customTitleHtml + "</span>"
+                ? "<span class='" + contextClassName + "'>" + classHtml + customTitleHtml + "</span>"
                 : "";
             var metaHtml = lessonHtml || contextHtml
                 ? "<span class='post-header-meta'>" + lessonHtml + contextHtml + "</span>"

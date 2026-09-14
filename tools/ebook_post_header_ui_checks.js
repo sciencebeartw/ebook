@@ -87,6 +87,35 @@ async (page) => {
         throw new Error('轉班前紀錄使標題產生橫向溢位');
       }
 
+      [
+        { title: '國一數學超前', className: '115國一數學超前班', expected: '國一數學超前班' },
+        { title: '小六資優數學', className: '115小六資優數學', expected: '小六資優數學' },
+      ].forEach(mathCase => {
+        const mathPost = Object.assign({}, post, {
+          title: mathCase.title,
+          className: mathCase.className,
+          sourceClassName: mathCase.className,
+          isTransferFormerClass: false,
+        });
+        renderDailyPosts([mathPost], history);
+        const mathHeader = document.querySelector('.post-header');
+        const mathDateRect = mathHeader.querySelector('.post-header-date-group').getBoundingClientRect();
+        const mathClass = mathHeader.querySelector('.post-header-class-name');
+        const mathClassRect = mathClass.getBoundingClientRect();
+        if (mathClass.textContent.trim() !== mathCase.expected) {
+          throw new Error('數學班級名稱錯誤：' + mathClass.textContent.trim());
+        }
+        if (mathHeader.querySelector('.post-lesson-badge')) {
+          throw new Error('沒有堂數的數學聯絡簿仍顯示堂數標籤');
+        }
+        if (width <= 600 && Math.abs(mathDateRect.top - mathClassRect.top) > 3) {
+          throw new Error('沒有堂數的數學聯絡簿未與日期同列');
+        }
+        if (document.documentElement.scrollWidth > innerWidth) {
+          throw new Error('沒有堂數的數學聯絡簿使標題產生橫向溢位');
+        }
+      });
+
       ['國一', '國二'].forEach(grade => {
         const advancedPost = Object.assign({}, post, {
           title: `第21堂｜${grade}自然超前`,
