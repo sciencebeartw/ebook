@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Deploy marker: holiday-session-workflow-20260914; holiday-transfer-note-fix-20260915 -->
+<!-- Deploy marker: holiday-session-workflow-20260914; holiday-transfer-note-fix-20260915; ebook-section-hierarchy-20260915 -->
 <!-- Deploy marker: ebook-home-practice-missing-and-makeup-fields-20260914 -->
 <!-- Deploy marker: feedback-supersession-and-attachment-safety-20260905 -->
 <!-- Deploy marker: ebook-score-max-200-20260831 -->
@@ -2164,6 +2164,22 @@
             background: var(--primary);
             margin-right: 10px;
             border-radius: 3px;
+        }
+
+        .supplemental-info-section {
+            margin-top: 30px;
+        }
+
+        .supplemental-info-section .info-block {
+            margin-bottom: 0;
+        }
+
+        .student-learning-report {
+            margin-bottom: 30px;
+        }
+
+        .student-learning-report .compact-student-tool:last-child {
+            margin-bottom: 0;
         }
 
         .info-block {
@@ -10956,6 +10972,7 @@
                     return buildDailyPostExamCard(post, item.main, item.others || [], myHistory);
                 }).join("");
                 var contentHtml = "";
+                var supplementalInfoHtml = "";
 
                 // ★★★ v3.9 修正：連結解析邏輯 (支援小標籤) ★★★
                 var parseBtn = function (text, linkMode, customLabel, linkPrefix) {
@@ -11216,7 +11233,8 @@
                         ? buildPendingExamAnchorAttrs('data-pending-exam-paper-anchor', f.pendingExamPaper)
                         : "";
                     var pendingHomeworkAttr = kind === 'homework' ? " data-pending-homework-anchor='1'" : "";
-                    return "<section class='info-block info-kind-" + kind + "'" + pendingExamPaperAttr + pendingHomeworkAttr + "><div class='info-label'>" + f.label + "</div>" + noteHtml + "<div class='info-content'>" + parseBtn(f.val || "", f.linkMode || "auto", f.customLabel || "", f.linkPrefix || "") + (f.extra || "") + "</div></section>";
+                    var labelHtml = f.hideLabel ? "" : "<div class='info-label'>" + f.label + "</div>";
+                    return "<section class='info-block info-kind-" + kind + "'" + pendingExamPaperAttr + pendingHomeworkAttr + ">" + labelHtml + noteHtml + "<div class='info-content'>" + parseBtn(f.val || "", f.linkMode || "auto", f.customLabel || "", f.linkPrefix || "") + (f.extra || "") + "</div></section>";
                 }
                 function buildPostMakeupFields(postData, extraHtml) {
                     var lines = splitPostMultiLinkValue(postData.makeup || "");
@@ -11252,8 +11270,15 @@
                     if (hwIdx === homeworkItems.length - 1) extra += buildHomeworkDoneButton(post);
                     fields.push({ label: item.label, val: item.val, extra: extra, linkMode: getDailyPostHomeworkLinkMode(post, item.key), customLabel: getDailyPostHomeworkCustomLabel(post, item.key) });
                 });
-                fields = fields.concat(buildPostMakeupFields(post, buildPendingMakeupResultReportHtml(post, sourceHistory, examCards, latestPostDate)), [{ label: "下次考試範圍", val: post.range }, { label: "補充資訊", val: post.note, linkMode: getDailyPostNoteLinkMode(post), customLabel: getDailyPostNoteCustomLabel(post) }]);
-                fields.forEach(function (f) { contentHtml += renderPostInfoBlock(f); });
+                fields = fields.concat(buildPostMakeupFields(post, buildPendingMakeupResultReportHtml(post, sourceHistory, examCards, latestPostDate)), [{ label: "下次考試範圍", val: post.range }, { label: "補充資訊", val: post.note, linkMode: getDailyPostNoteLinkMode(post), customLabel: getDailyPostNoteCustomLabel(post), hideLabel: true }]);
+                fields.forEach(function (f) {
+                    var blockHtml = renderPostInfoBlock(f);
+                    if (f.label === "補充資訊") {
+                        if (blockHtml) supplementalInfoHtml = "<section class='supplemental-info-section'><div class='section-title'>" + SVG.bulb + "補充資訊</div>" + blockHtml + "</section>";
+                        return;
+                    }
+                    contentHtml += blockHtml;
+                });
 
                 var historyHtml = "";
                 var safeDateId = post.date.replace(/\//g, '-');
@@ -11507,7 +11532,11 @@
                 contentHtml += HolidayPracticeApp.render(post);
 
                 // ★★★ v3.9 修正：家長留言 -> 留言內容 ★★★
-                var feedbackHtml = "<div class='feedback-section'>" + uploadHtml + "<div class='section-title'>" + SVG.chat + "留言內容</div><div id='history-" + safeDateId + "'>" + historyHtml + "</div>" + godStickerAdjustmentHtml + adminDirectHtml + studentInputHtml + "</div>"; var headerTitle = buildDailyPostHeaderTitle(post); var sessionBadge = buildDailyPostSessionBadge(post); var transferBadge = post.isTransferFormerClass ? "<span style='margin-left:8px; background:#fffbeb; color:#92400e; border:1px solid #fde68a; border-radius:999px; padding:2px 8px; font-size:0.78rem; font-weight:900;'>轉班前紀錄｜" + escapeHtml(post.sourceClassName || "原班") + "</span>" : ""; var pendingPostAttrs = " data-pending-post-anchor='1' data-post-id='" + escapeHtmlAttr(post.dailyPostId || post.id || '') + "' data-source-class-key='" + escapeHtmlAttr(post.sourceClassKey || post.storedClassKey || '') + "' data-stored-class-key='" + escapeHtmlAttr(post.storedClassKey || '') + "' data-post-date='" + escapeHtmlAttr(post.date || '') + "'"; html += "<div class='post-card-wrapper'" + pendingPostAttrs + "><div class='post-card'><div class='post-header'><span class='post-header-main'>" + SVG.calendar + headerTitle + sessionBadge + transferBadge + "</span></div>" + gradeHtml + "<div class='content-section'><div class='section-title'>" + SVG.megaphone + "聯絡事項</div>" + contentHtml + "</div>" + feedbackHtml + "</div></div>";
+                var showLearningReport = !isAdminMode && !isDashboardDraftPreviewMode && !post.isTransferFormerClass;
+                var learningReportHtml = showLearningReport
+                    ? "<section class='student-learning-report'><div class='section-title'>" + SVG.write + "學習回報</div>" + uploadHtml + "</section>"
+                    : uploadHtml;
+                var feedbackHtml = "<div class='feedback-section'>" + learningReportHtml + "<div class='section-title'>" + SVG.chat + "留言內容</div><div id='history-" + safeDateId + "'>" + historyHtml + "</div>" + godStickerAdjustmentHtml + adminDirectHtml + studentInputHtml + "</div>"; var headerTitle = buildDailyPostHeaderTitle(post); var sessionBadge = buildDailyPostSessionBadge(post); var transferBadge = post.isTransferFormerClass ? "<span style='margin-left:8px; background:#fffbeb; color:#92400e; border:1px solid #fde68a; border-radius:999px; padding:2px 8px; font-size:0.78rem; font-weight:900;'>轉班前紀錄｜" + escapeHtml(post.sourceClassName || "原班") + "</span>" : ""; var pendingPostAttrs = " data-pending-post-anchor='1' data-post-id='" + escapeHtmlAttr(post.dailyPostId || post.id || '') + "' data-source-class-key='" + escapeHtmlAttr(post.sourceClassKey || post.storedClassKey || '') + "' data-stored-class-key='" + escapeHtmlAttr(post.storedClassKey || '') + "' data-post-date='" + escapeHtmlAttr(post.date || '') + "'"; html += "<div class='post-card-wrapper'" + pendingPostAttrs + "><div class='post-card'><div class='post-header'><span class='post-header-main'>" + SVG.calendar + headerTitle + sessionBadge + transferBadge + "</span></div>" + gradeHtml + "<div class='content-section'><div class='section-title'>" + SVG.megaphone + "聯絡事項</div>" + contentHtml + supplementalInfoHtml + "</div>" + feedbackHtml + "</div></div>";
 
             }); container.innerHTML = html;
 
