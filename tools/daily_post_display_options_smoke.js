@@ -212,6 +212,28 @@ if (!numberedCustomHeader.includes('post-header-custom-title') || !numberedCusto
     throw new Error(`${grade}自然超前班名稱不可重複成為自訂標題`);
   }
 });
+context.BEAR_SUBJECT = '/math';
+const mathAdvancedHeader = context.buildDailyPostHeaderTitle({
+  date: '2026/09/19',
+  title: '第21堂｜數學超前',
+  className: '115數學超前',
+});
+if (mathAdvancedHeader.includes('post-header-custom-title') ||
+    !mathAdvancedHeader.includes('國一數學超前班') ||
+    mathAdvancedHeader.split('數學超前').length !== 2) {
+  throw new Error('數學超前舊標題只可顯示一次正式班名「國一數學超前班」');
+}
+const giftedMathHeader = context.buildDailyPostHeaderTitle({
+  date: '2026/09/19',
+  title: '第21堂｜資優數學',
+  className: '115資優數學',
+});
+if (giftedMathHeader.includes('post-header-custom-title') ||
+    !giftedMathHeader.includes('小六資優數學') ||
+    giftedMathHeader.split('資優數學').length !== 2) {
+  throw new Error('資優數學舊標題不可重複顯示');
+}
+context.BEAR_SUBJECT = '/science';
 const legacyHeader = context.buildDailyPostHeaderTitle({ date: '2026/09/12', title: '原有標題' });
 if (!legacyHeader.includes('原有標題') || legacyHeader.includes('post-lesson-badge')) {
   throw new Error('legacy unnumbered post titles must remain unchanged');

@@ -10352,7 +10352,12 @@
             }
             var comparableClassName = displayClassName.replace(/[\s_]/g, "").replace(/班$/, "");
             var comparableRemainingTitle = getEbookClassTitle(remainingTitle).replace(/[\s_]/g, "").replace(/班$/, "");
-            if (comparableRemainingTitle && comparableRemainingTitle === comparableClassName) remainingTitle = "";
+            var classNameWithoutGrade = comparableClassName.replace(/^(?:小[一二三四五六]|國[一二三])/, "");
+            var remainingTitleWithoutGrade = comparableRemainingTitle.replace(/^(?:小[一二三四五六]|國[一二三])/, "");
+            if (comparableRemainingTitle &&
+                (comparableRemainingTitle === comparableClassName || remainingTitleWithoutGrade === classNameWithoutGrade)) {
+                remainingTitle = "";
+            }
 
             var classHtml = displayClassName
                 ? "<span class='post-header-class-name'>" + escapeHtml(displayClassName) + "</span>"
