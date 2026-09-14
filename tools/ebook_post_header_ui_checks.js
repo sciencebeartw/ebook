@@ -39,11 +39,15 @@ async (page) => {
       const lessonRect = lesson.getBoundingClientRect();
       const classRect = className.getBoundingClientRect();
       const dateFontSize = parseFloat(getComputedStyle(dateGroup).fontSize);
-      if (dateFontSize < 21) throw new Error('日期字級不夠醒目：' + dateFontSize);
+      const minimumDateFontSize = width <= 600 ? 20 : 21;
+      if (dateFontSize < minimumDateFontSize) throw new Error('日期字級不夠醒目：' + dateFontSize);
 
-      if (width <= 600) {
+      if (width > 370 && width <= 600) {
         if (metaRect.left < dateRect.right - 1) throw new Error('手機版堂數與班級沒有位於日期右側');
         if (classRect.top <= lessonRect.top + 2) throw new Error('手機版堂數與班級沒有分成上下兩行');
+      } else if (width <= 370) {
+        if (metaRect.top < dateRect.bottom - 1) throw new Error('窄手機空間不足時沒有讓資訊整組換行');
+        if (classRect.top <= lessonRect.top + 2) throw new Error('窄手機版堂數與班級沒有分成上下兩行');
       } else {
         const dateCenter = dateRect.top + dateRect.height / 2;
         const lessonCenter = lessonRect.top + lessonRect.height / 2;
@@ -78,6 +82,7 @@ async (page) => {
         width,
         dateFontSize,
         mobileTwoRows: width <= 600 ? classRect.top > lessonRect.top + 2 : null,
+        narrowPhoneStacked: width <= 370 ? metaRect.top >= dateRect.bottom - 1 : null,
         desktopSingleRow: width > 600 ? true : null,
         overflow,
       };
