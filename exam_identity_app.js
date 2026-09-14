@@ -82,7 +82,8 @@
         colKey: colKey,
         date: date,
         title: title,
-        updatedAt: updatedAt
+        updatedAt: updatedAt,
+        ...(item.assessmentKind || item.sourceAssignmentId ? { assessmentKind: item.assessmentKind || '', sourceAssignmentId: item.sourceAssignmentId || '', sourcePostId: item.sourcePostId || '', sourceOccurrenceId: item.sourceOccurrenceId || '', dueOccurrenceId: item.dueOccurrenceId || '', dueAt: Number(item.dueAt || 0) } : {})
       };
     });
 

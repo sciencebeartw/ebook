@@ -114,6 +114,10 @@
       loadedAt: loadedAt,
       showPending: policy.showPending === true,
       loginReminder: loginReminder,
+      suppressEntryReminder: policy.suppressEntryReminder === true,
+      homeworkDueByClass: policy.homeworkDueByClass || {},
+      sessionPlansByClass: policy.sessionPlansByClass || {},
+      reminderLeadMs: Number(policy.reminderLeadMs || 0),
       reminderDue: loginReminder && policy.reminderDue === true && reminderDueAt > 0 && hasTrustedDueDate,
       reminderDueAt: reminderDueAt,
       reminderDueDateKey: hasTrustedDueDate ? explicitDueDateKey : ""
@@ -239,6 +243,7 @@
     if (!dueParts) return [];
 
     return items.filter(function(item) {
+      if (Number(item.dueAt) > 0) return Number(policy.loadedAt) >= Number(item.dueAt);
       // Reminder age follows the stable source captured when the task first
       // became actionable. reportTarget may keep moving for navigation, but it
       // must never move the reminder clock.
@@ -249,6 +254,14 @@
       // weekly slot strictly after the task date.
       return !!taskParts && taskParts.key < dueParts.key;
     });
+  }
+
+  function getEntryReminderItems(result) {
+    var policy = result && result.policy || {};
+    if (policy.suppressEntryReminder || policy.status !== 'ready' || !policy.loginReminder || !policy.reminderDue) return [];
+    var overdue = getReminderDueItems(result);
+    return (result.items || []).filter(function(item) { return overdue.indexOf(item) >= 0 ||
+      Number(item.dueAt) > 0 && Number(policy.loadedAt) >= Number(item.dueAt) - Number(policy.reminderLeadMs || 0); });
   }
 
   function isReminderDueState(result) {
@@ -792,7 +805,7 @@
     if (status === "cancelled" || status === "supplemental") {
       return { status: status, valid: true };
     }
-    if (!status) return { status: "standard", valid: true };
+    if (!status || status === "scheduled") return { status: "standard", valid: true };
     if (status !== "rescheduled") return { status: "invalid", valid: false };
     var actualDate = fullDateParts(session.actualDate);
     var originalStart = parseSessionClock(session.originalStartTime);
@@ -1325,6 +1338,13 @@
     return !sourceKey || sourceKey === context.classKey || sourceKey === currentNameKey;
   }
 
+
+  function holidayPostOptions(post) {
+    var value = post && post.displayOptions;
+    if (typeof value === "string") { try { return JSON.parse(value) || {}; } catch (_) { return {}; } }
+    return value || {};
+  }
+
   function buildPendingTasks(options) {
     options = options || {};
     var policy = normalizePendingPolicy(options.pendingPolicy);
@@ -1371,7 +1391,8 @@
       }
       var sourceClassKey = getPostSourceClassKey(post, context);
       var sourceStudentKey = getPostSourceStudentKey(options, post, sourceClassKey, rawStudentKey);
-      doneFlowPosts.push({ date: text(post.date), sourceClassKey: sourceClassKey });
+      doneFlowPosts.push({ date: text(post.date), sourceClassKey: sourceClassKey,
+        independentHolidayHomework: !!holidayPostOptions(post).holidayPractice });
       var doneRecord = getHomeworkDoneRecord(options, sourceClassKey, sourceStudentKey, rawStudentKey, dateKey, post, context, posts, helpers);
       var done = !!(doneRecord && doneRecord.status === "done");
       if (done) return;
@@ -1386,6 +1407,7 @@
         sourceItemId: text(post.id) || postRowKey || dateKey,
         legacySourceItemIds: legacySourceItemIds,
         reminderSourceDate: text(post.date),
+        dueAt: Number((((policy.homeworkDueByClass || {})[sourceClassKey] || {})[post.id] || holidayPostOptions(post).homeworkDue || {}).dueAt || 0),
         displayTarget: {
           tab: "contact",
           dailyPostId: postRowKey,
@@ -1405,7 +1427,31 @@
       }, context), policy);
     });
 
+    // A holiday report is independent of the ordinary homework completion button.
+    posts.forEach(function(post) {
+      var a = holidayPostOptions(post).holidayPractice;
+      if (!a || a.draft || !a.assignmentId) return;
+      var sourceClassKey = getPostSourceClassKey(post, context);
+      var sourceClassName = getPostSourceClassName(post, context);
+      var c = (options.holidayContexts || {})[sourceClassName];
+      if (!c || c.pending || !(c.assignments || {})[a.assignmentId]) return;
+      a = Object.assign({}, a, c.assignments[a.assignmentId]);
+      var progress = (c.progress || {})[a.assignmentId];
+      if (progress && progress.reportedAt) return;
+      if (grades.some(function(exam) { return exam.sourceAssignmentId === a.assignmentId &&
+        exam.score !== "" && exam.score != null && Number.isFinite(Number(exam.score)); })) return;
+      var target = { tab: "contact", dailyPostId: getPostRowKey(post), sourceClassKey: sourceClassKey,
+        postDate: text(post.date), section: "holiday", focus: "holiday", assignmentId: a.assignmentId };
+      pushIfActive(tasks, createTask({ kind: "holiday_practice", itemType: "homework_report",
+        neutralLabel: progress && progress.unlockedAt ? "假期卷待回報分數" : "假期卷待完成",
+        title: a.title, date: text(post.date), sourceClassKey: sourceClassKey, sourceClassName: sourceClassName,
+        sourceItemId: a.assignmentId, assignmentId: a.assignmentId, dueAt: a.dueAt,
+        reminderSourceDate: text(post.date), displayTarget: target, reportTarget: target
+      }, context), policy);
+    });
+
     grades.forEach(function(exam) {
+      if (exam && (exam.assessmentKind === "holiday_self_marked" || exam.sourceAssignmentId)) return;
       var titleText = text(exam && exam.date) + " " + text(exam && exam.exam);
       var isHomework = helpers && typeof helpers.isHomeworkColumnTitle === "function"
         ? helpers.isHomeworkColumnTitle(titleText)
@@ -1430,7 +1476,7 @@
           return donePost && donePost.date;
         });
         if (matchingDonePosts.some(function(donePost) {
-          return sourceMatches(sourceClassKey, donePost.sourceClassKey, helpers);
+          return !donePost.independentHolidayHomework && sourceMatches(sourceClassKey, donePost.sourceClassKey, helpers);
         })) return;
         if (isCompletedHomeworkScore(exam && exam.score)) return;
         var homeworkEligibility = resolveGradeHomeworkTaskEligibility(options, policy, exam, context, helpers);
@@ -1671,7 +1717,7 @@
     buildSkipIdentity: buildSkipIdentity,
     normalizePendingPolicy: normalizePendingPolicy,
     normalizeReminderDueDateKey: normalizeReminderDueDateKey,
-    getReminderDueItems: getReminderDueItems,
+    getReminderDueItems: getReminderDueItems, getEntryReminderItems: getEntryReminderItems,
     isReminderDueState: isReminderDueState,
     formatPendingTaskTitle: formatPendingTaskTitle,
     isCompletedHomeworkScore: isCompletedHomeworkScore,

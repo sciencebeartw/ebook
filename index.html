@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Deploy marker: holiday-session-workflow-20260914 -->
 <!-- Deploy marker: ebook-home-practice-missing-and-makeup-fields-20260914 -->
 <!-- Deploy marker: feedback-supersession-and-attachment-safety-20260905 -->
 <!-- Deploy marker: ebook-score-max-200-20260831 -->
@@ -24,6 +25,8 @@
     
     <!-- External Resources -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+    <script src="class_session_plan.js?v=holiday-20260914"></script>
+    <script src="holiday_practice_app.js?v=holiday-20260914"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         /* ================= 基礎設定 ================= */
@@ -5500,7 +5503,7 @@
                 dateAnchorKeys: gradeDateAnchorKeys
             });
             let studentScoreNum = NaN;
-            if (eData.score) {
+            if (eData.score !== undefined && eData.score !== null && String(eData.score).trim() !== "") {
                 const sMatch = eData.score.toString().match(/(\d+(\.\d+)?)/);
                 if (sMatch) studentScoreNum = parseFloat(sMatch[0]);
             }
@@ -5569,6 +5572,7 @@
             const isMissing = isNaN(studentScoreNum) && (eData.score || "").indexOf("尚未繳交") === -1;
 
             fullGradeList.push({
+                assessmentKind: eData.assessmentKind || '', sourceAssignmentId: eData.sourceAssignmentId || '', dueAt: eData.dueAt || 0,
                 className: presentation.className,
                 sourceClassKey: presentation.sourceClassKey,
                 sourceClassName: presentation.sourceClassName,
@@ -7562,6 +7566,7 @@
                 cohortHomeworkDoneRoot: gData.cohortHomeworkDoneRoot || null,
                 studentKeysByClassKey: gData.studentKeysByClassKey || null,
                 pendingPolicy: gData.pendingPolicy || null,
+                holidayContexts: window.HolidayPracticeApp ? HolidayPracticeApp.contextMap() : {},
                 helpers: getPendingTaskHelpers()
             });
         }
@@ -7751,6 +7756,7 @@
             if (!target) return null;
             var postAnchors = Array.prototype.slice.call(document.querySelectorAll('[data-pending-post-anchor]'));
             var postAnchor = postAnchors.find(function(element) { return pendingTargetMatchesPost(element, target); }) || null;
+            if (target.section === 'holiday' && postAnchor && /^holiday_[a-zA-Z0-9_-]+$/.test(target.assignmentId || '')) return document.getElementById('holiday-card-' + target.assignmentId) || postAnchor;
             if ((target.section === 'homework' || target.section === 'homework-score') && postAnchor) {
                 return postAnchor.querySelector('[data-pending-homework-anchor]') || postAnchor;
             }
@@ -7880,11 +7886,12 @@
 
         function maybeShowPendingEntryReminder() {
             if (!pendingEntryNoticeReady || pendingEntryReminderHandled) return;
+            if (pendingTasksState && pendingTasksState.policy && pendingTasksState.policy.suppressEntryReminder) return;
             if (activeEmergencyAnnouncement) return;
             if (isAdminMode && !isDashboardDraftPreviewMode) return;
             if (!isDashboardDraftPreviewMode && gData && gData.pendingPolicy && gData.pendingPolicy.loginReminder === false) return;
             var reminderDueItems = window.EbookPendingTasks
-                ? window.EbookPendingTasks.getReminderDueItems(pendingTasksState)
+                ? window.EbookPendingTasks.getEntryReminderItems(pendingTasksState)
                 : [];
             if (!reminderDueItems.length) return;
             var allPendingItems = pendingTasksState && Array.isArray(pendingTasksState.items)
@@ -7901,9 +7908,9 @@
             pendingReminderShownSessionIdentity = identity;
             markPendingReminderShownInBrowserSession(identity);
             swalAlert(
-                '逾期未完成提醒',
-                '目前有 ' + reminderDueItems.length + ' 項課務已逾期，請記得儘快處理。' +
-                    (openPendingCount ? '\n另外還有 ' + openPendingCount + ' 項尚未逾期的待完成事項。' : ''),
+                '待完成提醒',
+                '目前有 ' + reminderDueItems.length + ' 項課務已到提醒時間，請於期限內完成；已逾期的項目請儘快補交。' +
+                    (openPendingCount ? '\n另外還有 ' + openPendingCount + ' 項待完成事項。' : ''),
                 'warning',
                 '查看待完成',
                 {
@@ -9430,6 +9437,16 @@
                 return result;
             }
             
+            if (ClassSessionPlan.isSelfMarked(exam)) {
+                var holidayScore = ClassSessionPlan.validScore(exam.score);
+                var holidayProgress = typeof getHolidayProgressForExam === 'function' ? getHolidayProgressForExam(exam) : null;
+                result.effectiveNum = holidayScore;
+                var holidayAssignment = window.HolidayPracticeApp ? HolidayPracticeApp.assignmentForExam(exam) : exam;
+                result.mainScore = holidayScore !== null ? holidayScore : (holidayProgress && holidayProgress.reportedAt ? '成績更新中' : Date.now() >= holidayAssignment.dueAt ? '缺繳' : '待回報分數');
+                result.statusHtml = "<div class='home-exam-tag'>自行對答案</div>";
+                if (holidayScore !== null) result.mainClass = exam.myBucket === 4 ? ' score-green' : '';
+                return result;
+            }
             var overrideNum = getFeedbackOverrideNum(exam, feedbackHistory);
             
             if (sheetNum !== null && !isNaN(sheetNum)) {
@@ -10853,7 +10870,11 @@
                     return isRecordFromPostSource(h.sourceClassKey, postSourceClassKey);
                 }).sort(function(a, b) { return new Date(a.time) - new Date(b.time); });
             }
-            var container = document.getElementById('tab-content-0'); if (!posts || posts.length === 0) { container.innerHTML = "<div style='text-align:center; padding:30px; color:#999;'>目前沒有聯絡簿資料</div>"; return; } var latestStickerPostDate = posts[0] && posts[0].date; var latestPostDate = posts[0] && posts[0].date; var html = ""; posts.forEach(function (post) {
+            var container = document.getElementById('tab-content-0'); if (!posts || posts.length === 0) { container.innerHTML = "<div style='text-align:center; padding:30px; color:#999;'>目前沒有聯絡簿資料</div>"; return; } var stickerPosts = posts.filter(function(p) {
+                var name = p.storedClassName || p.className || gData.className, policy = ClassSessionPlan.policy(ebookSubjectParam, name);
+                var plan = ((gData.pendingPolicy || {}).sessionPlansByClass || {})[safeKey(name)] || {};
+                return ClassSessionPlan.isActualPost(policy, p, plan, Date.now());
+            }); var latestStickerPostDate = stickerPosts[0] && stickerPosts[0].date; var latestPostDate = posts[0] && posts[0].date; var html = ""; posts.forEach(function (post) {
                 var myHistory = getPostScopedHistory(post);
                 // 上次補考可能屬於更早的聯絡簿日期；只限制同一來源班級，不可限制成目前 post 日期。
                 var sourceHistory = getPostSourceHistory(post);
@@ -11404,6 +11425,8 @@
                     "<button type='button' class='fb-btn' id='feedback-send-" + newMessageContextKey + "' onclick=\"sendStudentFeedbackWithAttachments('" + newMessageContextKey + "', '" + post.date + "')\">新增留言</button>" +
                     "</div><div id='feedback-attachments-" + newMessageContextKey + "' class='feedback-attachment-list'></div>" +
                     "<div id='feedback-attachment-status-" + newMessageContextKey + "' class='feedback-attachment-status'></div></div>";
+
+                contentHtml += HolidayPracticeApp.render(post);
 
                 // ★★★ v3.9 修正：家長留言 -> 留言內容 ★★★
                 var feedbackHtml = "<div class='feedback-section'>" + uploadHtml + "<div class='section-title'>" + SVG.chat + "留言內容</div><div id='history-" + safeDateId + "'>" + historyHtml + "</div>" + godStickerAdjustmentHtml + adminDirectHtml + studentInputHtml + "</div>"; var headerTitle = escapeHtml(post.date + (post.title ? " " + post.title : "")); var sessionBadge = buildDailyPostSessionBadge(post); var transferBadge = post.isTransferFormerClass ? "<span style='margin-left:8px; background:#fffbeb; color:#92400e; border:1px solid #fde68a; border-radius:999px; padding:2px 8px; font-size:0.78rem; font-weight:900;'>轉班前紀錄｜" + escapeHtml(post.sourceClassName || "原班") + "</span>" : ""; var pendingPostAttrs = " data-pending-post-anchor='1' data-post-id='" + escapeHtmlAttr(post.dailyPostId || post.id || '') + "' data-source-class-key='" + escapeHtmlAttr(post.sourceClassKey || post.storedClassKey || '') + "' data-stored-class-key='" + escapeHtmlAttr(post.storedClassKey || '') + "' data-post-date='" + escapeHtmlAttr(post.date || '') + "'"; html += "<div class='post-card-wrapper'" + pendingPostAttrs + "><div class='post-card'><div class='post-header'><span>" + SVG.calendar + headerTitle + sessionBadge + transferBadge + "</span></div>" + gradeHtml + "<div class='content-section'><div class='section-title'>" + SVG.megaphone + "聯絡事項</div>" + contentHtml + "</div>" + feedbackHtml + "</div></div>";
@@ -13964,7 +13987,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                         var colIndex = parseInt(colKey.replace('col_', ''), 10);
                         if (isNaN(colIndex)) return;
                         var title = ((exam.date || "") + " " + (exam.examName || "")).trim();
-                        if (!isMakeupExamTitle(title)) return;
+                        if (ClassSessionPlan.isSelfMarked(exam) || !isMakeupExamTitle(title)) return;
                         if (isMathAdvancedGuidanceExam({ className: cls, date: exam.date, exam: exam.examName, note: exam.note })) return;
                         if (!examMap[colIndex]) {
                             examMap[colIndex] = {
@@ -14874,6 +14897,17 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
 
                 // 2. 處理每一個班級
 	                var classNames = targetClassKey === "all" ? Object.keys(allGrades) : [targetClassKey];
+                if (BEAR_SUBJECT === '/science') {
+                    var affected = await Promise.all(classNames.filter(function(c) { return !!ClassSessionPlan.policy('science', c); }).map(async function(c) {
+                        var snapshot = await db.ref('admin_workspace/class_session_plans/science/' + safeKey(c)).once('value');
+                        var plan = snapshot.val() || {};
+                        return plan.pending || Object.keys(plan.homeworkDueByPostId || {}).length || Object.keys(plan.exceptions || {}).length ? c : '';
+                    }));
+                    if (affected.some(Boolean)) {
+                        window.currentMissingHWList = [];
+                        throw new Error('此班已有新的上課／作業安排，請到 Dashboard「作業催繳」掃描，才能核對停課與假期卷期限。');
+                    }
+                }
                 classNames.forEach(function(cls) {
                     if (cls.startsWith('_') || cls.indexOf('總名單') > -1 || cls.indexOf('核對') > -1) return;
                     
@@ -14896,6 +14930,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     var makeupExamCols = [];
                     colKeys.forEach(function(colKey) {
                         var ex = examsObj[colKey];
+                        if (ClassSessionPlan.isSelfMarked(ex)) return;
                         var nameStr = (ex.date || "") + " " + (ex.examName || "");
                         if (isHomeworkColumnTitle(nameStr)) {
                             homeworkCols.push({ id: colKey, title: nameStr.trim(), rawDate: ex.date || "" });
@@ -14960,7 +14995,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                                     name: stuInfo.name,
                                     phone: stuInfo.phone || stuInfo.password,
                                     hwName: exam.title,
-                                    reason: "請假未補考"
+                                    reason: isHomePracticeScoreTitle(exam.title) ? '缺繳練習卷' : '請假未補考'
                                 });
                             }
                         });

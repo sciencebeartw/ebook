@@ -2178,3 +2178,17 @@ assert.strictEqual(preview[0].paperTarget.dailyPostId, 'paper_1', 'preview retai
 assert.strictEqual(preview[0].paperTarget.examId, 'exam_1');
 
 console.log('ebook pending tasks app tests passed');
+
+// 假期卷與同篇普通完成按鈕不能取代原資優自然表單。
+const holidayIndependentPost = {id:'holiday_three',date:'2026/09/19',className:CURRENT_CLASS,hw1:'課本作業',displayOptions:{holidayPractice:{assignmentId:'holiday_three_assignment',title:'複習卷',dueAt:Date.parse('2026-10-03T09:00:00+08:00')}}};
+const holidayIndependentOptions = baseOptions({posts:[holidayIndependentPost],now:new Date('2026-10-03T13:00:00+08:00'),
+ grades:[{date:'2026/09/19',exam:'資優自然作業',score:'',colIndex:5}],
+ holidayContexts:{[CURRENT_CLASS]:{assignments:{holiday_three_assignment:holidayIndependentPost.displayOptions.holidayPractice},progress:{}}},
+ helpers:Object.assign({},baseOptions().helpers,{shouldUseHomeworkDoneFlowForPost:()=>true})});
+assert.deepStrictEqual(Pending.buildPendingTasks(holidayIndependentOptions).items.map(x=>x.kind).sort(),['holiday_practice','homework_done','homework_score']);
+holidayIndependentOptions.homeworkDone={'2026/09/19':{status:'done'}};
+assert.deepStrictEqual(Pending.buildPendingTasks(holidayIndependentOptions).items.map(x=>x.kind).sort(),['holiday_practice','homework_score']);
+holidayIndependentOptions.holidayContexts[CURRENT_CLASS].progress.holiday_three_assignment={reportedAt:1};
+assert.deepStrictEqual(Pending.buildPendingTasks(holidayIndependentOptions).items.map(x=>x.kind),['homework_score']);
+holidayIndependentOptions.grades[0].score='80';
+assert.equal(Pending.buildPendingTasks(holidayIndependentOptions).items.length,0);

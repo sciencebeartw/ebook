@@ -25,6 +25,7 @@ function extract(name) {
   throw new Error(`Unterminated ${name}`);
 }
 const c = {
+  ClassSessionPlan: require("../class_session_plan"),
   FEEDBACK_TYPE_LABELS: { makeup: '缺考回報', legacyMakeup: '補考回報' },
   getMathAdvancedGuidanceStandard: () => null,
   isMathAdvancedGuidanceExam: () => false,
