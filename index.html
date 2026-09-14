@@ -10334,10 +10334,12 @@
             var dateKey = getHomeworkDoneDateKey(post.date);
             var doneRecord = getHomeworkDoneRecordForPost(post, dateKey);
             var done = !!(doneRecord && doneRecord.status === "done");
-            var btnText = done ? "✓ 已回報完成" : "我已完成本次作業";
+            var holiday = (ClassSessionPlan.options(post) || {}).holidayPractice;
+            var hasHoliday = !!(holiday && !holiday.draft);
+            var btnText = done ? "✓ 已回報完成" : hasHoliday ? "我已完成一般作業" : "我已完成本次作業";
             var doneClass = done ? " done" : "";
             var disabled = done ? " disabled" : "";
-            var hint = done ? "已記錄到作業完成回報。" : "完成作業後按一下，老師會看到你的回報。";
+            var hint = done ? "已記錄到作業完成回報。" : hasHoliday ? "一般作業完成後按一下；假期卷請另外對答案、回報分數。" : "完成作業後按一下，老師會看到你的回報。";
             return "<div class='homework-done-box' id='homework-done-box-" + homeworkDoneDomKey + "'>" +
                 "<button class='homework-done-btn" + doneClass + "' id='homework-done-btn-" + homeworkDoneDomKey + "' onclick=\"submitHomeworkDone('" + homeworkDoneDomKey + "')\"" + disabled + ">" + btnText + "</button>" +
                 "<div class='homework-done-hint' id='homework-done-hint-" + homeworkDoneDomKey + "'>" + hint + "</div>" +
@@ -10356,6 +10358,7 @@
         }
 
         function getDailyPostExamLabel(exam) {
+            if (exam && exam.assessmentKind === "holiday_self_marked") return "假期練習卷";
             var raw = ((exam && exam.date) || "") + " " + ((exam && exam.exam) || "");
             if (raw.indexOf("回家練習卷") > -1) return "回家練習卷";
             if (raw.indexOf("複習") > -1) return "複習考";
@@ -10365,6 +10368,7 @@
         }
 
         function getDailyPostExamTimePrefix(exam) {
+            if (exam && exam.assessmentKind === "holiday_self_marked") return "";
             var raw = ((exam && exam.date) || "") + " " + ((exam && exam.exam) || "");
             return raw.indexOf("回家練習卷") > -1 ? "上週" : "今日";
         }

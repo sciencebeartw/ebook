@@ -83,3 +83,7 @@ for (const extra of ['', '<form>結果回報</form>']) {
   if (extra) assert(fields[0].extra.includes(extra));
 }
 console.log('home practice score states and makeup fields passed');
+
+const holidayExam={...practice,assessmentKind:'holiday_self_marked'};
+assert.equal(c.getDailyPostExamTimePrefix(holidayExam)+c.getDailyPostExamLabel(holidayExam)+'成績','假期練習卷成績');
+assert.equal(c.getDailyPostExamTimePrefix(practice),'上週','ordinary returned homework keeps its existing label');

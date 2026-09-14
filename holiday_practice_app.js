@@ -1,11 +1,11 @@
 (function(root) {
     'use strict';
-    var P = root.ClassSessionPlan, contexts = {}, pending = {}, posts = {}, answers = {}, busy = {};
+    var P = root.ClassSessionPlan, contexts = {}, pending = {}, posts = {}, answers = {}, busy = {}, scoreDrafts = {};
     function esc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function(c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
     function className(post) { return post.storedClassName || post.sourceClassName || post.className || gData.className; }
     function owner() { return gData ? [gData.className, gData.foundUserKey || gData.studentName].join('/') : ''; }
     var currentOwner = '';
-    function resetOwner() { if (owner() !== currentOwner) { contexts = {}; pending = {}; posts = {}; answers = {}; currentOwner = owner(); } }
+    function resetOwner() { if (owner() !== currentOwner) { contexts = {}; pending = {}; posts = {}; answers = {}; scoreDrafts = {}; currentOwner = owner(); } }
     function api(action, payload) {
         return new Promise(function(resolve, reject) { doPostAction(action, payload, function(result) {
             if (!result || !result.success) reject(new Error(result && result.msg || '送出尚未完成，請稍後重試'));
@@ -41,13 +41,18 @@
         var buttonLabel = p && p.unlockedAt ? '再次開啟答案卷' : '我已完成，顯示答案卷';
         text += '<div class="homework-done-box"><button type="button" class="homework-done-btn" data-holiday-action="unlock" data-assignment="' + esc(id) + '"' + (busy[id] ? ' disabled' : '') + '>' + buttonLabel + '</button></div>';
         if (answers[id]) text += safeLink(answers[id], '答案卷 PDF');
-        if (p && p.unlockedAt && !p.reportedAt) text += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><label>自行對答案後的分數<input type="number" min="0" max="100" step="0.01" inputmode="decimal" class="score-input" id="holiday-score-' + esc(id) + '"></label>' +
+        if (p && p.unlockedAt && !p.reportedAt) text += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><label>自行對答案後的分數<input type="number" min="0" max="100" step="0.01" inputmode="decimal" class="score-input" id="holiday-score-' + esc(id) + '" value="' + esc(scoreDrafts[id] || '') + '"></label>' +
             '<button type="button" class="score-btn" data-holiday-action="report" data-assignment="' + esc(id) + '"' + (busy[id] ? ' disabled' : '') + '>回報分數</button></div>';
         return text + '<p role="status"' + (state === 'missing' ? ' style="color:#b91c1c"' : '') + '>' + esc(label) + '</p>';
     }
     function redraw(id) {
         var post = posts[id], target = document.getElementById('holiday-card-' + id);
-        if (post && target) target.innerHTML = body(post);
+        if (post && target) {
+            var focused = document.activeElement && document.activeElement.id === 'holiday-score-' + id;
+            target.innerHTML = body(post);
+            var input = document.getElementById('holiday-score-' + id);
+            if (focused && input) input.focus({ preventScroll: true });
+        }
         if (typeof schedulePendingTasksRecompute === 'function') schedulePendingTasksRecompute();
     }
     function load(post, force) {
@@ -82,6 +87,7 @@
             });
             if (!contexts[className(post)]) contexts[className(post)] = { progress: {} };
             if (result.progress) contexts[className(post)].progress[id] = result.progress;
+            if (result.progress && result.progress.reportedAt) delete scoreDrafts[id];
             if (result.answerUrl) answers[id] = result.answerUrl;
             await load(post, true);
             [4000, 12000, 28000].forEach(function(delay) {
@@ -95,6 +101,10 @@
             swalAlert('回報狀態', err.message, 'warning');
         } finally { delete busy[id]; redraw(id); }
     }
+    document.addEventListener('input', function(event) {
+        var input = event.target, prefix = 'holiday-score-';
+        if (input && input.id && input.id.indexOf(prefix) === 0) scoreDrafts[input.id.slice(prefix.length)] = input.value;
+    });
     document.addEventListener('click', function(event) {
         var target = event.target.closest('[data-holiday-action]');
         if (target) act(target.dataset.assignment, target.dataset.holidayAction);
