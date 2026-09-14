@@ -10219,13 +10219,8 @@
 
             var lessonNumber = Number(lessonMatch[1]);
             var remainingTitle = (lessonMatch[2] || "").trim();
-            var normalizedRemaining = remainingTitle.replace(/^\d+/, "").replace(/\s+/g, "");
-            var classNames = [post.className, post.sourceClassName, window.gData && gData.className].filter(Boolean);
-            var repeatsClassName = classNames.some(function(className) {
-                return normalizedRemaining === className.toString().trim().replace(/^\d+/, "").replace(/\s+/g, "");
-            });
             var lessonHtml = "<span class='post-lesson-badge' aria-label='第 " + lessonNumber + " 堂'>第" + lessonNumber + "堂</span>";
-            var customTitleHtml = remainingTitle && !repeatsClassName
+            var customTitleHtml = remainingTitle
                 ? "<span class='post-header-custom-title'>" + escapeHtml(remainingTitle) + "</span>"
                 : "";
             return dateHtml + lessonHtml + customTitleHtml;

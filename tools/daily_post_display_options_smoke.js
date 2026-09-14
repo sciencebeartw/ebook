@@ -181,8 +181,8 @@ const numberedDefaultHeader = context.buildDailyPostHeaderTitle({
 });
 if (!numberedDefaultHeader.includes("post-lesson-badge") ||
     !numberedDefaultHeader.includes('第21堂') ||
-    numberedDefaultHeader.includes('小六資優自然週六上午班')) {
-  throw new Error('numbered post header must use a lesson badge and suppress the repeated default class name');
+    !numberedDefaultHeader.includes('小六資優自然週六上午班')) {
+  throw new Error('numbered post header must use a lesson badge and retain the full class title');
 }
 const numberedCustomHeader = context.buildDailyPostHeaderTitle({
   date: '2026/09/19',
