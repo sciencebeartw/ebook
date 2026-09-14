@@ -42,6 +42,9 @@ async (page) => {
       const classFontSize = parseFloat(getComputedStyle(className).fontSize);
       const minimumDateFontSize = width <= 600 ? 20 : 21;
       if (dateFontSize < minimumDateFontSize) throw new Error('日期字級不夠醒目：' + dateFontSize);
+      if (Math.abs(classFontSize - dateFontSize) > 0.2) {
+        throw new Error('班級與日期字級不一致');
+      }
 
       if (width <= 600) {
         const dateCenter = dateRect.top + dateRect.height / 2;
@@ -54,9 +57,6 @@ async (page) => {
         }
         if (Math.abs(classRect.left - dateRect.left) > 2) {
           throw new Error('手機版班級與日期沒有共用左緣');
-        }
-        if (Math.abs(classFontSize - dateFontSize) > 0.2) {
-          throw new Error('手機版班級與日期字級不一致');
         }
       } else {
         const dateCenter = dateRect.top + dateRect.height / 2;
