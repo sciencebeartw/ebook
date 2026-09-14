@@ -35,6 +35,7 @@ vm.createContext(context);
   'isMathAdvancedGuidanceExam',
   'getMathAdvancedGuidanceStandard',
   'getGradeScoreUnitText',
+  'isHomePracticeScoreTitle',
   'getDisplayLogic',
 ].forEach((name) => vm.runInContext(extractFunction(name), context));
 

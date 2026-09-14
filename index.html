@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Deploy marker: ebook-home-practice-missing-and-makeup-fields-20260914 -->
 <!-- Deploy marker: feedback-supersession-and-attachment-safety-20260905 -->
 <!-- Deploy marker: ebook-score-max-200-20260831 -->
 <!-- Deploy marker: ebook-bulletin-queue-permanent-required-until-v4-20260823 -->
@@ -7685,6 +7686,8 @@
                     ? window.EbookPendingTasks.formatPendingTaskTitle(task.title)
                     : (task.title || '待完成項目');
                 var secondaryActionHtml = '';
+                var neutralLabel = task.kind === 'absence' && isHomePracticeScoreTitle(task.title)
+                    ? '缺繳練習卷待回報' : (task.neutralLabel || '待完成項目');
                 if (task.kind === 'makeup_result') {
                     secondaryActionHtml = buildPendingTaskActionButton(task, 'paper', '查看補考卷', 'paper');
                 } else if (task.kind === 'absence') {
@@ -7693,7 +7696,7 @@
                     secondaryActionHtml = buildPendingTaskActionButton(task, 'paper', '前往補考卷', 'paper');
                 }
                 html += "<article class='pending-card" + (taskReminderDue ? " is-reminder-due" : "") + "' data-pending-task-card='" + escapeHtmlAttr(task.taskId || '') + "'>" +
-                    "<div class='pending-card-head'><div class='pending-card-label'>" + escapeHtml(task.neutralLabel || '待完成項目') + "</div>" +
+                    "<div class='pending-card-head'><div class='pending-card-label'>" + escapeHtml(neutralLabel) + "</div>" +
                     "<div class='pending-card-date'>" + escapeHtml(task.date || '') + "</div></div>" +
                     "<div class='pending-card-title'>" + escapeHtml(pendingTitle) + "</div>" +
                     "<div class='pending-card-status'>" + (taskReminderDue ? "逾期未完成" : "待完成") + "</div>" +
@@ -9342,7 +9345,8 @@
         function getLatestMakeupReportInfo(exam, feedbackHistory) {
             if (!feedbackHistory || feedbackHistory.length === 0) return null;
             var rawScore = (exam.score || "").toString();
-            var isHw = isHomeworkColumnTitle((exam.date || "") + (exam.exam || "")) || isHomeworkMissingScore(rawScore);
+            var isHomePractice = isHomePracticeScoreTitle((exam.date || "") + (exam.exam || ""));
+            var isHw = !isHomePractice && (isHomeworkColumnTitle((exam.date || "") + (exam.exam || "")) || isHomeworkMissingScore(rawScore));
             if (isHw) return null;
             var examId = typeof normalizeEbookFeedbackExamId === 'function'
                 ? normalizeEbookFeedbackExamId(exam.examId || exam.targetExamId)
@@ -9413,7 +9417,8 @@
             var rawScore = (exam.score || "").toString();
             var sheetNum = exam.scoreNum;
             var myColor = (exam.cellColor || "").toLowerCase();
-            var isHw = isHomeworkColumnTitle((exam.date || "") + (exam.exam || "")) || isHomeworkMissingScore(rawScore);
+            var isHomePractice = isHomePracticeScoreTitle((exam.date || "") + (exam.exam || ""));
+            var isHw = !isHomePractice && (isHomeworkColumnTitle((exam.date || "") + (exam.exam || "")) || isHomeworkMissingScore(rawScore));
             var mathGuidanceStandard = getMathAdvancedGuidanceStandard(exam);
             var guidanceThreshold = Number(exam.guidanceThreshold || (mathGuidanceStandard && mathGuidanceStandard.guidanceThreshold) || 0);
             var isMathGuidanceExam = isMathAdvancedGuidanceExam(exam);
@@ -9450,7 +9455,7 @@
                     result.mainScore = overrideNum;
                     result.showReviewing = true;
                 } else {
-                    result.mainScore = isHw ? "未繳" : "缺考";
+                    result.mainScore = isHomePractice ? "缺繳" : (isHw ? "未繳" : "缺考");
                     result.mainClass = " text-grey-status";
                 }
             }
@@ -10691,10 +10696,11 @@
         }
 
         function buildAbsenceScoreReportFormHtml(post, exam, safeDate, scoreInputId, hasExamColIndex, reportedScore, isUpdate) {
+            var missingLabel = isHomePracticeScoreTitle((exam.date || "") + (exam.exam || "")) ? "缺繳" : "缺考";
             var valueAttr = reportedScore === undefined || reportedScore === null || reportedScore === ""
                 ? ""
                 : " value='" + escapeHtmlAttr(reportedScore) + "'";
-            return "<div class='score-report-section'><div style='font-weight:bold; color:#c0392b; margin-bottom:10px; font-size:1.35rem;'>" + SVG.edit + "回報" + getDailyPostExamTimePrefix(exam) + getDailyPostExamLabel(exam) + "缺考分數</div><div class='input-box'><input type='number' class='score-input' id='" + scoreInputId + "' placeholder='輸入分數'" + valueAttr + "><button class='score-btn' onclick=\"submitScoreReport('" + safeDate + "', '" + post.date + "', '" + (hasExamColIndex ? exam.colIndex : "") + "', '" + escapeInlineJs(exam.exam || "") + "', " + (isUpdate ? "true" : "false") + ")\">" + (isUpdate ? "更新" : "送出") + "</button></div></div>";
+            return "<div class='score-report-section'><div style='font-weight:bold; color:#c0392b; margin-bottom:10px; font-size:1.35rem;'>" + SVG.edit + "回報" + getDailyPostExamTimePrefix(exam) + getDailyPostExamLabel(exam) + missingLabel + "分數</div><div class='input-box'><input type='number' class='score-input' id='" + scoreInputId + "' placeholder='輸入分數'" + valueAttr + "><button class='score-btn' onclick=\"submitScoreReport('" + safeDate + "', '" + post.date + "', '" + (hasExamColIndex ? exam.colIndex : "") + "', '" + escapeInlineJs(exam.exam || "") + "', " + (isUpdate ? "true" : "false") + ")\">" + (isUpdate ? "更新" : "送出") + "</button></div></div>";
         }
 
         function buildDailyPostExamCard(post, exam, others, history) {
@@ -11044,6 +11050,7 @@
                 function buildPostQuizFields(postData) {
                     var quizText = postData.quiz || "";
                     var lines = splitPostMultiLinkValue(quizText);
+                    if (lines.length === 0) return [];
                     var quizOptions = getDailyPostQuizOptions(postData);
                     var legacyPendingExamPaperIdentity = getPostPendingExamPaperIdentity(postData, -1);
                     var hasExplicitRoles = quizOptions.slot1Role === "answer" || quizOptions.slot2Role === "answer";
@@ -11114,6 +11121,10 @@
                 }
                 function buildPostMakeupFields(postData, extraHtml) {
                     var lines = splitPostMultiLinkValue(postData.makeup || "");
+                    // 未附補考卷時只保留既有結果回報，不建立考卷標題或下載提示。
+                    if (lines.length === 0) {
+                        return extraHtml ? [{ label: "補考結果回報", val: "", extra: extraHtml }] : [];
+                    }
                     var note = lines.length > 0 ? "補考題目也很適合當作加強練習，已達標的同學也可以下載挑戰" : "";
                     return [{
                         label: "今日補考考卷",
@@ -12105,7 +12116,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
 
         async function submitScoreReport(safeId, realDate, examColIndex, examTitle, isUpdate) {
             var submitLabel = isUpdate ? "更新" : "送出";
-            if (!(await confirmStudentPreviewAction(isUpdate ? "更新缺考分數回報" : "回報缺考分數"))) return;
+            var missingLabel = isHomePracticeScoreTitle(examTitle) ? "缺繳" : "缺考";
+            if (!(await confirmStudentPreviewAction(isUpdate ? ("更新" + missingLabel + "分數回報") : ("回報" + missingLabel + "分數")))) return;
             var hasExamColIndex = examColIndex !== undefined && examColIndex !== null && examColIndex !== "";
             var inputId = 'score-in-' + safeId + (hasExamColIndex ? ('-' + examColIndex) : '');
             var val = document.getElementById(inputId).value; 
@@ -12116,7 +12128,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             try {
                 form = { className: gData.className, sourceClassName: resolveStudentActionSourceClassName(realDate), studentName: gData.studentName, targetDate: realDate, type: FEEDBACK_TYPE_LABELS.makeup, content: val };
             } catch (sourceErr) {
-                swalAlert('無法回報缺考分數', sourceErr.message || String(sourceErr), 'warning');
+                swalAlert('無法回報' + missingLabel + '分數', sourceErr.message || String(sourceErr), 'warning');
                 clearEbookSubmitLoading(btn, submitLabel);
                 return;
             }
@@ -12138,7 +12150,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 if (inputEl) inputEl.value = "";
                 clearEbookSubmitLoading(btn, "已送出", true);
                 appendLocalScoreReportFeedback(form, res);
-                swalAlert(isUpdate ? "已更新缺考分數" : "已回報缺考分數", "分數已送出，等待老師回填大表。", "success");
+                swalAlert((isUpdate ? "已更新" : "已回報") + missingLabel + "分數", "分數已送出，等待老師回填大表。", "success");
             }).withFailureHandler(function (e) { 
                 swalAlert("回報失敗", friendlySubmitError(e), 'warning');
                 clearEbookSubmitLoading(btn, submitLabel);
