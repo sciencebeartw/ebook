@@ -24,7 +24,7 @@
     }
     function safeLink(url, label) {
         try { if (new URL(url).protocol !== 'https:') return ''; } catch (_) { return ''; }
-        return '<a class="hw-link-btn" href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">' + label + '</a>';
+        return '<a class="btn-link" href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">' + label + '</a>';
     }
     function body(post) {
         var a = assignment(post), c = context(post), p = progress(post), now = Date.now();
@@ -38,8 +38,8 @@
         if (preview) return text + '<p>學生完成作答後可開答案並回報分數。預覽不記錄學生進度。</p>';
         if (!c || c.pending) return text + '<p role="status">正在核對上課安排與回報狀態…</p>';
         if (!(c.assignments || {})[id]) return '';
-        var buttonLabel = p && p.unlockedAt ? '再次開啟答案卷' : '我已完成，顯示答案卷';
-        text += '<div class="homework-done-box"><button type="button" class="homework-done-btn" data-holiday-action="unlock" data-assignment="' + esc(id) + '"' + (busy[id] ? ' disabled' : '') + '>' + buttonLabel + '</button></div>';
+        var buttonLabel = p && p.unlockedAt ? '再次開啟答案卷' : '我已完成，顯示答案';
+        text += '<div class="homework-done-box"><button type="button" class="homework-done-btn holiday-unlock-btn" data-holiday-action="unlock" data-assignment="' + esc(id) + '"' + (busy[id] ? ' disabled' : '') + '>' + buttonLabel + '</button></div>';
         if (answers[id]) text += safeLink(answers[id], '答案卷 PDF');
         if (p && p.unlockedAt && !p.reportedAt) text += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><label>自行對答案後的分數<input type="number" min="0" max="100" step="0.01" inputmode="decimal" class="score-input" id="holiday-score-' + esc(id) + '" value="' + esc(scoreDrafts[id] || '') + '"></label>' +
             '<button type="button" class="score-btn" data-holiday-action="report" data-assignment="' + esc(id) + '"' + (busy[id] ? ' disabled' : '') + '>回報分數</button></div>';
