@@ -39,15 +39,25 @@ async (page) => {
       const lessonRect = lesson.getBoundingClientRect();
       const classRect = className.getBoundingClientRect();
       const dateFontSize = parseFloat(getComputedStyle(dateGroup).fontSize);
+      const classFontSize = parseFloat(getComputedStyle(className).fontSize);
       const minimumDateFontSize = width <= 600 ? 20 : 21;
       if (dateFontSize < minimumDateFontSize) throw new Error('日期字級不夠醒目：' + dateFontSize);
 
-      if (width > 370 && width <= 600) {
-        if (metaRect.left < dateRect.right - 1) throw new Error('手機版堂數與班級沒有位於日期右側');
-        if (classRect.top <= lessonRect.top + 2) throw new Error('手機版堂數與班級沒有分成上下兩行');
-      } else if (width <= 370) {
-        if (metaRect.top < dateRect.bottom - 1) throw new Error('窄手機空間不足時沒有讓資訊整組換行');
-        if (classRect.top <= lessonRect.top + 2) throw new Error('窄手機版堂數與班級沒有分成上下兩行');
+      if (width <= 600) {
+        const dateCenter = dateRect.top + dateRect.height / 2;
+        const lessonCenter = lessonRect.top + lessonRect.height / 2;
+        if (lessonRect.left < dateRect.right - 1 || Math.abs(dateCenter - lessonCenter) > 8) {
+          throw new Error('手機版第一行不是日曆日期接堂數標籤');
+        }
+        if (classRect.top < Math.max(dateRect.bottom, lessonRect.bottom) + 2) {
+          throw new Error('手機版完整班級沒有獨立顯示於第二行');
+        }
+        if (Math.abs(classRect.left - dateRect.left) > 2) {
+          throw new Error('手機版班級與日期沒有共用左緣');
+        }
+        if (Math.abs(classFontSize - dateFontSize) > 0.2) {
+          throw new Error('手機版班級與日期字級不一致');
+        }
       } else {
         const dateCenter = dateRect.top + dateRect.height / 2;
         const lessonCenter = lessonRect.top + lessonRect.height / 2;
@@ -81,8 +91,8 @@ async (page) => {
       return {
         width,
         dateFontSize,
-        mobileTwoRows: width <= 600 ? classRect.top > lessonRect.top + 2 : null,
-        narrowPhoneStacked: width <= 370 ? metaRect.top >= dateRect.bottom - 1 : null,
+        classFontSize,
+        mobileClassSecondRow: width <= 600 ? classRect.top >= Math.max(dateRect.bottom, lessonRect.bottom) + 2 : null,
         desktopSingleRow: width > 600 ? true : null,
         overflow,
       };
