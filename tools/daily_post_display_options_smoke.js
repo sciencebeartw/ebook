@@ -167,8 +167,34 @@ const renderEnd = html.indexOf('function renderGrades', renderStart);
 const renderSource = html.slice(renderStart, renderEnd > renderStart ? renderEnd : undefined);
 if (renderSource.indexOf('var gradeHtml = examCards.map') === -1 ||
     renderSource.indexOf('var sessionBadge = buildDailyPostSessionBadge(post)') === -1 ||
-    renderSource.indexOf('headerTitle + sessionBadge + transferBadge') === -1) {
+    renderSource.indexOf('headerTitle + sessionBadge + transferBadge') === -1 ||
+    renderSource.indexOf('var headerTitle = buildDailyPostHeaderTitle(post)') === -1) {
   throw new Error('session badge must remain a header-only addition independent of grade/paper card rendering');
+}
+
+const headerSource = extractFunction('buildDailyPostHeaderTitle');
+vm.runInContext(headerSource, context);
+const numberedDefaultHeader = context.buildDailyPostHeaderTitle({
+  date: '2026/09/19',
+  title: '第21堂｜小六資優自然週六上午班',
+  className: '115小六資優自然週六上午班',
+});
+if (!numberedDefaultHeader.includes("post-lesson-badge") ||
+    !numberedDefaultHeader.includes('第21堂') ||
+    numberedDefaultHeader.includes('小六資優自然週六上午班')) {
+  throw new Error('numbered post header must use a lesson badge and suppress the repeated default class name');
+}
+const numberedCustomHeader = context.buildDailyPostHeaderTitle({
+  date: '2026/09/19',
+  title: '第21堂｜中秋前一週',
+  className: '115小六資優自然週六上午班',
+});
+if (!numberedCustomHeader.includes('post-header-custom-title') || !numberedCustomHeader.includes('中秋前一週')) {
+  throw new Error('numbered post header must retain a meaningful custom title');
+}
+const legacyHeader = context.buildDailyPostHeaderTitle({ date: '2026/09/12', title: '原有標題' });
+if (!legacyHeader.includes('原有標題') || legacyHeader.includes('post-lesson-badge')) {
+  throw new Error('legacy unnumbered post titles must remain unchanged');
 }
 
 [
@@ -185,6 +211,8 @@ if (renderSource.indexOf('var gradeHtml = examCards.map') === -1 ||
   'buildHomeworkUploadNote(post, item.val)',
   'displayOptions: parseDailyPostDisplayOptions(post.displayOptions)',
   'var sessionBadge = buildDailyPostSessionBadge(post)',
+  'buildDailyPostHeaderTitle(post)',
+  '.post-lesson-badge',
   '.post-session-badge'
 ].forEach((needle) => {
   if (!html.includes(needle)) throw new Error(`Missing eBook display behavior: ${needle}`);
