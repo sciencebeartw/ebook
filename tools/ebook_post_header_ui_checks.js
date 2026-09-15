@@ -38,6 +38,9 @@ async (page) => {
       const metaRect = meta.getBoundingClientRect();
       const lessonRect = lesson.getBoundingClientRect();
       const classRect = className.getBoundingClientRect();
+      const lessonTextRange = document.createRange();
+      lessonTextRange.selectNodeContents(lesson);
+      const lessonTextWidth = lessonTextRange.getBoundingClientRect().width;
       const dateFontSize = parseFloat(getComputedStyle(dateGroup).fontSize);
       const classFontSize = parseFloat(getComputedStyle(className).fontSize);
       const minimumDateFontSize = width <= 600 ? 20 : 21;
@@ -47,6 +50,9 @@ async (page) => {
       }
 
       if (width <= 600) {
+        if (lessonRect.width > lessonTextWidth + 24) {
+          throw new Error('手機版堂數標籤被網格拉寬');
+        }
         const dateCenter = dateRect.top + dateRect.height / 2;
         const lessonCenter = lessonRect.top + lessonRect.height / 2;
         if (lessonRect.left < dateRect.right - 1 || Math.abs(dateCenter - lessonCenter) > 8) {
