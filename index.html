@@ -26,11 +26,11 @@
     <!-- External Resources -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
     <script src="class_session_plan.js?v=holiday-20260914"></script>
-    <script src="holiday_practice_app.js?v=holiday-transfer-20260915"></script>
+    <script src="holiday_practice_app.js?v=button-colors-20260916"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
-        [data-holiday-card] .holiday-unlock-btn { background: linear-gradient(135deg, #7c3aed, #6d28d9); box-shadow: 0 3px 8px rgba(109,40,217,.22); }
-        [data-holiday-card] .holiday-unlock-btn:hover { background: #5b21b6; }
+        [data-holiday-card] { margin-top: 12px; }
+        [data-holiday-card] .holiday-unlock-actions { margin-top: 12px; text-align: center; }
         [data-holiday-card] .holiday-unlock-btn:disabled { opacity: .65; cursor: wait; }
         /* ================= 基礎設定 ================= */
         :root {
@@ -2515,30 +2515,6 @@
             display: block;
             width: 100%;
             box-sizing: border-box;
-            background: linear-gradient(135deg, #059669 0%, #047857 100%);
-            color: white;
-            padding: 12px 15px;
-            border-radius: 8px;
-            text-decoration: none;
-            font-size: 1.15rem;
-            font-weight: bold;
-            border: none;
-            margin: 8px 0;
-            text-align: center;
-            box-shadow: 0 3px 6px rgba(5, 150, 105, 0.28);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-
-        .btn-supplement-tag:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 12px rgba(4, 120, 87, 0.42);
-            color: white;
-        }
-
-        .btn-general-tag {
-            display: block;
-            width: 100%;
-            box-sizing: border-box;
             background: linear-gradient(135deg, #64748b 0%, #334155 100%);
             color: white;
             padding: 12px 15px;
@@ -2553,11 +2529,51 @@
             transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
 
-        .btn-general-tag:hover {
+        .btn-supplement-tag:hover {
             transform: translateY(-2px);
             box-shadow: 0 5px 12px rgba(51, 65, 85, 0.42);
             color: white;
         }
+
+        .btn-general-tag {
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+            background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+            color: white;
+            padding: 12px 15px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 1.15rem;
+            font-weight: bold;
+            border: none;
+            margin: 8px 0;
+            text-align: center;
+            box-shadow: 0 3px 6px rgba(75, 85, 99, 0.28);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .btn-general-tag:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 12px rgba(75, 85, 99, 0.42);
+            color: white;
+        }
+
+        /* button-colors-20260916: preserve original geometry; override palette only. */
+        .post-button-blue { --post-button-start: #3b82f6; --post-button-end: #2563eb; --post-button-shadow: 37,99,235; }
+        .post-button-purple { --post-button-start: #a855f7; --post-button-end: #6366f1; --post-button-shadow: 168,85,247; }
+        .post-button-slate { --post-button-start: #64748b; --post-button-end: #334155; --post-button-shadow: 51,65,85; }
+        .post-button-orange { --post-button-start: #ea580c; --post-button-end: #c2410c; --post-button-shadow: 194,65,12; }
+        .post-button-gray { --post-button-start: #6b7280; --post-button-end: #4b5563; --post-button-shadow: 75,85,99; }
+        .btn-link[class*="post-button-"], .btn-important-tag[class*="post-button-"],
+        .btn-supplement-tag[class*="post-button-"], .btn-general-tag[class*="post-button-"],
+        .homework-done-btn[class*="post-button-"] {
+            background: linear-gradient(135deg, var(--post-button-start), var(--post-button-end));
+            box-shadow: 0 3px 6px rgba(var(--post-button-shadow), .28);
+        }
+        .btn-link[class*="post-button-"]:hover, .btn-important-tag[class*="post-button-"]:hover,
+        .btn-supplement-tag[class*="post-button-"]:hover, .btn-general-tag[class*="post-button-"]:hover,
+        .homework-done-btn[class*="post-button-"]:hover { box-shadow: 0 5px 12px rgba(var(--post-button-shadow), .42); }
 
         .doc-link-wrap {
             display: block;
@@ -7593,7 +7609,7 @@
         }
 
         function compactParsedButtonBreaks(html) {
-            return (html || "").replace(/<br>\s*(?=(?:<span class="doc-link-wrap"|<a [^>]*class="(?:btn-link|btn-important-tag|btn-supplement-tag|btn-general-tag|btn-small-tag)"))/g, "");
+            return (html || "").replace(/<br>\s*(?=(?:<span class="doc-link-wrap"|<a [^>]*class="(?:btn-link|btn-important-tag|btn-supplement-tag|btn-general-tag|btn-small-tag)(?: post-button-[a-z]+)?"))/g, "");
         }
 
         // ★★★ 全域工具函式：解析連結 (v3.9.2) ★★★
@@ -10411,6 +10427,15 @@
             return ["auto", "general", "homework", "supplement", "custom"].indexOf(mode) > -1 ? mode : "auto";
         }
 
+        function getDailyPostButtonColorClass(color) {
+            return ["blue", "purple", "slate", "orange", "gray"].indexOf(color) > -1 ? " post-button-" + color : "";
+        }
+
+        function getDailyPostLinkColor(post, key) {
+            var options = getDailyPostDisplayOptions(post);
+            return (key === "note" ? options.links || {} : options.homework || {})[key + "Color"] || "";
+        }
+
         function getDailyPostHomeworkCustomLabel(post, slotKey) {
             var homework = getDailyPostDisplayOptions(post).homework || {};
             return (homework[slotKey + "CustomLabel"] || "").toString().trim().slice(0, 24);
@@ -10560,7 +10585,8 @@
             var dateKey = getHomeworkDoneDateKey(post.date);
             var doneRecord = getHomeworkDoneRecordForPost(post, dateKey);
             var done = !!(doneRecord && doneRecord.status === "done");
-            var btnText = done ? "✓ 已回報完成" : "我已完成本次作業";
+            var holiday = getDailyPostDisplayOptions(post).holidayPractice;
+            var btnText = done ? "✓ 已回報完成" : (holiday && !holiday.draft ? "我已完成本次一般作業" : "我已完成本次所有作業");
             var doneClass = done ? " done" : "";
             var disabled = done ? " disabled" : "";
             var hint = done ? "已記錄到作業完成回報。" : "完成作業後按一下，老師會看到你的回報。";
@@ -11116,7 +11142,7 @@
                 var supplementalInfoHtml = "";
 
                 // ★★★ v3.9 修正：連結解析邏輯 (支援小標籤) ★★★
-                var parseBtn = function (text, linkMode, customLabel, linkPrefix) {
+                var parseBtn = function (text, linkMode, customLabel, linkPrefix, color) {
                     if (!text) return "";
                     // 先對 HTML 特殊字元做跳脫 防範 XSS
                     text = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -11169,20 +11195,23 @@
                         parsed += renderEbookRichTextFormat(withBr.slice(lastIndex, linkMatch.index));
                         var name = linkMatch[1];
                         var url = linkMatch[2];
+                        var colorClass = getDailyPostButtonColorClass(color);
+                        var upload = name.indexOf("上傳") > -1;
+                        var homework = /作業|練習卷/.test(name);
                         if (linkPrefix) {
                             parsed += renderParsedLink(getDailyPostExamLinkDisplayName(name, linkPrefix), url, "btn-link", "📄 ");
-                        } else if (linkMode === "homework") {
-                            parsed += renderParsedLink(name, url, "btn-important-tag", "");
+                        } else if (linkMode === "homework" || (linkMode === "auto" && (upload || homework))) {
+                            var paper = !upload && (/卷/.test(name) || /\.pdf(?:$|[?#])/i.test(url) || /\.pdf$/i.test(name));
+                            var homeworkName = paper ? prependDailyPostLinkPurpose(name, "回家作業卷") : name;
+                            parsed += renderParsedLink(homeworkName, url, "btn-important-tag" + colorClass, paper ? "📄 " : SVG.upload);
                         } else if (linkMode === "supplement") {
-                            parsed += renderParsedLink(getDailyPostLinkDisplayName(name, linkMode, customLabel), url, "btn-supplement-tag", SVG.clip);
+                            parsed += renderParsedLink(getDailyPostLinkDisplayName(name, linkMode, customLabel), url, "btn-supplement-tag" + colorClass, SVG.clip);
                         } else if (linkMode === "general" || linkMode === "custom") {
-                            parsed += renderParsedLink(getDailyPostLinkDisplayName(name, linkMode, customLabel), url, "btn-general-tag", "🔗 ");
-                        } else if (linkMode !== "general" && (name.indexOf("作業") > -1 || name.indexOf("上傳") > -1)) {
-                            parsed += renderParsedLink(name, url, "btn-important-tag", SVG.upload);
-                        } else if (linkMode !== "general" && name.indexOf("附件") > -1) {
+                            parsed += renderParsedLink(getDailyPostLinkDisplayName(name, linkMode, customLabel), url, "btn-general-tag" + colorClass, "🔗 ");
+                        } else if (name.indexOf("附件") > -1) {
                             parsed += renderParsedLink(name, url, "btn-small-tag", SVG.clip);
                         } else {
-                            parsed += renderParsedLink(name, url, "btn-link", "");
+                            parsed += renderParsedLink(name, url, "btn-link" + colorClass, "");
                         }
                         lastIndex = linkPattern.lastIndex;
                     }
@@ -11191,6 +11220,11 @@
                 };
 
                 var homeworkItems = getPostHomeworkItems(post);
+                var holidayHtml = HolidayPracticeApp.render(post);
+                if (holidayHtml) {
+                    homeworkItems.forEach(function(item) { if (item.key === "hw1") item.label = "今日作業一"; });
+                    if (!homeworkItems.some(function(item) { return item.key === "hw2"; })) homeworkItems.push({ key: "hw2", label: "今日作業二", val: "" });
+                }
                 function getPostExamTypes(text) {
                     var raw = (text || "").toString();
                     var types = [];
@@ -11375,7 +11409,7 @@
                         : "";
                     var pendingHomeworkAttr = kind === 'homework' ? " data-pending-homework-anchor='1'" : "";
                     var labelHtml = f.hideLabel ? "" : "<div class='info-label'>" + f.label + "</div>";
-                    return "<section class='info-block info-kind-" + kind + "'" + pendingExamPaperAttr + pendingHomeworkAttr + ">" + labelHtml + noteHtml + "<div class='info-content'>" + parseBtn(f.val || "", f.linkMode || "auto", f.customLabel || "", f.linkPrefix || "") + (f.extra || "") + "</div></section>";
+                    return "<section class='info-block info-kind-" + kind + "'" + pendingExamPaperAttr + pendingHomeworkAttr + ">" + labelHtml + noteHtml + "<div class='info-content'>" + parseBtn(f.val || "", f.linkMode || "auto", f.customLabel || "", f.linkPrefix || "", f.color || "") + (f.extra || "") + "</div></section>";
                 }
                 function buildPostMakeupFields(postData, extraHtml) {
                     var lines = splitPostMultiLinkValue(postData.makeup || "");
@@ -11408,10 +11442,11 @@
                 homeworkItems.forEach(function(item, hwIdx) {
                     var homeworkNoteMode = getDailyPostHomeworkNoteMode(post);
                     var extra = homeworkNoteMode === "show" && hwIdx !== homeworkItems.length - 1 ? "" : buildHomeworkUploadNote(post, item.val);
+                    if (item.key === "hw2") extra += holidayHtml;
                     if (hwIdx === homeworkItems.length - 1) extra += buildHomeworkDoneButton(post);
-                    fields.push({ label: item.label, val: item.val, extra: extra, linkMode: getDailyPostHomeworkLinkMode(post, item.key), customLabel: getDailyPostHomeworkCustomLabel(post, item.key) });
+                    fields.push({ label: item.label, val: item.val, extra: extra, linkMode: getDailyPostHomeworkLinkMode(post, item.key), customLabel: getDailyPostHomeworkCustomLabel(post, item.key), color: getDailyPostLinkColor(post, item.key) });
                 });
-                fields = fields.concat(buildPostMakeupFields(post, buildPendingMakeupResultReportHtml(post, sourceHistory, examCards, latestPostDate)), [{ label: "下次考試範圍", val: post.range }, { label: "補充資訊", val: post.note, linkMode: getDailyPostNoteLinkMode(post), customLabel: getDailyPostNoteCustomLabel(post), hideLabel: true }]);
+                fields = fields.concat(buildPostMakeupFields(post, buildPendingMakeupResultReportHtml(post, sourceHistory, examCards, latestPostDate)), [{ label: "下次考試範圍", val: post.range }, { label: "補充資訊", val: post.note, linkMode: getDailyPostNoteLinkMode(post), customLabel: getDailyPostNoteCustomLabel(post), color: getDailyPostLinkColor(post, "note"), hideLabel: true }]);
                 fields.forEach(function (f) {
                     var blockHtml = renderPostInfoBlock(f);
                     if (f.label === "補充資訊") {
@@ -11670,7 +11705,6 @@
                     "</div><div id='feedback-attachments-" + newMessageContextKey + "' class='feedback-attachment-list'></div>" +
                     "<div id='feedback-attachment-status-" + newMessageContextKey + "' class='feedback-attachment-status'></div></div>";
 
-                contentHtml += HolidayPracticeApp.render(post);
 
                 // ★★★ v3.9 修正：家長留言 -> 留言內容 ★★★
                 var showLearningReport = !isAdminMode && !isDashboardDraftPreviewMode && !post.isTransferFormerClass;
