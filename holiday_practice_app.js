@@ -34,14 +34,14 @@
         var preview = isAdminMode || isDashboardDraftPreviewMode || isStudentPreviewMode;
         var color = (P.options(post).links || {}).holidayColor;
         var colorClass = ' post-button-' + (['blue', 'purple', 'slate', 'orange', 'gray'].indexOf(color) > -1 ? color : 'orange');
-        var text = safeLink(a.questionUrl, '📄 假期練習卷｜' + esc(a.title), colorClass) +
+        var text = safeLink(a.questionUrl, SVG.document + '假期練習卷｜' + esc(a.title), colorClass) +
             '<p>請於下次上課 ' + esc(a.dueDate || P.taipeiDate(a.dueAt)) + ' ' + esc(a.dueTime || '') + ' 前回報分數</p>';
         if (preview) return text + '<p>學生完成作答後可開答案並回報分數。預覽不記錄學生進度。</p>';
         if (!c || c.pending) return text + '<p role="status">正在核對上課安排與回報狀態…</p>';
         if (!(c.assignments || {})[id]) return '';
         var buttonLabel = p && p.unlockedAt ? '再次開啟答案卷' : '我已完成，顯示答案';
         text += '<div class="holiday-unlock-actions"><button type="button" class="homework-done-btn holiday-unlock-btn' + colorClass + '" data-holiday-action="unlock" data-assignment="' + esc(id) + '"' + (busy[id] ? ' disabled' : '') + '>' + buttonLabel + '</button></div>';
-        if (answers[id]) text += safeLink(answers[id], '📄 假期練習卷答案｜' + esc(a.title), colorClass);
+        if (answers[id]) text += safeLink(answers[id], SVG.document + '假期練習卷答案｜' + esc(a.title), colorClass);
         if (p && p.unlockedAt && !p.reportedAt) text += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><label>自行對答案後的分數<input type="number" min="0" max="100" step="0.01" inputmode="decimal" class="score-input" id="holiday-score-' + esc(id) + '" value="' + esc(scoreDrafts[id] || '') + '"></label>' +
             '<button type="button" class="score-btn" data-holiday-action="report" data-assignment="' + esc(id) + '"' + (busy[id] ? ' disabled' : '') + '>回報分數</button></div>';
         return text + '<p role="status"' + (state === 'missing' ? ' style="color:#b91c1c"' : '') + '>' + esc(label) + '</p>';
