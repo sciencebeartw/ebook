@@ -4620,10 +4620,6 @@
             cursor: default;
         }
         .emergency-expiry-notice[hidden] { display: none; }
-        .emergency-expiry-label {
-            font-size: 0.98rem;
-            line-height: 1.25;
-        }
         .emergency-expiry-text {
             color: var(--popup-accent-dark);
             font-size: 0.78rem;
@@ -4659,9 +4655,6 @@
             .emergency-expiry-notice {
                 min-height: 44px;
                 padding: 8px 14px;
-            }
-            .emergency-expiry-label {
-                font-size: 0.95rem;
             }
             .emergency-expiry-text {
                 font-size: 0.76rem;
@@ -6966,7 +6959,6 @@
                     <button type="button" class="emergency-btn" id="popupCloseButton" onclick="closeEmergencyModal()">知道了，關閉公告</button>
                     <button type="button" class="emergency-btn emergency-btn-secondary" id="popupDismissButton" onclick="dismissActivePopupAnnouncement()" hidden>看過了，本裝置不再提醒</button>
                     <div class="emergency-expiry-notice" id="emergencyExpiryNotice" role="note" aria-label="公告顯示期限">
-                        <span class="emergency-expiry-label">公告顯示期限</span>
                         <span class="emergency-expiry-text" id="emergencyExpiresAt"></span>
                     </div>
                 </div>

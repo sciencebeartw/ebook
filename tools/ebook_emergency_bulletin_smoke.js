@@ -85,6 +85,8 @@ assert.match(html, /知道了，關閉公告/, 'the popup must provide one clear
 assert.match(html, /看過了，本裝置不再提醒/, 'normal popups must offer a device-only dismissal action');
 assert.match(html, /id="popupDismissButton"[\s\S]{0,160}hidden/, 'the dismissal action must be hidden by default for urgent legacy behavior');
 assert.match(html, /本公告有效至/, 'the popup must display its effective-until label');
+assert.doesNotMatch(html, /class="emergency-expiry-label"/,
+  'the popup must not repeat a visible expiry heading above the effective-until text');
 assert.match(html, /class="emergency-expiry-notice"[\s\S]*id="emergencyExpiresAt"[\s\S]*<\/div>/,
   'the effective-until label must remain in a compact non-interactive notice');
 assert.match(html, /\.emergency-expiry-notice\[hidden\]\s*\{\s*display:\s*none;/,
