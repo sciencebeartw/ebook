@@ -10455,6 +10455,14 @@
             return prefix + "｜" + label;
         }
 
+        function getDailyPostUploadLinkDisplayName(name) {
+            var label = (name || "連結").toString();
+            var prefix = "上傳課本作業";
+            if (label.indexOf(prefix) !== 0) return label;
+            var detail = label.slice(prefix.length).replace(/^\s*[｜|：:]?\s*/, "");
+            return detail ? prefix + "｜" + detail : prefix;
+        }
+
         function getDailyPostLinkDisplayName(name, linkMode, customLabel) {
             if (linkMode === "supplement") return prependDailyPostLinkPurpose(name, "補充教材");
             if (linkMode === "general") return prependDailyPostLinkPurpose(name, "一般連結");
@@ -11204,7 +11212,7 @@
                             parsed += renderParsedLink(getDailyPostExamLinkDisplayName(name, linkPrefix), url, "btn-link", SVG.document);
                         } else if (linkMode === "homework" || (linkMode === "auto" && (upload || homework))) {
                             var paper = !upload && (/卷/.test(name) || /\.pdf(?:$|[?#])/i.test(url) || /\.pdf$/i.test(name));
-                            var homeworkName = paper ? prependDailyPostLinkPurpose(name, "回家作業卷") : name;
+                            var homeworkName = paper ? prependDailyPostLinkPurpose(name, "回家作業卷") : getDailyPostUploadLinkDisplayName(name);
                             parsed += renderParsedLink(homeworkName, url, "btn-important-tag" + colorClass, paper ? SVG.document : SVG.upload);
                         } else if (linkMode === "supplement") {
                             parsed += renderParsedLink(getDailyPostLinkDisplayName(name, linkMode, customLabel), url, "btn-supplement-tag" + colorClass, SVG.clip);
