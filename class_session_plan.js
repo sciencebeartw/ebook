@@ -16,6 +16,13 @@
         { id: 'g8_advanced_math_sun', subjectKey: 'math', classPattern: /^\d{3,4}國二數學超前班$/, weekday: 0, startTime: '18:00', endTime: '21:00' },
         { id: 'p6_gifted_math_wed', subjectKey: 'math', classPattern: /^\d{3,4}(?:小六)?資優數學(?:班)?$/, weekday: 3, startTime: '18:00', endTime: '21:00' }
     ].map(Object.freeze));
+    var HOLIDAY_PRACTICE_POLICY_IDS = Object.freeze([
+        'p6_gifted_science_sat_am',
+        'p6_gifted_science_sun_pm',
+        'p6_gifted_science_sun_night',
+        'g7_advanced_science_sat',
+        'g8_advanced_science_sat'
+    ]);
     function fail(message) { throw new Error(message); }
     function dateKey(value) {
         var s = String(value || '').trim().replace(/\//g, '-');
@@ -38,6 +45,11 @@
         var matches = POLICIES.filter(function(p) { return p.subjectKey === String(subject || '').replace(/^\/+/, '') && p.classPattern.test(String(className || '').replace(/\s+/g, '')); });
         return matches.length === 1 ? matches[0] : null;
     }
+    function holidayPracticePolicy(subject, className) {
+        var p = policy(subject, className);
+        return p && HOLIDAY_PRACTICE_POLICY_IDS.indexOf(p.id) >= 0 ? p : null;
+    }
+    function supportsHolidayPractice(subject, className) { return !!holidayPracticePolicy(subject, className); }
     function occurrenceId(p, originalDate) {
         var key = dateKey(originalDate);
         if (!p || !key || weekday(key) !== p.weekday) fail('原訂課次日期與固定班次不符');
@@ -166,8 +178,10 @@
         var n = Number(value); return Number.isFinite(n) && n >= 0 && n <= 100 ? n : null;
     }
     return Object.freeze({ schemaVersion: 1, TIMEZONE: 'Asia/Taipei', DAY: DAY, WEEK: WEEK, CLASS_SESSION_POLICIES: POLICIES,
+        HOLIDAY_PRACTICE_POLICY_IDS: HOLIDAY_PRACTICE_POLICY_IDS.slice(),
         dateKey: dateKey, dayMs: dayMs, weekday: weekday, addDays: addDays, at: at, taipeiDate: taipeiDate, timeMinutes: timeMinutes,
-        policy: policy, occurrenceId: occurrenceId, normalizeException: normalizeException, resolve: resolve,
+        policy: policy, holidayPracticePolicy: holidayPracticePolicy, supportsHolidayPractice: supportsHolidayPractice,
+        occurrenceId: occurrenceId, normalizeException: normalizeException, resolve: resolve,
         nextOriginal: nextOriginal, candidates: candidates, adjacent: adjacent, sourceForPost: sourceForPost,
         options: options, isActualPost: isActualPost, due: due, reminderLead: reminderLead, event: event, isSelfMarked: isSelfMarked,
         holidayState: holidayState, publicOptions: publicOptions, validScore: validScore });

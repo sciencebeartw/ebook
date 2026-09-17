@@ -17,3 +17,8 @@ test('unsubmitted holiday score survives focus/context refresh, and resets on st
  events.input({target:{id:'holiday-score-'+id,value:'80'}});windowEvents.focus();await new Promise(r=>setImmediate(r));assert.match(dom['holiday-card-'+id].innerHTML,/value="80"/);
  c.gData.foundUserKey='two';const next=c.HolidayPracticeApp.render(post);assert.ok(!next.includes('value="80"'));
 });
+
+test('ebook shared holiday policy recognizes advanced science only',()=>{
+ for(const name of ['115國一自然超前班','115國二自然超前班'])assert.equal(P.supportsHolidayPractice('science',name),true);
+ for(const name of ['115國一生物','115國二理化','115國一數學超前班'])assert.equal(P.supportsHolidayPractice('science',name),false);
+});
