@@ -26,10 +26,38 @@
     <!-- External Resources -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
     <script src="class_session_plan.js?v=holiday-20260918-advanced-science"></script>
-    <script src="holiday_practice_app.js?v=holiday-answer-ui-20260919"></script>
+    <script src="holiday_practice_app.js?v=holiday-answer-fast-ui-20260919"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         [data-holiday-card] { margin-top: 12px; }
+        [data-holiday-card] .holiday-deadline-box {
+            width: min(100%, 560px);
+            margin: 16px auto 12px;
+            padding: 10px 14px;
+            box-sizing: border-box;
+            border: 1px solid #fed7aa;
+            border-radius: 16px;
+            background: linear-gradient(135deg, #fff7ed 0%, #fffaf2 100%);
+            box-shadow: 0 6px 18px rgba(234, 88, 12, .10);
+            text-align: center;
+        }
+        [data-holiday-card] .holiday-deadline-hint,
+        [data-holiday-card] .holiday-unlock-hint,
+        [data-holiday-card] .holiday-progress-hint {
+            font-size: .84rem;
+            font-weight: 700;
+            line-height: 1.5;
+            text-align: center;
+        }
+        [data-holiday-card] .holiday-deadline-hint,
+        [data-holiday-card] .holiday-unlock-hint { color: #9a3412; }
+        [data-holiday-card] .holiday-unlock-hint,
+        [data-holiday-card] .holiday-progress-hint {
+            width: min(100%, 560px);
+            margin: 8px auto 0;
+        }
+        [data-holiday-card] .holiday-progress-hint { color: #047857; }
+        [data-holiday-card] .holiday-progress-hint.is-missing { color: #b91c1c; }
         [data-holiday-card] .holiday-unlock-actions { margin-top: 12px; text-align: center; }
         [data-holiday-card] .holiday-unlock-btn:disabled { opacity: .65; cursor: wait; }
         [data-holiday-card] .holiday-unlock-btn.holiday-preview-btn:disabled { opacity: 1; cursor: default; }

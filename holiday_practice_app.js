@@ -34,19 +34,20 @@
         var a = assignment(post), c = context(post), p = progress(post), now = Date.now();
         if (!a || a.draft) return '';
         var state = P.holidayState(a, p, now), id = a.assignmentId;
-        var label = state === 'reported' ? '已回報 ' + p.score + ' 分' : state === 'syncing' ? '已收到回報，成績更新中' : state === 'missing' ? '缺繳：請回報分數' : state === 'awaiting_score' ? '待回報分數' : '待作答';
+        var label = state === 'reported' ? '已回報 ' + p.score + ' 分' : state === 'syncing' ? '已收到回報，成績更新中' : state === 'missing' ? '缺繳：請回報分數' : state === 'awaiting_score' ? '答案已開啟，請自行對答案後回報分數。' : '';
         var preview = isAdminMode || isDashboardDraftPreviewMode;
         var color = (P.options(post).links || {}).holidayColor;
         var colorClass = ' post-button-' + (['blue', 'purple', 'slate', 'orange', 'gray'].indexOf(color) > -1 ? color : 'orange');
         var text = safeLink(a.questionUrl, SVG.document + esc(linkPurpose(post, false)) + '｜' + esc(a.title), colorClass) +
-            '<p>請於下次上課 ' + esc(a.dueDate || P.taipeiDate(a.dueAt)) + ' ' + esc(a.dueTime || '') + ' 前回報分數</p>';
+            '<div class="holiday-deadline-box"><div class="holiday-deadline-hint">請於下次上課 ' + esc(a.dueDate || P.taipeiDate(a.dueAt)) + ' ' + esc(a.dueTime || '') + ' 前回報分數</div></div>';
         if (preview) return text + '<div class="holiday-unlock-actions"><button type="button" class="homework-done-btn holiday-unlock-btn holiday-preview-btn' + colorClass + '" disabled aria-disabled="true">我已完成，顯示答案</button></div>' +
-            '<p>這是預覽；學生實際登入後按上方按鈕，才會開啟答案並可回報分數。預覽不記錄學生進度。</p>';
-        if (!c || c.pending) return text + '<p role="status">正在核對上課安排與回報狀態…</p>';
+            '<div class="holiday-unlock-hint">這是預覽；學生實際登入後按上方按鈕，才會開啟答案並可回報分數。預覽不記錄學生進度。</div>';
+        if (!c || c.pending) return text + '<div class="holiday-unlock-hint" role="status">正在核對上課安排與回報狀態…</div>';
         if (!(c.assignments || {})[id]) return '';
         if (!(p && p.unlockedAt)) {
             var buttonLabel = busy[id] ? '正在開啟答案…' : '我已完成，顯示答案';
-            text += '<div class="holiday-unlock-actions"><button type="button" class="homework-done-btn holiday-unlock-btn' + colorClass + '" data-holiday-action="unlock" data-assignment="' + esc(id) + '"' + (busy[id] ? ' disabled aria-busy="true"' : '') + '>' + buttonLabel + '</button></div>';
+            text += '<div class="holiday-unlock-actions"><button type="button" class="homework-done-btn holiday-unlock-btn' + colorClass + '" data-holiday-action="unlock" data-assignment="' + esc(id) + '"' + (busy[id] ? ' disabled aria-busy="true"' : '') + '>' + buttonLabel + '</button></div>' +
+                '<div class="holiday-unlock-hint">' + (busy[id] ? '正在安全核對答案，完成後會立即顯示。' : '完成作答後按一下，答案會立即開啟。') + '</div>';
         } else if (answers[id]) {
             text += safeLink(answers[id], SVG.document + esc(linkPurpose(post, true)) + '｜' + esc(a.title), colorClass);
         } else {
@@ -54,7 +55,7 @@
         }
         if (p && p.unlockedAt && !p.reportedAt) text += '<div class="holiday-score-report"><label class="holiday-score-label">自行對答案後的分數<input type="number" min="0" max="100" step="0.01" inputmode="decimal" class="score-input" id="holiday-score-' + esc(id) + '" value="' + esc(scoreDrafts[id] || '') + '"></label>' +
             '<button type="button" class="score-btn" data-holiday-action="report" data-assignment="' + esc(id) + '"' + (busy[id] ? ' disabled' : '') + '>回報分數</button></div>';
-        return text + '<p role="status"' + (state === 'missing' ? ' style="color:#b91c1c"' : '') + '>' + esc(label) + '</p>';
+        return text + (label ? '<div class="holiday-progress-hint' + (state === 'missing' ? ' is-missing' : '') + '" role="status">' + esc(label) + '</div>' : '');
     }
     function redraw(id) {
         var post = posts[id], target = document.getElementById('holiday-card-' + id);

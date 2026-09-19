@@ -34,6 +34,18 @@ test('dashboard draft preview shows the distinct holiday answer button without e
  assert.doesNotMatch(rendered,/private\.test/);assert.doesNotMatch(rendered,/data-holiday-action="unlock"/);
 });
 
+test('pending holiday card centers its deadline and omits the redundant pending label',async()=>{
+ const dom={},id='holiday_centered_deadline';
+ const post={id:'post',date:'2026/09/19',className:'class',displayOptions:{holidayPractice:{assignmentId:id,title:'理化複習',questionUrl:'https://demo.test/q',dueAt:Date.now()+100000}}};
+ const c={console,Date,URL,Promise,setTimeout:()=>{},gData:{className:'class',foundUserKey:'one',grades:[]},isAdminMode:false,isDashboardDraftPreviewMode:false,isStudentPreviewMode:false,ClassSessionPlan:P,document:{addEventListener(){},getElementById:key=>dom[key],activeElement:null},addEventListener(){},doPostAction:(action,data,ok)=>ok({success:true,assignments:{[id]:post.displayOptions.holidayPractice},progress:{}})};c.window=c;vm.createContext(c);
+ const icons=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8').match(/const SVG = \{[\s\S]*?\n        \};/)[0];vm.runInContext(icons,c);
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'../holiday_practice_app.js'),'utf8'),c);
+ const first=c.HolidayPracticeApp.render(post);dom['holiday-card-'+id]={innerHTML:first};await new Promise(r=>setImmediate(r));
+ const rendered=dom['holiday-card-'+id].innerHTML;
+ assert.match(rendered,/holiday-deadline-box/);assert.match(rendered,/holiday-deadline-hint/);assert.match(rendered,/holiday-unlock-hint/);
+ assert.match(rendered,/完成作答後按一下，答案會立即開啟。/);assert.doesNotMatch(rendered,/>待作答</);
+});
+
 test('named student preview loads the real holiday control and asks before unlocking',async()=>{
  const dom={},events={},windowEvents={},id='holiday_named_preview';
  const assignment={assignmentId:id,title:'理化複習',questionUrl:'https://demo.test/q',dueAt:Date.now()+100000,revision:1};
