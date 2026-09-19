@@ -22,3 +22,28 @@ test('ebook shared holiday policy recognizes advanced science only',()=>{
  for(const name of ['115國一自然超前班','115國二自然超前班'])assert.equal(P.supportsHolidayPractice('science',name),true);
  for(const name of ['115國一生物','115國二理化','115國一數學超前班'])assert.equal(P.supportsHolidayPractice('science',name),false);
 });
+
+test('dashboard draft preview shows the distinct holiday answer button without exposing the answer',()=>{
+ const dom={},events={},windowEvents={},id='holiday_preview_button';
+ const post={id:'post',date:'2026/09/19',className:'class',displayOptions:{holidayPractice:{assignmentId:id,title:'理化複習',questionUrl:'https://demo.test/q',answerUrl:'https://private.test/answer',dueAt:Date.now()+100000}}};
+ const c={console,Date,URL,Promise,setTimeout:()=>{},gData:{className:'class',foundUserKey:'one',grades:[]},isAdminMode:false,isDashboardDraftPreviewMode:true,isStudentPreviewMode:false,ClassSessionPlan:P,document:{addEventListener:(n,f)=>events[n]=f,getElementById:key=>dom[key],activeElement:null},addEventListener:(n,f)=>windowEvents[n]=f,doPostAction(){throw Error('preview must not call the student action API')}};c.window=c;vm.createContext(c);
+ const icons=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8').match(/const SVG = \{[\s\S]*?\n        \};/)[0];vm.runInContext(icons,c);
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'../holiday_practice_app.js'),'utf8'),c);
+ const rendered=c.HolidayPracticeApp.render(post);
+ assert.match(rendered,/holiday-preview-btn/);assert.match(rendered,/我已完成，顯示答案/);assert.match(rendered,/disabled aria-disabled="true"/);
+ assert.doesNotMatch(rendered,/private\.test/);assert.doesNotMatch(rendered,/data-holiday-action="unlock"/);
+});
+
+test('named student preview loads the real holiday control and asks before unlocking',async()=>{
+ const dom={},events={},windowEvents={},id='holiday_named_preview';
+ const assignment={assignmentId:id,title:'理化複習',questionUrl:'https://demo.test/q',dueAt:Date.now()+100000,revision:1};
+ const post={id:'post',date:'2026/09/19',className:'class',displayOptions:{holidayPractice:assignment}};
+ let progress={},confirmCount=0,unlockCount=0;
+ const c={console,Date,URL,Promise,setTimeout:()=>{},safeKey:value=>value,gData:{className:'class',foundUserKey:'one',grades:[]},isAdminMode:false,isDashboardDraftPreviewMode:false,isStudentPreviewMode:true,ClassSessionPlan:P,confirmStudentPreviewAction:async label=>{confirmCount++;assert.equal(label,'開啟假期卷答案');return true},document:{addEventListener:(n,f)=>events[n]=f,getElementById:key=>dom[key],activeElement:null},addEventListener:(n,f)=>windowEvents[n]=f,doPostAction:(action,data,ok)=>{if(action==='getHolidayPracticeContext')ok({success:true,assignments:{[id]:assignment},progress});else{unlockCount++;progress={[id]:{unlockedAt:1}};ok({success:true,progress:progress[id],answerUrl:'https://private.test/answer'});}}};c.window=c;vm.createContext(c);
+ const icons=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8').match(/const SVG = \{[\s\S]*?\n        \};/)[0];vm.runInContext(icons,c);
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'../holiday_practice_app.js'),'utf8'),c);
+ const first=c.HolidayPracticeApp.render(post);dom['holiday-card-'+id]={innerHTML:first};await new Promise(r=>setImmediate(r));
+ assert.match(dom['holiday-card-'+id].innerHTML,/data-holiday-action="unlock"/);assert.doesNotMatch(dom['holiday-card-'+id].innerHTML,/holiday-preview-btn/);
+ events.click({target:{closest:()=>({dataset:{assignment:id,holidayAction:'unlock'}})}});await new Promise(r=>setImmediate(r));
+ assert.equal(confirmCount,1);assert.equal(unlockCount,1);assert.match(dom['holiday-card-'+id].innerHTML,/private\.test\/answer/);
+});

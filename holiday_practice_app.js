@@ -35,12 +35,13 @@
         if (!a || a.draft) return '';
         var state = P.holidayState(a, p, now), id = a.assignmentId;
         var label = state === 'reported' ? '已回報 ' + p.score + ' 分' : state === 'syncing' ? '已收到回報，成績更新中' : state === 'missing' ? '缺繳：請回報分數' : state === 'awaiting_score' ? '待回報分數' : '待作答';
-        var preview = isAdminMode || isDashboardDraftPreviewMode || isStudentPreviewMode;
+        var preview = isAdminMode || isDashboardDraftPreviewMode;
         var color = (P.options(post).links || {}).holidayColor;
         var colorClass = ' post-button-' + (['blue', 'purple', 'slate', 'orange', 'gray'].indexOf(color) > -1 ? color : 'orange');
         var text = safeLink(a.questionUrl, SVG.document + esc(linkPurpose(post, false)) + '｜' + esc(a.title), colorClass) +
             '<p>請於下次上課 ' + esc(a.dueDate || P.taipeiDate(a.dueAt)) + ' ' + esc(a.dueTime || '') + ' 前回報分數</p>';
-        if (preview) return text + '<p>學生完成作答後可開答案並回報分數。預覽不記錄學生進度。</p>';
+        if (preview) return text + '<div class="holiday-unlock-actions"><button type="button" class="homework-done-btn holiday-unlock-btn holiday-preview-btn' + colorClass + '" disabled aria-disabled="true">我已完成，顯示答案</button></div>' +
+            '<p>這是預覽；學生實際登入後按上方按鈕，才會開啟答案並可回報分數。預覽不記錄學生進度。</p>';
         if (!c || c.pending) return text + '<p role="status">正在核對上課安排與回報狀態…</p>';
         if (!(c.assignments || {})[id]) return '';
         var buttonLabel = p && p.unlockedAt ? '再次開啟答案卷' : '我已完成，顯示答案';
@@ -76,12 +77,13 @@
     }
     async function act(id, action) {
         var post = posts[id]; if (!post || busy[id]) return;
-        if (isAdminMode || isDashboardDraftPreviewMode || isStudentPreviewMode) return;
+        if (isAdminMode || isDashboardDraftPreviewMode) return;
         var a = assignment(post), score;
         if (action === 'report') {
             score = P.validScore((document.getElementById('holiday-score-' + id) || {}).value);
             if (score === null) { swalAlert('請確認分數', '請填入 0 到 100 的分數。', 'warning'); return; }
         }
+        if (isStudentPreviewMode && !(await confirmStudentPreviewAction(action === 'unlock' ? '開啟假期卷答案' : '回報假期卷分數'))) return;
         busy[id] = true; redraw(id);
         try {
             var result = await api(action === 'unlock' ? 'unlockHolidayPractice' : 'reportHolidayPractice', {
