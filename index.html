@@ -26,13 +26,40 @@
     <!-- External Resources -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
     <script src="class_session_plan.js?v=holiday-20260918-advanced-science"></script>
-    <script src="holiday_practice_app.js?v=holiday-preview-20260919"></script>
+    <script src="holiday_practice_app.js?v=holiday-answer-ui-20260919"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         [data-holiday-card] { margin-top: 12px; }
         [data-holiday-card] .holiday-unlock-actions { margin-top: 12px; text-align: center; }
         [data-holiday-card] .holiday-unlock-btn:disabled { opacity: .65; cursor: wait; }
         [data-holiday-card] .holiday-unlock-btn.holiday-preview-btn:disabled { opacity: 1; cursor: default; }
+        [data-holiday-card] .holiday-answer-btn {
+            border: 0;
+            font-family: inherit;
+            cursor: pointer;
+        }
+        [data-holiday-card] .holiday-answer-btn:disabled { opacity: .65; cursor: wait; transform: none; }
+        [data-holiday-card] .holiday-score-report {
+            width: min(100%, 560px);
+            margin: 16px auto 0;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: end;
+            justify-content: center;
+            gap: 12px;
+        }
+        [data-holiday-card] .holiday-score-label {
+            display: grid;
+            gap: 8px;
+            min-width: 0;
+            text-align: center;
+        }
+        [data-holiday-card] .holiday-score-label .score-input { width: 100%; box-sizing: border-box; }
+        [data-holiday-card] .holiday-score-report .score-btn { align-self: end; }
+        @media (max-width: 600px) {
+            [data-holiday-card] .holiday-score-report { grid-template-columns: minmax(0, 1fr); }
+            [data-holiday-card] .holiday-score-report .score-btn { width: min(100%, 220px); justify-self: center; }
+        }
         /* ================= 基礎設定 ================= */
         :root {
             --primary: #4CAF50;          /* Eco Green (Science) */
@@ -4548,6 +4575,17 @@
             color: var(--popup-accent);
             font-weight: 900;
             font-size: 1.7rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .emergency-header svg {
+            width: 1.08em;
+            height: 1.08em;
+            flex: 0 0 auto;
+            margin: 0 !important;
+            vertical-align: middle !important;
         }
         .emergency-body {
             padding: 16px 24px 24px;
@@ -4610,8 +4648,8 @@
             letter-spacing: 0;
             width: auto;
             max-width: 100%;
-            min-height: 44px;
-            padding: 8px 18px;
+            min-height: 34px;
+            padding: 4px 14px;
             justify-self: center;
             display: inline-flex;
             flex-direction: column;
@@ -4623,7 +4661,7 @@
         .emergency-expiry-notice[hidden] { display: none; }
         .emergency-expiry-text {
             color: var(--popup-accent-dark);
-            font-size: 0.78rem;
+            font-size: 0.72rem;
             font-weight: 700;
             line-height: 1.25;
         }
@@ -4654,11 +4692,11 @@
                 letter-spacing: 0;
             }
             .emergency-expiry-notice {
-                min-height: 44px;
-                padding: 8px 14px;
+                min-height: 34px;
+                padding: 4px 12px;
             }
             .emergency-expiry-text {
-                font-size: 0.76rem;
+                font-size: 0.7rem;
             }
         }
     
@@ -6954,7 +6992,7 @@
         <!-- 公告彈窗：一般／注意可略過，重要／緊急每次進入提醒 -->
         <div id="emergencyModal" class="emergency-modal" role="dialog" aria-modal="true" aria-labelledby="emergencyTitle" aria-describedby="emergencyContent">
             <div class="emergency-box">
-                <div class="emergency-header" id="emergencyTitle">⚠️ 緊急公告</div>
+                <div class="emergency-header" id="emergencyTitle">緊急公告</div>
                 <div class="emergency-body" id="emergencyContent"></div>
                 <div class="emergency-footer">
                     <button type="button" class="emergency-btn" id="popupCloseButton" onclick="closeEmergencyModal()">知道了，關閉公告</button>
@@ -11224,9 +11262,9 @@
 
                 var homeworkItems = getPostHomeworkItems(post);
                 var holidayHtml = HolidayPracticeApp.render(post);
-                if (holidayHtml) {
+                var hasRegularHomeworkTwo = homeworkItems.some(function(item) { return item.key === "hw2"; });
+                if (holidayHtml && !hasRegularHomeworkTwo) {
                     homeworkItems.forEach(function(item) { if (item.key === "hw1") item.label = "今日作業一"; });
-                    if (!homeworkItems.some(function(item) { return item.key === "hw2"; })) homeworkItems.push({ key: "hw2", label: "今日作業二", val: "" });
                 }
                 function getPostExamTypes(text) {
                     var raw = (text || "").toString();
@@ -11449,6 +11487,18 @@
                     if (hwIdx === homeworkItems.length - 1) extra += buildHomeworkDoneButton(post);
                     fields.push({ label: item.label, val: item.val, extra: extra, linkMode: getDailyPostHomeworkLinkMode(post, item.key), customLabel: getDailyPostHomeworkCustomLabel(post, item.key), color: getDailyPostLinkColor(post, item.key) });
                 });
+                // 假期練習卷有自己的完成／開答案流程，不能依賴一般作業二存在。
+                // 沒有一般作業二時，將它獨立成一個作業欄位；兩者皆空時就是唯一的「今日作業」。
+                if (holidayHtml && !hasRegularHomeworkTwo) {
+                    fields.push({
+                        label: homeworkItems.length ? "今日作業二" : "今日作業",
+                        val: "",
+                        extra: holidayHtml,
+                        linkMode: "auto",
+                        customLabel: "",
+                        color: ""
+                    });
+                }
                 fields = fields.concat(buildPostMakeupFields(post, buildPendingMakeupResultReportHtml(post, sourceHistory, examCards, latestPostDate)), [{ label: "下次考試範圍", val: post.range }, { label: "補充資訊", val: post.note, linkMode: getDailyPostNoteLinkMode(post), customLabel: getDailyPostNoteCustomLabel(post), color: getDailyPostLinkColor(post, "note"), hideLabel: true }]);
                 fields.forEach(function (f) {
                     var blockHtml = renderPostInfoBlock(f);
@@ -12915,6 +12965,12 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             return text;
         }
 
+        function getPopupTitleIcon(popupTone) {
+            if (popupTone === 'urgent') return SVG.alert;
+            if (popupTone === 'notice') return SVG.megaphone;
+            return SVG.bulb;
+        }
+
         function resetPopupQueueForEntry() {
             popupAnnouncementQueue = [];
             popupShownIdentitiesForCurrentEntry = {};
@@ -12940,9 +12996,12 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             popupShownIdentitiesForCurrentEntry[buildEmergencyIdentity(emergency)] = true;
             activeEmergencyAnnouncement = emergency;
             var emergencyTitle = document.getElementById('emergencyTitle');
-            var popupTitleIcon = popupTone === 'urgent' ? '⚠️' : (popupTone === 'notice' ? '🔔' : 'ℹ️');
             var popupFallbackTitle = popupTone === 'urgent' ? '重要通知' : (popupTone === 'notice' ? '注意通知' : '溫馨提醒');
-            if (emergencyTitle) emergencyTitle.textContent = popupTitleIcon + ' ' + ((emergency.title || popupFallbackTitle).toString().trim() || popupFallbackTitle);
+            var popupTitle = ((emergency.title || popupFallbackTitle).toString().trim() || popupFallbackTitle);
+            if (emergencyTitle) {
+                emergencyTitle.innerHTML = getPopupTitleIcon(popupTone) + '<span>' + escapeHtml(popupTitle) + '</span>';
+                emergencyTitle.setAttribute('aria-label', popupTitle);
+            }
             document.getElementById('emergencyContent').innerHTML = parseBtn(emergency.content);
             var displayChannels = getBulletinDisplayChannels(emergency);
             var expiryNotice = document.getElementById('emergencyExpiryNotice');

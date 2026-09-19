@@ -91,14 +91,18 @@ assert.match(html, /class="emergency-expiry-notice"[\s\S]*id="emergencyExpiresAt
   'the effective-until label must remain in a compact non-interactive notice');
 assert.match(html, /\.emergency-expiry-notice\[hidden\]\s*\{\s*display:\s*none;/,
   'hidden popup metadata containers must not leave empty pills behind');
+assert.match(html, /min-height:\s*34px;[\s\S]{0,100}padding:\s*4px 14px;/,
+  'the popup expiry notice must stay compact');
 assert.doesNotMatch(html, /彈窗提醒規則|此為重要通知，每次登入都會顯示|已到可略過時間/,
   'popup recurrence rules are admin behavior and must not be shown to families');
+assert.doesNotMatch(extractFunction('showNextPopupAnnouncement'), /⚠️|🔔|ℹ️/,
+  'popup titles must use the ebook SVG icon system instead of platform emoji');
 
 const storage = new Map();
 let pendingReminderAttempts = 0;
 const elements = {
   emergencyModal: { style: { display: 'none' }, dataset: {} },
-  emergencyTitle: { textContent: '' },
+  emergencyTitle: { innerHTML: '', attributes: {}, setAttribute(name, value) { this.attributes[name] = value; } },
   emergencyContent: { innerHTML: '' },
   emergencyExpiryNotice: { hidden: false },
   emergencyExpiresAt: { textContent: '' },
@@ -106,6 +110,12 @@ const elements = {
   popupDismissButton: { hidden: true },
 };
 const context = {
+  SVG: {
+    alert: '<svg data-icon="alert"></svg>',
+    megaphone: '<svg data-icon="megaphone"></svg>',
+    bulb: '<svg data-icon="bulb"></svg>',
+  },
+  escapeHtml(value) { return String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); },
   BULLETIN_MARQUEE_COLOR_KEYS: ['blue', 'rose', 'amber', 'emerald', 'violet'],
   BULLETIN_POPUP_TONE_KEYS: ['info', 'notice', 'urgent'],
   BEAR_SUBJECT: '/science',
@@ -139,6 +149,7 @@ vm.createContext(context);
   'isPopupDismissedOnThisDevice',
   'formatPopupDatetimeText',
   'formatEmergencyExpiryText',
+  'getPopupTitleIcon',
   'resetPopupQueueForEntry',
   'hideEmergencyModal',
   'showNextPopupAnnouncement',
@@ -160,7 +171,8 @@ const emergency = {
 
 context.checkEmergency([emergency]);
 assert.equal(elements.emergencyModal.style.display, 'flex', 'an active emergency must open on entry');
-assert.equal(elements.emergencyTitle.textContent, '⚠️ 下次鑑定考');
+assert.equal(elements.emergencyTitle.innerHTML, '<svg data-icon="alert"></svg><span>下次鑑定考</span>');
+assert.equal(elements.emergencyTitle.attributes['aria-label'], '下次鑑定考');
 assert.equal(elements.emergencyModal.dataset.popupTone, 'urgent');
 assert.equal(elements.popupCloseButton.textContent, '知道了，關閉公告');
 assert.equal(elements.popupDismissButton.hidden, true, 'urgent popup must never offer a persistent dismissal');
@@ -224,7 +236,7 @@ const ordinary = {
 context.resetPopupQueueForEntry();
 context.checkEmergency([ordinary]);
 assert.equal(elements.emergencyModal.style.display, 'flex', 'an undismissed normal popup must open on entry');
-assert.equal(elements.emergencyTitle.textContent, '🔔 下課接送提醒');
+assert.equal(elements.emergencyTitle.innerHTML, '<svg data-icon="megaphone"></svg><span>下課接送提醒</span>');
 assert.equal(elements.emergencyModal.dataset.popupTone, 'notice');
 assert.equal(elements.popupCloseButton.textContent, '這次先關閉');
 assert.equal(elements.popupDismissButton.hidden, false, 'normal popup must offer the device-only dismissal');
@@ -285,12 +297,12 @@ const permanent = Object.assign({}, ordinary, {
 context.gData = { className: '115國一自然超前班', studentName: '學生丙' };
 context.resetPopupQueueForEntry();
 context.checkEmergency([ordinary, permanent]);
-assert.equal(elements.emergencyTitle.textContent, 'ℹ️ 永久班規提醒', 'the newest routine popup must appear first');
+assert.equal(elements.emergencyTitle.innerHTML, '<svg data-icon="bulb"></svg><span>永久班規提醒</span>', 'the newest routine popup must appear first');
 assert.equal(elements.popupCloseButton.textContent, '這次先關閉，查看下一則', 'the first popup must explain that another notice follows');
 assert.equal(elements.emergencyExpiryNotice.hidden, true, 'showPopupExpiry=false must hide the complete popup expiry block independently of the card date');
 assert.equal(elements.emergencyExpiresAt.textContent, '', 'hidden popup expiry metadata must not remain in the accessibility tree');
 context.closeEmergencyModal();
-assert.equal(elements.emergencyTitle.textContent, '🔔 下課接送提醒', 'closing the first popup must advance to the next active popup');
+assert.equal(elements.emergencyTitle.innerHTML, '<svg data-icon="megaphone"></svg><span>下課接送提醒</span>', 'closing the first popup must advance to the next active popup');
 assert.equal(elements.emergencyModal.style.display, 'flex', 'the popup queue must stay open for the next active notice');
 assert.equal(elements.emergencyExpiryNotice.hidden, false, 'a later popup may restore the complete expiry block');
 context.closeEmergencyModal();

@@ -1,11 +1,11 @@
 (function(root) {
     'use strict';
-    var P = root.ClassSessionPlan, contexts = {}, pending = {}, posts = {}, answers = {}, busy = {}, scoreDrafts = {};
+    var P = root.ClassSessionPlan, contexts = {}, pending = {}, posts = {}, answers = {}, busy = {}, scoreDrafts = {}, optimisticUntil = {};
     function esc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function(c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
     function className(post) { return post.storedClassName || post.sourceClassName || post.className || gData.className; }
     function owner() { return gData ? [gData.className, gData.foundUserKey || gData.studentName].join('/') : ''; }
     var currentOwner = '';
-    function resetOwner() { if (owner() !== currentOwner) { contexts = {}; pending = {}; posts = {}; answers = {}; scoreDrafts = {}; currentOwner = owner(); } }
+    function resetOwner() { if (owner() !== currentOwner) { contexts = {}; pending = {}; posts = {}; answers = {}; scoreDrafts = {}; optimisticUntil = {}; currentOwner = owner(); } }
     function api(action, payload) {
         return new Promise(function(resolve, reject) { doPostAction(action, payload, function(result) {
             if (!result || !result.success) reject(new Error(result && result.msg || '送出尚未完成，請稍後重試'));
@@ -44,10 +44,15 @@
             '<p>這是預覽；學生實際登入後按上方按鈕，才會開啟答案並可回報分數。預覽不記錄學生進度。</p>';
         if (!c || c.pending) return text + '<p role="status">正在核對上課安排與回報狀態…</p>';
         if (!(c.assignments || {})[id]) return '';
-        var buttonLabel = p && p.unlockedAt ? '再次開啟答案卷' : '我已完成，顯示答案';
-        text += '<div class="holiday-unlock-actions"><button type="button" class="homework-done-btn holiday-unlock-btn' + colorClass + '" data-holiday-action="unlock" data-assignment="' + esc(id) + '"' + (busy[id] ? ' disabled' : '') + '>' + buttonLabel + '</button></div>';
-        if (answers[id]) text += safeLink(answers[id], SVG.document + esc(linkPurpose(post, true)) + '｜' + esc(a.title), colorClass);
-        if (p && p.unlockedAt && !p.reportedAt) text += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><label>自行對答案後的分數<input type="number" min="0" max="100" step="0.01" inputmode="decimal" class="score-input" id="holiday-score-' + esc(id) + '" value="' + esc(scoreDrafts[id] || '') + '"></label>' +
+        if (!(p && p.unlockedAt)) {
+            var buttonLabel = busy[id] ? '正在開啟答案…' : '我已完成，顯示答案';
+            text += '<div class="holiday-unlock-actions"><button type="button" class="homework-done-btn holiday-unlock-btn' + colorClass + '" data-holiday-action="unlock" data-assignment="' + esc(id) + '"' + (busy[id] ? ' disabled aria-busy="true"' : '') + '>' + buttonLabel + '</button></div>';
+        } else if (answers[id]) {
+            text += safeLink(answers[id], SVG.document + esc(linkPurpose(post, true)) + '｜' + esc(a.title), colorClass);
+        } else {
+            text += '<div class="holiday-unlock-actions"><button type="button" class="btn-link holiday-answer-btn' + colorClass + '" data-holiday-action="answer" data-assignment="' + esc(id) + '"' + (busy[id] ? ' disabled aria-busy="true"' : '') + '>' + SVG.document + (busy[id] ? '正在取得答案…' : esc(linkPurpose(post, true)) + '｜' + esc(a.title)) + '</button></div>';
+        }
+        if (p && p.unlockedAt && !p.reportedAt) text += '<div class="holiday-score-report"><label class="holiday-score-label">自行對答案後的分數<input type="number" min="0" max="100" step="0.01" inputmode="decimal" class="score-input" id="holiday-score-' + esc(id) + '" value="' + esc(scoreDrafts[id] || '') + '"></label>' +
             '<button type="button" class="score-btn" data-holiday-action="report" data-assignment="' + esc(id) + '"' + (busy[id] ? ' disabled' : '') + '>回報分數</button></div>';
         return text + '<p role="status"' + (state === 'missing' ? ' style="color:#b91c1c"' : '') + '>' + esc(label) + '</p>';
     }
@@ -69,11 +74,28 @@
         if (contexts[c] && !force && Date.now() - (contexts[c]._loadedAt || 0) < 60000 && (!incoming || saved && incoming.revision === saved.revision)) return Promise.resolve(contexts[c]);
         pending[c] = api('getHolidayPracticeContext', { sourceClassName: c }).then(function(result) {
             if (own !== currentOwner) return null;
+            var previousProgress = contexts[c] && contexts[c].progress || {};
+            result.progress = Object.assign({}, result.progress || {});
+            Object.keys(previousProgress).forEach(function(id) {
+                if (!optimisticUntil[id]) return;
+                if (optimisticUntil[id] <= Date.now()) { delete optimisticUntil[id]; return; }
+                var local = previousProgress[id], remote = result.progress[id];
+                var remoteIsCurrent = remote && Number(remote.reportedAt || remote.unlockedAt || 0) >= Number(local.reportedAt || local.unlockedAt || 0);
+                if (remoteIsCurrent) delete optimisticUntil[id];
+                else result.progress[id] = local;
+            });
             contexts[c] = Object.assign({}, result, { _loadedAt: Date.now() });
             Object.keys(posts).forEach(function(id) { if (className(posts[id]) === c) redraw(id); });
             return result;
         }).finally(function() { delete pending[c]; });
         return pending[c];
+    }
+    function actionPayload(post, assignment, id) {
+        return {
+            sourceClassName: className(post), sourceClassKey: post.storedClassKey || post.sourceClassKey || safeKey(className(post)),
+            sourceStudentKey: post.sourceStudentKey || '', sourceItemId: post.id || post.dailyPostId,
+            dailyPostId: post.id || post.dailyPostId, targetDate: post.date, assignmentId: id, revision: assignment.revision
+        };
     }
     async function act(id, action) {
         var post = posts[id]; if (!post || busy[id]) return;
@@ -83,20 +105,23 @@
             score = P.validScore((document.getElementById('holiday-score-' + id) || {}).value);
             if (score === null) { swalAlert('請確認分數', '請填入 0 到 100 的分數。', 'warning'); return; }
         }
-        if (isStudentPreviewMode && !(await confirmStudentPreviewAction(action === 'unlock' ? '開啟假期卷答案' : '回報假期卷分數'))) return;
+        if (isStudentPreviewMode && !(await confirmStudentPreviewAction(action === 'report' ? '回報假期卷分數' : '開啟假期卷答案'))) return;
         busy[id] = true; redraw(id);
         try {
-            var result = await api(action === 'unlock' ? 'unlockHolidayPractice' : 'reportHolidayPractice', {
-                sourceClassName: className(post), sourceClassKey: post.storedClassKey || post.sourceClassKey || safeKey(className(post)),
-                sourceStudentKey: post.sourceStudentKey || '', sourceItemId: post.id || post.dailyPostId,
-                dailyPostId: post.id || post.dailyPostId, targetDate: post.date, assignmentId: id, revision: a.revision,
-                ...(action === 'report' ? { score: score } : {})
-            });
+            var payload = actionPayload(post, a, id);
+            if (action === 'report') payload.score = score;
+            var result = await api(action === 'report' ? 'reportHolidayPractice' : 'unlockHolidayPractice', payload);
             if (!contexts[className(post)]) contexts[className(post)] = { progress: {} };
-            if (result.progress) contexts[className(post)].progress[id] = result.progress;
+            if (!contexts[className(post)].progress) contexts[className(post)].progress = {};
+            if (result.progress) {
+                contexts[className(post)].progress[id] = result.progress;
+                optimisticUntil[id] = Date.now() + 30000;
+            }
             if (result.progress && result.progress.reportedAt) delete scoreDrafts[id];
             if (result.answerUrl) answers[id] = result.answerUrl;
-            await load(post, true);
+            // 先使用伺服器剛回傳的單筆結果重畫；背景讀回不應讓家長卡在舊按鈕。
+            redraw(id);
+            load(post, true).catch(function() {});
             [4000, 12000, 28000].forEach(function(delay) {
                 var own = currentOwner;
                 setTimeout(function() {

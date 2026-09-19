@@ -45,5 +45,43 @@ test('named student preview loads the real holiday control and asks before unloc
  const first=c.HolidayPracticeApp.render(post);dom['holiday-card-'+id]={innerHTML:first};await new Promise(r=>setImmediate(r));
  assert.match(dom['holiday-card-'+id].innerHTML,/data-holiday-action="unlock"/);assert.doesNotMatch(dom['holiday-card-'+id].innerHTML,/holiday-preview-btn/);
  events.click({target:{closest:()=>({dataset:{assignment:id,holidayAction:'unlock'}})}});await new Promise(r=>setImmediate(r));
- assert.equal(confirmCount,1);assert.equal(unlockCount,1);assert.match(dom['holiday-card-'+id].innerHTML,/private\.test\/answer/);
+ assert.equal(confirmCount,1);assert.equal(unlockCount,1);assert.match(dom['holiday-card-'+id].innerHTML,/private\.test\/answer/);assert.doesNotMatch(dom['holiday-card-'+id].innerHTML,/再次開啟答案卷/);
+});
+
+test('holiday practice has an independent homework field when regular homework is empty',()=>{
+ const main=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
+ assert.match(main,/var hasRegularHomeworkTwo = homeworkItems\.some/);
+ assert.match(main,/if \(holidayHtml && !hasRegularHomeworkTwo\)[\s\S]{0,500}label: homeworkItems\.length \? "今日作業二" : "今日作業"/);
+ assert.doesNotMatch(main,/homeworkItems\.push\(\{ key: "hw2", label: "今日作業二", val: "" \}\)/);
+});
+
+test('unlocked holiday practice renders an answer-style button instead of the old reopen wording',async()=>{
+ const dom={},events={},windowEvents={},id='holiday_answer_button';
+ const assignment={assignmentId:id,title:'理化複習',questionUrl:'https://demo.test/q',dueAt:Date.now()+100000,revision:1};
+ const post={id:'post',date:'2026/09/19',className:'class',displayOptions:{holidayPractice:assignment}};
+ const progress={[id]:{unlockedAt:1}};
+ const c={console,Date,URL,Promise,setTimeout:()=>{},safeKey:value=>value,gData:{className:'class',foundUserKey:'one',grades:[]},isAdminMode:false,isDashboardDraftPreviewMode:false,isStudentPreviewMode:false,ClassSessionPlan:P,document:{addEventListener:(n,f)=>events[n]=f,getElementById:key=>dom[key],activeElement:null},addEventListener:(n,f)=>windowEvents[n]=f,doPostAction:(action,data,ok)=>ok({success:true,assignments:{[id]:assignment},progress})};c.window=c;vm.createContext(c);
+ const icons=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8').match(/const SVG = \{[\s\S]*?\n        \};/)[0];vm.runInContext(icons,c);
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'../holiday_practice_app.js'),'utf8'),c);
+ const first=c.HolidayPracticeApp.render(post);dom['holiday-card-'+id]={innerHTML:first};await new Promise(r=>setImmediate(r));
+ assert.match(dom['holiday-card-'+id].innerHTML,/holiday-answer-btn/);
+ assert.match(dom['holiday-card-'+id].innerHTML,/假期練習卷答案｜理化複習/);
+ assert.doesNotMatch(dom['holiday-card-'+id].innerHTML,/再次開啟答案卷/);
+ assert.match(dom['holiday-card-'+id].innerHTML,/holiday-score-report/);
+});
+
+test('unlock click immediately shows progress and swaps to the answer link without a reload',async()=>{
+ const dom={},events={},windowEvents={},id='holiday_fast_feedback';let unlockCallback;
+ const assignment={assignmentId:id,title:'理化複習',questionUrl:'https://demo.test/q',dueAt:Date.now()+100000,revision:1};
+ const post={id:'post',date:'2026/09/19',className:'class',displayOptions:{holidayPractice:assignment}};
+ const c={console,Date,URL,Promise,setTimeout:()=>{},safeKey:value=>value,gData:{className:'class',foundUserKey:'one',grades:[]},isAdminMode:false,isDashboardDraftPreviewMode:false,isStudentPreviewMode:false,ClassSessionPlan:P,document:{addEventListener:(n,f)=>events[n]=f,getElementById:key=>dom[key],activeElement:null},addEventListener:(n,f)=>windowEvents[n]=f,doPostAction:(action,data,ok)=>{if(action==='getHolidayPracticeContext')ok({success:true,assignments:{[id]:assignment},progress:{}});else unlockCallback=ok;}};c.window=c;vm.createContext(c);
+ const icons=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8').match(/const SVG = \{[\s\S]*?\n        \};/)[0];vm.runInContext(icons,c);
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'../holiday_practice_app.js'),'utf8'),c);
+ const first=c.HolidayPracticeApp.render(post);dom['holiday-card-'+id]={innerHTML:first};await new Promise(r=>setImmediate(r));
+ events.click({target:{closest:()=>({dataset:{assignment:id,holidayAction:'unlock'}})}});
+ assert.match(dom['holiday-card-'+id].innerHTML,/正在開啟答案…/);
+ unlockCallback({success:true,progress:{unlockedAt:1},answerUrl:'https://private.test/answer'});
+ await new Promise(r=>setImmediate(r));
+ assert.match(dom['holiday-card-'+id].innerHTML,/private\.test\/answer/);
+ assert.doesNotMatch(dom['holiday-card-'+id].innerHTML,/正在開啟答案|再次開啟答案卷/);
 });
