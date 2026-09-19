@@ -25,8 +25,8 @@
     
     <!-- External Resources -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-    <script src="class_session_plan.js?v=holiday-20260918-advanced-science"></script>
-    <script src="holiday_practice_app.js?v=holiday-answer-fast-ui-20260919"></script>
+    <script src="class_session_plan.js?v=holiday-review-20260920"></script>
+    <script src="holiday_practice_app.js?v=holiday-review-20260920"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         [data-holiday-card] { margin-top: 12px; }
@@ -9698,7 +9698,7 @@
                 var holidayProgress = typeof getHolidayProgressForExam === 'function' ? getHolidayProgressForExam(exam) : null;
                 result.effectiveNum = holidayScore;
                 var holidayAssignment = window.HolidayPracticeApp ? HolidayPracticeApp.assignmentForExam(exam) : exam;
-                result.mainScore = holidayScore !== null ? holidayScore : (holidayProgress && holidayProgress.reportedAt ? '成績更新中' : Date.now() >= holidayAssignment.dueAt ? '缺繳' : '待回報分數');
+                result.mainScore = holidayScore !== null ? holidayScore : (holidayProgress && holidayProgress.reportedAt ? '等待老師登記' : Date.now() >= holidayAssignment.dueAt ? '缺繳' : '待回報分數');
                 result.statusHtml = "<div class='home-exam-tag'>自行對答案</div>";
                 if (holidayScore !== null) result.mainClass = exam.myBucket === 4 ? ' score-green' : '';
                 return result;

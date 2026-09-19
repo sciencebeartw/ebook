@@ -159,7 +159,7 @@
     }
     function isSelfMarked(exam) { return !!exam && (exam.assessmentKind === 'holiday_self_marked' || !!exam.sourceAssignmentId); }
     function holidayState(assignment, progress, now) {
-        if (progress && (progress.reportedAt || progress.status === 'synced' || progress.status === 'received')) return progress.status === 'synced' ? 'reported' : 'syncing';
+        if (progress && (progress.reportedAt || ['synced', 'received', 'pending_review'].includes(progress.status))) return progress.status === 'synced' ? 'reported' : 'awaiting_review';
         if (!assignment || !Number.isFinite(Number(assignment.dueAt))) return 'unconfirmed';
         return now >= assignment.dueAt ? 'missing' : progress && progress.unlockedAt ? 'awaiting_score' : 'pending';
     }

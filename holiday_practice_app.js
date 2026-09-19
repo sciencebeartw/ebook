@@ -34,7 +34,7 @@
         var a = assignment(post), c = context(post), p = progress(post), now = Date.now();
         if (!a || a.draft) return '';
         var state = P.holidayState(a, p, now), id = a.assignmentId;
-        var label = state === 'reported' ? '已回報 ' + p.score + ' 分' : state === 'syncing' ? '已收到回報，成績更新中' : state === 'missing' ? '缺繳：請回報分數' : state === 'awaiting_score' ? '答案已開啟，請自行對答案後回報分數。' : '';
+        var label = state === 'reported' ? '已登記 ' + p.score + ' 分' : state === 'awaiting_review' ? '已回報分數，等待老師登記' : state === 'missing' ? '缺繳：請回報分數' : state === 'awaiting_score' ? '答案已開啟，請自行對答案後回報分數。' : '';
         var preview = isAdminMode || isDashboardDraftPreviewMode;
         var color = (P.options(post).links || {}).holidayColor;
         var colorClass = ' post-button-' + (['blue', 'purple', 'slate', 'orange', 'gray'].indexOf(color) > -1 ? color : 'orange');
