@@ -53,9 +53,18 @@
         } else {
             text += '<div class="holiday-unlock-actions"><button type="button" class="btn-link holiday-answer-btn' + colorClass + '" data-holiday-action="answer" data-assignment="' + esc(id) + '"' + (busy[id] ? ' disabled aria-busy="true"' : '') + '>' + SVG.document + (busy[id] ? '正在取得答案…' : esc(linkPurpose(post, true)) + '｜' + esc(a.title)) + '</button></div>';
         }
-        if (p && p.unlockedAt && !p.reportedAt) text += '<div class="holiday-score-report"><label class="holiday-score-label">自行對答案後的分數<input type="number" min="0" max="' + (P.SCORE_MAX || 200) + '" step="0.01" inputmode="decimal" class="score-input" id="holiday-score-' + esc(id) + '" value="' + esc(scoreDrafts[id] || '') + '"></label>' +
-            '<button type="button" class="score-btn" data-holiday-action="report" data-assignment="' + esc(id) + '"' + (busy[id] ? ' disabled' : '') + '>回報分數</button></div>';
         return text + (label ? '<div class="holiday-progress-hint' + (state === 'missing' ? ' is-missing' : '') + '" role="status">' + esc(label) + '</div>' : '');
+    }
+
+    function reportFormForExam(exam) {
+        var id = exam && exam.sourceAssignmentId, post = id && posts[id];
+        if (!post || isAdminMode || isDashboardDraftPreviewMode) return '';
+        var p = progress(post);
+        if (!(p && p.unlockedAt) || p.reportedAt) return '';
+        return '<div class="score-report-section holiday-score-report" data-holiday-score-report="' + esc(id) + '">' +
+            '<div style="font-weight:bold; color:#c0392b; margin-bottom:10px; font-size:1.35rem;">' + SVG.edit + '回報假期練習卷分數</div>' +
+            '<div class="input-box"><input type="number" min="0" max="' + (P.SCORE_MAX || 200) + '" step="0.01" inputmode="decimal" class="score-input" aria-label="自行對答案後的分數" id="holiday-score-' + esc(id) + '" placeholder="輸入分數" value="' + esc(scoreDrafts[id] || '') + '">' +
+            '<button type="button" class="score-btn" data-holiday-action="report" data-assignment="' + esc(id) + '"' + (busy[id] ? ' disabled aria-busy="true"' : '') + '>' + (busy[id] ? '送出中…' : '送出') + '</button></div></div>';
     }
     function redraw(id) {
         var post = posts[id], target = document.getElementById('holiday-card-' + id);
@@ -87,6 +96,8 @@
             });
             contexts[c] = Object.assign({}, result, { _loadedAt: Date.now() });
             Object.keys(posts).forEach(function(id) { if (className(posts[id]) === c) redraw(id); });
+            // 初次讀回解鎖狀態後，同步重畫成績卡；否則回報框要等到下一次頁面刷新才會出現。
+            if (typeof refreshHolidayGradeDisplays === 'function') refreshHolidayGradeDisplays();
             return result;
         }).finally(function() { delete pending[c]; });
         return pending[c];
@@ -108,6 +119,7 @@
         }
         if (isStudentPreviewMode && !(await confirmStudentPreviewAction(action === 'report' ? '回報假期卷分數' : '開啟假期卷答案'))) return;
         busy[id] = true; redraw(id);
+        if (action === 'report' && typeof refreshHolidayGradeDisplays === 'function') refreshHolidayGradeDisplays();
         try {
             var payload = actionPayload(post, a, id);
             if (action === 'report') payload.score = score;
@@ -122,7 +134,6 @@
             if (result.answerUrl) answers[id] = result.answerUrl;
             // 先使用伺服器剛回傳的單筆結果重畫；背景讀回不應讓家長卡在舊按鈕。
             redraw(id);
-            if (action === 'report' && typeof refreshHolidayGradeDisplays === 'function') refreshHolidayGradeDisplays();
             load(post, true).catch(function() {});
             [4000, 12000, 28000].forEach(function(delay) {
                 var own = currentOwner;
@@ -133,7 +144,11 @@
         } catch (err) {
             await load(post, true).catch(function() {});
             swalAlert('回報狀態', err.message, 'warning');
-        } finally { delete busy[id]; redraw(id); }
+        } finally {
+            delete busy[id];
+            redraw(id);
+            if (typeof refreshHolidayGradeDisplays === 'function') refreshHolidayGradeDisplays();
+        }
     }
     document.addEventListener('input', function(event) {
         var input = event.target, prefix = 'holiday-score-';
@@ -158,6 +173,7 @@
             return '<div id="holiday-card-' + esc(a.assignmentId) + '" data-holiday-card="1">' + body(post) + '</div>';
         },
         contextMap: function() { return contexts; },
+        reportFormForExam: reportFormForExam,
         assignmentForExam: function(exam) { return ((contexts[exam.originClassName || exam.storedClassName || exam.sourceClassName || gData.className] || {}).assignments || {})[exam.sourceAssignmentId] || exam; },
         progressForExam: function(exam) { return ((contexts[exam.originClassName || exam.storedClassName || exam.sourceClassName || gData.className] || {}).progress || {})[exam.sourceAssignmentId] || null; }
     };

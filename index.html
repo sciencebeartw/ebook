@@ -26,8 +26,8 @@
     <!-- External Resources -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
     <script src="class_session_plan.js?v=holiday-score-review-20260921"></script>
-    <script src="holiday_practice_app.js?v=holiday-score-review-20260921"></script>
-    <!-- holiday-score-card-review-20260921 -->
+    <script src="holiday_practice_app.js?v=holiday-score-card-form-20260921"></script>
+    <!-- holiday-score-card-form-20260921 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         [data-holiday-card] { margin-top: 12px; }
@@ -68,27 +68,6 @@
             cursor: pointer;
         }
         [data-holiday-card] .holiday-answer-btn:disabled { opacity: .65; cursor: wait; transform: none; }
-        [data-holiday-card] .holiday-score-report {
-            width: min(100%, 560px);
-            margin: 16px auto 0;
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) auto;
-            align-items: end;
-            justify-content: center;
-            gap: 12px;
-        }
-        [data-holiday-card] .holiday-score-label {
-            display: grid;
-            gap: 8px;
-            min-width: 0;
-            text-align: center;
-        }
-        [data-holiday-card] .holiday-score-label .score-input { width: 100%; box-sizing: border-box; }
-        [data-holiday-card] .holiday-score-report .score-btn { align-self: end; }
-        @media (max-width: 600px) {
-            [data-holiday-card] .holiday-score-report { grid-template-columns: minmax(0, 1fr); }
-            [data-holiday-card] .holiday-score-report .score-btn { width: min(100%, 220px); justify-self: center; }
-        }
         /* ================= 基礎設定 ================= */
         :root {
             --primary: #4CAF50;          /* Eco Green (Science) */
@@ -2126,11 +2105,11 @@
         
             font-family: 'Outfit', sans-serif !important;}
 
-        /* 缺考、尚未繳交 等文字型分數縮小 */
+        /* 缺考、待回報等文字型分數：比數字成績小，但維持手機可讀性。grey-status-size-20260921 */
         .main-score.text-grey-status,
         .main-score .text-grey-status,
         .score-val.text-grey-status {
-            font-size: 2.6rem !important;
+            font-size: 3.2rem !important;
             color: #64748b !important;
             font-family: 'Noto Sans TC', sans-serif !important;
             letter-spacing: 0px !important;
@@ -4828,7 +4807,7 @@
   <script src="ebook_lifecycle_app.js?v=20260815_full_year_date_v1"></script>
   <script src="ebook_promotion_app.js?v=20260812_legacy_transfer_student_key"></script>
   <script src="gifted_homework_full_scores.js?v=20260720_geo3_question_count_v2"></script>
-  <script src="ebook_pending_tasks_app.js?v=20260822_gifted_batch_makeup_auto_link_v1"></script>
+  <script src="ebook_pending_tasks_app.js?v=holiday-score-card-form-20260921"></script>
   <script src="ebook_feedback_threads_app.js?v=20260822_feedback_threads_v1"></script>
 
   <!-- Webhook API & Firebase Polyfill (Replace google.script.run) -->
@@ -7842,6 +7821,7 @@
 
         function getPendingTaskPrimaryTargetKind(task) {
             if (task && task.kind === 'makeup_result' && task.reportTarget) return 'report';
+            if (task && task.kind === 'holiday_practice' && task.reportTarget && task.reportTarget.section === 'holiday-score-report') return 'report';
             return 'display';
         }
 
@@ -7879,6 +7859,11 @@
             if (!task) return '前往查看';
             if (task.kind === 'homework_done') return '前往完成回報';
             if (task.kind === 'homework_score') return '前往作業';
+            if (task.kind === 'holiday_practice') {
+                return task.displayTarget && task.displayTarget.section === 'holiday-score-report'
+                    ? '前往回報分數'
+                    : '前往完成作答';
+            }
             if (task.kind === 'absence' || task.kind === 'guidance_absence') return '前往回報分數';
             if (task.kind === 'makeup_result') return '前往回報補考結果';
             return '查看考試';
@@ -7960,6 +7945,8 @@
                     secondaryActionHtml = buildPendingTaskActionButton(task, 'paper', '查看補考卷', 'paper');
                 } else if (task.kind === 'absence') {
                     secondaryActionHtml = buildPendingTaskActionButton(task, 'paper', getPendingAbsencePaperActionLabel(task), 'secondary');
+                } else if (task.kind === 'holiday_practice' && task.paperTarget && task.reportTarget) {
+                    secondaryActionHtml = buildPendingTaskActionButton(task, 'paper', '查看假期練習卷', 'secondary');
                 } else {
                     secondaryActionHtml = buildPendingTaskActionButton(task, 'paper', '前往補考卷', 'paper');
                 }
@@ -8015,6 +8002,11 @@
             return !!colIndex && colIndex === (element.dataset.examColIndex || '');
         }
 
+        function pendingTargetMatchesHolidayAssignment(element, target) {
+            var assignmentId = (target && target.assignmentId || '').toString();
+            return !!assignmentId && assignmentId === (element && element.dataset.assignmentId || '').toString();
+        }
+
         function findPendingTargetElement(target) {
             if (!target) return null;
             var postAnchors = Array.prototype.slice.call(document.querySelectorAll('[data-pending-post-anchor]'));
@@ -8032,6 +8024,14 @@
                 return paperAnchors.find(function(element) { return pendingTargetMatchesExam(element, target); }) || null;
             }
             var examRoot = postAnchor || document;
+            if (target.section === 'holiday-score-report') {
+                var holidayExamAnchors = Array.prototype.slice.call(examRoot.querySelectorAll('[data-pending-exam-anchor]'));
+                var holidayExamAnchor = holidayExamAnchors.find(function(element) {
+                    return pendingTargetMatchesExam(element, target) || pendingTargetMatchesHolidayAssignment(element, target);
+                });
+                if (!holidayExamAnchor) return null;
+                return holidayExamAnchor.querySelector('[data-holiday-score-report]') || holidayExamAnchor;
+            }
             if (target.section === 'makeup-result') {
                 var reportAnchors = Array.prototype.slice.call(examRoot.querySelectorAll('[data-pending-makeup-result-anchor]'));
                 var reportAnchor = reportAnchors.find(function(element) { return pendingTargetMatchesExam(element, target); });
@@ -11099,7 +11099,9 @@
             var safeDate = post.date.replace(/\//g, '-');
             var hasExamColIndex = exam.colIndex !== undefined && exam.colIndex !== null && exam.colIndex !== "";
             var scoreInputId = "score-in-" + safeDate + (hasExamColIndex ? ("-" + exam.colIndex) : "");
-            if (logic.needsReport && !logic.showReviewing && !isAdminMode) {
+            if (ClassSessionPlan.isSelfMarked(exam) && !isAdminMode && window.HolidayPracticeApp && typeof HolidayPracticeApp.reportFormForExam === 'function') {
+                scoreReportHtml = HolidayPracticeApp.reportFormForExam(exam);
+            } else if (logic.needsReport && !logic.showReviewing && !isAdminMode) {
                 scoreReportHtml = buildAbsenceScoreReportFormHtml(post, exam, safeDate, scoreInputId, hasExamColIndex, "", false);
             } else if (logic.showReviewing && !isAdminMode) {
                 var absenceReport = getLatestMakeupReportInfo(exam, history);
@@ -11196,7 +11198,7 @@
             }
 
             var examTitle = getDailyPostExamTimePrefix(exam) + getDailyPostExamLabel(exam) + "成績";
-            var pendingExamAttrs = " data-pending-exam-anchor='1' data-exam-id='" + escapeHtmlAttr(exam.examId || '') + "' data-stored-exam-id='" + escapeHtmlAttr(exam.storedExamId || '') + "' data-exam-col-index='" + escapeHtmlAttr(exam.colIndex === undefined || exam.colIndex === null ? '' : exam.colIndex) + "'";
+            var pendingExamAttrs = " data-pending-exam-anchor='1' data-exam-id='" + escapeHtmlAttr(exam.examId || '') + "' data-stored-exam-id='" + escapeHtmlAttr(exam.storedExamId || '') + "' data-exam-col-index='" + escapeHtmlAttr(exam.colIndex === undefined || exam.colIndex === null ? '' : exam.colIndex) + "' data-assignment-id='" + escapeHtmlAttr(exam.sourceAssignmentId || '') + "'";
 
             return "<div class='grade-section'" + pendingExamAttrs + "><div class='main-exam-title'>" + examTitle + "</div><div class='main-exam-range'>" + exam.exam + "</div><div class='main-score'>" + scoreDisplay + "</div>" + logic.statusHtml + "<div class='score-sub'>班平均: " + exam.average + "</div>" + standardHtml + scoreReportHtml + chartHtml + refHwHtml + "</div>";
         }

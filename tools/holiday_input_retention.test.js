@@ -14,8 +14,10 @@ test('unsubmitted holiday score survives focus/context refresh, and resets on st
  dom['holiday-card-'+id]={innerHTML:first};await new Promise(r=>setImmediate(r));
  assert.match(dom['holiday-card-'+id].innerHTML,/我已完成，顯示答案/);assert.match(dom['holiday-card-'+id].innerHTML,/holiday-unlock-btn/);
  progress={[id]:{unlockedAt:1}};windowEvents.focus();await new Promise(r=>setImmediate(r));
- events.input({target:{id:'holiday-score-'+id,value:'80'}});windowEvents.focus();await new Promise(r=>setImmediate(r));assert.match(dom['holiday-card-'+id].innerHTML,/value="80"/);
- c.gData.foundUserKey='two';const next=c.HolidayPracticeApp.render(post);assert.ok(!next.includes('value="80"'));
+ assert.doesNotMatch(dom['holiday-card-'+id].innerHTML,/holiday-score-report/);
+ assert.match(c.HolidayPracticeApp.reportFormForExam({sourceAssignmentId:id}),/holiday-score-report/);
+ events.input({target:{id:'holiday-score-'+id,value:'80'}});windowEvents.focus();await new Promise(r=>setImmediate(r));assert.match(c.HolidayPracticeApp.reportFormForExam({sourceAssignmentId:id}),/value="80"/);
+ c.gData.foundUserKey='two';c.HolidayPracticeApp.render(post);assert.doesNotMatch(c.HolidayPracticeApp.reportFormForExam({sourceAssignmentId:id}),/value="80"/);
 });
 
 test('ebook shared holiday policy recognizes advanced science only',()=>{
@@ -79,8 +81,11 @@ test('unlocked holiday practice renders an answer-style button instead of the ol
  assert.match(dom['holiday-card-'+id].innerHTML,/holiday-answer-btn/);
  assert.match(dom['holiday-card-'+id].innerHTML,/假期練習卷答案｜理化複習/);
  assert.doesNotMatch(dom['holiday-card-'+id].innerHTML,/再次開啟答案卷/);
- assert.match(dom['holiday-card-'+id].innerHTML,/holiday-score-report/);
- assert.match(dom['holiday-card-'+id].innerHTML,/max="200"/);
+ assert.doesNotMatch(dom['holiday-card-'+id].innerHTML,/holiday-score-report/);
+ const reportForm=c.HolidayPracticeApp.reportFormForExam({sourceAssignmentId:id});
+ assert.match(reportForm,/score-report-section holiday-score-report/);
+ assert.match(reportForm,/回報假期練習卷分數/);
+ assert.match(reportForm,/max="200"/);
  assert.equal(P.validScore(150),150);
  assert.equal(P.validScore(201),null);
 });

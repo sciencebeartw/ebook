@@ -1440,13 +1440,25 @@
       if (progress && progress.reportedAt) return;
       if (grades.some(function(exam) { return exam.sourceAssignmentId === a.assignmentId &&
         exam.score !== "" && exam.score != null && Number.isFinite(Number(exam.score)); })) return;
-      var target = { tab: "contact", dailyPostId: getPostRowKey(post), sourceClassKey: sourceClassKey,
+      var holidayExam = grades.find(function(exam) {
+        return exam && exam.sourceAssignmentId === a.assignmentId;
+      }) || null;
+      var awaitingScoreReport = !!(progress && progress.unlockedAt);
+      var paperTarget = { tab: "contact", dailyPostId: getPostRowKey(post), sourceClassKey: sourceClassKey,
         postDate: text(post.date), section: "holiday", focus: "holiday", assignmentId: a.assignmentId };
+      var scoreTarget = { tab: "contact", dailyPostId: getPostRowKey(post), sourceClassKey: sourceClassKey,
+        postDate: text(post.date), section: "holiday-score-report", focus: "score-report", assignmentId: a.assignmentId };
+      if (holidayExam) {
+        scoreTarget.examId = text(holidayExam.examId || holidayExam.targetExamId);
+        scoreTarget.storedExamId = text(holidayExam.storedExamId);
+        scoreTarget.colIndex = holidayExam.colIndex;
+      }
       pushIfActive(tasks, createTask({ kind: "holiday_practice", itemType: "homework_report",
         neutralLabel: progress && progress.unlockedAt ? "假期卷待回報分數" : "假期卷待完成",
         title: a.title, date: text(post.date), sourceClassKey: sourceClassKey, sourceClassName: sourceClassName,
         sourceItemId: a.assignmentId, assignmentId: a.assignmentId, dueAt: a.dueAt,
-        reminderSourceDate: text(post.date), displayTarget: target, reportTarget: target
+        reminderSourceDate: text(post.date), displayTarget: awaitingScoreReport ? scoreTarget : paperTarget,
+        reportTarget: awaitingScoreReport ? scoreTarget : null, paperTarget: paperTarget
       }, context), policy);
     });
 

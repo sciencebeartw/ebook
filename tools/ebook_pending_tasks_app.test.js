@@ -2188,6 +2188,14 @@ const holidayIndependentOptions = baseOptions({posts:[holidayIndependentPost],no
 assert.deepStrictEqual(Pending.buildPendingTasks(holidayIndependentOptions).items.map(x=>x.kind).sort(),['holiday_practice','homework_done','homework_score']);
 holidayIndependentOptions.homeworkDone={'2026/09/19':{status:'done'}};
 assert.deepStrictEqual(Pending.buildPendingTasks(holidayIndependentOptions).items.map(x=>x.kind).sort(),['holiday_practice','homework_score']);
+holidayIndependentOptions.grades.push({date:'2026/09/19',exam:'複習卷',score:'',colIndex:6,examId:'holiday_exam_three',sourceAssignmentId:'holiday_three_assignment',assessmentKind:'holiday_self_marked'});
+holidayIndependentOptions.holidayContexts[CURRENT_CLASS].progress.holiday_three_assignment={unlockedAt:1};
+const holidayScoreTask=Pending.buildPendingTasks(holidayIndependentOptions).items.find(x=>x.kind==='holiday_practice');
+assert.equal(holidayScoreTask.displayTarget.section,'holiday-score-report');
+assert.equal(holidayScoreTask.reportTarget.section,'holiday-score-report');
+assert.equal(holidayScoreTask.reportTarget.examId,'holiday_exam_three');
+assert.equal(holidayScoreTask.paperTarget.section,'holiday');
+assert.equal(holidayScoreTask.paperTarget.assignmentId,'holiday_three_assignment');
 holidayIndependentOptions.holidayContexts[CURRENT_CLASS].progress.holiday_three_assignment={reportedAt:1};
 assert.deepStrictEqual(Pending.buildPendingTasks(holidayIndependentOptions).items.map(x=>x.kind),['homework_score']);
 holidayIndependentOptions.grades[0].score='80';
