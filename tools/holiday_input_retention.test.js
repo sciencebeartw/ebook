@@ -97,11 +97,15 @@ test('unlock click immediately shows progress and swaps to the answer link witho
  const c={console,Date,URL,Promise,setTimeout:()=>{},safeKey:value=>value,gData:{className:'class',foundUserKey:'one',grades:[]},isAdminMode:false,isDashboardDraftPreviewMode:false,isStudentPreviewMode:false,ClassSessionPlan:P,document:{addEventListener:(n,f)=>events[n]=f,getElementById:key=>dom[key],activeElement:null},addEventListener:(n,f)=>windowEvents[n]=f,doPostAction:(action,data,ok)=>{if(action==='getHolidayPracticeContext')ok({success:true,assignments:{[id]:assignment},progress:{}});else unlockCallback=ok;}};c.window=c;vm.createContext(c);
  const icons=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8').match(/const SVG = \{[\s\S]*?\n        \};/)[0];vm.runInContext(icons,c);
  vm.runInContext(fs.readFileSync(path.join(__dirname,'../holiday_practice_app.js'),'utf8'),c);
+ let opened=0,navigated='';const popup={document:{body:{style:{}}},location:{replace:url=>navigated=url}};
+ c.open=()=>{opened++;return popup};
  const first=c.HolidayPracticeApp.render(post);dom['holiday-card-'+id]={innerHTML:first};await new Promise(r=>setImmediate(r));
  events.click({target:{closest:()=>({dataset:{assignment:id,holidayAction:'unlock'}})}});
+ assert.equal(opened,1);assert.equal(navigated,'');assert.equal(popup.opener,null);
  assert.match(dom['holiday-card-'+id].innerHTML,/正在開啟答案…/);
  unlockCallback({success:true,progress:{unlockedAt:1},answerUrl:'https://private.test/answer'});
  await new Promise(r=>setImmediate(r));
  assert.match(dom['holiday-card-'+id].innerHTML,/private\.test\/answer/);
+ assert.equal(navigated,'https://private.test/answer');
  assert.doesNotMatch(dom['holiday-card-'+id].innerHTML,/正在開啟答案|再次開啟答案卷/);
 });

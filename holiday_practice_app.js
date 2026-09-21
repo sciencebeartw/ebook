@@ -1,21 +1,23 @@
 (function(root) {
     'use strict';
-    var P = root.ClassSessionPlan, contexts = {}, pending = {}, posts = {}, answers = {}, busy = {}, scoreDrafts = {}, optimisticUntil = {};
+    var P = root.ClassSessionPlan, contexts = {}, pending = {}, posts = {}, answers = {}, answerVersions = {}, answerLoads = {}, busy = {}, scoreDrafts = {}, acceptedProgress = {};
     function esc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function(c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
     function className(post) { return post.storedClassName || post.sourceClassName || post.className || gData.className; }
     function owner() { return gData ? [gData.className, gData.foundUserKey || gData.studentName].join('/') : ''; }
     var currentOwner = '';
-    function resetOwner() { if (owner() !== currentOwner) { contexts = {}; pending = {}; posts = {}; answers = {}; scoreDrafts = {}; optimisticUntil = {}; currentOwner = owner(); } }
+    function resetOwner() { if (owner() !== currentOwner) { contexts = {}; pending = {}; posts = {}; answers = {}; answerVersions = {}; answerLoads = {}; busy = {}; scoreDrafts = {}; acceptedProgress = {}; currentOwner = owner(); } }
     function api(action, payload) {
         return new Promise(function(resolve, reject) { doPostAction(action, payload, function(result) {
-            if (!result || !result.success) reject(new Error(result && result.msg || '送出尚未完成，請稍後重試'));
+            if (!result || !result.success) { var error = new Error(result && result.msg || '送出尚未完成，請稍後重試'); error.code = result && result.code; reject(error); }
             else resolve(result);
         }, reject); });
     }
     function context(post) { return contexts[className(post)]; }
     function assignment(post) {
         var a = P.options(post).holidayPractice;
-        return a && Object.assign({}, a, (context(post) && context(post).assignments || {})[a.assignmentId] || {});
+        a = a && Object.assign({}, a, (context(post) && context(post).assignments || {})[a.assignmentId] || {});
+        if (a && answers[a.assignmentId] && answerVersions[a.assignmentId] !== a.revision) delete answers[a.assignmentId];
+        return a;
     }
     function progress(post) {
         var a = assignment(post), p = a && ((context(post) || {}).progress || {})[a.assignmentId] || null;
@@ -87,15 +89,19 @@
             var previousProgress = contexts[c] && contexts[c].progress || {};
             result.progress = Object.assign({}, result.progress || {});
             Object.keys(previousProgress).forEach(function(id) {
-                if (!optimisticUntil[id]) return;
-                if (optimisticUntil[id] <= Date.now()) { delete optimisticUntil[id]; return; }
+                if (!acceptedProgress[id]) return;
                 var local = previousProgress[id], remote = result.progress[id];
-                var remoteIsCurrent = remote && Number(remote.reportedAt || remote.unlockedAt || 0) >= Number(local.reportedAt || local.unlockedAt || 0);
-                if (remoteIsCurrent) delete optimisticUntil[id];
+                var currentAssignment = (result.assignments || {})[id];
+                if (!currentAssignment || local.revision != null && Number(local.revision) !== Number(currentAssignment.revision)) { delete acceptedProgress[id]; return; }
+                var remoteIsCurrent = remote && (local.reportedAt ? remote.reportedAt : remote.unlockedAt);
+                if (remoteIsCurrent) delete acceptedProgress[id];
                 else result.progress[id] = local;
             });
             contexts[c] = Object.assign({}, result, { _loadedAt: Date.now() });
             Object.keys(posts).forEach(function(id) { if (className(posts[id]) === c) redraw(id); });
+            Object.keys(posts).forEach(function(id) {
+                if (className(posts[id]) === c && progress(posts[id]) && progress(posts[id]).unlockedAt) prefetchAnswer(id).catch(function() {});
+            });
             // 初次讀回解鎖狀態後，同步重畫成績卡；否則回報框要等到下一次頁面刷新才會出現。
             if (typeof refreshHolidayGradeDisplays === 'function') refreshHolidayGradeDisplays();
             return result;
@@ -109,6 +115,38 @@
             dailyPostId: post.id || post.dailyPostId, targetDate: post.date, assignmentId: id, revision: assignment.revision
         };
     }
+    async function prefetchAnswer(id) {
+        var post = posts[id], own = currentOwner, a = assignment(post);
+        if (answers[id]) return Promise.resolve({ answerUrl: answers[id] });
+        if (answerLoads[id]) return answerLoads[id];
+        answerLoads[id] = api('getHolidayPracticeAnswer', actionPayload(post, a, id)).then(function(result) {
+            if (own === currentOwner && assignment(post).revision === a.revision && result.answerUrl && safeLink(result.answerUrl, '', '')) { answers[id] = result.answerUrl; answerVersions[id] = a.revision; redraw(id); }
+            return result;
+        }).finally(function() { if (own === currentOwner) delete answerLoads[id]; });
+        return answerLoads[id];
+    }
+    function openAnswerWindow() {
+        if (typeof root.open !== 'function') return null;
+        var popup = root.open('about:blank', '_blank');
+        if (popup) {
+            popup.opener = null;
+            popup.document.title = '正在開啟假期卷答案';
+            popup.document.body.textContent = '正在安全開啟答案，請稍候…';
+            popup.document.body.style.cssText = 'font:600 20px system-ui;text-align:center;padding:48px 20px;color:#9a3412;background:#fff7ed';
+        }
+        return popup;
+    }
+    async function sendWithRetry(action, payload) {
+        for (var attempt = 0; ; attempt++) {
+            try { return await api(action, payload); }
+            catch (error) {
+                var offline = root.navigator && root.navigator.onLine === false;
+                var transient = /unavailable|deadline-exceeded|internal|network|timeout|fetch/i.test(String(error.code || '') + ' ' + error.message);
+                if (offline || !transient || attempt >= 3) throw error;
+                await new Promise(function(resolve) { setTimeout(resolve, [1000, 3000, 8000][attempt]); });
+            }
+        }
+    }
     async function act(id, action) {
         var post = posts[id]; if (!post || busy[id]) return;
         if (isAdminMode || isDashboardDraftPreviewMode) return;
@@ -118,20 +156,27 @@
             if (score === null) { swalAlert('請確認分數', '請填入 0 到 ' + (P.SCORE_MAX || 200) + ' 的分數。', 'warning'); return; }
         }
         if (isStudentPreviewMode && !(await confirmStudentPreviewAction(action === 'report' ? '回報假期卷分數' : '開啟假期卷答案'))) return;
+        var own = currentOwner, popup = action === 'report' ? null : openAnswerWindow();
         busy[id] = true; redraw(id);
         if (action === 'report' && typeof refreshHolidayGradeDisplays === 'function') refreshHolidayGradeDisplays();
         try {
             var payload = actionPayload(post, a, id);
+            payload.clientRequestId = 'holiday_' + Date.now() + '_' + Math.random().toString(36).slice(2);
             if (action === 'report') payload.score = score;
-            var result = await api(action === 'report' ? 'reportHolidayPractice' : 'unlockHolidayPractice', payload);
+            var result = action === 'answer' ? await prefetchAnswer(id) : await sendWithRetry(action === 'report' ? 'reportHolidayPractice' : 'unlockHolidayPractice', payload);
+            if (own !== currentOwner) { if (popup) popup.close(); return; }
             if (!contexts[className(post)]) contexts[className(post)] = { progress: {} };
             if (!contexts[className(post)].progress) contexts[className(post)].progress = {};
             if (result.progress) {
                 contexts[className(post)].progress[id] = result.progress;
-                optimisticUntil[id] = Date.now() + 30000;
+                acceptedProgress[id] = true;
             }
             if (result.progress && result.progress.reportedAt) delete scoreDrafts[id];
-            if (result.answerUrl) answers[id] = result.answerUrl;
+            if (result.answerUrl && safeLink(result.answerUrl, '', '')) {
+                answers[id] = result.answerUrl;
+                answerVersions[id] = a.revision;
+                if (popup && !popup.closed) popup.location.replace(result.answerUrl);
+            } else if (popup) popup.close();
             // 先使用伺服器剛回傳的單筆結果重畫；背景讀回不應讓家長卡在舊按鈕。
             redraw(id);
             load(post, true).catch(function() {});
@@ -142,12 +187,16 @@
                 }, delay);
             });
         } catch (err) {
+            if (popup && !popup.closed) { popup.document.body.textContent = '答案暫時無法開啟，請回聯絡簿按答案連結重試。'; }
+            if (own !== currentOwner) return;
             await load(post, true).catch(function() {});
-            swalAlert('回報狀態', err.message, 'warning');
+            if (action !== 'report' || !(progress(post) && progress(post).reportedAt)) swalAlert('回報狀態', root.navigator && root.navigator.onLine === false ? '目前沒有網路連線，請連線後再試。' : err.message, 'warning');
         } finally {
-            delete busy[id];
-            redraw(id);
-            if (typeof refreshHolidayGradeDisplays === 'function') refreshHolidayGradeDisplays();
+            if (own === currentOwner) {
+                delete busy[id];
+                redraw(id);
+                if (typeof refreshHolidayGradeDisplays === 'function') refreshHolidayGradeDisplays();
+            }
         }
     }
     document.addEventListener('input', function(event) {

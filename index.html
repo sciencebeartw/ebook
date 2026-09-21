@@ -26,7 +26,7 @@
     <!-- External Resources -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
     <script src="class_session_plan.js?v=holiday-score-review-20260921"></script>
-    <script src="holiday_practice_app.js?v=holiday-score-card-form-20260921"></script>
+    <script src="holiday_practice_app.js?v=holiday-durable-answer-20260922"></script>
     <!-- holiday-score-card-form-20260921 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
@@ -7862,7 +7862,7 @@
             if (task.kind === 'holiday_practice') {
                 return task.displayTarget && task.displayTarget.section === 'holiday-score-report'
                     ? '前往回報分數'
-                    : '前往完成作答';
+                    : '前往假期練習卷';
             }
             if (task.kind === 'absence' || task.kind === 'guidance_absence') return '前往回報分數';
             if (task.kind === 'makeup_result') return '前往回報補考結果';
@@ -7945,8 +7945,8 @@
                     secondaryActionHtml = buildPendingTaskActionButton(task, 'paper', '查看補考卷', 'paper');
                 } else if (task.kind === 'absence') {
                     secondaryActionHtml = buildPendingTaskActionButton(task, 'paper', getPendingAbsencePaperActionLabel(task), 'secondary');
-                } else if (task.kind === 'holiday_practice' && task.paperTarget && task.reportTarget) {
-                    secondaryActionHtml = buildPendingTaskActionButton(task, 'paper', '查看假期練習卷', 'secondary');
+                } else if (task.kind === 'holiday_practice') {
+                    if (task.paperTarget && task.reportTarget) secondaryActionHtml = buildPendingTaskActionButton(task, 'paper', '查看假期練習卷', 'secondary');
                 } else {
                     secondaryActionHtml = buildPendingTaskActionButton(task, 'paper', '前往補考卷', 'paper');
                 }
@@ -9709,7 +9709,7 @@
                 var holidayScore = ClassSessionPlan.validScore(exam.score);
                 var holidayProgress = typeof getHolidayProgressForExam === 'function' ? getHolidayProgressForExam(exam) : null;
                 var holidayReport = getLatestMakeupReportInfo(exam, feedbackHistory);
-                var holidayProgressScore = ClassSessionPlan.validScore(holidayProgress && holidayProgress.score);
+                var holidayProgressScore = ClassSessionPlan.validScore(holidayProgress && (holidayProgress.reportedScore != null ? holidayProgress.reportedScore : holidayProgress.score));
                 var holidayReportedScore = holidayReport ? holidayReport.reportedScoreNum : holidayProgressScore;
                 var holidayAssignment = window.HolidayPracticeApp ? HolidayPracticeApp.assignmentForExam(exam) : exam;
                 result.statusHtml = "<div class='home-exam-tag'>自行對答案</div>";
