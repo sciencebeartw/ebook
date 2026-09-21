@@ -5,7 +5,7 @@
     if (root) root.ClassSessionPlan = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function() {
     'use strict';
-    var DAY = 86400000, WEEK = 7 * DAY, OFFSET = 8 * 3600000;
+    var DAY = 86400000, WEEK = 7 * DAY, OFFSET = 8 * 3600000, SCORE_MAX = 200;
     var POLICIES = Object.freeze([
         { id: 'p6_gifted_science_sat_am', subjectKey: 'science', classPattern: /^\d{3,4}小六資優自然週六上午班$/, weekday: 6, startTime: '09:00', endTime: '12:00' },
         { id: 'p6_gifted_science_sun_pm', subjectKey: 'science', classPattern: /^\d{3,4}小六資優自然週日下午班$/, weekday: 0, startTime: '14:00', endTime: '17:00' },
@@ -175,7 +175,7 @@
     function validScore(value) {
         if (typeof value === 'string' && !/^\d{1,3}(?:\.\d{1,2})?$/.test(value.trim())) return null;
         if (typeof value !== 'string' && typeof value !== 'number') return null;
-        var n = Number(value); return Number.isFinite(n) && n >= 0 && n <= 100 ? n : null;
+        var n = Number(value); return Number.isFinite(n) && n >= 0 && n <= SCORE_MAX ? n : null;
     }
     return Object.freeze({ schemaVersion: 1, TIMEZONE: 'Asia/Taipei', DAY: DAY, WEEK: WEEK, CLASS_SESSION_POLICIES: POLICIES,
         HOLIDAY_PRACTICE_POLICY_IDS: HOLIDAY_PRACTICE_POLICY_IDS.slice(),
@@ -184,5 +184,5 @@
         occurrenceId: occurrenceId, normalizeException: normalizeException, resolve: resolve,
         nextOriginal: nextOriginal, candidates: candidates, adjacent: adjacent, sourceForPost: sourceForPost,
         options: options, isActualPost: isActualPost, due: due, reminderLead: reminderLead, event: event, isSelfMarked: isSelfMarked,
-        holidayState: holidayState, publicOptions: publicOptions, validScore: validScore });
+        holidayState: holidayState, publicOptions: publicOptions, SCORE_MAX: SCORE_MAX, validScore: validScore });
 });

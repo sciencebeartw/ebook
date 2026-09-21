@@ -26,20 +26,23 @@ function extract(name) {
 }
 const c = {
   ClassSessionPlan: require("../class_session_plan"),
-  FEEDBACK_TYPE_LABELS: { makeup: '缺考回報', legacyMakeup: '補考回報' },
+  FEEDBACK_TYPE_LABELS: { makeup: '缺考回報', legacyMakeup: '補考回報', holidayScore: '假期練習回報' },
   getMathAdvancedGuidanceStandard: () => null,
   isMathAdvancedGuidanceExam: () => false,
   isCurrentStudentEnrollmentExemptExam: () => false,
   normalizeEbookFeedbackExamId: value => String(value || ''),
   SVG: { edit: '', thumbsUp: '', smile: '', frown: '', meh: '', alert: '' },
   escapeHtmlAttr: String, escapeInlineJs: String,
-  buildPostMakeupExtra: (post, extra) => (post.makeup || '') + (extra || '')
+  buildPostMakeupExtra: (post, extra) => (post.makeup || '') + (extra || ''),
+  getHolidayProgressForExam: () => null,
+  window: {}
 };
 vm.createContext(c);
 ['isHomePracticeScoreTitle', 'isHomeworkColumnTitle', 'isHomeworkMissingScore', 'getDisplayLogic',
  'getDailyPostExamLabel', 'getDailyPostExamTimePrefix', 'buildAbsenceScoreReportFormHtml',
  'splitPostMultiLinkValue', 'buildPostMakeupFields', 'getFeedbackOverrideNum',
- 'getLatestMakeupReportInfo', 'isMakeupScoreReportType', 'getAbsenceScoreReviewStatus'].forEach(name => vm.runInContext(extract(name), c));
+ 'getLatestMakeupReportInfo', 'isMakeupScoreReportType', 'isHolidayScoreReportType',
+ 'isScoreReportTypeForExam', 'getAbsenceScoreReviewStatus'].forEach(name => vm.runInContext(extract(name), c));
 vm.runInContext(extract('buildPostQuizFields'), c);
 for (const quiz of ['', '  \n ', null, undefined]) {
   assert.equal(c.buildPostQuizFields({ quiz }).length, 0, 'no quiz attachment must omit the paper header and answer note');
@@ -87,3 +90,29 @@ console.log('home practice score states and makeup fields passed');
 const holidayExam={...practice,assessmentKind:'holiday_self_marked'};
 assert.equal(c.getDailyPostExamTimePrefix(holidayExam)+c.getDailyPostExamLabel(holidayExam)+'成績','假期練習卷成績');
 assert.equal(c.getDailyPostExamTimePrefix(practice),'上週','ordinary returned homework keeps its existing label');
+
+const pendingHoliday = { ...holidayExam, examId: 'exam_holiday', score: '', scoreNum: null, dueAt: Date.now() + 86400000 };
+const pendingHolidayLogic = c.getDisplayLogic(pendingHoliday, []);
+assert.equal(pendingHolidayLogic.mainScore, '待回報');
+assert.match(pendingHolidayLogic.mainClass, /text-grey-status/);
+
+const holidayReports = [{
+  type: '假期練習回報',
+  targetExamId: 'exam_holiday',
+  content: '假期練習卷已回報：98 分',
+  reportedScore: 98
+}];
+const reportedHolidayLogic = c.getDisplayLogic(pendingHoliday, holidayReports);
+assert.equal(reportedHolidayLogic.mainScore, 98);
+assert.equal(reportedHolidayLogic.showReviewing, true);
+assert.match(reportedHolidayLogic.statusHtml, /待審核/);
+assert.equal(c.getDisplayLogic(pendingHoliday, [{ ...holidayReports[0], targetExamId: 'other_exam' }]).mainScore, '待回報');
+
+const bonusHolidayLogic = c.getDisplayLogic(pendingHoliday, [{ ...holidayReports[0], content: '假期練習卷已回報：150 分', reportedScore: 150 }]);
+assert.equal(bonusHolidayLogic.mainScore, 150);
+assert.equal(bonusHolidayLogic.showReviewing, true);
+
+const reviewedHolidayLogic = c.getDisplayLogic({ ...pendingHoliday, score: '98', scoreNum: 98 }, holidayReports);
+assert.equal(reviewedHolidayLogic.mainScore, 98);
+assert.equal(reviewedHolidayLogic.showReviewing, false);
+assert.doesNotMatch(reviewedHolidayLogic.statusHtml, /待審核/);

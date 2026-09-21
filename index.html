@@ -25,8 +25,9 @@
     
     <!-- External Resources -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-    <script src="class_session_plan.js?v=holiday-review-20260920"></script>
-    <script src="holiday_practice_app.js?v=holiday-review-20260920"></script>
+    <script src="class_session_plan.js?v=holiday-score-review-20260921"></script>
+    <script src="holiday_practice_app.js?v=holiday-score-review-20260921"></script>
+    <!-- holiday-score-card-review-20260921 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         [data-holiday-card] { margin-top: 12px; }
@@ -2126,7 +2127,9 @@
             font-family: 'Outfit', sans-serif !important;}
 
         /* 缺考、尚未繳交 等文字型分數縮小 */
-        .main-score.text-grey-status {
+        .main-score.text-grey-status,
+        .main-score .text-grey-status,
+        .score-val.text-grey-status {
             font-size: 2.6rem !important;
             color: #64748b !important;
             font-family: 'Noto Sans TC', sans-serif !important;
@@ -6225,6 +6228,10 @@
                 sourceClassKey: fb.sourceClassKey || "",
                 sourceClassName: fb.sourceClassName || "",
                 currentClassName: fb.currentClassName || "",
+                reportedScore: fb.reportedScore,
+                sourceAssignmentId: fb.sourceAssignmentId || "",
+                assessmentKind: fb.assessmentKind || "",
+                reviewStatus: fb.reviewStatus || "",
                 isTransferFormerClass: fb.isTransferFormerClass === true
             });
         }
@@ -9616,10 +9623,15 @@
                 : '';
 
             function buildReportFromFeedback(fb) {
-                var match = fb.content.match(/(\d+(\.\d+)?)/);
-                if (!match) return null;
-                var reportedNum = parseFloat(match[0]);
-                var reportedText = match[0];
+                var projectedHolidayScore = isHolidayScoreReportType(fb.type)
+                    ? ClassSessionPlan.validScore(fb.reportedScore)
+                    : null;
+                var match = projectedHolidayScore === null
+                    ? String(fb.content || "").match(/(\d+(\.\d+)?)/)
+                    : null;
+                if (projectedHolidayScore === null && !match) return null;
+                var reportedNum = projectedHolidayScore === null ? parseFloat(match[0]) : projectedHolidayScore;
+                var reportedText = String(reportedNum);
                 var status = getAbsenceScoreReviewStatus(rawScore, reportedText);
                 return {
                     feedbackKey: fb.fbKey || "",
@@ -9642,7 +9654,7 @@
             var legacyFallbackReports = [];
             for (var k = feedbackHistory.length - 1; k >= 0; k--) {
                 var fb = feedbackHistory[k];
-                if (isMakeupScoreReportType(fb.type)) {
+                if (isScoreReportTypeForExam(fb.type, exam)) {
                     var feedbackExamId = typeof normalizeEbookFeedbackExamId === 'function'
                         ? normalizeEbookFeedbackExamId(fb.targetExamId)
                         : '';
@@ -9696,11 +9708,29 @@
             if (ClassSessionPlan.isSelfMarked(exam)) {
                 var holidayScore = ClassSessionPlan.validScore(exam.score);
                 var holidayProgress = typeof getHolidayProgressForExam === 'function' ? getHolidayProgressForExam(exam) : null;
-                result.effectiveNum = holidayScore;
+                var holidayReport = getLatestMakeupReportInfo(exam, feedbackHistory);
+                var holidayProgressScore = ClassSessionPlan.validScore(holidayProgress && holidayProgress.score);
+                var holidayReportedScore = holidayReport ? holidayReport.reportedScoreNum : holidayProgressScore;
                 var holidayAssignment = window.HolidayPracticeApp ? HolidayPracticeApp.assignmentForExam(exam) : exam;
-                result.mainScore = holidayScore !== null ? holidayScore : (holidayProgress && holidayProgress.reportedAt ? '等待老師登記' : Date.now() >= holidayAssignment.dueAt ? '缺繳' : '待回報分數');
                 result.statusHtml = "<div class='home-exam-tag'>自行對答案</div>";
-                if (holidayScore !== null) result.mainClass = exam.myBucket === 4 ? ' score-green' : '';
+                if (holidayScore !== null) {
+                    result.effectiveNum = holidayScore;
+                    result.mainScore = holidayScore;
+                    result.mainClass = exam.myBucket === 4 ? ' score-green' : '';
+                    if (holidayReport && holidayReport.reportedScoreNum !== holidayScore) {
+                        result.teacherCorrected = true;
+                        result.reportedScoreNum = holidayReport.reportedScoreNum;
+                        result.statusHtml += "<div class='home-exam-tag'>(老師已更正：原回報 " + holidayReport.reportedScoreNum + " 分)</div>";
+                    }
+                } else if (holidayReportedScore !== null) {
+                    result.effectiveNum = holidayReportedScore;
+                    result.mainScore = holidayReportedScore;
+                    result.showReviewing = true;
+                    result.statusHtml += "<div class='reviewing-tag'>(待審核)</div>";
+                } else {
+                    result.mainScore = Date.now() >= Number(holidayAssignment.dueAt) ? '缺繳' : '待回報';
+                    result.mainClass = ' text-grey-status';
+                }
                 return result;
             }
             var overrideNum = getFeedbackOverrideNum(exam, feedbackHistory);
@@ -9746,6 +9776,12 @@
                 if (result.effectiveNum < exam.makeupThreshold) result.statusHtml += "<div class='makeup-status-tag status-warning'>" + SVG.alert + "未達標需補考</div>";
             }
             return result;
+        }
+
+        function refreshHolidayGradeDisplays() {
+            if (!gData) return;
+            if (Array.isArray(gData.dailyPost)) renderDailyPosts(gData.dailyPost, gData.feedbackHistory || []);
+            if (Array.isArray(gData.grades)) renderOldGradeCards(gData.grades);
         }
 
         // ★★★ v3.9 新增：學生上傳佇列處理 ★★★
@@ -13136,11 +13172,22 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             sticker: "\u68d2\u5361\u7533\u8acb",
             makeup: "\u7f3a\u8003\u56de\u5831",
             legacyMakeup: "\u88dc\u8003\u56de\u5831",
-            makeupResult: "\u88dc\u8003\u7d50\u679c\u56de\u5831"
+            makeupResult: "\u88dc\u8003\u7d50\u679c\u56de\u5831",
+            holidayScore: "\u5047\u671f\u7df4\u7fd2\u56de\u5831"
         };
 
         function isMakeupScoreReportType(type) {
             return type === FEEDBACK_TYPE_LABELS.makeup || type === FEEDBACK_TYPE_LABELS.legacyMakeup;
+        }
+
+        function isHolidayScoreReportType(type) {
+            return type === FEEDBACK_TYPE_LABELS.holidayScore;
+        }
+
+        function isScoreReportTypeForExam(type, exam) {
+            return ClassSessionPlan.isSelfMarked(exam)
+                ? isHolidayScoreReportType(type)
+                : isMakeupScoreReportType(type);
         }
 
         function isStudentSideFeedbackType(type) {

@@ -50,6 +50,54 @@ async (page) => {
     await page.locator('[data-holiday-card]').scrollIntoViewIfNeeded();
     await page.screenshot({ path: `output/playwright/holiday-preview-${width}.png`, fullPage: true });
   }
+  await page.setViewportSize({ width: 390, height: 900 });
+  const gradeStates = await page.evaluate(async () => {
+    const source = '115小六資優自然週六上午班';
+    const assignmentId = 'holiday_preview_score';
+    const examId = 'holiday-score-exam';
+    const exam = {
+      date: '2026/09/19', exam: '20260926-27 小六資優自然 回家複習卷 理化（上）第1～8章',
+      examId, sourceExamId: examId, colIndex: 6, score: '', scoreNum: null, average: '-',
+      sourceClassKey: source, assessmentKind: 'holiday_self_marked', sourceAssignmentId: assignmentId,
+      dueAt: Date.now() + 86400000
+    };
+    const post = {
+      date: '2026/09/19', id: 'holiday_score_post', dailyPostId: 'holiday_score_post', sourceClassKey: source,
+      title: '第21堂｜小六資優自然', progress: '理化（下）課本作業第十章 概念一',
+      hw1: '', hw2: '', quiz: '', makeup: '', note: '', range: '', examData: { exams: [{ main: exam, others: [] }] },
+      displayOptions: { holidayPractice: { assignmentId, title: exam.exam, dueAt: exam.dueAt } }
+    };
+    gData.grades = [exam];
+    gData.dailyPost = [post];
+    renderDailyPosts([post], []);
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const pendingNode = document.querySelector('.main-score');
+    const pending = {
+      text: pendingNode && pendingNode.textContent.trim(),
+      className: pendingNode && pendingNode.querySelector('span') && pendingNode.querySelector('span').className,
+      width: pendingNode && pendingNode.getBoundingClientRect().width,
+      scrollWidth: pendingNode && pendingNode.scrollWidth
+    };
+    const feedback = [{
+      type: '假期練習回報', targetExamId: examId, targetDate: '2026/09/19', sourceClassKey: source,
+      time: '2026-09-21T08:00:00+08:00', content: '假期練習卷已回報：150 分', reportedScore: 150
+    }];
+    renderDailyPosts([post], feedback);
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    return {
+      pending,
+      reported: document.querySelector('.main-score') && document.querySelector('.main-score').textContent.trim(),
+      review: document.querySelector('.reviewing-tag') && document.querySelector('.reviewing-tag').textContent.trim(),
+      pageWidth: document.documentElement.scrollWidth,
+      viewport: innerWidth
+    };
+  });
+  if (gradeStates.pending.text !== '待回報' || !String(gradeStates.pending.className).includes('text-grey-status')) throw new Error('Pending holiday grade state is invalid: ' + JSON.stringify(gradeStates));
+  if (gradeStates.pending.scrollWidth > gradeStates.pending.width || gradeStates.reported !== '150分' || gradeStates.review !== '(待審核)') throw new Error('Holiday review state or mobile layout is invalid: ' + JSON.stringify(gradeStates));
+  if (gradeStates.pageWidth > gradeStates.viewport) throw new Error('Holiday score card overflows mobile viewport: ' + JSON.stringify(gradeStates));
+  checks.push({ width: 390, gradeStates });
+  await page.locator('.grade-section').first().scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'output/playwright/holiday-score-review-390.png', fullPage: true });
   if (errors.length) throw new Error(JSON.stringify(errors));
   return { cases: checks.length, checks, pageErrors: errors };
 }

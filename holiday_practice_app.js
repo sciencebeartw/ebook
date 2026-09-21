@@ -53,7 +53,7 @@
         } else {
             text += '<div class="holiday-unlock-actions"><button type="button" class="btn-link holiday-answer-btn' + colorClass + '" data-holiday-action="answer" data-assignment="' + esc(id) + '"' + (busy[id] ? ' disabled aria-busy="true"' : '') + '>' + SVG.document + (busy[id] ? '正在取得答案…' : esc(linkPurpose(post, true)) + '｜' + esc(a.title)) + '</button></div>';
         }
-        if (p && p.unlockedAt && !p.reportedAt) text += '<div class="holiday-score-report"><label class="holiday-score-label">自行對答案後的分數<input type="number" min="0" max="100" step="0.01" inputmode="decimal" class="score-input" id="holiday-score-' + esc(id) + '" value="' + esc(scoreDrafts[id] || '') + '"></label>' +
+        if (p && p.unlockedAt && !p.reportedAt) text += '<div class="holiday-score-report"><label class="holiday-score-label">自行對答案後的分數<input type="number" min="0" max="' + (P.SCORE_MAX || 200) + '" step="0.01" inputmode="decimal" class="score-input" id="holiday-score-' + esc(id) + '" value="' + esc(scoreDrafts[id] || '') + '"></label>' +
             '<button type="button" class="score-btn" data-holiday-action="report" data-assignment="' + esc(id) + '"' + (busy[id] ? ' disabled' : '') + '>回報分數</button></div>';
         return text + (label ? '<div class="holiday-progress-hint' + (state === 'missing' ? ' is-missing' : '') + '" role="status">' + esc(label) + '</div>' : '');
     }
@@ -104,7 +104,7 @@
         var a = assignment(post), score;
         if (action === 'report') {
             score = P.validScore((document.getElementById('holiday-score-' + id) || {}).value);
-            if (score === null) { swalAlert('請確認分數', '請填入 0 到 100 的分數。', 'warning'); return; }
+            if (score === null) { swalAlert('請確認分數', '請填入 0 到 ' + (P.SCORE_MAX || 200) + ' 的分數。', 'warning'); return; }
         }
         if (isStudentPreviewMode && !(await confirmStudentPreviewAction(action === 'report' ? '回報假期卷分數' : '開啟假期卷答案'))) return;
         busy[id] = true; redraw(id);
@@ -122,6 +122,7 @@
             if (result.answerUrl) answers[id] = result.answerUrl;
             // 先使用伺服器剛回傳的單筆結果重畫；背景讀回不應讓家長卡在舊按鈕。
             redraw(id);
+            if (action === 'report' && typeof refreshHolidayGradeDisplays === 'function') refreshHolidayGradeDisplays();
             load(post, true).catch(function() {});
             [4000, 12000, 28000].forEach(function(delay) {
                 var own = currentOwner;

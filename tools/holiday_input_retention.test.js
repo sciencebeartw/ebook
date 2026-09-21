@@ -80,6 +80,9 @@ test('unlocked holiday practice renders an answer-style button instead of the ol
  assert.match(dom['holiday-card-'+id].innerHTML,/假期練習卷答案｜理化複習/);
  assert.doesNotMatch(dom['holiday-card-'+id].innerHTML,/再次開啟答案卷/);
  assert.match(dom['holiday-card-'+id].innerHTML,/holiday-score-report/);
+ assert.match(dom['holiday-card-'+id].innerHTML,/max="200"/);
+ assert.equal(P.validScore(150),150);
+ assert.equal(P.validScore(201),null);
 });
 
 test('unlock click immediately shows progress and swaps to the answer link without a reload',async()=>{
