@@ -4823,6 +4823,7 @@
   <script src="gifted_homework_full_scores.js?v=20260720_geo3_question_count_v2"></script>
   <script src="ebook_pending_tasks_app.js?v=holiday-score-card-form-20260921"></script>
   <script src="ebook_feedback_threads_app.js?v=20260822_feedback_threads_v1"></script>
+  <script src="ebook_score_distribution.js?v=equal-high-score-chart-20260922"></script>
 
   <!-- Webhook API & Firebase Polyfill (Replace google.script.run) -->
   <script>
@@ -5847,6 +5848,8 @@
                 unit: currentUnit,
                 average: eData.average,
                 dist: eData.dist,
+                distMin: eData.distMin,
+                distMax: eData.distMax,
                 labels: rangeLabels,
                 myBucket: myBucketIndex,
                 total: eData.total,
@@ -11096,7 +11099,9 @@
         function buildDailyPostExamCard(post, exam, others, history) {
             if (!exam) return "";
             var scoreReportHtml = "";
-            var logic = getDisplayLogic(exam, history);
+            var chartDistribution = EbookScoreDistribution.forDisplay(exam);
+            var displayExam = chartDistribution.normalized ? Object.assign({}, exam, { myBucket: chartDistribution.myBucket }) : exam;
+            var logic = getDisplayLogic(displayExam, history);
             var unitDisplay = "";
             if (!isNaN(parseFloat(logic.mainScore))) unitDisplay = "<span class='score-unit-big'>" + escapeHtml(getGradeScoreUnitText(exam, exam.unit || "分")) + "</span>";
             var scoreDisplay = "<span class='" + logic.mainClass + "'>" + logic.mainScore + "</span>" + unitDisplay;
@@ -11153,8 +11158,8 @@
             }
             var chartHtml = "";
             if (exam.dist) {
-                var dist = exam.dist || [0,0,0,0,0];
-                var labels = exam.labels || ["0~20","20~40","40~60","60~80","80~100"];
+                var dist = chartDistribution.dist;
+                var labels = chartDistribution.labels;
                 var maxVal = Math.max(...dist);
                 if (maxVal === 0) maxVal = 1;
 
@@ -11166,8 +11171,8 @@
 
                     var scNum = parseFloat(logic.mainScore);
                     if (!isNaN(scNum)) {
-                        if (exam.myBucket !== undefined && exam.myBucket !== -1) {
-                            if (idx === exam.myBucket) isMyGroup = true;
+                        if (chartDistribution.normalized || (chartDistribution.myBucket !== undefined && chartDistribution.myBucket !== -1)) {
+                            if (idx === chartDistribution.myBucket) isMyGroup = true;
                         } else if (lbl.includes("-") || lbl.includes("~")) {
                             var pts = lbl.split(/-|~/);
                             if(scNum >= parseInt(pts[0]) && scNum <= parseInt(pts[1])) isMyGroup = true;
@@ -11881,9 +11886,11 @@
         function renderOldGradeCards(grades) {
             window.adminModeScoreEditContext = window.adminModeScoreEditContext || {};
             var container = document.getElementById('tab-content-1'); if (!grades || grades.length === 0) { container.innerHTML = "<p style='color:#666; padding:10px;'>目前尚無成績紀錄。</p>"; return; } var html = ""; grades.forEach(function (item) {
-                var logic = getDisplayLogic(item, gData ? gData.feedbackHistory : []); var unitDisplay = ""; if (!isNaN(parseFloat(logic.mainScore))) unitDisplay = "<span class='score-unit'>" + escapeHtml(getGradeScoreUnitText(item, item.unit)) + "</span>"; var displayScore = "<div class='score-val" + logic.mainClass + "'>" + escapeHtml(logic.mainScore) + unitDisplay + "</div>"; var chartHtml = "";
-var dist = item.dist || [0,0,0,0,0];
-var labels = item.labels || ["0~20","20~40","40~60","60~80","80~100"];
+                var chartDistribution = EbookScoreDistribution.forDisplay(item);
+                var displayItem = chartDistribution.normalized ? Object.assign({}, item, { myBucket: chartDistribution.myBucket }) : item;
+                var logic = getDisplayLogic(displayItem, gData ? gData.feedbackHistory : []); var unitDisplay = ""; if (!isNaN(parseFloat(logic.mainScore))) unitDisplay = "<span class='score-unit'>" + escapeHtml(getGradeScoreUnitText(item, item.unit)) + "</span>"; var displayScore = "<div class='score-val" + logic.mainClass + "'>" + escapeHtml(logic.mainScore) + unitDisplay + "</div>"; var chartHtml = "";
+var dist = chartDistribution.dist;
+var labels = chartDistribution.labels;
 var maxVal = Math.max(...dist);
 if (maxVal === 0) maxVal = 1;
 
@@ -11891,7 +11898,7 @@ var barCols = "";
 dist.forEach((val, idx) => {
     var lbl = labels[idx] || "";
     var compactLabel = escapeHtml(String(lbl).replace(/\s*~\s*/g, '–'));
-    var isMyGroup = (!item.isMissing && idx === item.myBucket);
+    var isMyGroup = (!item.isMissing && idx === chartDistribution.myBucket);
     
     var fillGrad = "#5b9bd5";
     var boxShad = "";
