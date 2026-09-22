@@ -4710,14 +4710,14 @@
             }
         }
     
-        /* V2 Vertical Bar Chart for index.html */
+        /* chart-label-layout-20260922：柱寬與區間欄寬分離，避免三位數換行。 */
         .v2-bar-chart-container {
-            display: flex;
-            align-items: flex-end;
-            justify-content: space-around;
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            align-items: end;
             height: 120px;
             margin: 25px 10px 10px 10px;
-            padding-bottom: 25px;
+            padding-bottom: 30px;
             border-bottom: 2px solid #e2e8f0;
             position: relative;
         }
@@ -4728,12 +4728,14 @@
             align-items: center;
             justify-content: flex-end;
             height: 100%;
-            width: 35px;
+            min-width: 0;
             position: relative;
         }
 
         .v2-bar-fill {
-            width: 100%;
+            width: 35px;
+            max-width: 60%;
+            flex-shrink: 0;
             border-radius: 8px 8px 0 0;
             position: relative;
             
@@ -4755,17 +4757,29 @@
             font-weight: 900;
             color: #064e3b;
             font-family: 'Outfit', sans-serif;
+            line-height: 20px;
         }
 
         .v2-bar-label {
             position: absolute;
-            bottom: -25px;
+            top: calc(100% + 8px);
             font-size: 0.8rem;
-            font-weight: 800;
+            font-weight: 700;
             color: #64748b;
             text-align: center;
             font-family: 'Outfit', sans-serif;
-            width: 200%;
+            width: 100%;
+            white-space: nowrap;
+            line-height: 1.2;
+            font-variant-numeric: tabular-nums;
+        }
+        @media (max-width: 600px) {
+            .v2-bar-chart-container { margin-left: 0; margin-right: 0; }
+            .v2-bar-label { font-size: 0.75rem; }
+        }
+        @media (max-width: 360px) {
+            .v2-bar-chart-container { margin-left: -16px; margin-right: -16px; }
+            .v2-bar-label { font-size: 0.6875rem; }
         }
 
         .draft-preview-banner {
@@ -11147,6 +11161,7 @@
                 var barCols = "";
                 dist.forEach((val, idx) => {
                     var lbl = labels[idx] || "";
+                    var compactLabel = escapeHtml(String(lbl).replace(/\s*~\s*/g, '–'));
                     var isMyGroup = false;
 
                     var scNum = parseFloat(logic.mainScore);
@@ -11172,7 +11187,7 @@
                     }
 
                     var h = (val / maxVal * 100) + '%';
-                    barCols += `<div class="v2-bar-col"><div class="v2-bar-fill" data-val="${val}" style="--target-height: ${h}; background: ${fillGrad}; ${boxShad}"></div><div class="v2-bar-label">${lbl}</div></div>`;
+                    barCols += `<div class="v2-bar-col"><div class="v2-bar-fill" data-val="${val}" style="--target-height: ${h}; background: ${fillGrad}; ${boxShad}"></div><div class="v2-bar-label">${compactLabel}</div></div>`;
                 });
                 chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }
@@ -11875,6 +11890,7 @@ if (maxVal === 0) maxVal = 1;
 var barCols = "";
 dist.forEach((val, idx) => {
     var lbl = labels[idx] || "";
+    var compactLabel = escapeHtml(String(lbl).replace(/\s*~\s*/g, '–'));
     var isMyGroup = (!item.isMissing && idx === item.myBucket);
     
     var fillGrad = "#5b9bd5";
@@ -11889,7 +11905,7 @@ dist.forEach((val, idx) => {
     }
     
     var h = (val / maxVal * 100) + '%';
-    barCols += `<div class="v2-bar-col"><div class="v2-bar-fill" data-val="${Number(val) || 0}" style="--target-height: ${h}; background: ${fillGrad}; ${boxShad}"></div><div class="v2-bar-label">${escapeHtml(lbl)}</div></div>`;
+    barCols += `<div class="v2-bar-col"><div class="v2-bar-fill" data-val="${Number(val) || 0}" style="--target-height: ${h}; background: ${fillGrad}; ${boxShad}"></div><div class="v2-bar-label">${compactLabel}</div></div>`;
 });
 chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
 
