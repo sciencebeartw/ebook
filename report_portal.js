@@ -78,6 +78,6 @@
         try { await call('logout'); } catch (_) { /* 本機仍登出 */ }
         await auth.signOut(); items = []; $('rp-papers').innerHTML = ''; message('已登出。');
     };
-    auth.onAuthStateChanged(user => { epoch++; $('rp-login').hidden = !!user; $('rp-content').hidden = !user; if (user) load(); });
+    auth.onAuthStateChanged(user => { document.body.classList.toggle('rp-signed-in', !!user); epoch++; $('rp-login').hidden = !!user; $('rp-content').hidden = !user; if (user) load(); });
     document.addEventListener('visibilitychange', () => { if (document.hidden) clearTimeout(timer); else load(); });
 }());
