@@ -2,10 +2,10 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <link rel="icon" href="LOGO.png" type="image/png">
+  <link rel="icon" href="report-logo-green.png" type="image/png">
   <meta name="theme-color" content="#edf5ef">
   <meta name="referrer" content="no-referrer"><title>段考／作業回報｜山熊科學</title>
-  <link rel="stylesheet" href="report_portal.css?v=20260922_whitebear">
+  <link rel="stylesheet" href="report_portal.css?v=20260923_brand_login">
   <script defer src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script defer src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
   <script defer src="https://www.gstatic.com/firebasejs/8.10.1/firebase-functions.js"></script>
@@ -14,7 +14,7 @@
 </head>
 <body><main class="rp-shell">
   <header class="rp-cover">
-    <img class="rp-logo" src="LOGO.png" alt="山熊科學 Bear’s Lab" width="1326" height="1512" fetchpriority="high">
+    <img class="rp-logo" src="report-logo-green.png" alt="山熊科學 Bear’s Lab" width="1261" height="1568" fetchpriority="high">
     <div class="rp-brand">阿喵老師的學習專區</div>
     <h1>段考／作業回報</h1>
     <p>複習資料、答案與成績回報，都在這裡。</p>
@@ -27,7 +27,7 @@
     <label>家長電話<input name="phone" placeholder="請輸入家長電話" type="password" inputmode="tel" autocomplete="current-password" maxlength="30" required></label>
     <label class="rp-check"><input name="remember" type="checkbox" checked>在此裝置保持登入</label>
     <button type="submit">登入專區</button>
-    <p class="rp-muted rp-login-note">請使用成績表登記的家長電話。<br>若無法登入，請洽老師。</p>
+    <p class="rp-muted rp-login-note">預設密碼為家長電話。<br>一般為母親電話；若以父親電話登記，請使用父親電話。<br>若無法登入，請洽老師協助確認。</p>
   </form>
   <section id="rp-content" hidden>
     <div class="rp-toolbar"><strong id="rp-name"></strong><div><button id="rp-refresh" class="rp-secondary">重新整理</button><button id="rp-logout" class="rp-secondary">登出</button></div></div>
