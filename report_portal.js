@@ -7,6 +7,12 @@
     const escape = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
     const formatDate = n => n ? new Date(n).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '';
     let items = [], identityKey = '', loading = false, submitting = false, timer = null, epoch = 0;
+    const teacherSelect = $('rp-login').elements.teacher;
+    const preferredTeacher = new URLSearchParams(location.search).get('teacher');
+    if (['miaw', 'yan'].includes(preferredTeacher)) teacherSelect.value = preferredTeacher;
+    function updateBrand(label) { document.querySelector('.rp-brand').textContent = `${label}的學習專區`; }
+    teacherSelect.onchange = () => updateBrand(teacherSelect.selectedOptions[0].textContent);
+    teacherSelect.onchange();
     function message(text) { $('rp-message').textContent = text; }
     function draftKey(item) { return `report-draft:${identityKey}:${item.teacherKey}:${item.className}:${item.examId}:${item.submissionRevision || 0}`; }
     function draft(item, value) {
@@ -14,9 +20,9 @@
         return '';
     }
     async function call(action, value = {}) { return (await functions.httpsCallable('runReportPortalStudentAction')({ action, ...value })).data; }
-    function safeLink(url, label) {
+    function safeLink(url, label, variant = 'paper') {
         if (!url || !/^https:\/\/firebasestorage\.googleapis\.com\//.test(url)) return '';
-        return `<a class="rp-link" href="${escape(url)}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+        return `<a class="rp-link rp-link-${variant}" href="${escape(url)}" target="_blank" rel="noopener noreferrer">${label}</a>`;
     }
     function render() {
         $('rp-papers').innerHTML = items.length ? items.map((a, i) => {
@@ -28,7 +34,7 @@
                 r && pending ? `<div class="rp-result rp-wait"><div>已回報 <strong>${escape(r.score)}</strong> 分</div><div>已收到，正在背景登記。可以離開本頁。</div><small>${formatDate(r.receivedAt)}</small></div>` :
                 !a.canSubmit ? '<p class="rp-result rp-wait">目前尚無法確認正式成績，請重新整理或聯絡老師。</p>' :
                 expired ? '<p class="rp-result rp-wait">回報期限已過，請聯絡老師。</p>' : `<form class="rp-score" data-index="${i}"><label>我的分數（滿分 ${escape(a.maxScore)}）<input name="score" type="number" inputmode="decimal" min="0" max="${escape(a.maxScore)}" step="any" required value="${escape(draft(a))}"></label><button type="submit">送出分數</button></form><p class="rp-muted">送出後，看到「已收到」即可離開。${draft(a) ? '有尚未確認送達的分數，請確認後送出。' : ''}</p>`;
-            return `<article class="rp-card" data-paper="${escape(a.assignmentId)}"><div class="rp-meta">${escape(a.className)} · ${escape(a.date)}</div><h2>${escape(a.title)}</h2>${a.dueAt ? `<div class="rp-meta">回報期限：${formatDate(a.dueAt)}</div>` : ''}<div class="rp-actions">${safeLink(a.questionUrl, '開啟考卷')}</div>${a.answerReady ? (a.answerText || a.answerUrl ? `<details><summary>查看答案</summary>${a.answerText ? `<div class="rp-answer">${escape(a.answerText)}</div>` : ''}${safeLink(a.answerUrl, '開啟答案 PDF')}</details>` : '') : `<p class="rp-muted">答案將於 ${formatDate(a.answerOpenAt)} 開放</p>`}<hr style="border:0;border-top:1px solid #e4ebe6;margin:18px 0">${a.reset ? '<p class="rp-muted">老師已清空成績，請重新回報。</p>' : ''}${status}${r || recorded ? '<p class="rp-muted">需要更正分數時，請聯絡老師。</p>' : ''}${pending ? '<span class="rp-meta">重新開啟本頁可查詢登記結果。</span>' : ''}</article>`;
+            return `<article class="rp-card" data-paper="${escape(a.assignmentId)}"><div class="rp-meta">${escape(a.className)} · ${escape(a.date)}</div><h2>${escape(a.title)}</h2>${a.dueAt ? `<div class="rp-meta">回報期限：${formatDate(a.dueAt)}</div>` : ''}<div class="rp-actions">${safeLink(a.questionUrl, '開啟考卷')}</div>${a.answerReady ? (a.answerText || a.answerUrl ? `<details><summary>查看答案</summary>${a.answerText ? `<div class="rp-answer">${escape(a.answerText)}</div>` : ''}${safeLink(a.answerUrl, '開啟答案 PDF', 'answer')}</details>` : '') : `<p class="rp-muted">答案將於 ${formatDate(a.answerOpenAt)} 開放</p>`}<hr style="border:0;border-top:1px solid #e4ebe6;margin:18px 0">${a.reset ? '<p class="rp-muted">老師已清空成績，請重新回報。</p>' : ''}${status}${r || recorded ? '<p class="rp-muted">需要更正分數時，請聯絡老師。</p>' : ''}${pending ? '<span class="rp-meta">重新開啟本頁可查詢登記結果。</span>' : ''}</article>`;
         }).join('') : '<div class="rp-card">目前沒有開放的考卷或作業。</div>';
     }
     function schedule() {
@@ -44,6 +50,8 @@
             const result = await call('list');
             if (generation !== epoch || !auth.currentUser) return;
             items = result.items; identityKey = result.identityKey;
+            if (result.teacherKey) teacherSelect.value = result.teacherKey;
+            updateBrand(result.teacherLabel || teacherSelect.selectedOptions[0].textContent);
             items.forEach(a => { if (a.report) draft(a, null); });
             $('rp-name').textContent = `${result.name}，你好`;
             render(); message('');
@@ -58,7 +66,7 @@
         try {
             const remember = form.elements.remember.checked;
             await auth.setPersistence(remember ? firebase.auth.Auth.Persistence.LOCAL : firebase.auth.Auth.Persistence.SESSION);
-            const result = (await functions.httpsCallable('createReportPortalSession')({ teacherKey: 'miaw', name: form.elements.name.value.trim(), phone: form.elements.phone.value, remember })).data;
+            const result = (await functions.httpsCallable('createReportPortalSession')({ teacherKey: form.elements.teacher.value, name: form.elements.name.value.trim(), phone: form.elements.phone.value, remember })).data;
             form.elements.phone.value = ''; await auth.signInWithCustomToken(result.token);
         } catch (error) { message(error.message || '登入失敗，請稍後再試。'); }
         finally { button.disabled = false; }
@@ -72,7 +80,16 @@
         try {
             const result = await call('submit', { teacherKey: a.teacherKey, className: a.className, assignmentId: a.assignmentId, score, submissionRevision: a.submissionRevision || 0 });
             a.report = result.report; a.reset = false; a.canSubmit = false; draft(a, null); render(); message('已收到回報，可以離開本頁。');
-        } catch (error) { message('尚未確認送達。請重新整理查詢，分數草稿已保留；不要另外建立新的回報。'); button.disabled = false; button.textContent = '再次確認送出'; }
+        } catch (error) {
+            button.disabled = false;
+            if (['functions/failed-precondition', 'functions/permission-denied', 'functions/unauthenticated', 'functions/invalid-argument'].includes(error.code)) {
+                message((error.message || '回報狀態已變更') + '。請重新整理資料後再試，分數草稿已保留。');
+                button.type = 'button'; button.textContent = '重新整理資料'; button.onclick = load;
+            } else {
+                message('尚未確認送達。請重新整理查詢，分數草稿已保留；不要另外建立新的回報。');
+                button.textContent = '再次確認送出';
+            }
+        }
         finally { submitting = false; schedule(); }
     });
     $('rp-refresh').onclick = load;

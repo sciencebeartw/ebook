@@ -19,15 +19,17 @@ h2 { font-size: 21px; line-height: 1.5; margin: 0 0 12px; overflow-wrap: anywher
 .rp-muted { color: #62756e; line-height: 1.7; }
 .rp-card { background: #fff; border: 1px solid #dce6df; border-radius: 20px; padding: 24px; margin: 20px 0; box-shadow: 0 6px 20px #20382d06; }
 .rp-card label { display: block; font-weight: 600; margin: 16px 0 8px; }
-input:not([type=checkbox]) { display: block; width: 100%; min-width: 0; padding: 13px 14px; border: 1px solid #cbdacf; border-radius: 12px; min-height: 50px; margin-top: 8px; font-size: 17px; color: #243d38; background: #f9fbf9; transition: border-color .15s, box-shadow .15s; }
+input:not([type=checkbox]), #rp-login select { display: block; width: 100%; min-width: 0; padding: 13px 14px; border: 1px solid #cbdacf; border-radius: 12px; min-height: 50px; margin-top: 8px; font-size: 17px; color: #243d38; background: #f9fbf9; transition: border-color .15s, box-shadow .15s; }
 input::placeholder { color: #93a097; font-size: 15px; font-weight: 400; }
-input:focus { background: #fff; border-color: #388558; }
-input:focus, button:focus-visible, a:focus-visible { outline: 3px solid #bddbcc; outline-offset: 2px; }
+input:focus, #rp-login select:focus { background: #fff; border-color: #388558; }
+input:focus, select:focus-visible, summary:focus-visible, button:focus-visible, a:focus-visible { outline: 3px solid #bddbcc; outline-offset: 2px; }
 .rp-check { display: flex!important; align-items: center; gap: 9px; font-weight: 400!important; }
 .rp-check input { width: 20px; height: 20px; margin: 0; accent-color: #28744a; flex-shrink: 0; }
 button, .rp-link { display: inline-flex; align-items: center; justify-content: center; min-height: 46px; border: 0; border-radius: 12px; background: #28744a; color: white; padding: 10px 18px; font-weight: 600; cursor: pointer; text-decoration: none; }
 button:disabled { opacity: .6; cursor: default; }
 .rp-secondary, .rp-link { background: #edf3ef; color: #28543f; border: 1px solid #d2dfd7; }
+.rp-link-paper { background: #28744a; color: #fff; border-color: #28744a; }
+.rp-link-answer { background: #28658b; color: #fff; border-color: #28658b; }
 .rp-toolbar, .rp-actions, .rp-score { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .rp-toolbar { justify-content: space-between; }
 .rp-toolbar>div { display: flex; gap: 8px; }
@@ -41,7 +43,8 @@ button:disabled { opacity: .6; cursor: default; }
 .rp-wait { background: #fff6e3; color: #775a18; }
 .rp-answer { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.8; padding: 12px 0; }
 .rp-card details { border-top: 1px solid #e4ebe6; padding-top: 14px; margin-top: 14px; }
-.rp-card summary { min-height: 44px; padding: 10px 0; cursor: pointer; font-weight: 600; }
+.rp-card summary { width: fit-content; min-height: 46px; padding: 10px 18px; border: 1px solid #b9d3e5; border-radius: 12px; background: #e6f1f9; color: #225b80; cursor: pointer; font-weight: 600; }
+.rp-card details[open] summary { margin-bottom: 8px; }
 #rp-message { max-width: 440px; margin: 20px auto; border: 1px solid #e9ddbc; border-radius: 12px; padding: 12px 16px; background: #fff9eb; line-height: 1.6; }
 #rp-message:empty { display: none; }
 #rp-login { width: 100%; max-width: 440px; margin: 0 auto; padding: 26px 30px; border-radius: 24px; box-shadow: 0 14px 42px #234b3510, 0 2px 6px #234b3505; }
@@ -56,6 +59,9 @@ button:disabled { opacity: .6; cursor: default; }
 .rp-signed-in #rp-message { max-width: none; }
 [hidden] { display: none!important; }
 @media (hover: hover) {
+    .rp-link-paper:hover { background: #205f3c; }
+    .rp-link-answer:hover { background: #1d4e6d; }
+    .rp-card summary:hover { background: #d6e9f6; }
     #rp-login>button:not(:disabled):hover { background: #205f3c; }
 }
 @media (max-width: 480px) {

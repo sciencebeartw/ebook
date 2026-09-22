@@ -5,12 +5,12 @@
   <link rel="icon" href="LOGO.png" type="image/png">
   <meta name="theme-color" content="#edf5ef">
   <meta name="referrer" content="no-referrer"><title>段考／作業回報｜山熊科學</title>
-  <link rel="stylesheet" href="report_portal.css?v=20260922_sheet_truth">
+  <link rel="stylesheet" href="report_portal.css?v=20260922_yan">
   <script defer src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script defer src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
   <script defer src="https://www.gstatic.com/firebasejs/8.10.1/firebase-functions.js"></script>
   <script defer src="firebase-config.js"></script>
-  <script defer src="report_portal.js?v=20260922_sheet_truth"></script>
+  <script defer src="report_portal.js?v=20260922_yan"></script>
 </head>
 <body><main class="rp-shell">
   <header class="rp-cover">
@@ -22,6 +22,7 @@
   <p id="rp-message" role="status" aria-live="polite"></p>
   <form id="rp-login" class="rp-card">
     <h2>進入我的專區</h2>
+    <label>授課老師<select name="teacher"><option value="miaw">阿喵老師</option><option value="yan">小彥老師</option></select></label>
     <label>學生姓名<input name="name" placeholder="請輸入學生姓名" autocomplete="username" maxlength="80" required></label>
     <label>家長電話<input name="phone" placeholder="請輸入家長電話" type="password" inputmode="tel" autocomplete="current-password" maxlength="30" required></label>
     <label class="rp-check"><input name="remember" type="checkbox" checked>在此裝置保持登入</label>
