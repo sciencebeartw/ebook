@@ -9,7 +9,7 @@
     let items = [], identityKey = '', loading = false, submitting = false, timer = null, epoch = 0;
     const teacherSelect = $('rp-login').elements.teacher;
     const preferredTeacher = new URLSearchParams(location.search).get('teacher');
-    if (['miaw', 'yan'].includes(preferredTeacher)) teacherSelect.value = preferredTeacher;
+    if (['miaw', 'yan', 'whitebear'].includes(preferredTeacher)) teacherSelect.value = preferredTeacher;
     function updateBrand(label) { document.querySelector('.rp-brand').textContent = `${label}的學習專區`; }
     teacherSelect.onchange = () => updateBrand(teacherSelect.selectedOptions[0].textContent);
     teacherSelect.onchange();
