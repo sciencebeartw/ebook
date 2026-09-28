@@ -9,9 +9,12 @@
     let items = [], identityKey = '', loading = false, submitting = false, timer = null, epoch = 0;
     const teacherSelect = $('rp-login').elements.teacher;
     const preferredTeacher = new URLSearchParams(location.search).get('teacher');
-    if (['miaw', 'yan', 'whitebear'].includes(preferredTeacher)) teacherSelect.value = preferredTeacher;
+    if (['miaw', 'yan', 'whitebear', 'lixiang', 'xiaodong', 'guanwei'].includes(preferredTeacher)) teacherSelect.value = preferredTeacher;
     function updateBrand(label) { document.querySelector('.rp-brand').textContent = `${label}的學習專區`; }
-    teacherSelect.onchange = () => updateBrand(teacherSelect.selectedOptions[0].textContent);
+    teacherSelect.onchange = () => {
+        updateBrand(teacherSelect.selectedOptions[0].textContent);
+        document.querySelector('.rp-login-note').textContent = teacherSelect.value === 'whitebear' ? '請使用名冊登記的媽媽或爸爸手機登入；兩者皆可。若無法登入，請洽老師協助確認。' : '預設密碼為家長電話。一般為媽媽電話；若以爸爸電話登記，請使用爸爸電話。若無法登入，請洽老師協助確認。';
+    };
     teacherSelect.onchange();
     function message(text) { $('rp-message').textContent = text; }
     function draftKey(item) { return `report-draft:${identityKey}:${item.teacherKey}:${item.className}:${item.examId}:${item.submissionRevision || 0}`; }
