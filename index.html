@@ -4825,6 +4825,10 @@
   <script src="ebook_feedback_threads_app.js?v=20260822_feedback_threads_v1"></script>
   <script src="ebook_score_distribution.js?v=equal-high-score-chart-20260922"></script>
 
+  <link rel="stylesheet" href="ebook_resources.css?v=20260930_resources_v2">
+  <script src="resource_catalog_view.js?v=20260930_resources_v2"></script>
+  <script src="ebook_resources_app.js?v=20260930_resources_v2"></script>
+
   <!-- Webhook API & Firebase Polyfill (Replace google.script.run) -->
   <script>
     const qParams = new URLSearchParams(window.location.search);
@@ -7288,6 +7292,11 @@
                     </div>
                 </div>
             </div>
+            <div id="ebookResourceEntry" class="er-root" hidden></div>
+            <section id="ebookResourcePage" class="er-root" aria-label="段考複習資料" hidden>
+                <div class="er-tools"><button type="button" data-er-action="back">‹ 返回聯絡簿</button><button type="button" data-er-action="list">所有複習資料</button><button type="button" data-er-action="retry">重新整理</button></div>
+                <div id="ebookResourceContent"></div>
+            </section>
             <div class="sticky-wrapper">
                 <div id="sticky-notice-container"></div>
                 <div class="tabs">
@@ -9143,6 +9152,14 @@
             }
             syncEbookRealtimeVisibilityState();
 
+            if (window.EbookResources) {
+                if (!isDashboardDraftPreviewMode && !isAdminMode && (ebookAuthSessionInfo || {}).role !== 'teacher') {
+                    window.EbookResources.mount({ request: async function(payload) {
+                        var response = await ebookFunctions.httpsCallable('getEbookResources')(payload);
+                        return response.data;
+                    }});
+                } else window.EbookResources.reset();
+            }
             renderDailyPosts(result.dailyPost, result.feedbackHistory);
             renderOldGradeCards(result.grades);
             renderBulletins(result.currentBulletins || result.bulletins || [], result.historicalBulletins || []);
@@ -9199,6 +9216,7 @@
             google.script.run.withSuccessHandler(function (result) { enterStudentView(result, "admin_view"); }).getStudentDataByAdmin(cls, name, gPass);
         }
         function exitGodMode() {
+            if (window.EbookResources) window.EbookResources.reset();
             clearRealtimeListeners();
             ebookAuth.signOut().catch(function() {});
             document.getElementById('full-loader').style.display = 'none';
@@ -9565,6 +9583,7 @@
         }
 
         function doLogout() {
+            if (window.EbookResources) window.EbookResources.reset();
             clearRealtimeListeners();
             if (isAdminMode) exitGodMode();
             ebookAuth.signOut().catch(function() {});
