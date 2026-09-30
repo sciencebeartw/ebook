@@ -85,3 +85,8 @@ button:disabled { opacity: .6; cursor: default; }
 @media (prefers-reduced-motion: reduce) {
     input:not([type=checkbox]) { transition: none; }
 }
+
+/* 遲交是收件狀態，與 Sheet 背景登記進度分開顯示。 */
+.rp-late { background: #fff0dc; color: #854400; border: 1px solid #edcc9d; }
+.rp-timing { margin-top: 12px; padding: 10px 12px; border-radius: 8px; font-size: 14px; line-height: 1.8; overflow-wrap: anywhere; }
+.rp-timing strong { font-size: 15px; }

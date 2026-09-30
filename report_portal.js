@@ -7,6 +7,24 @@
     const escape = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
     const formatDate = n => n ? new Date(n).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '';
     let items = [], identityKey = '', loading = false, submitting = false, timer = null, epoch = 0;
+    let deadlineTimer = null, serverClock = null;
+    const serverNow = () => serverClock ? serverClock.time + performance.now() - serverClock.anchor : Date.now();
+    const isOverdue = a => !!a.dueAt && serverNow() > a.dueAt;
+    const timing = r => r && typeof r.isLate === 'boolean' ? `<div class="rp-timing ${r.isLate ? 'rp-late' : ''}"><strong>${r.isLate ? '遲交' : r.dueAtSnapshot ? '準時回報' : '已回報'}</strong>${r.dueAtSnapshot ? `<div>當時回報期限：${formatDate(r.dueAtSnapshot)}</div>` : ''}<div>實際回報時間：${formatDate(r.receivedAt)}</div></div>` : '';
+    // 到期只更新提示與按鈕，保留正在輸入的分數、焦點及答案展開狀態。
+    function updateDeadlines() {
+        clearTimeout(deadlineTimer);
+        let next = Infinity;
+        document.querySelectorAll('.rp-score').forEach(form => {
+            const a = items[Number(form.dataset.index)], late = isOverdue(a);
+            const warning = form.previousElementSibling;
+            if (warning?.classList.contains('rp-overdue')) warning.hidden = !late;
+            const button = form.querySelector('button');
+            if (!submitting && button.type === 'submit' && ['送出分數', '補交分數'].includes(button.textContent)) button.textContent = late ? '補交分數' : '送出分數';
+            if (a.dueAt && !late) next = Math.min(next, a.dueAt - serverNow() + 1);
+        });
+        if (Number.isFinite(next) && !document.hidden) deadlineTimer = setTimeout(updateDeadlines, Math.max(1, Math.min(next, 2147483647)));
+    }
     const teacherSelect = $('rp-login').elements.teacher;
     const preferredTeacher = new URLSearchParams(location.search).get('teacher');
     if (['miaw', 'yan', 'whitebear', 'lixiang', 'xiaodong', 'guanwei'].includes(preferredTeacher)) teacherSelect.value = preferredTeacher;
@@ -30,15 +48,16 @@
     function render() {
         $('rp-papers').innerHTML = items.length ? items.map((a, i) => {
             const r = a.report, pending = r && !['completed', 'needs_attention'].includes(r.status);
-            const expired = a.dueAt && Date.now() > a.dueAt;
+            const expired = isOverdue(a);
             const official = a.official || { state: 'unavailable' };
             const recorded = !pending && ['score', 'text'].includes(official.state);
-            const status = recorded ? `<div class="rp-result"><div>目前成績 <strong>${escape(official.state === 'score' ? official.score : official.text)}</strong>${official.state === 'score' ? ' 分' : ''}</div><div>${r && official.state === 'score' && official.score !== r.score ? '老師已更新成績，以目前登記為準。' : '成績登記完成'}</div></div>` :
-                r && pending ? `<div class="rp-result rp-wait"><div>已回報 <strong>${escape(r.score)}</strong> 分</div><div>已收到，正在背景登記。可以離開本頁。</div><small>${formatDate(r.receivedAt)}</small></div>` :
-                !a.canSubmit ? '<p class="rp-result rp-wait">目前尚無法確認正式成績，請重新整理或聯絡老師。</p>' :
-                expired ? '<p class="rp-result rp-wait">回報期限已過，請聯絡老師。</p>' : `<form class="rp-score" data-index="${i}"><label>我的分數（滿分 ${escape(a.maxScore)}）<input name="score" type="number" inputmode="decimal" min="0" max="${escape(a.maxScore)}" step="any" required value="${escape(draft(a))}"></label><button type="submit">送出分數</button></form><p class="rp-muted">送出後，看到「已收到」即可離開。${draft(a) ? '有尚未確認送達的分數，請確認後送出。' : ''}</p>`;
+            const status = recorded ? `<div class="rp-result"><div>目前成績 <strong>${escape(official.state === 'score' ? official.score : official.text)}</strong>${official.state === 'score' ? ' 分' : ''}</div><div>${r && official.state === 'score' && official.score !== r.score ? '老師已更新成績，以目前登記為準。' : '成績登記完成'}</div>${timing(r)}</div>` :
+                r && pending ? `<div class="rp-result rp-wait"><div>${r.isLate === true ? '已補交' : '已回報'} <strong>${escape(r.score)}</strong> 分</div><div>已收到，正在背景登記。可以離開本頁。</div>${timing(r) || `<small>${formatDate(r.receivedAt)}</small>`}</div>` :
+                !a.canSubmit ? `<div class="rp-result rp-wait">${r?.status === 'needs_attention' ? '回報已保留，登記需要老師協助。' : '目前尚無法確認正式成績，請重新整理或聯絡老師。'}${timing(r)}</div>` :
+                `<p class="rp-result rp-late rp-overdue" role="status" ${expired ? '' : 'hidden'}>已超過回報期限，請儘速完成並回報。本次將記錄為遲交。</p><form class="rp-score" data-index="${i}"><label>我的分數（滿分 ${escape(a.maxScore)}）<input name="score" type="number" inputmode="decimal" min="0" max="${escape(a.maxScore)}" step="any" required value="${escape(draft(a))}"></label><button type="submit">${expired ? '補交分數' : '送出分數'}</button></form><p class="rp-muted">送出後，看到「已收到」即可離開。${draft(a) ? '有尚未確認送達的分數，請確認後送出。' : ''}</p>`;
             return `<article class="rp-card" data-paper="${escape(a.assignmentId)}"><div class="rp-meta">${escape(a.className)} · ${escape(a.date)}</div><h2>${escape(a.title)}</h2>${a.dueAt ? `<div class="rp-meta">回報期限：${formatDate(a.dueAt)}</div>` : ''}<div class="rp-actions">${safeLink(a.questionUrl, '開啟考卷')}</div>${a.answerReady ? (a.answerText || a.answerUrl ? `<details><summary>查看答案</summary>${a.answerText ? `<div class="rp-answer">${escape(a.answerText)}</div>` : ''}${safeLink(a.answerUrl, '開啟答案檔案', 'answer')}</details>` : '') : `<p class="rp-muted">答案將於 ${formatDate(a.answerOpenAt)} 開放</p>`}<hr style="border:0;border-top:1px solid #e4ebe6;margin:18px 0">${a.reset ? '<p class="rp-muted">老師已清空成績，請重新回報。</p>' : ''}${status}${r || recorded ? '<p class="rp-muted">需要更正分數時，請聯絡老師。</p>' : ''}${pending ? '<span class="rp-meta">重新開啟本頁可查詢登記結果。</span>' : ''}</article>`;
         }).join('') : '<div class="rp-card">目前沒有開放的考卷或作業。</div>';
+        updateDeadlines();
     }
     function schedule() {
         clearTimeout(timer);
@@ -53,6 +72,7 @@
             const result = await call('list');
             if (generation !== epoch || !auth.currentUser) return;
             items = result.items; identityKey = result.identityKey;
+            serverClock = Number.isFinite(result.serverNow) ? { time: result.serverNow, anchor: performance.now() } : null;
             if (result.teacherKey) teacherSelect.value = result.teacherKey;
             updateBrand(result.teacherLabel || teacherSelect.selectedOptions[0].textContent);
             items.forEach(a => { if (a.report) draft(a, null); });
@@ -82,7 +102,7 @@
         draft(a, score); submitting = true; button.disabled = true; button.textContent = '正在送出…'; message('正在傳送，請等候「已收到」。');
         try {
             const result = await call('submit', { teacherKey: a.teacherKey, className: a.className, assignmentId: a.assignmentId, score, submissionRevision: a.submissionRevision || 0 });
-            a.report = result.report; a.reset = false; a.canSubmit = false; draft(a, null); render(); message('已收到回報，可以離開本頁。');
+            a.report = result.report; a.reset = false; a.canSubmit = false; draft(a, null); render(); message(result.report?.isLate === true ? '已收到補交分數，本次記錄為遲交，可以離開本頁。' : '已收到回報，可以離開本頁。');
         } catch (error) {
             button.disabled = false;
             if (['functions/failed-precondition', 'functions/permission-denied', 'functions/unauthenticated', 'functions/invalid-argument'].includes(error.code)) {
@@ -98,10 +118,10 @@
     $('rp-refresh').onclick = load;
     $('rp-logout').onclick = async () => {
         if (submitting) { message('請先等候本次回報接收結果。'); return; }
-        epoch++; clearTimeout(timer);
+        epoch++; clearTimeout(timer); clearTimeout(deadlineTimer);
         try { await call('logout'); } catch (_) { /* 本機仍登出 */ }
         await auth.signOut(); items = []; $('rp-papers').innerHTML = ''; message('已登出。');
     };
     auth.onAuthStateChanged(user => { document.body.classList.toggle('rp-signed-in', !!user); epoch++; $('rp-login').hidden = !!user; $('rp-content').hidden = !user; if (user) load(); });
-    document.addEventListener('visibilitychange', () => { if (document.hidden) clearTimeout(timer); else load(); });
+    document.addEventListener('visibilitychange', () => { if (document.hidden) { clearTimeout(timer); clearTimeout(deadlineTimer); } else { updateDeadlines(); load(); } });
 }());

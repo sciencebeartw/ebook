@@ -1,0 +1,39 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>回報遲交測試（假資料）</title><link rel="icon" href="../report-logo-green.png"><style>body{font-family:-apple-system,BlinkMacSystemFont,"Microsoft JhengHei",sans-serif}</style></head><body>
+<script>
+(async () => {
+    const params = new URLSearchParams(location.search), admin = params.has('admin');
+    const realNow = Date.now(), baseNow = realNow + Number(params.get('clockSkew') || 0);
+    const mk = (title, report, official, dueAt = baseNow - 86400000) => ({assignmentId:'paper_'+title, teacherKey:'miaw', className:'115國一生物', title, date:'2026-09-30', examId:'exam_'+title, dueAt, maxScore:100, questionUrl:'https://drive.google.com/file/d/abcdefghij_123/view', answerText:'答案測試', answerReady:true, report, official:official || {state:'blank'}, canSubmit:!report&&!official});
+    const receipt = (isLate, status='completed', dueAtSnapshot=baseNow-86400000) => ({status,score:85,receivedAt:isLate === false ? dueAtSnapshot-5000 : baseNow-5000,completedAt:baseNow,dueAtSnapshot,isLate,revision:0});
+    const items = [mk('逾期未回報',null),mk('準時完成',receipt(false),{state:'score',score:85}),mk('遲交完成',receipt(true),{state:'score',score:95}),mk('遲交背景登記',receipt(true,'queued')),mk('舊回報',receipt(null,'completed',null),{state:'score',score:85}),mk('Sheet已登記',null,{state:'score',score:90}),mk('未設期限',null,null,0)];
+    if (params.has('crossing')) items.splice(0,items.length,mk('輸入途中到期',null,null,baseNow+Number(params.get('crossing'))));
+    window.__fixture={items,calls:[],mode:'success',complete(){items.forEach(a=>{if(a.report){a.report.status='completed';a.official={state:'score',score:a.report.score};}});}};
+    const api = async(name,data) => {
+        window.__fixture.calls.push({name,data});
+        if(admin) {
+            const assignment={...items[0],status:'published',revision:1,kind:'practice'};
+            if(data.action==='overview')return{data:{assignment,rows:items.map((a,i)=>({name:'測試學生'+(i+1),...a}))}};
+            return{data:data.className ? {assignments:{[assignment.assignmentId]:assignment},catalog:{}} : {classes:['115國一生物']}};
+        }
+        if(data.action==='list')return{data:JSON.parse(JSON.stringify({items,identityKey:'fixture-only',name:'測試學生',teacherKey:'miaw',teacherLabel:'阿喵老師',serverNow:baseNow+Date.now()-realNow}))};
+        if(data.action==='submit'){
+            const a=items.find(x=>x.assignmentId===data.assignmentId);
+            if(window.__fixture.mode==='lost'){window.__fixture.mode='success';throw new Error('connection lost');}
+            if(!a.report)a.report={...receipt(!!a.dueAt&&baseNow+Date.now()-realNow>a.dueAt,'queued',a.dueAt),receivedAt:baseNow+Date.now()-realNow,score:Number(data.score)};
+            a.canSubmit=false;return{data:{received:true,report:a.report}};
+        }
+        return{data:{}};
+    };
+    const auth={currentUser:{uid:'fixture'},onAuthStateChanged:fn=>fn(auth.currentUser),signOut:async()=>{auth.currentUser=null;}};
+    const funcs={httpsCallable:name=>data=>api(name,data)};
+    window.firebaseConfig={};window.firebase={initializeApp:()=>({auth:()=>auth,functions:()=>funcs}),functions:()=>funcs,auth:()=>auth};
+    const style=document.createElement('link');style.rel='stylesheet';style.href=admin?'../../dashboard/report_portal_admin.css':'../report_portal.css';document.head.appendChild(style);
+    if(admin){document.body.innerHTML='<main id="report-portal-admin" style="padding:16px;max-width:1200px;margin:auto"></main>';}
+    else {
+        const html=await(await fetch('../report.html')).text();const doc=new DOMParser().parseFromString(html,'text/html');
+        doc.querySelector('.rp-logo').setAttribute('src','../report-logo-green.png');document.body.innerHTML=doc.body.innerHTML;
+    }
+    const script=document.createElement('script');script.src=admin?'../../dashboard/report_portal_admin.js':'../report_portal.js';
+    script.onload=async()=>{if(admin)await window.mountReportPortal();window.__fixture.ready=true;};document.body.appendChild(script);
+})();
+</script></body></html>
