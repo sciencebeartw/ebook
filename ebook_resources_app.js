@@ -12,8 +12,8 @@
         var rows = visible();
         el('ebookResourceEntry').hidden = !rows.length;
         if (rows.length) el('ebookResourceEntry').innerHTML = '<button type="button" class="er-entry er-entry--review" data-er-action="open"><span class="er-entry-copy"><strong>' +
-            view.escape(rows.length === 1 ? rows[0].title + '複習資料' : '段考複習資料') + '</strong><small>' +
-            (rows.length === 1 ? rows[0].paperCount + ' 份各校考古題・題目與答案' : rows.reduce(function(total,row) { return total + (Number(row.paperCount) || 0); }, 0) + ' 份各校考古題・題目與答案') + '</small></span><span class="er-entry-action">開啟複習資料<span aria-hidden="true">→</span></span></button>';
+            view.escape(rows.length === 1 ? rows[0].title + '複習資料' : '段考複習資料') + '</strong><small><span class="er-entry-meta">' +
+            rows.reduce(function(total,row) { return total + (Number(row.paperCount) || 0); }, 0) + ' 份各校考古題</span><span class="er-entry-meta">・題目與答案' + '</span></small></span><span class="er-entry-action"><span>開啟<span class="er-entry-action-detail">複習資料</span></span><span aria-hidden="true">→</span></span></button>';
     }
     function showPage() {
         el('main-screen').classList.add('resources-open');
