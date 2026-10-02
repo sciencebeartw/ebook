@@ -11,9 +11,9 @@
     function renderEntry() {
         var rows = visible();
         el('ebookResourceEntry').hidden = !rows.length;
-        if (rows.length) el('ebookResourceEntry').innerHTML = '<button type="button" class="er-entry" data-er-action="open"><span><strong>' +
+        if (rows.length) el('ebookResourceEntry').innerHTML = '<button type="button" class="er-entry er-entry--review" data-er-action="open"><span class="er-entry-copy"><strong>' +
             view.escape(rows.length === 1 ? rows[0].title + '複習資料' : '段考複習資料') + '</strong><small>' +
-            (rows.length === 1 ? rows[0].paperCount + ' 份練習卷 · 題目與答案' : rows.length + ' 組複習資料') + '</small></span><span class="er-entry-arrow" aria-hidden="true">›</span></button>';
+            (rows.length === 1 ? rows[0].paperCount + ' 份練習卷 · 題目與答案' : rows.length + ' 組複習資料') + '</small></span><span class="er-entry-action">開啟複習資料<span aria-hidden="true">→</span></span></button>';
     }
     function showPage() {
         el('main-screen').classList.add('resources-open');

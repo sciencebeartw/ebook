@@ -4825,9 +4825,9 @@
   <script src="ebook_feedback_threads_app.js?v=20260822_feedback_threads_v1"></script>
   <script src="ebook_score_distribution.js?v=equal-high-score-chart-20260922"></script>
 
-  <link rel="stylesheet" href="ebook_resources.css?v=20261002_resources_time_v1">
+  <link rel="stylesheet" href="ebook_resources.css?v=20261002_resources_entry_v2">
   <script src="resource_catalog_view.js?v=20261002_resources_time_v1"></script>
-  <script src="ebook_resources_app.js?v=20261002_resources_time_v1"></script>
+  <script src="ebook_resources_app.js?v=20261002_resources_entry_v2"></script>
 
   <!-- Webhook API & Firebase Polyfill (Replace google.script.run) -->
   <script>
@@ -7292,7 +7292,6 @@
                     </div>
                 </div>
             </div>
-            <div id="ebookResourceEntry" class="er-root" hidden></div>
             <section id="ebookResourcePage" class="er-root" aria-label="段考複習資料" hidden>
                 <div class="er-tools"><button type="button" data-er-action="back">‹ 返回聯絡簿</button><button type="button" data-er-action="list">所有複習資料</button><button type="button" data-er-action="retry">重新整理</button></div>
                 <div id="ebookResourceContent"></div>
@@ -7309,6 +7308,7 @@
                     <div class="tab-item" id="tab-pending" onclick="switchTab(3)">待完成<span id="tab-pending-count" class="pending-tab-count" aria-live="polite"></span></div>
                 </div>
             </div>
+            <div id="ebookResourceEntry" class="er-root" hidden></div>
             <div id="tab-content-0"></div>
             <div id="tab-content-1" style="display:none; padding:15px;"></div>
             <div id="tab-content-2" style="display:none; padding:15px;"></div>
