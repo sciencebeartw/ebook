@@ -2,7 +2,7 @@
     'use strict';
     var view = root.ResourceCatalogView;
     var generation = 0, request = null, bundles = [], selected = null, offset = 0;
-    var loadedAt = 0, timer = null, busy = false, lastDay = '';
+    var loadedAt = 0, timer = null, busy = false, lastDay = '', nextOpenAt = 0, boundaryTimer = null;
     function el(id) { return document.getElementById(id); }
     function now() { return Date.now() + offset; }
     function taipeiDay() { return new Date(now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10); }
@@ -42,7 +42,7 @@
             var result = await request({ id: id });
             if (token !== generation) return;
             offset = Number(result.serverNow || Date.now()) - Date.now();
-            selected = result.bundle;
+            selected = result.bundle; scheduleBoundary();
             if (!view.active(selected, now())) { message('這份複習資料尚未開放或已結束提供。'); selected = null; return; }
             el('ebookResourceContent').innerHTML = view.renderBundle(selected);
             var heading = el('ebookResourceContent').querySelector('h2');
@@ -72,8 +72,8 @@
             var result = await request({});
             if (token !== generation) return;
             offset = Number(result.serverNow || Date.now()) - Date.now();
-            bundles = result.bundles || []; loadedAt = Date.now(); lastDay = taipeiDay();
-            renderEntry(); route();
+            bundles = result.bundles || []; nextOpenAt = Number(result.nextOpenAt) || 0; loadedAt = Date.now(); lastDay = taipeiDay();
+            renderEntry(); route(); scheduleBoundary();
         } catch (error) {
             if (token !== generation) return;
             bundles = []; renderEntry();
@@ -83,8 +83,25 @@
             if (/^#resources/.test(location.hash)) { showPage(); message('資料讀取失敗，請按重新整理重試。'); }
         } finally { if (token === generation) busy = false; }
     }
+    function checkBoundaries() {
+        if (!request || document.hidden) return;
+        renderEntry();
+        if (selected && !view.active(selected, now())) { selected = null; message('這份複習資料已結束提供。'); }
+        else if (!selected && !busy && location.hash === '#resources') renderList();
+        if (nextOpenAt && now() >= nextOpenAt && !busy) { nextOpenAt = 0; load(); }
+        else scheduleBoundary();
+    }
+    function scheduleBoundary() {
+        clearTimeout(boundaryTimer);
+        if (!request) return;
+        var stamp = now(), events = bundles.map(function(row) { return view.boundary(row, 'end'); });
+        if (selected) events.push(view.boundary(selected, 'end'));
+        if (nextOpenAt) events.push(nextOpenAt > stamp ? nextOpenAt : stamp + 1000);
+        var next = Math.min.apply(null, events.filter(function(value) { return Number.isFinite(value) && value > stamp; }));
+        if (Number.isFinite(next)) boundaryTimer = setTimeout(checkBoundaries, Math.min(2147483647, Math.max(1, next - stamp)));
+    }
     function reset() {
-        generation++; request = null; bundles = []; selected = null; busy = false; loadedAt = 0; lastDay = '';
+        generation++; request = null; bundles = []; selected = null; busy = false; loadedAt = 0; lastDay = ''; nextOpenAt = 0; clearTimeout(boundaryTimer); boundaryTimer = null;
         clearInterval(timer); timer = null;
         el('ebookResourceEntry').hidden = true; el('ebookResourceEntry').innerHTML = '';
         el('ebookResourceContent').innerHTML = '';
@@ -95,8 +112,7 @@
         load();
         timer = setInterval(function() {
             if (document.hidden) return;
-            renderEntry();
-            if (selected && !view.active(selected, now())) { selected = null; message('這份複習資料已結束提供。'); }
+            checkBoundaries();
             // One scoped refresh at the Taipei date boundary also reveals newly opened packs.
             if (lastDay && lastDay !== taipeiDay() && !busy) { lastDay = taipeiDay(); load(); }
         }, 60000);
@@ -111,6 +127,6 @@
         else if (target.dataset.erAction === 'retry') { if (!busy) load(); }
     });
     window.addEventListener('hashchange', route);
-    document.addEventListener('visibilitychange', function() { if (!document.hidden && request && !busy && Date.now() - loadedAt > 120000) load(); });
+    document.addEventListener('visibilitychange', function() { if (document.hidden || !request) return; if (!busy && Date.now() - loadedAt > 120000) load(); else checkBoundaries(); });
     root.EbookResources = { mount: mount, reset: reset, close: close };
 })(window);
