@@ -9,9 +9,9 @@
 .er-answer-text{margin:16px 0 0 32px;padding:16px;background:var(--er-bg);border:1px solid var(--er-light);border-radius:10px;overflow-wrap:anywhere}.er-answer-text strong{color:var(--er-dark)}.er-answer-text p{white-space:pre-wrap;line-height:1.8;margin:10px 0 0;font-size:1rem}@media(max-width:400px){.er-answer-text{margin-left:0}}
 
 /* 複習入口置於四個標籤下，以清楚的動作文字引導點擊。 */
-.er-entry--review{background:var(--er-dark);color:#fff;border:1px solid var(--er-dark);padding:18px 20px;box-shadow:0 4px 12px #00000014}
+.er-entry--review{--er-accent:#b91c46;background:var(--er-accent);color:#fff;border:1px solid var(--er-accent);padding:18px 20px;box-shadow:0 4px 12px #00000014}
 .er-entry-copy{flex:1;min-width:0;overflow-wrap:anywhere}.er-entry--review strong{line-height:1.5}.er-entry--review small{color:#fff;line-height:1.5}
-.er-entry-action{display:flex;align-items:center;justify-content:center;gap:10px;flex-shrink:0;min-height:44px;padding:10px 14px;background:#fff;color:var(--er-dark);border-radius:10px;font-size:1rem;font-weight:700;white-space:nowrap}
+.er-entry-action{display:flex;align-items:center;justify-content:center;gap:10px;flex-shrink:0;min-height:44px;padding:10px 14px;background:#fff;color:var(--er-accent);border-radius:10px;font-size:1rem;font-weight:700;white-space:nowrap}
 @media(hover:hover){.er-entry--review:hover{filter:brightness(1.07)}}
 .er-entry--review:active{box-shadow:none}
-@media(max-width:540px){.er-entry--review{flex-direction:column;align-items:stretch;padding:16px;gap:12px}.er-entry-action{padding:9px 12px}}
+@media(max-width:540px){.er-entry--review{flex-direction:column;align-items:center;padding:18px 16px;gap:12px;text-align:center}.er-entry-copy{width:100%}.er-entry--review strong{font-size:1.25rem}.er-entry--review small{font-size:.88rem}.er-entry-action{align-self:center;min-height:44px;padding:8px 18px;font-size:.94rem}}
