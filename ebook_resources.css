@@ -10,9 +10,9 @@
 
 /* 複習入口置於四個標籤下，以清楚的動作文字引導點擊。 */
 /* 入口採淡底與局部櫻桃紅，手機也保留左右排列。 */
-.er-entry--review{--er-accent:#b91c46;background:#fff7f9;color:var(--er-accent);border:1px solid #f0c4cf;border-left:4px solid var(--er-accent);padding:16px 18px;box-shadow:0 2px 8px #00000008}
+.er-entry--review{--er-accent:#b91c46;background:#fff7f9;color:var(--er-accent);border:2px solid var(--er-accent);padding:16px 18px;box-shadow:0 2px 8px #00000008}
 .er-entry-copy{flex:1;min-width:0;overflow-wrap:anywhere}.er-entry--review strong{line-height:1.5}.er-entry--review small{color:#78525d;line-height:1.5}.er-entry-meta{display:inline-block}
-.er-entry-action{display:flex;align-items:center;justify-content:center;gap:8px;flex-shrink:0;min-height:44px;padding:10px 14px;background:var(--er-accent);color:#fff;border-radius:10px;font-size:1rem;font-weight:700;white-space:nowrap}
+.er-entry-action{box-sizing:border-box;line-height:1.4;display:flex;align-items:center;justify-content:center;gap:8px;flex-shrink:0;min-height:44px;padding:10px 14px;background:var(--er-accent);color:#fff;border-radius:10px;font-size:1rem;font-weight:700;white-space:nowrap}
 @media(hover:hover){.er-entry--review:hover{background:#ffedf2}}
 .er-entry--review:active{box-shadow:none}
-@media(max-width:540px){.er-entry--review{flex-direction:row;align-items:center;padding:14px 12px;gap:10px;text-align:left}.er-entry--review strong{font-size:1.06rem}.er-entry--review small{font-size:.78rem;margin-top:4px}.er-entry-action{min-height:44px;padding:9px 12px;font-size:.88rem;gap:6px}.er-entry-action-detail{display:none}}
+@media(max-width:540px){.er-entry--review{flex-direction:row;align-items:center;padding:14px 10px;gap:8px;text-align:left}.er-entry--review strong{font-size:1rem}.er-entry--review small{font-size:.78rem;margin-top:4px}.er-entry-action{min-height:44px;padding:9px 10px;font-size:.88rem;gap:6px}}
