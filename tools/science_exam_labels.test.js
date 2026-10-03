@@ -50,6 +50,18 @@ c.BEAR_SUBJECT = '/math';
 for (const [file] of samples) assert.equal(c.getDailyPostExamLinkDisplayName(file, '補考題目'), '補考題目｜' + file.replace(/^(?:小考|隨堂考|鑑定考|複習考|補考)[：:]\s*/, ''));
 c.BEAR_SUBJECT = '/science';
 assert.equal(c.getDailyPostExamLinkDisplayName('&lt;img src=x&gt;.pdf', '小考卷'), '小考卷｜&lt;img src=x&gt;');
+assert.equal(
+  c.getDailyPostExamLinkDisplayName('20260926-27 小六資優自然 回家複習卷 理化（上）第1～8章', '假期練習卷'),
+  '假期練習卷｜理化（上）第1～8章'
+);
+assert.equal(
+  c.getDailyPostExamLinkDisplayName('20260926-27 小六資優自然 回家複習卷 理化（上）第1～8章', '中秋複習卷答案'),
+  '中秋複習卷答案｜理化（上）第1～8章'
+);
+assert.equal(
+  c.getDailyPostExamLinkDisplayName('20260926-27 小六資優自然 回家複習卷 理化（上）第1～8章', '假期練習卷', 'full'),
+  '假期練習卷｜20260926-27 小六資優自然 回家複習卷 理化（上）第1～8章'
+);
 // Display labels must not replace the Office preview/download filename.
 assert(ebook.includes('SVG.document, BEAR_SUBJECT === "/science" ? name : "")'));
 const linkContext = { decodeBasicHtmlEntities: String, escapeHtmlAttr: String, isOfficeDocumentLink: name => name.endsWith('.doc'), getOfficePreviewUrl: () => 'https://preview.test', getOfficeDownloadFileName: name => name };

@@ -27,7 +27,7 @@
     <!-- External Resources -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
     <script src="class_session_plan.js?v=holiday-score-review-20260921"></script>
-    <script src="holiday_practice_app.js?v=holiday-durable-answer-20260922"></script>
+    <script src="holiday_practice_app.js?v=holiday-compact-title-20261004"></script>
     <!-- holiday-score-card-form-20260921 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
@@ -10615,11 +10615,13 @@
                 if (classPrefix) compact = compact.slice(classPrefix[0].length);
                 var examPrefix = compact.match(/^(?:在家|(理化))?(?:小考(?:卷)?|隨堂考(?:卷)?|鑑定考(?:卷)?|複習考(?:卷)?|補考(?:考卷|卷|題目|答案)?)[\s｜|：:]+/);
                 if (examPrefix) compact = (examPrefix[1] || "") + compact.slice(examPrefix[0].length);
+                var homePracticePrefix = compact.match(/^(?:回家|假期|中秋|連假)(?:作業|練習|複習)*(?:考卷|卷)?[\s｜|：:]+/);
+                if (homePracticePrefix) compact = compact.slice(homePracticePrefix[0].length);
                 compact = compact.replace(/(^|[^a-z])ANS$/i, "$1").trim();
                 compact = compact.replace(/(?:^|\s+)(?:答案(?:卷)?|解答(?:卷)?|解析(?:卷)?)$/, "").trim();
                 compact = compact.replace(/\s+複習考$/, "").trim();
                 // 未知的日期／班別格式保留完整檔名，不猜測或補造章節。
-                if (compact && (!datePrefix || classPrefix || examPrefix)) label = compact;
+                if (compact && (!datePrefix || classPrefix || examPrefix || homePracticePrefix)) label = compact;
             }
             return prependDailyPostLinkPurpose(label, purpose || "考卷");
         }

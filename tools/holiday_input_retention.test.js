@@ -25,6 +25,18 @@ test('ebook shared holiday policy recognizes advanced science only',()=>{
  for(const name of ['115國一生物','115國二理化','115國一數學超前班'])assert.equal(P.supportsHolidayPractice('science',name),false);
 });
 
+test('holiday question and answer links use the shared compact science title',async()=>{
+ const dom={},id='holiday_compact_title';
+ const assignment={assignmentId:id,title:'20260926-27 小六資優自然 回家複習卷 理化（上）第1～8章',questionUrl:'https://demo.test/q',dueAt:Date.now()+100000,revision:1};
+ const post={id:'post',date:'2026/09/19',className:'class',displayOptions:{links:{holidayLabel:'中秋複習卷'},holidayPractice:assignment}};
+ const c={console,Date,URL,Promise,setTimeout:()=>{},safeKey:value=>value,gData:{className:'class',foundUserKey:'one',grades:[]},isAdminMode:false,isDashboardDraftPreviewMode:false,isStudentPreviewMode:false,ClassSessionPlan:P,getDailyPostExamLinkDisplayName:(title,purpose)=>purpose+'｜理化（上）第1～8章',document:{addEventListener(){},getElementById:key=>dom[key],activeElement:null},addEventListener(){},doPostAction:(action,data,ok)=>ok({success:true,assignments:{[id]:assignment},progress:{[id]:{unlockedAt:1}}})};c.window=c;vm.createContext(c);
+ const icons=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8').match(/const SVG = \{[\s\S]*?\n        \};/)[0];vm.runInContext(icons,c);
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'../holiday_practice_app.js'),'utf8'),c);
+ const first=c.HolidayPracticeApp.render(post);assert.match(first,/中秋複習卷｜理化（上）第1～8章/);assert.doesNotMatch(first,/20260926-27/);
+ dom['holiday-card-'+id]={innerHTML:first};await new Promise(r=>setImmediate(r));
+ assert.match(dom['holiday-card-'+id].innerHTML,/中秋複習卷答案｜理化（上）第1～8章/);assert.doesNotMatch(dom['holiday-card-'+id].innerHTML,/20260926-27/);
+});
+
 test('dashboard draft preview shows the distinct holiday answer button without exposing the answer',()=>{
  const dom={},events={},windowEvents={},id='holiday_preview_button';
  const post={id:'post',date:'2026/09/19',className:'class',displayOptions:{holidayPractice:{assignmentId:id,title:'理化複習',questionUrl:'https://demo.test/q',answerUrl:'https://private.test/answer',dueAt:Date.now()+100000}}};

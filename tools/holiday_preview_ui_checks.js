@@ -42,7 +42,7 @@ async (page) => {
         privateAnswerExposed: document.documentElement.innerHTML.includes('holiday-answer.pdf')
       };
     });
-    if (!result.questionText || !result.questionText.includes('20260926-27 小六資優自然')) throw new Error('Holiday filename/title is missing: ' + JSON.stringify(result));
+    if (result.questionText !== '假期練習卷｜理化（上）第1～8章') throw new Error('Holiday title was not compacted: ' + JSON.stringify(result));
     if (result.previewText !== '我已完成，顯示答案' || !result.previewDisabled || result.previewHeight < 44) throw new Error('Holiday preview button is invalid: ' + JSON.stringify(result));
     if (result.generalText !== '我已完成本次一般作業' || result.generalIsHoliday) throw new Error('General and holiday completion controls are not distinct: ' + JSON.stringify(result));
     if (result.privateAnswerExposed || result.pageWidth > result.viewport) throw new Error('Privacy or layout check failed: ' + JSON.stringify(result));
