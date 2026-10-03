@@ -93,7 +93,7 @@ if (context.getDailyPostLinkDisplayName('活動說明', 'custom', '行前通知'
 if (context.getDailyPostLinkDisplayName('活動說明', 'custom', '<img src=x>') !== '&lt;img src=x&gt;｜活動說明') {
   throw new Error('custom link labels must be escaped before entering the rendered button HTML');
 }
-if (context.getDailyPostExamLinkDisplayName('小考：理化第六章.pdf', '小考卷') !== '小考卷｜理化第六章.pdf') {
+if (context.getDailyPostExamLinkDisplayName('小考：理化第六章.pdf', '小考卷') !== '小考卷｜理化第六章') {
   throw new Error('exam links must replace the stored type marker with a parent-facing exam prefix');
 }
 if (context.getDailyPostHomeworkNoteMode({ displayOptions: { homework: { noteMode: 'hide' } } }) !== 'hide') {
