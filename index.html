@@ -6851,6 +6851,7 @@
   </script>
 
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="gifted_entry.css?v=20261009-v25">
 </head>
 
 <body>
@@ -8815,6 +8816,7 @@
             var activeSession = ebookAuthSessionInfo || ebookGodSessionInfo || {};
             if (result.pendingPolicy === undefined) result.pendingPolicy = activeSession.pendingPolicy || null;
             gData = result;
+            queueMicrotask(function() { window.GiftedEbook?.ready({ auth: ebookAuth, result: result, mode: pass, preview: isDashboardDraftPreviewMode || !!ebookGodSessionInfo }); });
             activeEbookPromotionContext = result.promotionContext || null;
             resetPopupQueueForEntry();
             pendingTasksState = { status: 'unavailable', items: [] };
@@ -9585,6 +9587,7 @@
         }
 
         function doLogout() {
+            window.GiftedEbook?.close(true);
             if (window.EbookResources) window.EbookResources.reset();
             clearRealtimeListeners();
             if (isAdminMode) exitGodMode();
@@ -15727,6 +15730,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             restoreRememberedStudentLogin();
         });
     </script>
-</div></body>
+</div><script src="gifted_release_config.js?v=20261009-v25"></script>
+<script src="gifted_entry.js?v=20261009-v25"></script>
+</body>
 
 </html>
