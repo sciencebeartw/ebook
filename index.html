@@ -5780,6 +5780,7 @@
                 date: displayIdentity.date || eData.date,
                 exam: eData.examName,
                 note: eData.note,
+                homeworkMaxScore: eData.homeworkMaxScore,
                 score: eData.score
             };
             const isMathAdvancedGuidance = isMathAdvancedGuidanceExam(mathGuidanceGrade);
@@ -5845,6 +5846,7 @@
                 displaySourceColKey: displayIdentity.sourceColKey || "",
                 hasMappedTransferDisplayDate: displayIdentity.mapped === true,
                 note: eData.note,
+                homeworkMaxScore: eData.homeworkMaxScore,
                 makeupThreshold: makeupThreshold,
                 guidanceThreshold: mathGuidanceStandard ? mathGuidanceStandard.guidanceThreshold : 0,
                 fullScore: mathGuidanceStandard ? mathGuidanceStandard.fullScore : null,
@@ -10375,7 +10377,9 @@
             var className = grade.className || grade.storedClassName || grade.sourceClassName || (gData && gData.className) || "";
             if (!isGiftedScienceClassName(className)) return null;
             if (!isHomeworkColumnTitle((grade.date || "") + (grade.exam || ""))) return null;
-            var fullScore = window.BearGiftedHomeworkFullScores.getFullScore(grade.exam || "");
+            var explicit = grade.homeworkMaxScore;
+            var fullScore = typeof explicit === "number" && Number.isFinite(explicit) && explicit > 0 && explicit <= 250
+                ? explicit : window.BearGiftedHomeworkFullScores.getFullScore(grade.exam || "");
             var scoreMatch = String(grade.score === undefined || grade.score === null ? "" : grade.score).match(/(\d+(?:\.\d+)?)/);
             if (!fullScore || (scoreMatch && Number(scoreMatch[1]) > fullScore)) return null;
             return fullScore;
