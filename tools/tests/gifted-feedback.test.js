@@ -1,0 +1,14 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const html=fs.readFileSync(__dirname+'/../../index.html','utf8');
+const code=html.slice(html.indexOf('        function renderGiftedFeedback('),html.indexOf('        const APP_LOGO'));
+const escapeHtml=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const context={encodeURIComponent,escapeHtml,escapeHtmlAttr:escapeHtml,parseBtn:s=>escapeHtml(s).replace(/\s*\[gifted-correction:[^\]]+\]/g,'')};vm.createContext(context);vm.runInContext(code,context);
+const marker='[gifted-correction:hw_'+'a'.repeat(64)+':week-1:cr_abcdefghijklmnop]';
+const item={type:'作業更正申請',content:'理化第11章 常見的力｜概念一、二\n更正原因：<img src=x onerror=alert(1)>\n補充原因\n首次成績維持不變，待老師核准。\n'+marker};
+const before=JSON.stringify(item),out=context.renderGiftedFeedback(item,item.content);
+assert(out.includes('作業更正申請'));assert(out.includes('已送出'));assert(out.includes('補充原因'));assert(out.includes('&lt;img'));assert(!out.includes('<img'));assert(!out.includes('gifted-correction:'));assert(!out.includes('待老師核准'));assert(out.includes('?gifted=hw_'));assert(out.includes('week-1'));assert.equal(JSON.stringify(item),before);
+assert.equal(context.renderGiftedFeedback({type:'學生留言'},'普通留言'), '普通留言');
+assert.equal(context.renderGiftedFeedback(null,null),'');
+assert(html.includes('renderGiftedFeedback(item, content'));assert(html.includes('renderGiftedFeedback(h, h.content'));
+assert.match(html,/\.history-msg-body \{[^}]*min-width: 0;[^}]*overflow-wrap: anywhere;/);
+console.log('gifted feedback: raw identity preserved; safe card; both render paths; responsive width passed');

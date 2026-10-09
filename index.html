@@ -3095,7 +3095,19 @@
             border-radius: 4px 16px 16px 16px;
             padding: 10px 14px;
             flex: 1;
+            min-width: 0;
+            overflow-wrap: anywhere;
         }
+
+        .gifted-feedback-card { font-size: 1rem; line-height: 1.65; color: #29483e; }
+        .gifted-feedback-heading { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin-bottom: 8px; }
+        .gifted-feedback-heading strong { font-size: 1rem; }
+        .gifted-feedback-badge { font-size: .8rem; color: #27634c; background: #e1f1e8; border-radius: 20px; padding: 2px 9px; }
+        .gifted-feedback-title { margin: 0 0 8px; font-weight: 700; }
+        .gifted-feedback-reason { margin: 0; white-space: pre-wrap; }
+        .gifted-feedback-reason span { display: block; font-size: .85rem; color: #657970; }
+        .gifted-feedback-hint { margin: 10px 0 4px; color: #657970; font-size: .85rem; }
+        .gifted-feedback-link { display: inline-flex; align-items: center; min-height: 44px; color: #24624b; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
 
         .history-msg-body.teacher-body {
             background: var(--primary-bg);
@@ -7700,6 +7712,22 @@
             return parseEbookEscapedTextLinks(escapedText);
         };
 
+        function renderGiftedFeedback(item, content) {
+            var text = String(content == null ? '' : content);
+            var marker = /\[gifted-correction:(hw_[a-f0-9]{64}):(week-\d+):[a-zA-Z0-9_-]{16,100}\]/.exec(String(item && item.content || ''));
+            if (!item || item.type !== '作業更正申請' || !marker) return parseBtn(text);
+            var clean = text.replace(/\s*\[gifted-correction:[^\]\r\n]+\]/g, '').trim();
+            var parts = clean.split(/\r?\n更正原因：/);
+            var title = parts.shift() || '課本作業';
+            var reason = parts.join('\n更正原因：').replace(/\n首次成績維持不變，待老師核准。\s*$/, '').trim();
+            var url = '?gifted=' + encodeURIComponent(marker[1]) + '&segment=' + encodeURIComponent(marker[2]);
+            // 「已送出」描述這筆申請事件，不能用留言已讀狀態推論是否核准。
+            return '<div class="gifted-feedback-card"><div class="gifted-feedback-heading"><strong>作業更正申請</strong><span class="gifted-feedback-badge">已送出</span></div>' +
+                '<p class="gifted-feedback-title">' + escapeHtml(title) + '</p><p class="gifted-feedback-reason"><span>更正原因</span>' + escapeHtml(reason) + '</p>' +
+                '<p class="gifted-feedback-hint">老師核准後才會更新成績，審核進度可至作業頁查看。</p>' +
+                '<a class="gifted-feedback-link" href="' + escapeHtmlAttr(url) + '">查看作業與審核進度 →</a></div>';
+        }
+
         const APP_LOGO = "https://www.sciencebear.com.tw/ebook/LOGO.png";
         const DEFAULT_HW_TEXT = `1.請記得，要先在課本寫完才能開始上傳。\n2.上傳時注意名字填寫全名，並且前後不要有空格。\n3.送出後記得要查看分數，一題一題訂正在課本上！\n4.未訂正視同作業未完成哦。`;
 
@@ -11683,7 +11711,7 @@
                     var content = entry && entry.displayContent !== undefined ? entry.displayContent : item.content;
                     return "<div class='history-msg" + (nested ? " feedback-thread-reply" : "") + "' data-feedback-key='" + escapeHtmlAttr(entry && entry.key || "") + "'>" +
                         "<div class='history-msg-avatar " + avatarClass + "'>" + escapeHtml(avatarChar) + "</div>" +
-                        "<div class='history-msg-body " + bodyClass + "'>" + parseBtn(content || "") +
+                        "<div class='history-msg-body " + bodyClass + "'>" + renderGiftedFeedback(item, content || "") +
                         "<div class='history-msg-time'>" + escapeHtml((item.time || "").substring(5, 16)) + "</div></div></div>";
                 }
 
@@ -11726,7 +11754,7 @@
                             }
                             historyHtml += "<div class='history-msg'><div class='history-msg-avatar " + stickerAvatarClass + "'>" + escapeHtml(stickerAvatarChar) + "</div><div class='history-msg-body " + bodyCls + "'><span>" + icon + safeStickerReason + "</span><span class='" + badgeCls + "'>" + escapeHtml(formatStickerCountText(stickerData.count)) + "</span><br><span class='sticker-status " + statusClass + "'>" + (statusKind === "approved" ? SVG.check : (statusKind === "rejected" ? SVG.cross : SVG.hourglass)) + safeStatusLabel + "</span><div class='history-msg-time'>" + escapeHtml((h.time || "").substring(5, 16)) + "</div>" + stickerReviewHtml + "</div></div>";
                         } else {
-                            historyHtml += "<div class='history-msg'><div class='history-msg-avatar " + avatarClass + "'>" + escapeHtml(avatarChar) + "</div><div class='history-msg-body " + bodyClass + "'>" + parseBtn(h.content || "") + "<div class='history-msg-time'>" + escapeHtml((h.time || "").substring(5, 16)) + "</div></div></div>";
+                            historyHtml += "<div class='history-msg'><div class='history-msg-avatar " + avatarClass + "'>" + escapeHtml(avatarChar) + "</div><div class='history-msg-body " + bodyClass + "'>" + renderGiftedFeedback(h, h.content || "") + "<div class='history-msg-time'>" + escapeHtml((h.time || "").substring(5, 16)) + "</div></div></div>";
                         }
                         return;
                     }
