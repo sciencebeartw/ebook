@@ -6857,7 +6857,7 @@
   </script>
 
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="gifted_entry.css?v=20261009-v25">
+<link rel="stylesheet" href="gifted_entry.css?v=20261010-auto-status">
 </head>
 
 <body>
@@ -7048,7 +7048,7 @@
         </div>
 
         <div id="login-screen">
-            <img src="LOGO.png" class="logo-img logo-target" alt="山熊科學">
+            <img src="report-logo-green.png" class="logo-img" alt="山熊科學 Bear’s Lab">
             <h2>數位聯絡簿</h2>
             <div class="sub-title" id="loginSubTitle">小六資優自然<br>國中自然超前班</div>
             
@@ -7696,7 +7696,7 @@
         function parseBtn(text) {
             if (!text) return "";
             // 先對 HTML 特殊字元做跳脫 防範 XSS
-            var escapedText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            var escapedText = text.replace(/\s*\[gifted-correction:hw_[a-f0-9]{64}:week-\d+:[a-zA-Z0-9_-]{16,100}\]/g, "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
             return parseEbookEscapedTextLinks(escapedText);
         };
 
@@ -15054,6 +15054,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 if (!isMakeupFeedback && item.type === '作業上傳') { bg = '#f0f9ff'; accent = '#0ea5e9'; }
                 
                 var displayContent = (item.content !== undefined && item.content !== null) ? item.content.toString() : "";
+                displayContent = displayContent.replace(/\s*\[gifted-correction:hw_[a-f0-9]{64}:week-\d+:[a-zA-Z0-9_-]{16,100}\]/g, "");
                 if (displayContent.startsWith("'")) displayContent = displayContent.substring(1);
 
                 if (isMakeupResult) {
@@ -15739,7 +15740,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         });
     </script>
 </div><script src="gifted_release_config.js?v=20261009-v25"></script>
-<script src="gifted_entry.js?v=20261009-v25"></script>
+<script src="gifted_entry.js?v=20261010-auto-status"></script>
 </body>
 
 </html>
