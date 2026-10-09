@@ -59,7 +59,7 @@ async function load(){box?.close({erase:false});task=await student('task');confl
  if(task.submission){const result=await learning({action:'result',planId:task.planId,segmentId:task.segmentId});$('receipt').textContent='本段 '+task.questions.length+' 題已收到。首次正式答案已保存；重複送出不會新增另一筆成績。';$('result').innerHTML=result.items.map(item=>{const q=task.questions.find(q=>q.id===item.questionId);return `<span class="result ${item.outcome==='correct'?'':'wrong'}">第${q.sourceIndex}題 ${item.outcome==='correct'?'答對':item.outcome==='blank'?'留白':'答錯'}</span>`;}).join('');$('studentStatus').textContent='本段已提交，首次作答不再覆蓋。';}
 }
 async function flush(){try{const result=await box.flush();if(['saved','submitted'].includes(result.status)){await load();if(result.status==='saved')$('studentStatus').textContent='草稿已保存至資料庫。';}}catch(e){if(['DRAFT_CONFLICT','FORMAL_ALREADY_SUBMITTED'].includes(e.message)){showConflict(await student('task'));return;}$('studentStatus').textContent='尚未確認送出結果；原答案與送出編號已保留，請按重試。';paint();throw e;}}
-function initStudent(){$('student').hidden=false;if(!query.get('plan')){$('login').innerHTML='<p>請先由老師發布測試聯絡簿，再從作業按鈕進入。</p>';return;}
+function initStudent(){$('student').hidden=false;if(!query.get('plan')){$('login').innerHTML='<p>請從電子聯絡簿的本週作業連結進入。</p>';return;}
  const mediaStatus=document.createElement('div');mediaStatus.id='mediaStatus';mediaStatus.hidden=true;mediaStatus.innerHTML='<p id="mediaMessage" role="status"></p><button type="button" id="reloadMedia">重新載入圖表</button>';$('questionCard').before(mediaStatus);
  $('reloadMedia').onclick=()=>refreshMedia();
  document.addEventListener('error',e=>{if(e.target.tagName==='IMG'&&e.target.closest('.student-media,.student-media-dialog'))refreshMedia();},true);
