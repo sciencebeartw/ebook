@@ -28,12 +28,17 @@
             if (privateRequired && (!url(a.answerUrl) || a.answerUrl === a.questionUrl)) throw new Error('請附上有效的 HTTPS 解答網址，不能與題目相同');
             used[a.id] = used[a.slot + ':' + a.questionUrl] = true;
             var out = { id: a.id, revision: a.revision, slot: a.slot, title: p.title.slice(0, 300), questionUrl: p.questionUrl };
+            out.reportScore = a.reportScore === true;
+            out.scoreMax = a.scoreMax === undefined ? 100 : Number(a.scoreMax);
+            out.scoreUnit = a.scoreUnit === '題' ? '題' : '分';
+            if (!Number.isInteger(out.scoreMax) || out.scoreMax < 1 || out.scoreMax > 200) throw new Error('滿分須為 1～200 的整數');
+            if (a.reportProvisioned === true) out.reportProvisioned = true;
             if (privateRequired) out.answerUrl = a.answerUrl;
             return out;
         });
     }
     function signature(entries) {
-        return JSON.stringify((entries || []).map(function(a) { return [a.id, a.revision, a.slot, a.questionUrl]; }).sort(function(a, b) { return a[0].localeCompare(b[0]); }));
+        return JSON.stringify((entries || []).map(function(a) { return [a.id, a.revision, a.slot, a.questionUrl, a.reportScore === true, a.scoreMax || 100, a.scoreUnit || '分']; }).sort(function(a, b) { return a[0].localeCompare(b[0]); }));
     }
     return { papers: papers, normalize: normalize, signature: signature, validUrl: url };
 });

@@ -27,9 +27,9 @@
     <!-- External Resources -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
     <script src="class_session_plan.js?v=holiday-score-review-20260921"></script>
-    <script src="homework_answers_contract.js?v=20261010"></script>
-    <script src="homework_answers_app.js?v=20261010"></script>
-    <link rel="stylesheet" href="homework_answers.css?v=20261010">
+    <script src="homework_answers_contract.js?v=20261011-report1"></script>
+    <script src="homework_answers_app.js?v=20261011-report1"></script>
+    <link rel="stylesheet" href="homework_answers.css?v=20261011-report1">
     <script src="holiday_practice_app.js?v=holiday-compact-title-20261004"></script>
     <!-- holiday-score-card-form-20260921 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -5693,7 +5693,7 @@
             sourceColKey: colKey,
             mapped: false
         };
-        if (grade.assessmentKind === 'holiday_self_marked') return fallback;
+        if (ClassSessionPlan.isSelfMarked(grade)) return fallback;
         var sourceClassKey = presentation.sourceClassKey || storedClassKey;
         if (!presentation.isTransferFormerClass || !sourceClassKey || sourceClassKey === storedClassKey) return fallback;
 
@@ -5851,7 +5851,7 @@
             const isMissing = isNaN(studentScoreNum) && (eData.score || "").indexOf("尚未繳交") === -1;
 
             fullGradeList.push({
-                assessmentKind: eData.assessmentKind || '', sourceAssignmentId: eData.sourceAssignmentId || '', dueAt: eData.dueAt || 0, originClassName: eData.originClassName || '',
+                assessmentKind: eData.assessmentKind || '', scoreMax: eData.scoreMax, scoreUnit: eData.scoreUnit, reportEnabled: eData.reportEnabled, sourceAssignmentId: eData.sourceAssignmentId || '', dueAt: eData.dueAt || 0, originClassName: eData.originClassName || '',
                 className: presentation.className,
                 sourceClassKey: presentation.sourceClassKey,
                 sourceClassName: presentation.sourceClassName,
@@ -9718,7 +9718,7 @@
             var rawScore = (exam.score || "").toString();
             var isHomePractice = isHomePracticeScoreTitle((exam.date || "") + (exam.exam || ""));
             var isHw = !isHomePractice && (isHomeworkColumnTitle((exam.date || "") + (exam.exam || "")) || isHomeworkMissingScore(rawScore));
-            if (isHw) return null;
+            if (isHw && !ClassSessionPlan.isSelfMarked(exam)) return null;
             var examId = typeof normalizeEbookFeedbackExamId === 'function'
                 ? normalizeEbookFeedbackExamId(exam.examId || exam.targetExamId)
                 : '';
@@ -9829,7 +9829,7 @@
                     result.showReviewing = true;
                     result.statusHtml += "<div class='reviewing-tag'>(待審核)</div>";
                 } else {
-                    result.mainScore = Date.now() >= Number(holidayAssignment.dueAt) ? '缺繳' : '待回報';
+                    result.mainScore = exam.assessmentKind === 'homework_self_marked' && exam.reportEnabled === false ? '自行訂正' : Number(holidayAssignment.dueAt) > 0 && Date.now() >= Number(holidayAssignment.dueAt) ? '缺繳' : '待回報';
                     result.mainClass = ' text-grey-status';
                 }
                 return result;
@@ -10444,6 +10444,7 @@
         }
 
         function getGradeScoreUnitText(grade, fallbackUnit) {
+            if (grade && grade.assessmentKind === "homework_self_marked") return "／" + grade.scoreMax + " " + (grade.scoreUnit || "分");
             var mathStandard = getMathAdvancedGuidanceStandard(grade);
             if (mathStandard && mathStandard.fullScore) return "／" + mathStandard.fullScore + " 分";
             var fullScore = getGiftedScienceHomeworkFullScore(grade);
@@ -10845,6 +10846,7 @@
         }
 
         function getDailyPostExamLabel(exam) {
+            if (exam && exam.assessmentKind === "homework_self_marked") return "回家作業卷";
             if (exam && exam.assessmentKind === "holiday_self_marked") return "假期練習卷";
             var raw = ((exam && exam.date) || "") + " " + ((exam && exam.exam) || "");
             if (raw.indexOf("回家練習卷") > -1) return "回家練習卷";
@@ -10855,7 +10857,7 @@
         }
 
         function getDailyPostExamTimePrefix(exam) {
-            if (exam && exam.assessmentKind === "holiday_self_marked") return "";
+            if (exam && ClassSessionPlan.isSelfMarked(exam)) return "";
             var raw = ((exam && exam.date) || "") + " " + ((exam && exam.exam) || "");
             return raw.indexOf("回家練習卷") > -1 ? "上週" : "今日";
         }
@@ -13333,7 +13335,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         }
 
         function isHolidayScoreReportType(type) {
-            return type === FEEDBACK_TYPE_LABELS.holidayScore;
+            return type === FEEDBACK_TYPE_LABELS.holidayScore || type === "回家作業回報";
         }
 
         function isScoreReportTypeForExam(type, exam) {

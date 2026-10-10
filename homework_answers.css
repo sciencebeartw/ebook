@@ -2,3 +2,12 @@
 .homework-answers { margin-top: 12px; }
 .homework-answers .homework-answer-link { min-height: 44px; box-sizing: border-box; overflow-wrap: anywhere; }
 .homework-answer-retry { min-height: 44px; padding: 8px 16px; background: #f5f3ff; color: #6d28d9; border: 1px solid #ddd6fe; border-radius: 8px; font: inherit; cursor: pointer; }
+
+.homework-report-form { margin:12px 0 18px; padding:16px; background:#faf8ff; border:1px solid #ddd6fe; border-radius:12px; }
+.homework-report-form label { display:block; font-weight:700; margin-bottom:10px; color:#5b21b6; }
+.homework-report-fields { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:10px; }
+.homework-report-fields input { width:90px; min-height:44px; box-sizing:border-box; font:inherit; font-size:20px; text-align:center; border:1px solid #b9a6e8; border-radius:8px; background:#fff; }
+.homework-report-fields button { min-height:44px; padding:8px 18px; font:inherit; font-weight:700; color:white; background:#7c3aed; border:0; border-radius:8px; cursor:pointer; }
+.homework-report-fields button:disabled { opacity:.65; cursor:wait; }
+.homework-report-status { margin-top:10px; font-size:15px; color:#665b7a; line-height:1.6; }
+.homework-report-received { margin:12px 0; padding:14px; background:#f0fdf4; border-radius:10px; color:#166534; font-weight:700; }
