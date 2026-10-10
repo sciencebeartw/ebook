@@ -27,6 +27,9 @@
     <!-- External Resources -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
     <script src="class_session_plan.js?v=holiday-score-review-20260921"></script>
+    <script src="homework_answers_contract.js?v=20261010"></script>
+    <script src="homework_answers_app.js?v=20261010"></script>
+    <link rel="stylesheet" href="homework_answers.css?v=20261010">
     <script src="holiday_practice_app.js?v=holiday-compact-title-20261004"></script>
     <!-- holiday-score-card-form-20260921 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -10822,11 +10825,12 @@
             var btnText = done ? "✓ 已回報完成" : (holiday && !holiday.draft ? "我已完成本次一般作業" : "我已完成本次所有作業");
             var doneClass = done ? " done" : "";
             var disabled = done ? " disabled" : "";
-            var hint = done ? "已記錄到作業完成回報。" : "完成作業後按一下，老師會看到你的回報。";
+            var hasAnswers = window.HomeworkAnswersApp && HomeworkAnswersApp.has(post);
+            var hint = done ? "已記錄到作業完成回報。" : (hasAnswers ? "完成作業後按一下，即可查看解答並訂正。" : "完成作業後按一下，老師會看到你的回報。");
             return "<div class='homework-done-box' id='homework-done-box-" + homeworkDoneDomKey + "'>" +
                 "<button class='homework-done-btn" + doneClass + "' id='homework-done-btn-" + homeworkDoneDomKey + "' onclick=\"submitHomeworkDone('" + homeworkDoneDomKey + "')\"" + disabled + ">" + btnText + "</button>" +
                 "<div class='homework-done-hint' id='homework-done-hint-" + homeworkDoneDomKey + "'>" + hint + "</div>" +
-                "</div>";
+                (hasAnswers ? HomeworkAnswersApp.render(post, done) : "") + "</div>";
         }
 
         function buildHomeworkUploadNote(post, homeworkText) {
@@ -11428,40 +11432,42 @@
                     // 老師發布的連結 -> 藍色大膠囊
                     // 學生上傳的連結 -> 灰色小標籤 (透過 class="btn-small-tag" 區分)
                     var linkPattern = /\[(.*?)\](http[s]?:\/\/[^\s<]+)/g;
-                    var parsed = "";
+                    var parsed = "", renderedLinks = [];
+                    function keepLink(html) { var token = "\uE000HWA" + renderedLinks.length + "\uE001"; renderedLinks.push(html); return token; }
                     var lastIndex = 0;
                     var linkMatch;
                     while ((linkMatch = linkPattern.exec(withBr)) !== null) {
-                        parsed += renderEbookRichTextFormat(withBr.slice(lastIndex, linkMatch.index));
+                        parsed += withBr.slice(lastIndex, linkMatch.index);
                         var name = linkMatch[1];
                         var url = linkMatch[2];
                         var colorClass = getDailyPostButtonColorClass(color);
                         var upload = name.indexOf("上傳") > -1;
                         var homework = /作業|練習卷/.test(name);
                         if (linkPrefix) {
-                            parsed += renderParsedLink(getDailyPostExamLinkDisplayName(name, linkPrefix, (getDailyPostDisplayOptions(post).links || {}).examTitleMode), url, "btn-link", SVG.document, BEAR_SUBJECT === "/science" ? name : "");
+                            parsed += keepLink(renderParsedLink(getDailyPostExamLinkDisplayName(name, linkPrefix, (getDailyPostDisplayOptions(post).links || {}).examTitleMode), url, "btn-link", SVG.document, BEAR_SUBJECT === "/science" ? name : ""));
                         } else if (name.indexOf('回家作業卷｜') === 0) {
                             // 上傳／連結小幫手的明確用途只作用於這一份卷，不改同欄參考連結。
                             var originalPaperName = name.slice('回家作業卷｜'.length);
                             var paperTitle = getDailyPostExamLinkDisplayName(originalPaperName, '回家作業卷', (getDailyPostDisplayOptions(post).links || {}).examTitleMode);
-                            parsed += renderParsedLink(paperTitle, url, 'btn-important-tag' + colorClass, SVG.document, originalPaperName);
+                            parsed += keepLink(renderParsedLink(paperTitle, url, 'btn-important-tag' + colorClass, SVG.document, originalPaperName));
                         } else if (linkMode === "homework" || (linkMode === "auto" && (upload || homework))) {
                             var paper = !upload && (/卷/.test(name) || /\.pdf(?:$|[?#])/i.test(url) || /\.pdf$/i.test(name));
                             var textbook = /^課本作業｜/.test(name);
                             var homeworkName = textbook ? name : paper ? prependDailyPostLinkPurpose(name, "回家作業卷") : getDailyPostUploadLinkDisplayName(name);
-                            parsed += renderParsedLink(homeworkName, url, "btn-important-tag" + colorClass, (textbook || paper) ? SVG.document : SVG.upload);
+                            parsed += keepLink(renderParsedLink(homeworkName, url, "btn-important-tag" + colorClass, (textbook || paper) ? SVG.document : SVG.upload));
                         } else if (linkMode === "supplement") {
-                            parsed += renderParsedLink(getDailyPostLinkDisplayName(name, linkMode, customLabel), url, "btn-supplement-tag" + colorClass, SVG.clip);
+                            parsed += keepLink(renderParsedLink(getDailyPostLinkDisplayName(name, linkMode, customLabel), url, "btn-supplement-tag" + colorClass, SVG.clip));
                         } else if (linkMode === "general" || linkMode === "custom") {
-                            parsed += renderParsedLink(getDailyPostLinkDisplayName(name, linkMode, customLabel), url, "btn-general-tag" + colorClass, SVG.link);
+                            parsed += keepLink(renderParsedLink(getDailyPostLinkDisplayName(name, linkMode, customLabel), url, "btn-general-tag" + colorClass, SVG.link));
                         } else if (name.indexOf("附件") > -1) {
-                            parsed += renderParsedLink(name, url, "btn-small-tag", SVG.clip);
+                            parsed += keepLink(renderParsedLink(name, url, "btn-small-tag", SVG.clip));
                         } else {
-                            parsed += renderParsedLink(name, url, "btn-link" + colorClass, "");
+                            parsed += keepLink(renderParsedLink(name, url, "btn-link" + colorClass, ""));
                         }
                         lastIndex = linkPattern.lastIndex;
                     }
-                    parsed += renderEbookRichTextFormat(withBr.slice(lastIndex));
+                    parsed += withBr.slice(lastIndex);
+                    parsed = renderEbookRichTextFormat(parsed).replace(/\uE000HWA(\d+)\uE001/g, function(_, index) { return renderedLinks[Number(index)] || ""; });
                     return compactParsedButtonBreaks(parsed);
                 };
 
@@ -12529,6 +12535,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     btn.classList.add("done");
                     btn.disabled = true;
                     if (hint) hint.innerText = "已記錄到作業完成回報。";
+                    if (window.HomeworkAnswersApp) HomeworkAnswersApp.completed(post);
                     schedulePendingTasksRecompute();
                 } else {
                     btn.disabled = false;

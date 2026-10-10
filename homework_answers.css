@@ -1,0 +1,4 @@
+.homework-answers:empty { display: none; }
+.homework-answers { margin-top: 12px; }
+.homework-answers .homework-answer-link { min-height: 44px; box-sizing: border-box; overflow-wrap: anywhere; }
+.homework-answer-retry { min-height: 44px; padding: 8px 16px; background: #f5f3ff; color: #6d28d9; border: 1px solid #ddd6fe; border-radius: 8px; font: inherit; cursor: pointer; }
