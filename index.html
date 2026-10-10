@@ -11424,6 +11424,11 @@
                         var homework = /作業|練習卷/.test(name);
                         if (linkPrefix) {
                             parsed += renderParsedLink(getDailyPostExamLinkDisplayName(name, linkPrefix, (getDailyPostDisplayOptions(post).links || {}).examTitleMode), url, "btn-link", SVG.document, BEAR_SUBJECT === "/science" ? name : "");
+                        } else if (name.indexOf('回家作業卷｜') === 0) {
+                            // 上傳／連結小幫手的明確用途只作用於這一份卷，不改同欄參考連結。
+                            var originalPaperName = name.slice('回家作業卷｜'.length);
+                            var paperTitle = getDailyPostExamLinkDisplayName(originalPaperName, '回家作業卷', (getDailyPostDisplayOptions(post).links || {}).examTitleMode);
+                            parsed += renderParsedLink(paperTitle, url, 'btn-important-tag' + colorClass, SVG.document, originalPaperName);
                         } else if (linkMode === "homework" || (linkMode === "auto" && (upload || homework))) {
                             var paper = !upload && (/卷/.test(name) || /\.pdf(?:$|[?#])/i.test(url) || /\.pdf$/i.test(name));
                             var textbook = /^課本作業｜/.test(name);

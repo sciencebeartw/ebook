@@ -62,12 +62,17 @@ assert.equal(
   c.getDailyPostExamLinkDisplayName('20260926-27 小六資優自然 回家複習卷 理化（上）第1～8章', '假期練習卷', 'full'),
   '假期練習卷｜20260926-27 小六資優自然 回家複習卷 理化（上）第1～8章'
 );
+const homeworkFile = '20261010 國二自然超前班 回家作業 高中補充 拋體運動.doc';
+assert.equal(c.getDailyPostExamLinkDisplayName(homeworkFile, '回家作業卷'), '回家作業卷｜高中補充 拋體運動');
+assert.equal(c.getDailyPostExamLinkDisplayName(homeworkFile, '回家作業卷', 'full'), '回家作業卷｜' + homeworkFile);
 // Display labels must not replace the Office preview/download filename.
 assert(ebook.includes('SVG.document, BEAR_SUBJECT === "/science" ? name : "")'));
 const linkContext = { decodeBasicHtmlEntities: String, escapeHtmlAttr: String, isOfficeDocumentLink: name => name.endsWith('.doc'), getOfficePreviewUrl: () => 'https://preview.test', getOfficeDownloadFileName: name => name };
 vm.createContext(linkContext); vm.runInContext(extract(ebook, 'renderParsedLink'), linkContext);
 const link = linkContext.renderParsedLink('補考卷｜大氣', 'https://files.test/opaque', 'btn-link', '<svg></svg>', samples[2][0]);
 assert(link.includes('https://preview.test') && link.includes('data-file-name="' + samples[2][0] + '"') && link.includes('<svg></svg>補考卷｜大氣'));
+const homeworkLink = linkContext.renderParsedLink(c.getDailyPostExamLinkDisplayName(homeworkFile, '回家作業卷'), 'https://files.test/opaque', 'btn-important-tag', '<svg></svg>', homeworkFile);
+assert(homeworkLink.includes('data-file-name="' + homeworkFile + '"') && homeworkLink.includes('<svg></svg>回家作業卷｜高中補充 拋體運動'));
 const Plan = require('../class_session_plan');
 assert.equal(Plan.publicOptions({ links: { examTitleMode: 'full' } }).links.examTitleMode, 'full');
 for (const name of ['parseDailyPostDisplayOptions', 'getDailyPostDisplayOptions', 'getDailyPostQuizOptions']) vm.runInContext(extract(ebook, name), c);
