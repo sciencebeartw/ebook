@@ -2507,6 +2507,8 @@
             color: white;
         }
 
+        .textbook-link-part { display: inline-block; max-width: 100%; vertical-align: top; }
+
         /* 學生上傳的連結按鈕 (小標籤) */
         .btn-small-tag {
             display: inline-block;
@@ -7606,6 +7608,11 @@
             var rawUrl = decodeBasicHtmlEntities(url);
             var safeRawUrl = escapeHtmlAttr(rawUrl);
             var safeName = name || "連結";
+            if (/^課本作業｜/.test(safeName)) {
+                safeName = safeName.split("｜").map(function(part, index) {
+                    return '<span class="textbook-link-part">' + (index ? "｜" : "") + part + '</span>';
+                }).join("");
+            }
             var icon = iconHtml || "";
             var fileName = originalName || name;
             if (isOfficeDocumentLink(fileName, rawUrl)) {
@@ -7688,7 +7695,7 @@
                 var name = match[1] || "連結";
                 var url = match[2] || "";
                 if (name.indexOf("作業") > -1 || name.indexOf("上傳") > -1) {
-                    html += renderParsedLink(name, url, "btn-important-tag", SVG.upload);
+                    html += renderParsedLink(name, url, "btn-important-tag", /^課本作業｜/.test(name) ? SVG.document : SVG.upload);
                 } else if (name.indexOf("附件") > -1) {
                     html += renderParsedLink(name, url, "btn-small-tag", SVG.clip);
                 } else {
@@ -11419,8 +11426,9 @@
                             parsed += renderParsedLink(getDailyPostExamLinkDisplayName(name, linkPrefix, (getDailyPostDisplayOptions(post).links || {}).examTitleMode), url, "btn-link", SVG.document, BEAR_SUBJECT === "/science" ? name : "");
                         } else if (linkMode === "homework" || (linkMode === "auto" && (upload || homework))) {
                             var paper = !upload && (/卷/.test(name) || /\.pdf(?:$|[?#])/i.test(url) || /\.pdf$/i.test(name));
-                            var homeworkName = paper ? prependDailyPostLinkPurpose(name, "回家作業卷") : getDailyPostUploadLinkDisplayName(name);
-                            parsed += renderParsedLink(homeworkName, url, "btn-important-tag" + colorClass, paper ? SVG.document : SVG.upload);
+                            var textbook = /^課本作業｜/.test(name);
+                            var homeworkName = textbook ? name : paper ? prependDailyPostLinkPurpose(name, "回家作業卷") : getDailyPostUploadLinkDisplayName(name);
+                            parsed += renderParsedLink(homeworkName, url, "btn-important-tag" + colorClass, (textbook || paper) ? SVG.document : SVG.upload);
                         } else if (linkMode === "supplement") {
                             parsed += renderParsedLink(getDailyPostLinkDisplayName(name, linkMode, customLabel), url, "btn-supplement-tag" + colorClass, SVG.clip);
                         } else if (linkMode === "general" || linkMode === "custom") {
