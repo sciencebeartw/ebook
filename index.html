@@ -8389,6 +8389,9 @@
                         title: sanitizeDashboardDraftPreviewText(post.title),
                         progress: sanitizeDashboardDraftPreviewText(post.progress),
                         hw1: sanitizeDashboardDraftPreviewText(post.hw1),
+                        giftedHomeworkPreview: post.giftedHomeworkPreview && typeof post.giftedHomeworkPreview.label === 'string'
+                            ? { label: sanitizeDashboardDraftPreviewText(post.giftedHomeworkPreview.label), dual: post.giftedHomeworkPreview.dual === true }
+                            : null,
                         hw2: sanitizeDashboardDraftPreviewText(post.hw2),
                         quiz: sanitizeDashboardDraftPreviewText(post.quiz),
                         makeup: sanitizeDashboardDraftPreviewText(post.makeup),
@@ -8425,6 +8428,19 @@
                     };
                 })
             };
+        }
+
+        // 草稿僅顯示按鈕外觀，沒有作答網址；正式學生頁不使用此預覽資料。
+        function renderGiftedHomeworkDraftPreview(post) {
+            var preview = post && post.giftedHomeworkPreview;
+            if (!isDashboardDraftPreviewMode || !preview || !/^課本作業｜/.test(preview.label || '')) return '';
+            var labels = [preview.label];
+            if (preview.dual) labels.push('課本作業｜Google表單・整章');
+            return '<div class="gifted-homework-draft-preview">' + labels.map(function(label) {
+                return '<span class="btn-important-tag" role="button" aria-disabled="true" style="cursor:default">' + SVG.document + label.split('｜').map(function(part, index) {
+                    return '<span class="textbook-link-part">' + (index ? '｜' : '') + escapeHtml(part) + '</span>';
+                }).join('') + '</span>';
+            }).join('') + '<div style="font-size:0.85rem;color:#64748b;margin-top:6px">按鈕外觀預覽，完成聯絡簿儲存後開放作答。</div></div>';
         }
 
         function loadDashboardDraftPreviewPayload() {
@@ -11672,6 +11688,7 @@
                 homeworkItems.forEach(function(item, hwIdx) {
                     var homeworkNoteMode = getDailyPostHomeworkNoteMode(post);
                     var extra = homeworkNoteMode === "show" && hwIdx !== homeworkItems.length - 1 ? "" : buildHomeworkUploadNote(post, item.val);
+                    if (item.key === "hw1") extra = renderGiftedHomeworkDraftPreview(post) + extra;
                     if (item.key === "hw2") extra += holidayHtml;
                     if (hwIdx === homeworkItems.length - 1) extra += buildHomeworkDoneButton(post);
                     fields.push({ label: item.label, val: item.val, extra: extra, linkMode: getDailyPostHomeworkLinkMode(post, item.key), customLabel: getDailyPostHomeworkCustomLabel(post, item.key), color: getDailyPostLinkColor(post, item.key) });
