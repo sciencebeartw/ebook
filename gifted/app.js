@@ -129,7 +129,10 @@ async function flush(){
   $('studentStatus').textContent='尚未確認送出結果；原答案與送出編號已保留，請按重試。';paint();throw e;
  }
  if(response.status==='submitted'){
-  task.submission=response.result;task.revision=response.result.revision;showReceipt();paint();
+  task.submission=response.result;task.revision=response.result.revision;
+  // 交卷後不重載 task，仍須讓更正表單取得本次正式送出的完整答案。
+  task.answers=Object.fromEntries(task.questions.map(q=>{const value=answers[q.id];return [q.id,q.type==='manual'?value||'':Array.isArray(value)?[...value].sort():value?[value]:[]];}));
+  showReceipt();paint();
   GiftedCorrectionRequest.mount($('correctionRequest'),{task,scopeKey:transport?transport.sessionUid:actor,send:learning,reload:load});
   if(response.result.result)renderResult(response.result.result);else readResult();
   startSummary();$('summary').scrollIntoView({behavior:'instant',block:'start'});
