@@ -4843,8 +4843,9 @@
   <script src="exam_identity_app.js?v=20260712_exam_identity_phase1"></script>
   <script src="ebook_lifecycle_app.js?v=20260815_full_year_date_v1"></script>
   <script src="ebook_promotion_app.js?v=20260812_legacy_transfer_student_key"></script>
+  <script src="gifted_assignment_visibility.js?v=20261011-contactbook1"></script>
   <script src="gifted_homework_full_scores.js?v=20260720_geo3_question_count_v2"></script>
-  <script src="ebook_pending_tasks_app.js?v=20261011-homework-score"></script>
+  <script src="ebook_pending_tasks_app.js?v=20261011-contactbook1-20261011-homework-score"></script>
   <script src="ebook_feedback_threads_app.js?v=20260822_feedback_threads_v1"></script>
   <script src="ebook_score_distribution.js?v=equal-high-score-chart-20260922"></script>
 
@@ -5760,6 +5761,7 @@
         var fullGradeList = [];
         for (let col in (examsObj || {})) {
             const rawData = examsObj[col] || {};
+            if (!GiftedAssignmentVisibility.visible(rawData, options.dailyPosts || {}, classKey)) continue;
             const eData = Object.assign({}, rawData, {
                 dist: Array.isArray(rawData.dist) ? rawData.dist.slice() : rawData.dist,
                 labels: Array.isArray(rawData.labels) ? rawData.labels.slice() : rawData.labels
@@ -5852,6 +5854,7 @@
             const isMissing = isNaN(studentScoreNum) && (eData.score || "").indexOf("尚未繳交") === -1;
 
             fullGradeList.push({
+                giftedPostId:eData.giftedPostId, giftedPlanId:eData.giftedPlanId, giftedSegmentId:eData.giftedSegmentId,
                 assessmentKind: eData.assessmentKind || '', scoreMax: eData.scoreMax, scoreUnit: eData.scoreUnit, reportEnabled: eData.reportEnabled, sourceAssignmentId: eData.sourceAssignmentId || '', dueAt: eData.dueAt || 0, originClassName: eData.originClassName || '',
                 className: presentation.className,
                 sourceClassKey: presentation.sourceClassKey,
@@ -5891,7 +5894,7 @@
         return fullGradeList;
     }
 
-    function buildGradeListFromClassExamMap(classExamMap, classKeys, currentClassKey, transferIndex, currentClassName, examIdByClassColKey, examCatalogEntriesByClassKey, transferChain, promotionContext, dateAnchorKeys, dateAnchorKeysByExamId) {
+    function buildGradeListFromClassExamMap(classExamMap, classKeys, currentClassKey, transferIndex, currentClassName, examIdByClassColKey, examCatalogEntriesByClassKey, transferChain, promotionContext, dateAnchorKeys, dateAnchorKeysByExamId, dailyPosts) {
         var grades = [];
         var trackedKeys = uniqueClassKeys(classKeys);
         transferChain = transferChain || EbookLifecycleApp.buildTransferChain(transferIndex || {}, currentClassKey, { maxDepth: 8 });
@@ -5907,6 +5910,7 @@
                 promotionContext: promotionContext,
                 dateAnchorKeys: dateAnchorKeys || [],
                 dateAnchorKeysByExamId: dateAnchorKeysByExamId || {},
+                dailyPosts: dailyPosts || {},
                 examIdByColKey: (examIdByClassColKey || {})[classKey] || {},
                 examCatalogEntriesByClassKey: examCatalogEntriesByClassKey || {}
             }));
@@ -6587,7 +6591,8 @@
                     result.studentTransferChain,
                     result.promotionContext,
                     result.gradeDateAnchorKeys,
-                    result.gradeDateAnchorKeysByExamId
+                    result.gradeDateAnchorKeysByExamId,
+                    postsObj
                 ),
                 result.studentEnrollmentIndex,
                 result.trackedClassKeys
@@ -9050,7 +9055,8 @@
                                 gData.studentTransferChain,
                                 gData.promotionContext,
                                 gData.gradeDateAnchorKeys,
-                                gData.gradeDateAnchorKeysByExamId
+                                gData.gradeDateAnchorKeysByExamId,
+                                gData.dailyPostSourceRoot
                             ),
                             gData.studentEnrollmentIndex || {},
                             trackedClassKeys
@@ -9140,6 +9146,7 @@
                             trackedClassKeys
                         );
                         
+                        rebuildGradesFromScopedSources();
                         remapDailyPostGrades(); // 從 grades 陣列進行映射
                         renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
                         schedulePendingTasksRecompute();

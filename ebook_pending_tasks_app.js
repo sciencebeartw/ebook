@@ -381,8 +381,9 @@
       .trim() || "待完成項目";
   }
 
-  function isCompletedHomeworkScore(rawScore) {
+  function isCompletedHomeworkScore(rawScore, exam) {
     var raw = text(rawScore).trim();
+    if (exam && Number(exam.homeworkMaxScore)>0 && /^\d+(?:\.\d+)?$/.test(raw)) return true;
     if (!raw || raw === "#N/A" || raw === "0" || raw === "０") return false;
     if (raw.indexOf("缺") > -1 || raw.indexOf("未") > -1) return false;
     return true;
@@ -1508,7 +1509,7 @@
         if (matchingDonePosts.some(function(donePost) {
           return !donePost.independentHolidayHomework && sourceMatches(sourceClassKey, donePost.sourceClassKey, helpers);
         })) return;
-        if (isCompletedHomeworkScore(exam && exam.score)) return;
+        if (isCompletedHomeworkScore(exam && exam.score, exam)) return;
         var homeworkEligibility = resolveGradeHomeworkTaskEligibility(options, policy, exam, context, helpers);
         if (!homeworkEligibility.allowed) return;
         pushIfActive(tasks, createTask({
