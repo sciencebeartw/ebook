@@ -9,7 +9,7 @@ vm.createContext(context);vm.runInContext(code,context);
 const auth={currentUser:{uid:'student-a',getIdToken:async()=> 'opaque'},onAuthStateChanged(fn){listeners.push(fn);return()=>{};}};
 const ready=extra=>context.GiftedEbook.ready({auth,result:{studentName:'合成學生'},mode:'remembered_session',...extra});
 const click=(href,extra={})=>{let prevented=false;events.click({button:0,target:{closest:()=>({href,hasAttribute:()=>false})},preventDefault(){prevented=true;},...extra});return prevented;};
-return {ui:context.GiftedEbook,ready,auth,values,elements,listeners,click,resolveFetch:()=>resolveFetch({ok:true,json:async()=>({privateResult:'owner-only'})})};}
+return {context,ui:context.GiftedEbook,ready,auth,values,elements,listeners,click,resolveFetch:()=>resolveFetch({ok:true,json:async()=>({privateResult:'owner-only'})})};}
 test('closed config and teacher preview never create a student frame',()=>{for(const extra of [{preview:true},{mode:'god_session'},{mode:'student_preview'},{result:{isAdmin:true} }]){const f=setup();f.ready(extra);assert.equal(f.elements.length,0);}const f=setup(false);f.ready();assert.equal(f.elements.length,0);});
 test('return then logout erases only current owner drafts; a different login cannot reuse the bridge',()=>{const f=setup();f.ready();f.values.set('gifted-answer-outbox-v1:student-a|p','old');f.values.set('gifted-correction-request:student-a:p','private');f.values.set('unrelated','retain');assert.throws(()=>f.ui.getTransport({}),/LOGIN_REQUIRED/);f.ui.close(false);assert.equal(f.values.size,3);f.ui.close(true);assert.deepEqual([...f.values.keys()],['unrelated']);f.ready();f.auth.currentUser={uid:'student-b',getIdToken:async()=> 'new'};assert.throws(()=>f.ui.getTransport({}),/LOGIN_REQUIRED/);});
 test('logout invalidates a request in flight and removes the frame before any stale response is returned',async()=>{const f=setup();f.ready();const frame=f.elements[0].children[1],transport=f.ui.getTransport(frame.contentWindow);const pending=transport.request({action:'task'});await new Promise(setImmediate);f.ui.close(true);f.resolveFetch();await assert.rejects(pending,/LOGIN_REQUIRED/);assert.equal(f.elements.length,0);assert.throws(()=>f.ui.getTransport(frame.contentWindow),/LOGIN_REQUIRED/);});
@@ -43,7 +43,7 @@ test('switching a segment retires the old frame and its in-flight transport',asy
 });
 
 test('verified Dashboard teacher view opens the first homework in place, read-only and without token storage',async()=>{
- for(const mode of ['god_session','student_preview']){
+ for(const mode of ['god_session']){
   const f=setup(true,false);f.ready({mode,teacherView:true,result:{isAdmin:true,studentName:'測試生'}});
   assert.equal(f.click('https://www.sciencebear.com.tw/ebook/?gifted='+plan),true);
   const frame=f.elements[0].children[1],transport=f.ui.getTransport(frame.contentWindow);
@@ -53,4 +53,18 @@ test('verified Dashboard teacher view opens the first homework in place, read-on
   await f.elements[0].children[0].onclick();assert.equal(f.elements.length,0);
  }
  const f=setup();f.ready({teacherView:true,mode:'god_session',preview:true});assert.equal(f.elements.length,0);
+});
+
+test('Dashboard student preview prompts before formal actions, preserves cancellation and forwards activity',async()=>{
+ const f=setup(true,false);f.ready({mode:'student_preview',teacherView:true,result:{studentName:'測試生'}});
+ assert.equal(f.click('https://www.sciencebear.com.tw/ebook/?gifted='+plan),true);
+ const frame=f.elements[0].children[1],transport=f.ui.getTransport(frame.contentWindow);
+ assert.equal(transport.readOnly,false);assert.equal(transport.studentPreview,true);
+ const prompts=[];let accepted=false,activity=0;
+ f.context.confirmStudentPreviewAction=async label=>{prompts.push(label);return accepted;};f.context.markEbookGodSessionActivity=()=>activity++;
+ assert.equal(await transport.confirmWrite('submit'),false);assert.match(prompts[0],/正式成績/);
+ accepted=true;assert.equal(await transport.confirmWrite('submit'),true);assert.equal(await transport.confirmWrite('requestCorrection'),true);
+ transport.activity();assert.equal(activity,1);
+ const pending=transport.request({action:'submit'});await new Promise(setImmediate);f.resolveFetch();await pending;
+ f.ui.close(true);await assert.rejects(transport.confirmWrite('submit'),/LOGIN_REQUIRED/);assert.throws(()=>transport.activity(),/LOGIN_REQUIRED/);
 });

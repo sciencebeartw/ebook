@@ -19,7 +19,7 @@
   const user=context.auth?.currentUser;
   const teacherView=context.teacherView===true&&['god_session','student_preview'].includes(context.mode);
   if(!user||context.preview||(!teacherView&&(context.result?.isAdmin||['admin_view','god_session','student_preview','dashboard_draft_preview'].includes(context.mode)))){close(true);return;}
-  studentSession={auth:context.auth,uid:user.uid,readOnly:teacherView,studentName:String(context.result.studentName||'')};
+  studentSession={auth:context.auth,uid:user.uid,readOnly:teacherView&&context.mode==='god_session',studentPreview:teacherView&&context.mode==='student_preview',studentName:String(context.result.studentName||'')};
   if(query.get('gifted')){const assignment=assignmentFromHref(location.href);if(assignment)openAssignment(assignment);}
  }
  function openAssignment(assignment){
@@ -33,7 +33,7 @@
   const back=document.createElement('button');back.type='button';back.textContent='返回聯絡簿';
   back.onclick=async()=>{if(session.readOnly){close(false);return;}const ok=await root.swalConfirm('返回聯絡簿','尚未送出的答案會保留在此裝置，下次可繼續填寫。');if(ok)close(false);};
   frame=document.createElement('iframe');frame.title='資優自然課本作業';
-  const url=new URL('gifted/index.html',location.href);url.searchParams.set('v','20261011-teacher-direct');url.searchParams.set('plan',assignment.planId);url.searchParams.set('segment',assignment.segmentId);
+  const url=new URL('gifted/index.html',location.href);url.searchParams.set('v','20261011-three-entry');url.searchParams.set('plan',assignment.planId);url.searchParams.set('segment',assignment.segmentId);
   overlay.append(back,frame);document.body.append(overlay);document.body.classList.add('gifted-entry-open');frame.src=url.href;back.focus();
   unsubscribe=auth.onAuthStateChanged(next=>{if(next?.uid!==owner)close(true);});
   return true;
@@ -49,7 +49,11 @@
   if(!frame||frame.contentWindow!==caller||!owner||auth.currentUser?.uid!==owner)throw Error('LOGIN_REQUIRED');
   const uid=owner,epoch=generation,endpoint=config.studentApi;
   function valid(){if(epoch!==generation||owner!==uid||auth?.currentUser?.uid!==uid)throw Error('LOGIN_REQUIRED');}
-  return Object.freeze({sessionUid:uid,studentName,readOnly:studentSession.readOnly,async request(body){
+  const preview=studentSession.studentPreview;
+  return Object.freeze({sessionUid:uid,studentName,readOnly:studentSession.readOnly,studentPreview:preview,
+   activity(){valid();root.markEbookGodSessionActivity?.();},
+   async confirmWrite(action){valid();if(!preview)return true;const ok=await root.confirmStudentPreviewAction(action==='requestCorrection'?'送出正式答案更正申請':action==='draft'?'儲存作業草稿':'提交本週作業並登記正式成績');valid();return ok;},
+   async request(body){
    if(studentSession?.readOnly&&!['task','receipt','result','summary'].includes(body.action))throw Error('TEACHER_VIEW_READ_ONLY');
    valid();const token=await auth.currentUser.getIdToken();valid();
    const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify(body),signal:AbortSignal.timeout(30000)});

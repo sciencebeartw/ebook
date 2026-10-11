@@ -1,18 +1,18 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const source=fs.readFileSync(require.resolve('../../gifted/app.js'),'utf8');
-function setup(response){
- const nodes=new Map(),requests=[],correctionMounts=[];
+function setup(response,accept=true){
+ const nodes=new Map(),requests=[],correctionMounts=[],queued=[],confirmations=[];
  const node=id=>{if(!nodes.has(id))nodes.set(id,{hidden:false,disabled:false,innerHTML:'',textContent:'',querySelectorAll:()=>[],scrollIntoView(){this.scrolled=true;}});return nodes.get(id);};
  const context={URLSearchParams,location:{search:'?plan=p&segment=s'},document:{getElementById:node,querySelectorAll:()=>[],visibilityState:'visible'},navigator:{onLine:true},
  structuredClone,localStorage:{},BearStudentMedia:{bind(){},reset(){},html:()=>''},GiftedCorrectionRequest:{mount(host,{task}){correctionMounts.push(structuredClone(task.answers));}},GiftedResult:{...require('../../gifted/gifted-result.js'),mount(){}},
- GiftedGradeRefresh:{create:({read})=>({refresh:read,dispose(){}})},GiftedStudentTransport:{sessionUid:'test',studentName:'合成學生',request:async req=>{requests.push(req.action);if(req.action==='summary')return new Promise(()=>{});throw Error('temporary');}}};
+ GiftedGradeRefresh:{create:({read})=>({refresh:read,dispose(){}})},GiftedStudentTransport:{confirmWrite:async action=>{confirmations.push(action);return accept;},sessionUid:'test',studentName:'合成學生',request:async req=>{requests.push(req.action);if(req.action==='summary')return new Promise(()=>{});throw Error('temporary');}}};
  context.window=context;vm.createContext(context);
- vm.runInContext(source.slice(0,source.indexOf('if(transport){initStudent();'))+'globalThis.hooks={flush,readResult,renderSummary,renderResult,paintAnswerGrid,setup:(t,b)=>{task=t;box=b;answers=t.answers;}};})();',context);
+ vm.runInContext(source.slice(0,source.indexOf('if(transport){initStudent();'))+'globalThis.hooks={saveOrSubmit,flush,readResult,renderSummary,renderResult,paintAnswerGrid,setup:(t,b)=>{task=t;box=b;answers=t.answers;}};})();',context);
  const task={planId:'p',segmentId:'s',scopeRevision:'r',classId:'test',revision:0,target:{questionCount:2},answers:{q1:'B',q2:'A'},questions:[{id:'q1',sourceIndex:1,prompt:'題目',choices:['A','B'],options:[],media:[]},{id:'q2',sourceIndex:2,prompt:'題目',choices:['A','B'],options:[],media:[]}]};
  const result={score:{earnedPoints:1,maxPoints:2,correctCount:1,wrongCount:1,blankCount:0},items:[{questionId:'q2',answer:['A'],correctAnswers:['A'],outcome:'correct'},{questionId:'q1',answer:['B'],correctAnswers:['A'],outcome:'wrong'}]};
- context.hooks.setup(task,{snapshot:()=>({}),flush:async()=>response||{status:'submitted',result:{status:'submitted',receiptId:'r',revision:1,result}}});
- return {hooks:context.hooks,node,requests,task,result,correctionMounts};
+ context.hooks.setup(task,{snapshot:()=>({}),enqueue:(...args)=>queued.push(args),flush:async()=>response||{status:'submitted',result:{status:'submitted',receiptId:'r',revision:1,result}}});
+ return {hooks:context.hooks,node,requests,task,result,correctionMounts,queued,confirmations};
 }
 test('submission paints score and wrong questions immediately while background summary stays unresolved',async()=>{
  const f=setup();await f.hooks.flush();
@@ -64,4 +64,11 @@ test('result grid stays hidden until submission exists and clears correction hin
  f.task.submission={receiptId:'r'};f.result.items.forEach(item=>item.outcome='correct');f.hooks.renderResult(f.result);
  assert.doesNotMatch(f.node('answerGrid').innerHTML,/needs-correction|正確/);assert.equal(f.node('answerGridHelp').hidden,true);
  assert.equal((f.node('answerGrid').innerHTML.match(/class="answered"/g)||[]).length,2);
+});
+
+test('cancelled Dashboard submission never queues or sends answers, confirmation occurs before a successful submit',async()=>{
+ const cancelled=setup(undefined,false);await cancelled.hooks.saveOrSubmit('submit');
+ assert.deepEqual(cancelled.confirmations,['submit']);assert.equal(cancelled.queued.length,0);assert.equal(cancelled.requests.length,0);assert.equal(cancelled.task.submission,undefined);
+ const accepted=setup();await accepted.hooks.saveOrSubmit('submit');
+ assert.deepEqual(accepted.confirmations,['submit']);assert.equal(accepted.queued.length,1);assert.equal(accepted.queued[0][0],'submit');assert.equal(accepted.task.submission.receiptId,'r');
 });
