@@ -17,3 +17,5 @@ test('actual grade list function hides unpublished columns, restores them on pub
  const published={...post,reserveTime:''};assert.equal(ctx.buildGradeListFromExams(exams,{classKey:cls,dailyPosts:{post1:published}}).length,2);
  assert.equal(ctx.buildGradeListFromExams(exams,{classKey:cls,dailyPosts:{post1:{...published,hw1:''}}}).length,1);
 });
+
+test('merged teacher post maps retain the original row identity',()=>{const v=require('../gifted_assignment_visibility');const cls='115小六資優自然週日下午班',plan='hw_abc';const grade={giftedPostId:'p1',giftedPlanId:plan,giftedSegmentId:'week-1'};assert.equal(v.visible(grade,{[cls+'__p1']:{_rowKey:'p1',sourceClassKey:cls,hw1:'[課本作業｜19題]https://www.sciencebear.com.tw/ebook/?gifted='+plan+'&segment=week-1'}},cls),true);});
