@@ -157,7 +157,7 @@
             status: o.status, revision: o.revision, at: o.startAt - lead,
             originalAt: at(o.originalDate, p.startTime) - lead, occurrence: o };
     }
-    function isSelfMarked(exam) { return !!exam && (exam.assessmentKind === 'holiday_self_marked' || !!exam.sourceAssignmentId); }
+    function isSelfMarked(exam) { return !!exam && (exam.assessmentKind === 'holiday_self_marked' || (!!exam.sourceAssignmentId && !/^gifted_library_/.test(exam.assessmentKind || ''))); }
     function holidayState(assignment, progress, now) {
         if (progress && (progress.reportedAt || ['synced', 'received', 'pending_review'].includes(progress.status))) return progress.status === 'synced' ? 'reported' : 'awaiting_review';
         if (!assignment || !Number.isFinite(Number(assignment.dueAt))) return 'unconfirmed';
@@ -170,7 +170,9 @@
             if (/^(answerUrl|answerURL|answerPdfUrl|private|privateAnswer|answerVersionHistory)$/.test(k)) delete obj[k];
             else if (obj[k] && typeof obj[k] === 'object') strip(obj[k]);
         }); }
-        strip(o); return o;
+        strip(o);
+        if (o.giftedLibrary && o.giftedLibrary.studentRelease !== true) delete o.giftedLibrary;
+        return o;
     }
     function validScore(value) {
         if (typeof value === 'string' && !/^\d{1,3}(?:\.\d{1,2})?$/.test(value.trim())) return null;

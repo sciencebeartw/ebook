@@ -83,7 +83,7 @@
         date: date,
         title: title,
         updatedAt: updatedAt,
-        ...(item.assessmentKind || item.sourceAssignmentId ? { assessmentKind: item.assessmentKind || '', sourceAssignmentId: item.sourceAssignmentId || '', sourcePostId: item.sourcePostId || '', sourceOccurrenceId: item.sourceOccurrenceId || '', dueOccurrenceId: item.dueOccurrenceId || '', dueAt: Number(item.dueAt || 0) } : {})
+        ...(item.assessmentKind || item.sourceAssignmentId ? { assessmentKind: item.assessmentKind || '', sourceAssignmentId: item.sourceAssignmentId || '', sourcePostId: item.sourcePostId || '', sourceOccurrenceId: item.sourceOccurrenceId || '', dueOccurrenceId: item.dueOccurrenceId || '', dueAt: Number(item.dueAt || 0), ...(item.assessmentKind && /^gifted_library_/.test(item.assessmentKind) ? {libraryChapterId:item.libraryChapterId,libraryRevision:item.libraryRevision,previewOnly:item.previewOnly,studentRelease:item.studentRelease,scoreMax:item.scoreMax,scoreUnit:item.scoreUnit,homeworkMaxScore:item.homeworkMaxScore} : {}) } : {})
       };
     });
 

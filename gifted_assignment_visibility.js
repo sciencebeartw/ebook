@@ -2,6 +2,7 @@
 (function(root,factory){var api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.GiftedAssignmentVisibility=api;})(typeof globalThis==='object'?globalThis:this,function(){'use strict';
  function visible(grade,posts,className,now){
   if(!grade)return true;
+  if(/^gifted_library_(review|mock)$/.test(grade.assessmentKind||'') && (grade.studentRelease!==true || grade.previewOnly!==false))return false;
   var postId=grade.giftedPostId || grade.sourcePostId;
   if(!postId)return true;
   var rows=Array.isArray(posts)?posts:Object.keys(posts||{}).map(function(id){return Object.assign({id:id},posts[id]);});
