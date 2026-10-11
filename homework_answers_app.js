@@ -58,7 +58,7 @@
         return '<form class="homework-report-form" data-homework-report="' + esc(getHomeworkDoneDomKey(post)) + '" data-answer-id="' + esc(a.id) + '">' +
             '<label for="' + esc(inputId) + '">' + (a.scoreUnit === '題' ? '對答案後，回報答對幾大題' : '對答案後，回報分數') + '</label>' +
             '<div class="homework-report-fields"><input id="' + esc(inputId) + '" type="number" inputmode="decimal" min="0" max="' + a.scoreMax + '" step="' + (a.scoreUnit === '題' ? '1' : '0.01') + '" required placeholder="0" value="' + esc(drafts[k] || '') + '"' + (sending[k] ? ' disabled' : '') + '><span>／' + a.scoreMax + ' ' + esc(a.scoreUnit) + '</span><button type="submit"' + (sending[k] ? ' disabled aria-busy="true"' : '') + '>' + (sending[k] ? '回報中…' : '送出回報') + '</button></div>' +
-            '<div class="homework-report-status" role="status">' + esc(status || '送出後由老師審核；有需要更正請留言告訴老師。') + '</div></form>';
+            (status ? '<div class="homework-report-status" role="status">' + esc(status) + '</div>' : '') + '</form>';
     }
     function findPost(domKey) { return (gData && gData.dailyPost || []).find(function(p) { return getHomeworkDoneDomKey(p) === domKey; }); }
     document.addEventListener('input', function(event) {
