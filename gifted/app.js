@@ -1,7 +1,7 @@
 (function(){'use strict';
 const $=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const query=new URLSearchParams(location.search),transport=window.GiftedStudentTransport;let actor,task,box,answers={},questionIndex=0,busy=false,tabId,releaseTab,conflictTask;
-let mediaRefresh,mediaRetryAt=0,gradeRefresh;
+let mediaRefresh,mediaRetryAt=0,gradeRefresh,submissionResult=null,latestSummary=null,resultRead=null;
 // 延用 v17 的分頁鎖：重新整理保留同一草稿；複製分頁取得獨立編輯副本。
 async function reserveTab(){
  if(tabId)return;
@@ -46,36 +46,82 @@ function paint(){BearStudentMedia.bind($('questionCard'));BearStudentMedia.reset
  $('answerGrid').innerHTML=task.questions.map((q,i)=>`<button class="${one(answers[q.id])?'answered':''}" data-index="${i}" aria-current="${i===questionIndex}">${q.sourceIndex} ${one(answers[q.id])?String.fromCharCode(65+q.choices.indexOf(one(answers[q.id]))):'—'}</button>`).join('');$('answerGrid').querySelectorAll('button').forEach(el=>el.onclick=()=>{questionIndex=Number(el.dataset.index);paint();});
  $('previous').disabled=questionIndex===0;$('next').disabled=questionIndex===task.questions.length-1;controls();
 }
-function renderSummary(v){const s=v.student,g=v.grades.find(g=>g.targetId===task.segmentId),done=g?.status==='completed',submitted=!!task.submission;
- const labels={waiting_answers:'答案已收到，補齊前段後會自動計算全章成績。',waiting_column:'答案已收到，老師建立作業欄後會自動登記。',waiting_grading:'答案已收到，等待老師批改。',pending:'成績登記中，完成後會自動顯示，不必重新提交。',sync_pending:'成績已登記，正在同步顯示。',blocked:'答案已收到，成績需要老師確認，請勿重複提交。'};
- $('summary').innerHTML=`<div class="score-cards"><div class="score-card ${done?'':submitted?'processing':'pending'}"><strong>本次作業成績</strong><b>${done?esc(g.receipt.score)+' <small>/ '+task.target.questionCount+' 題</small>':submitted?'已成功送出':'尚未提交'}</b><p>${done?'已自動登記，不必另外回報。':labels[g?.status]||(submitted?labels.pending:'先完成紙本，再填寫本次答案。')}</p></div><div class="score-card"><strong>本章完成進度</strong><b>${s.submittedQuestionCount} <small>/ ${s.requiredQuestionCount} 題</small></b><p>${s.status==='complete'?'全章已交齊 · '+s.finalScore+' 分':'分段完成後，自動合計全章'}</p></div></div>`;
- $('gradeRefreshStatus').textContent=done?'成績已確認。':submitted?'答案已保存，不需重複送出。':'';
+function renderSummary(v){
+ if(v)latestSummary=v;
+ const s=latestSummary?.student,g=latestSummary?.grades.find(g=>g.targetId===task.segmentId),done=g?.status==='completed',submitted=!!task.submission,score=submissionResult?.score;
+ const labels={waiting_answers:'補齊前段答案後，會自動登記全章成績。',waiting_column:'老師建立作業欄後，會自動登記。',waiting_grading:'等待老師批改。',pending:'成績正在背景登記，不必重新提交。',sync_pending:'成績已登記，正在同步顯示。',blocked:'成績登記需要老師確認，請勿重複提交。'};
+ const value=score?score.earnedPoints===null?'待老師批改':esc(score.earnedPoints)+' <small>/ '+esc(score.maxPoints)+' 分</small>':done?esc(g.receipt.score)+' <small>/ '+task.target.questionCount+' 分</small>':submitted?'已成功送出':'尚未提交';
+ $('summary').innerHTML=`<div class="score-cards"><div class="score-card ${score||done?'':submitted?'processing':'pending'}"><strong>${score?'本次作答成績':'本次作業成績'}</strong><b>${value}</b><p>${score&&score.earnedPoints!==null?'答對 '+score.correctCount+' 題 · 答錯 '+score.wrongCount+' 題'+(score.blankCount?' · 留白 '+score.blankCount+' 題':''):submitted?'答案已保存，不必重新提交。':'先完成紙本，再填寫本次答案。'}</p></div><div class="score-card"><strong>本章完成進度</strong><b>${s?s.submittedQuestionCount+' <small>/ '+s.requiredQuestionCount+' 題</small>':'確認中'}</b><p>${s?.status==='complete'?'全章已交齊 · '+s.finalScore+' 分':'分段完成後，自動合計全章'}</p></div></div>`;
+ $('gradeRefreshStatus').textContent=done?'成績已自動登記，不必另外回報。':submitted?labels[g?.status]||labels.pending:'';
  $('refreshSummary').hidden=done||!submitted;
  return submitted&&(!g||['not_submitted','pending','sync_pending'].includes(g.status));
 }
 function startSummary(){
- gradeRefresh?.dispose();
- // 收件與登分分開呈現；登分查詢失敗不能把已收件顯示為送出失敗。
- $('summary').innerHTML='<div class="submission-state"><strong>'+ (task.submission?'已成功送出':'尚未提交')+'</strong><p>'+(task.submission?'答案已收到，正在確認成績；不用重新提交。':'先完成紙本，再填寫本次答案。')+'</p></div>';
- $('gradeRefreshStatus').textContent='';$('refreshSummary').hidden=!task.submission;
+ gradeRefresh?.dispose();renderSummary();
  gradeRefresh=GiftedGradeRefresh.create({read:()=>student('summary'),render:renderSummary,
   isVisible:()=>document.visibilityState!=='hidden',isOnline:()=>navigator.onLine!==false,
-  onError:()=>{$('gradeRefreshStatus').textContent=task.submission?'答案已收到，目前暫時無法查詢成績；恢復連線後會再確認。':'目前無法查詢登記狀態，已填答案仍保留。';return !!task.submission;},
-  onWaiting:reason=>{if(task.submission)$('gradeRefreshStatus').textContent=reason==='delayed'?'答案已收到，登分時間較長；不用重交，稍後回到作業頁即可查看。':'答案已收到，回到頁面或恢復網路後會繼續確認成績。';}
+  onError:()=>{$('gradeRefreshStatus').textContent=task.submission?'答案已收到，暫時無法確認背景登記進度；不必重新提交。':'目前無法查詢登記狀態，已填答案仍保留。';return !!task.submission;},
+  onWaiting:reason=>{if(task.submission)$('gradeRefreshStatus').textContent=reason==='delayed'?'背景登記時間較長；不必重交，稍後會繼續確認。':'回到頁面或恢復網路後，會繼續確認背景登記。';}
  });
  return gradeRefresh.refresh();
 }
+function viewQuestion(id){const i=task.questions.findIndex(q=>q.id===id);if(i>=0){questionIndex=i;paint();$('questionCard').scrollIntoView({behavior:'smooth',block:'start'});}}
+function showReceipt(){
+ $('resultSection').hidden=false;$('submitSection').hidden=true;
+ $('receipt').textContent='已成功送出 '+task.questions.length+' 題！請用紅筆逐題訂正在課本上；未訂正仍視同作業未完成。';
+ $('studentStatus').textContent='本段已提交，首次作答已保存；誤填時可在下方申請更正，待老師核准。';
+}
+function renderResult(result){
+ submissionResult=result;showReceipt();renderSummary();$('reloadResult').hidden=true;$('resultStatus').textContent='';
+ const outcomes={correct:'答對',wrong:'答錯',blank:'留白',pending:'待老師批改'};
+ const items=[...result.items].sort((a,b)=>(a.outcome==='correct')-(b.outcome==='correct'));
+ const wrong=items.filter(i=>['wrong','blank'].includes(i.outcome)).length;
+ $('resultTitle').textContent=wrong?'需要訂正 '+wrong+' 題':'每題作答結果';
+ $('result').innerHTML=items.map(item=>{const q=task.questions.find(q=>q.id===item.questionId);return `<button type="button" data-question-id="${esc(q.id)}" class="result ${['wrong','blank'].includes(item.outcome)?'wrong':''}">章內第 ${q.sourceIndex} 題 · ${outcomes[item.outcome]}</button>`;}).join('');
+ $('result').querySelectorAll('[data-question-id]').forEach(el=>el.onclick=()=>viewQuestion(el.dataset.questionId));
+ if(window.GiftedResult)GiftedResult.mount($('result'),result,task,{viewQuestion});
+ if(result.correction)$('studentStatus').textContent='老師已更正 · '+new Date(result.correction.correctedAt).toLocaleString('zh-TW')+' · '+result.correction.reason;
+}
+function readResult(){
+ if(resultRead?.task===task)return resultRead.promise;
+ const original=task;showReceipt();$('reloadResult').hidden=true;$('resultStatus').textContent='正在讀取本次分數與錯題…';
+ const entry={task:original};resultRead=entry;
+ entry.promise=learning({action:'result',planId:task.planId,segmentId:task.segmentId}).then(result=>{if(task===original)renderResult(result);}).catch(e=>{
+  if(task!==original)return;
+  $('resultStatus').textContent=e.message==='ANSWERS_NOT_RELEASED'?'本次結果將於老師開放後顯示；答案已保存。':'答案已成功保存，逐題結果暫時無法載入；請重新載入結果，不必重交。';
+  $('reloadResult').hidden=e.message==='ANSWERS_NOT_RELEASED';
+ }).finally(()=>{if(resultRead===entry)resultRead=null;});
+ return entry.promise;
+}
 function showConflict(server){conflictTask=server;$('conflict').hidden=false;const local=box.snapshot().draft?.answers||{};const label=(q,v)=>{const n=q.choices.indexOf(one(v));return n<0?'未答':String.fromCharCode(65+n);};const differences=task.questions.filter(q=>one(local[q.id])!==one(server.answers[q.id]));$('comparison').innerHTML=differences.length?differences.map(q=>'<p>第 '+q.sourceIndex+' 題：本機 '+label(q,local[q.id])+'／已保存 '+label(q,server.answers[q.id])+'</p>').join(''):'<p>選項相同，保存版本不同；請選擇要保留的版本。</p>';$('studentStatus').textContent='另一個視窗或裝置已更新答案；請先比較版本。';controls();}
-async function load(){gradeRefresh?.dispose();box?.close({erase:false});task=await student('task');conflictTask=null;$('conflict').hidden=true;$('workspace').hidden=false;$('login').hidden=true;$('studentName').textContent=task.classId+' · '+(transport?transport.studentName:'測試學生 '+actor.toUpperCase());$('studentTitle').innerHTML=esc(task.chapterLabel)+'<span class="scope-label">'+esc(task.label)+'</span>';$('assignmentInfo').textContent='本次 '+task.questions.length+' 題 · '+(task.target.includesPreviousAnswers?'會沿用上週答案，合併計算全章。':'作業欄只登記本次範圍。');
- box=GiftedAnswerOutbox.create({storage:localStorage,scope:{sessionUid:transport?transport.sessionUid:'v21-test-'+(query.get('fixture')||'default')+'-'+actor,planId:task.planId,segmentId:task.segmentId,scopeRevision:task.scopeRevision,tabId},transport:learning});const local=box.snapshot();answers=structuredClone(!task.submission&&local.draft?local.draft.answers:task.answers);
+async function load(){gradeRefresh?.dispose();box?.close({erase:false});task=await student('task');submissionResult=null;latestSummary=null;$('result').innerHTML='';$('receipt').textContent='';$('resultStatus').textContent='';$('resultSection').hidden=!task.submission;$('submitSection').hidden=!!task.submission;conflictTask=null;$('conflict').hidden=true;$('workspace').hidden=false;$('login').hidden=true;$('studentName').textContent=task.classId+' · '+(transport?transport.studentName:'測試學生 '+actor.toUpperCase());$('studentTitle').innerHTML=esc(task.chapterLabel)+'<span class="scope-label">'+esc(task.label)+'</span>';$('assignmentInfo').textContent='本次 '+task.questions.length+' 題 · '+(task.target.includesPreviousAnswers?'會沿用上週答案，合併計算全章。':'作業欄只登記本次範圍。');
+ box=GiftedAnswerOutbox.create({storage:localStorage,scope:{sessionUid:transport?transport.sessionUid:'v21-test-'+(query.get('fixture')||'default')+'-'+actor,planId:task.planId,segmentId:task.segmentId,scopeRevision:task.scopeRevision,tabId},transport:learning});
+ // 收件回覆曾遺失，但重新整理已取得正式收據時，清掉待重送狀態；不重寫伺服器首答。
+ if(task.submission&&box.snapshot().pending)box.resolveConflict(task,'server');
+ const local=box.snapshot();answers=structuredClone(!task.submission&&local.draft?local.draft.answers:task.answers);
  if(local.pending)$('studentStatus').textContent='上次送出尚未確認；請重試原本的送出，不必重填。';
  else if(local.draft&&!task.submission&&local.draft.expectedRevision!==task.revision)showConflict(task);
  else $('studentStatus').textContent=local.draft&&!task.submission?'已恢復本機答案。':'可以開始作答。';
- $('question').innerHTML=task.questions.map(q=>`<option value="${q.id}">第 ${q.sourceIndex} 題</option>`).join('');paint();await startSummary();
+ $('question').innerHTML=task.questions.map(q=>`<option value="${q.id}">第 ${q.sourceIndex} 題</option>`).join('');paint();startSummary();
  GiftedCorrectionRequest.mount($('correctionRequest'),{task,scopeKey:transport?transport.sessionUid:actor,send:learning,reload:load});
- if(task.submission){const result=await learning({action:'result',planId:task.planId,segmentId:task.segmentId});$('receipt').textContent='已成功送出 '+task.questions.length+' 題！請查看每題結果，並用紅筆逐題訂正在課本上；未訂正仍視同作業未完成。';$('result').innerHTML=result.items.map(item=>{const q=task.questions.find(q=>q.id===item.questionId);return `<span class="result ${item.outcome==='correct'?'':'wrong'}">第${q.sourceIndex}題 ${item.outcome==='correct'?'答對':item.outcome==='blank'?'留白':'答錯'}</span>`;}).join('');if(window.GiftedResult)GiftedResult.mount($('result'),result,task,{viewQuestion:id=>{const i=task.questions.findIndex(q=>q.id===id);if(i>=0){questionIndex=i;paint();$('questionCard').scrollIntoView({behavior:'smooth',block:'start'});}}});$('studentStatus').textContent=result.correction?'老師已更正 · '+new Date(result.correction.correctedAt).toLocaleString('zh-TW')+' · '+result.correction.reason:'本段已提交，首次作答已保存；誤填時可在下方申請更正，待老師核准。';}
+ if(task.submission)await readResult();
 }
-async function flush(){try{const result=await box.flush();if(['saved','submitted'].includes(result.status)){await load();if(result.status==='saved')$('studentStatus').textContent='草稿已保存至資料庫。';}}catch(e){if(['DRAFT_CONFLICT','FORMAL_ALREADY_SUBMITTED'].includes(e.message)){showConflict(await student('task'));return;}$('studentStatus').textContent='尚未確認送出結果；原答案與送出編號已保留，請按重試。';paint();throw e;}}
+async function flush(){
+ let response;
+ try{response=await box.flush();}catch(e){
+  if(['DRAFT_CONFLICT','FORMAL_ALREADY_SUBMITTED'].includes(e.message)){showConflict(await student('task'));return;}
+  $('studentStatus').textContent='尚未確認送出結果；原答案與送出編號已保留，請按重試。';paint();throw e;
+ }
+ if(response.status==='submitted'){
+  task.submission=response.result;task.revision=response.result.revision;showReceipt();paint();
+  GiftedCorrectionRequest.mount($('correctionRequest'),{task,scopeKey:transport?transport.sessionUid:actor,send:learning,reload:load});
+  if(response.result.result)renderResult(response.result.result);else readResult();
+  startSummary();$('summary').scrollIntoView({behavior:'instant',block:'start'});
+ }else if(response.status==='saved'){
+  task.revision=response.result.revision;task.answers=structuredClone(answers);$('studentStatus').textContent='草稿已保存至資料庫。';paint();
+ }
+}
+
 function initStudent(){$('student').hidden=false;if(!query.get('plan')){$('login').innerHTML='<p>請從電子聯絡簿的本週作業連結進入。</p>';return;}
  const mediaStatus=document.createElement('div');mediaStatus.id='mediaStatus';mediaStatus.hidden=true;mediaStatus.innerHTML='<p id="mediaMessage" role="status"></p><button type="button" id="reloadMedia">重新載入圖表</button>';$('questionCard').before(mediaStatus);
  $('reloadMedia').onclick=()=>refreshMedia();
@@ -84,6 +130,7 @@ function initStudent(){$('student').hidden=false;if(!query.get('plan')){$('login
  document.querySelectorAll('[data-actor]').forEach(el=>el.onclick=()=>run(el,async()=>{await reserveTab();actor=el.dataset.actor;await load();}));
  $('question').onchange=e=>{questionIndex=task.questions.findIndex(q=>q.id===e.target.value);paint();};$('previous').onclick=()=>{questionIndex--;paint();};$('next').onclick=()=>{questionIndex++;paint();};
  for(const action of ['save','submit'])$(action).onclick=e=>run(e.target,async()=>{if(action==='submit'&&valuesCount()<task.questions.length&&!$('blanks').checked)throw Error('還有未答題，請填完或勾選確認留白。');box.enqueue(action==='save'?'draft':'submit',answers,task.revision,$('blanks').checked);await flush();});$('retry').onclick=e=>run(e.target,flush);
+ $('reloadResult').onclick=e=>run(e.target,readResult);
  $('refreshSummary').onclick=e=>run(e.target,()=>gradeRefresh?.refresh({manual:true}));
  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')gradeRefresh?.pause();else gradeRefresh?.resume();});
  window.addEventListener('offline',()=>gradeRefresh?.pause());window.addEventListener('online',()=>gradeRefresh?.resume());
