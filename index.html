@@ -4960,6 +4960,10 @@
         reminderDueAt: reminderDueAt,
         reminderDueDateKey: hasTrustedDueDate ? explicitDueDateKey : '',
         items: Array.isArray(payload.items) ? payload.items : [],
+        // 保留伺服器已限定班級範圍的調課資料，棒卡與作業期限共用實際課次。
+        sessionPlansByClass: payload.sessionPlansByClass || {},
+        homeworkDueByClass: payload.homeworkDueByClass || {},
+        reminderLeadMs: Number(payload.reminderLeadMs || 0),
         skippedItemKeys: Array.isArray(payload.skippedItemKeys) || (payload.skippedItemKeys && typeof payload.skippedItemKeys === 'object')
           ? payload.skippedItemKeys
           : []
