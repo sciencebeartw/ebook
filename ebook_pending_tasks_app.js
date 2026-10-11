@@ -4,6 +4,7 @@
   if (root) root.EbookPendingTasks = api;
 })(typeof window !== "undefined" ? window : globalThis, function() {
   "use strict";
+  var Reports = typeof module === "object" && module.exports ? require("./homework_report_status") : globalThis.HomeworkReportStatus;
 
   function text(value) {
     return value === undefined || value === null ? "" : String(value);
@@ -1395,7 +1396,24 @@
         independentHolidayHomework: !!holidayPostOptions(post).holidayPractice });
       var doneRecord = getHomeworkDoneRecord(options, sourceClassKey, sourceStudentKey, rawStudentKey, dateKey, post, context, posts, helpers);
       var done = !!(doneRecord && doneRecord.status === "done");
-      if (done) return;
+      if (done) {
+        var scopedFeedback = feedback.filter(function(f) { return (f.storedClassKey || f.sourceClassKey || context.classKey) === sourceClassKey; });
+        var scopedGrades = grades.filter(function(g) { return (g.storedClassKey || g.sourceClassKey || context.classKey) === sourceClassKey; });
+        var receipts = ((options.homeworkReportReceipts || {})[sourceClassKey] || {});
+        Reports.pending(post, { feedbacks: scopedFeedback, grades: scopedGrades, receipts: receipts,
+          dueAt: Number((((policy.homeworkDueByClass || {})[sourceClassKey] || {})[post.id] || holidayPostOptions(post).homeworkDue || {}).dueAt || 0)
+        }).forEach(function(a) {
+          pushIfActive(tasks, createTask({ kind: "homework_paper_report", itemType: "homework_report",
+            neutralLabel: "作業待回報分數", title: a.title, date: text(post.date),
+            sourceClassKey: sourceClassKey, sourceClassName: getPostSourceClassName(post, context),
+            sourceItemId: a.sourceItemId, assignmentId: a.assignmentId, answerId: a.answerId,
+            dueAt: a.dueAt, reminderSourceDate: text(post.date),
+            displayTarget: { tab: "contact", dailyPostId: postRowKey, sourceClassKey: sourceClassKey,
+              postDate: text(post.date), section: "homework-paper-report", focus: "homework-paper-report", answerId: a.answerId }
+          }, context), policy);
+        });
+        return;
+      }
       pushIfActive(tasks, createTask({
         kind: "homework_done",
         itemType: "homework_report",

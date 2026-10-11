@@ -29,7 +29,7 @@
             var valid = res && res.success === true && Array.isArray(res.answers) && res.answers.length === expected.length && expected.every(function(a) {
                 return res.answers.some(function(r) { return r.id === a.id && r.revision === a.revision && HomeworkAnswers.validUrl(r.answerUrl); });
             });
-            if (valid) cache[k] = res.answers;
+            if (valid) { cache[k] = res.answers; updatePending(); }
             else errors[k] = res && res.msg || '解答暫時無法取得，請稍後再試。';
             redraw(post);
         }, function(err) {
@@ -50,10 +50,25 @@
         return '<div class="homework-done-hint" role="status">正在確認完成紀錄並載入解答…</div>';
     }
     function reportKey(post, a) { return key(post) + ':' + a.id; }
+    function reportReceipts() {
+        resetOwner(); var result = {};
+        (gData && gData.dailyPost || []).forEach(function(post) {
+            var source = post.storedClassKey || post.sourceClassKey || safeKey(getStudentActionPostSourceClassName(post, gData.className));
+            var answers = cache[key(post)] || [];
+            HomeworkReportStatus.entries(post).forEach(function(a) {
+                var answer = answers.find(function(r) { return r.id === a.answerId; });
+                if (!answer || !answer.report) return;
+                if (!result[source]) result[source] = {};
+                result[source][a.assignmentId] = answer.report;
+            });
+        });
+        return result;
+    }
+    function updatePending() { if (typeof schedulePendingTasksRecompute === 'function') schedulePendingTasksRecompute(); }
     function reportForm(post, a, answer) {
         if (!a.reportScore) return '';
         var k = reportKey(post, a), inputId = 'homework-score-' + getHomeworkDoneDomKey(post) + '-' + a.id;
-        if (answer.report) return '<div class="homework-report-received" role="status">已回報 ' + esc(String(answer.report.score)) + ' ' + esc(a.scoreUnit) + '，由老師審核登記。</div>';
+        if (answer.report) return '<div class="homework-report-received" role="status">已回報 ' + esc(String(answer.report.score)) + ' ' + esc(a.scoreUnit) + '，已完成本份作業回報。</div>';
         var status = reportErrors[k] || '';
         return '<form class="homework-report-form" data-homework-report="' + esc(getHomeworkDoneDomKey(post)) + '" data-answer-id="' + esc(a.id) + '">' +
             '<label for="' + esc(inputId) + '">' + (a.scoreUnit === '題' ? '對答案後，回報答對幾大題' : '對答案後，回報分數') + '</label>' +
@@ -85,7 +100,7 @@
                 if (res && res.success && res.report) {
                     var answer = (cache[key(post)] || []).find(function(r) { return r.id === a.id; });
                     if (answer) answer.report = res.report;
-                    delete drafts[k]; redraw(post);
+                    delete drafts[k]; redraw(post); updatePending();
                 } else if (res && (res.queued || res.pending || res.syncPending)) {
                     delete cache[key(post)]; load(post); redraw(post);
                     reportErrors[k] = '正在處理回報；可稍後重新開啟確認，再次送出也不會重複收件。';
@@ -102,6 +117,7 @@
         has: function(post) { return entries(post).length > 0; },
         render: function(post, completed) { return '<div class="homework-answers" id="homework-answers-' + getHomeworkDoneDomKey(post) + '">' + body(post, completed) + '</div>'; },
         completed: redraw,
+        reportReceipts: reportReceipts,
         reset: function() { owner = ''; cache = {}; pending = {}; errors = {}; drafts = {}; sending = {}; reportErrors = {}; }
     };
 })(window);

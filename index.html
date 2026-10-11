@@ -27,8 +27,9 @@
     <!-- External Resources -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
     <script src="class_session_plan.js?v=holiday-score-review-20260921"></script>
+    <script src="homework_report_status.js?v=20261011-pending1"></script>
     <script src="homework_answers_contract.js?v=20261011-report1"></script>
-    <script src="homework_answers_app.js?v=20261011-report2"></script>
+    <script src="homework_answers_app.js?v=20261011-pending1"></script>
     <link rel="stylesheet" href="homework_answers.css?v=20261011-report1">
     <script src="holiday_practice_app.js?v=holiday-compact-title-20261004"></script>
     <!-- holiday-score-card-form-20260921 -->
@@ -4843,7 +4844,7 @@
   <script src="ebook_lifecycle_app.js?v=20260815_full_year_date_v1"></script>
   <script src="ebook_promotion_app.js?v=20260812_legacy_transfer_student_key"></script>
   <script src="gifted_homework_full_scores.js?v=20260720_geo3_question_count_v2"></script>
-  <script src="ebook_pending_tasks_app.js?v=holiday-score-card-form-20260921"></script>
+  <script src="ebook_pending_tasks_app.js?v=20261011-homework-score"></script>
   <script src="ebook_feedback_threads_app.js?v=20260822_feedback_threads_v1"></script>
   <script src="ebook_score_distribution.js?v=equal-high-score-chart-20260922"></script>
 
@@ -7882,6 +7883,7 @@
                 studentKeysByClassKey: gData.studentKeysByClassKey || null,
                 pendingPolicy: gData.pendingPolicy || null,
                 holidayContexts: window.HolidayPracticeApp ? HolidayPracticeApp.contextMap() : {},
+                homeworkReportReceipts: window.HomeworkAnswersApp ? HomeworkAnswersApp.reportReceipts() : {},
                 helpers: getPendingTaskHelpers()
             });
         }
@@ -7930,6 +7932,7 @@
 
         function getPendingTaskPrimaryActionLabel(task) {
             if (!task) return '前往查看';
+            if (task.kind === 'homework_paper_report') return '前往回報分數';
             if (task.kind === 'homework_done') return '前往完成回報';
             if (task.kind === 'homework_score') return '前往作業';
             if (task.kind === 'holiday_practice') {
@@ -8085,6 +8088,10 @@
             var postAnchors = Array.prototype.slice.call(document.querySelectorAll('[data-pending-post-anchor]'));
             var postAnchor = postAnchors.find(function(element) { return pendingTargetMatchesPost(element, target); }) || null;
             if (target.section === 'holiday' && postAnchor && /^holiday_[a-zA-Z0-9_-]+$/.test(target.assignmentId || '')) return document.getElementById('holiday-card-' + target.assignmentId) || postAnchor;
+            if (target.section === 'homework-paper-report' && postAnchor) {
+                var forms = Array.prototype.slice.call(postAnchor.querySelectorAll('[data-homework-report]'));
+                return forms.find(function(form) { return form.dataset.answerId === target.answerId; }) || postAnchor.querySelector('.homework-answers') || postAnchor;
+            }
             if ((target.section === 'homework' || target.section === 'homework-score') && postAnchor) {
                 return postAnchor.querySelector('[data-pending-homework-anchor]') || postAnchor;
             }
@@ -8127,6 +8134,7 @@
             if (!element || !target) return;
             var selector = '';
             if (target.focus === 'homework') selector = '.homework-done-btn:not([disabled])';
+            else if (target.focus === 'homework-paper-report') selector = 'input[type=number]';
             else if (target.focus === 'score-report') selector = '.score-input';
             else if (target.focus === 'makeup-result') selector = '.makeup-wrong-count-input';
             else if (target.section === 'makeup-paper' || target.section === 'exam-paper') selector = 'a[href]';
