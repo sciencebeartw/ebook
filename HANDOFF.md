@@ -1,14 +1,16 @@
 ## 2026-10-11 課本修訂與解析同步學生端（v41）
 
-使用者授權同步五題核定修法及先前確認内容，既有學生首答、核准更正、成績與名冊不改。32章／1,200題解析完成：19題題文／選項／分類表修正，理化13Q5另以新版本改正解C→B。原catalog、assets、bank fingerprint與既有凍結作業不覆寫；新建立作業採新答案。舊結果保留原判分答案、outcome及分數，另列訂正答案B與保留成績說明。
+使用者授權同步五題核定修法及先前確認內容，既有學生首答、核准更正、成績與名冊不改。32章／1,200題解析完成：19題題文／選項／分類表修正，理化13Q5另以新版本改正解C→B。原catalog、assets、bank fingerprint與既有凍結作業不覆寫；新建立作業採新答案。舊結果保留原判分答案、outcome及分數，另列訂正答案B與保留成績說明。
 
 Student API v15／Teacher API v15 ACTIVE，分別以部署前Student14／Teacher13最新來源修補；Submission／Recovery、GAS@486及Rules不改。解析按單章讀靜態sidecar；無新RTDB／Storage讀寫或listener。錯題統計以每份既有作業版本驗證事件，統計結果仍按原已保存outcome計算。
 
-學生前端與Dashboard共用修正題面，新增原生分类表。131項後端／3項部署初始化／25項學生前端／14項統計回歸、Chrome 1280／390／320px與WebKit390px分類表、放大返回不改答案、舊C判分和訂正B並列驗證通過。沒有在正式資料庫代替學生提交或重新登分。正式回讀發現Teacher13來源未含解析import，已補共同content initializer引用並修復為Teacher15；保留Teacher13老師題本接線，不套回Student14來源。
+學生前端與Dashboard共用修正題面，新增原生分類表。131項後端／3項部署初始化／25項學生前端／14項統計回歸、Chrome 1280／390／320px與WebKit390px分類表、放大返回不改答案、舊C判分和訂正B並列驗證通過。沒有在正式資料庫代替學生提交或重新登分。正式回讀發現Teacher13來源未含解析 import，已補共同content initializer引用並修復為Teacher15；保留Teacher13老師題本接線，不套回Student14來源。
 
-教師v41包維持2,947题指紋、packageId、審稿碼、889圖資密文不變，只更新發布提示；老師原進度、留言、草稿、存檔與待重審標記保留。複習題本3／模擬9疑義及學生作答入口仍維持未開放。
+教師v41包維持2,947題指紋、packageId、審稿碼、889圖資密文不變，只更新發布提示；老師原進度、留言、草稿、存檔與待重審標記保留。複習題本3／模擬9疑義及學生作答入口仍維持未開放。
 
 已印生物上、理化上、理化下先依課本勘誤表提供課堂訂正；收到可編輯原檔後，再核對版本並修改教用／學用／解答。114下冊來源不能直接套115頁碼。私有證據：根workspace `output/gifted-student-content-20261011/`；原檔清單：`docs/systems/gifted-textbook-errata-20261011.md`。
+
+正式收尾：兩API均v15；公開20檔與來源79／112檔SHA一致、4私有入口404。原61筆覆核與45筆留言重整／重新解鎖逐欄相同。共享MCP既有JSONL解析錯誤，以append-only追加部署摘要，原歷史位元保留。完整驗證 `output/gifted-student-content-20261011/release-validation.json`。
 
 # 山熊科學 後台現代化改造計畫 - 完整交接手冊
 
