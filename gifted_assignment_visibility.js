@@ -5,7 +5,7 @@
   var postId=grade.giftedPostId || grade.sourcePostId;
   if(!postId)return true;
   var rows=Array.isArray(posts)?posts:Object.keys(posts||{}).map(function(id){return Object.assign({id:id},posts[id]);});
-  var matches=rows.filter(function(p){return p&&p.id===postId&&(p.sourceClassKey||p.className)===className;});
+  var matches=rows.filter(function(p){return p&&(p._rowKey||p.id)===postId&&(p.sourceClassKey||p.className)===className;});
   if(matches.length!==1)return false;
   var post=matches[0],options=post.displayOptions||{};
   if(typeof options==='string'){try{options=JSON.parse(options);}catch(_){return false;}}
