@@ -41,3 +41,16 @@ test('switching a segment retires the old frame and its in-flight transport',asy
  assert.equal(f.click(href+'&segment=week-2'),true);const frame=f.elements[0].children[1];assert.notEqual(frame,old);assert.equal(new URL(frame.src).searchParams.get('segment'),'week-2');
  f.resolveFetch();await assert.rejects(pending,/LOGIN_REQUIRED/);assert.throws(()=>f.ui.getTransport(old.contentWindow),/LOGIN_REQUIRED/);
 });
+
+test('verified Dashboard teacher view opens the first homework in place, read-only and without token storage',async()=>{
+ for(const mode of ['god_session','student_preview']){
+  const f=setup(true,false);f.ready({mode,teacherView:true,result:{isAdmin:true,studentName:'測試生'}});
+  assert.equal(f.click('https://www.sciencebear.com.tw/ebook/?gifted='+plan),true);
+  const frame=f.elements[0].children[1],transport=f.ui.getTransport(frame.contentWindow);
+  assert.equal(transport.readOnly,true);assert.equal(f.values.size,0);
+  for(const action of ['draft','submit','requestCorrection'])await assert.rejects(transport.request({action}),/TEACHER_VIEW_READ_ONLY/);
+  const pending=transport.request({action:'task'});await new Promise(setImmediate);f.resolveFetch();assert.equal((await pending).privateResult,'owner-only');
+  await f.elements[0].children[0].onclick();assert.equal(f.elements.length,0);
+ }
+ const f=setup();f.ready({teacherView:true,mode:'god_session',preview:true});assert.equal(f.elements.length,0);
+});
