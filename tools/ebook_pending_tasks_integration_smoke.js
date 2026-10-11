@@ -40,7 +40,8 @@ function extractFunction(name) {
   return '';
 }
 
-check(html.includes('ebook_pending_tasks_app.js?v=20260822_gifted_batch_makeup_auto_link_v1'), 'pending UMD module must load with the gifted batch makeup cache bust before the app');
+const pendingScript = /<script src="ebook_pending_tasks_app\.js\?v=[^"]+"><\/script>/.exec(html);
+check(pendingScript && pendingScript.index < html.indexOf('function renderPendingTasks()'), 'versioned pending UMD module must load before its app consumer');
 check((html.match(/class="tab-item/g) || []).length === 4, 'student view must have exactly four tabs');
 check(html.includes('id="tab-pending" onclick="switchTab(3)"'), 'pending tab must retain numeric switchTab compatibility at index 3');
 check(html.includes('id="tab-content-3"'), 'pending tab content is missing');
@@ -105,10 +106,10 @@ check(pendingReminder.includes('pendingReminderShownSessionIdentity'), 'pending 
 check(pendingReminder.includes('wasPendingReminderShownInBrowserSession'), 'a same-tab page reload must not repeat the same due-slot reminder');
 check(pendingReminder.includes('markPendingReminderShownInBrowserSession'), 'shown reminders must persist for the current browser-tab session');
 check(pendingReminder.includes('gData.pendingPolicy.loginReminder === false'), 'loginReminder=false must suppress reminder styling and popup');
-check(pendingReminder.includes('getReminderDueItems(pendingTasksState)'), 'popup count must use only server-due items');
-check(pendingReminder.includes("'逾期未完成提醒'"), 'pending popup title must identify the due-only reminder');
-check(pendingReminder.includes("'目前有 ' + reminderDueItems.length + ' 項課務已逾期，請記得儘快處理。'"), 'pending popup must identify the overdue count');
-check(pendingReminder.includes("' 項尚未逾期的待完成事項。'"), 'mixed pending popup must also identify the neutral pending count');
+check(pendingReminder.includes('getEntryReminderItems(pendingTasksState)'), 'popup count must use the server-authorized entry reminder items');
+check(pendingReminder.includes("'待完成提醒'"), 'pending popup title must identify the entry reminder');
+check(pendingReminder.includes("'目前有 ' + reminderDueItems.length + ' 項課務已到提醒時間，請於期限內完成；已逾期的項目請儘快補交。'"), 'pending popup must distinguish reminder time from an overdue deadline');
+check(pendingReminder.includes("' 項待完成事項。'"), 'mixed pending popup must also identify the neutral pending count');
 check(pendingReminder.includes('swalAlert(') && !pendingReminder.includes('Swal.fire'), 'pending popup must use the shared swalAlert wrapper');
 check(pendingReminder.includes("'查看待完成'"), 'pending popup button must clearly navigate to pending');
 check(pendingReminder.includes("iconColor: '#e11d48'") && pendingReminder.includes("confirmButtonColor: '#e11d48'"), 'pending popup icon and action must use the warning red');
@@ -255,6 +256,7 @@ async function checkExactFormerHomeworkSubmitBehavior() {
       cohortHomeworkDoneRoot: { '114原班_key': { old_student_key: {} } },
     },
     ebookAuthSessionInfo: null,
+    window: {},
     confirmStudentPreviewAction: async () => true,
     getHomeworkDoneDomKey: item => item === post ? 'exact-dom-key' : '',
     getStudentActionPostSourceClassName: () => '114原班',
@@ -308,11 +310,11 @@ async function checkPendingReminderBehavior() {
     getPendingReminderDeliveryIdentity: () => 'stable-login-session|due-slot',
     wasPendingReminderShownInBrowserSession: identity => persistedReminderIdentities.has(identity),
     markPendingReminderShownInBrowserSession: identity => persistedReminderIdentities.add(identity),
-    window: { EbookPendingTasks: { getReminderDueItems: () => [{ taskId: 'due-task' }] } },
+    window: { EbookPendingTasks: { getEntryReminderItems: () => [{ taskId: 'due-task' }] } },
     swalAlert(title, text, icon, confirmText, options) {
       alertCalls += 1;
-      check(title === '逾期未完成提醒', 'behavior popup title must identify the overdue state');
-      check(text === '目前有 1 項課務已逾期，請記得儘快處理。\n另外還有 1 項尚未逾期的待完成事項。', 'behavior popup must explain both overdue and neutral pending counts');
+      check(title === '待完成提醒', 'behavior popup title must identify the entry reminder');
+      check(text === '目前有 1 項課務已到提醒時間，請於期限內完成；已逾期的項目請儘快補交。\n另外還有 1 項待完成事項。', 'behavior popup must explain both reminder-eligible and other pending counts');
       check(!text.includes('private title'), 'behavior popup must not expose individual task details');
       check(icon === 'warning' && confirmText === '查看待完成', 'behavior popup must use the expected warning action');
       check(options && options.iconColor === '#e11d48' && options.confirmButtonColor === '#e11d48', 'behavior popup must apply warning red options through swalAlert');
@@ -356,7 +358,7 @@ async function checkPendingReminderBehavior() {
     getPendingReminderDeliveryIdentity: () => 'neutral-session|future-slot',
     wasPendingReminderShownInBrowserSession: () => false,
     markPendingReminderShownInBrowserSession: () => {},
-    window: { EbookPendingTasks: { getReminderDueItems: () => [] } },
+    window: { EbookPendingTasks: { getEntryReminderItems: () => [] } },
     swalAlert() { alertCalls += 1; return Promise.resolve({ isConfirmed: true }); },
     switchTab() {},
   };

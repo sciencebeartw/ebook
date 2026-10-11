@@ -362,7 +362,7 @@ checkIncludes(pendingStickerCheck, 'studentFeedbackRef.child(feedbackKey)', 'sti
 checkIncludes(pendingStickerCheck, 'candidates.length > 1', 'legacy timestamp-only sticker lookup must fail on ambiguity');
 
 // Chapter ranges such as 「第1-8章」 are not calendar dates; exact exam routing must not misread them as 1/8.
-const examLookupSandbox = {};
+const examLookupSandbox = { ClassSessionPlan: require(path.join(ADMIN_DIR, 'functions', 'class_session_plan.js')) };
 vm.createContext(examLookupSandbox);
 [
   'normalizeEbookExamLookupText',
