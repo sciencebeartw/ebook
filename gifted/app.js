@@ -40,10 +40,26 @@ function controls(){let state;try{state=box?.snapshot();}catch{state={invalid:tr
 async function run(button,fn){if(busy)return;busy=true;controls();$('error').textContent='';try{await fn();}catch(e){error(e);}finally{busy=false;controls();}}
 function one(v){return Array.isArray(v)?v[0]||'':v||'';}
 function valuesCount(){return Object.keys(answers).filter(k=>one(answers[k])).length;}
+function paintAnswerGrid(){
+ const results=new Map((task.submission?submissionResult?.items||[]:[]).map(item=>[item.questionId,item]));
+ let needsCorrection=false;
+ $('answerGrid').innerHTML=task.questions.map((q,i)=>{
+  const item=results.get(q.id),wrong=['wrong','blank'].includes(item?.outcome),pending=item?.outcome==='pending';
+  const value=item?item.answer:answers[q.id],original=q.type==='manual'?(one(value)?'已填':'留白'):GiftedResult.answerText(q,value);
+  const hasKey=wrong&&q.type!=='manual'&&Array.isArray(item.correctAnswers)&&item.correctAnswers.length>0&&item.correctAnswers.every(id=>q.choices.includes(id));
+  const correct=hasKey?GiftedResult.answerText(q,item.correctAnswers):'';
+  const state=wrong?'needs-correction':pending?'awaiting-grading':item?.outcome==='correct'||one(value)?'answered':'';
+  const status=wrong?(correct?'，正確答案 '+correct:'，待訂正'):pending?'，待老師批改':item?.outcome==='correct'?'，答對':'';
+  needsCorrection=needsCorrection||wrong;
+  return `<button type="button" class="${state}" data-index="${i}" aria-current="${i===questionIndex}" aria-label="${esc('章內第 '+q.sourceIndex+' 題，原答 '+original+status)}"><span>${esc(q.sourceIndex)} ${hasKey?'<s>'+esc(original)+'</s>':esc(original)}</span>${hasKey?'<span class="answer-correction">→ 正確 '+esc(correct)+'</span>':wrong?'<span class="answer-correction">待訂正</span>':pending?'<span class="answer-pending">待批</span>':''}</button>`;
+ }).join('');
+ $('answerGrid').querySelectorAll('button').forEach(el=>el.onclick=()=>{questionIndex=Number(el.dataset.index);paint();});
+ $('answerGridHelp').hidden=!needsCorrection;
+}
 function paint(){BearStudentMedia.bind($('questionCard'));BearStudentMedia.reset();const q=task.questions[questionIndex];$('count').textContent='已填 '+valuesCount()+' / '+task.questions.length+' 題';$('question').value=q.id;
  $('questionCard').innerHTML=(q.groupContext?'<p>'+esc(q.groupContext)+'</p>':'')+'<p><strong>章內第 '+q.sourceIndex+' 題</strong></p><p>'+esc(q.prompt)+'</p>'+q.media.map(m=>BearStudentMedia.html(m,'','第 '+q.sourceIndex+' 題圖表')).join('')+q.options.map(o=>`<label class="option"><input type="radio" name="answer" value="${esc(o.id)}" ${one(answers[q.id])===o.id?'checked':''} ${task.submission?'disabled':''}><span>${esc(o.text)}${(o.media||[]).map(m=>BearStudentMedia.html(m,'','選項圖表')).join('')}</span></label>`).join('');
  $('questionCard').querySelectorAll('input[name=answer]').forEach(el=>el.onchange=()=>{try{answers[q.id]=el.value;box.saveLocalDraft(answers,task.revision);$('studentStatus').textContent='已暫存本機；送出後才正式登記。';paint();}catch(e){error(e);}});
- $('answerGrid').innerHTML=task.questions.map((q,i)=>`<button class="${one(answers[q.id])?'answered':''}" data-index="${i}" aria-current="${i===questionIndex}">${q.sourceIndex} ${one(answers[q.id])?String.fromCharCode(65+q.choices.indexOf(one(answers[q.id]))):'—'}</button>`).join('');$('answerGrid').querySelectorAll('button').forEach(el=>el.onclick=()=>{questionIndex=Number(el.dataset.index);paint();});
+ paintAnswerGrid();
  $('previous').disabled=questionIndex===0;$('next').disabled=questionIndex===task.questions.length-1;controls();
 }
 function renderSummary(v){
@@ -72,7 +88,7 @@ function showReceipt(){
  $('studentStatus').textContent='本段已提交，首次作答已保存；誤填時可在下方申請更正，待老師核准。';
 }
 function renderResult(result){
- submissionResult=result;showReceipt();renderSummary();$('reloadResult').hidden=true;$('resultStatus').textContent='';
+ submissionResult=result;showReceipt();renderSummary();paintAnswerGrid();$('reloadResult').hidden=true;$('resultStatus').textContent='';
  const outcomes={correct:'答對',wrong:'答錯',blank:'留白',pending:'待老師批改'};
  const items=[...result.items].sort((a,b)=>(a.outcome==='correct')-(b.outcome==='correct'));
  const wrong=items.filter(i=>['wrong','blank'].includes(i.outcome)).length;

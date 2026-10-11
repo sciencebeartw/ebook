@@ -34,3 +34,10 @@ button:hover:not(:disabled){border-color:var(--bear-green);filter:brightness(.98
 .scope-label{display:block;font-size:18px;font-weight:600;color:#567566;margin-top:5px}
 
 #resultSection{scroll-margin-top:16px}#resultStatus:empty{display:none}#result button.result{min-height:44px;line-height:1.5}#result button.result.wrong{border-color:#dca86b;color:#81441f}#result{margin-top:16px}#result .gifted-result-explanations{width:100%}
+
+#answerGrid button{display:flex;align-items:center;justify-content:center;gap:5px;flex-wrap:wrap;min-height:44px;max-width:100%}
+#answerGrid button.needs-correction{background:#fff0f0;border-color:#dca0a5;color:#952d38}
+#answerGrid button.needs-correction[aria-current=true]{border-color:#952d38}
+#answerGrid .answer-correction{font-weight:750;white-space:nowrap}#answerGrid s{color:#865059;text-decoration-thickness:2px}
+#answerGrid button.awaiting-grading{background:#fff6df;border-color:#dec78b;color:#76571d}
+#answerGridHelp{font-size:14px;color:#952d38;margin:0;line-height:1.7}
