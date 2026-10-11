@@ -5,7 +5,7 @@ function setup(response,accept=true){
  const nodes=new Map(),requests=[],correctionMounts=[],queued=[],confirmations=[];
  const node=id=>{if(!nodes.has(id))nodes.set(id,{hidden:false,disabled:false,innerHTML:'',textContent:'',querySelectorAll:()=>[],scrollIntoView(){this.scrolled=true;}});return nodes.get(id);};
  const context={URLSearchParams,location:{search:'?plan=p&segment=s'},document:{getElementById:node,querySelectorAll:()=>[],visibilityState:'visible'},navigator:{onLine:true},
- structuredClone,localStorage:{},BearStudentMedia:{bind(){},reset(){},html:()=>''},GiftedCorrectionRequest:{mount(host,{task}){correctionMounts.push(structuredClone(task.answers));}},GiftedResult:{...require('../../gifted/gifted-result.js'),mount(){}},
+ structuredClone,localStorage:{},BearStudentMedia:{bind(){},reset(){},html:()=>'',blocks:()=>''},GiftedCorrectionRequest:{mount(host,{task}){correctionMounts.push(structuredClone(task.answers));}},GiftedResult:{...require('../../gifted/gifted-result.js'),mount(){}},
  GiftedGradeRefresh:{create:({read})=>({refresh:read,dispose(){}})},GiftedStudentTransport:{confirmWrite:async action=>{confirmations.push(action);return accept;},sessionUid:'test',studentName:'合成學生',request:async req=>{requests.push(req.action);if(req.action==='summary')return new Promise(()=>{});throw Error('temporary');}}};
  context.window=context;vm.createContext(context);
  vm.runInContext(source.slice(0,source.indexOf('if(transport){initStudent();'))+'globalThis.hooks={saveOrSubmit,flush,readResult,renderSummary,renderResult,paintAnswerGrid,setup:(t,b)=>{task=t;box=b;answers=t.answers;}};})();',context);

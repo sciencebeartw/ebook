@@ -16,6 +16,16 @@
     return { width: `${Math.round(width)}px`, manual: false };
   }
   const escape = value => String(value ?? '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+  function blocks(items){
+    return (items||[]).map(b=>{
+      if(b.kind==='text')return '<p>'+escape(b.text)+'</p>';
+      if(b.kind!=='table'||!Array.isArray(b.rows))return '';
+      const table='<table class="asset-table'+(b.compact?' asset-table-compact':'')+'"><tbody>'+b.rows.map((row,i)=>'<tr>'+row.map(c=>{
+        const tag=i===0?'th':'td';return '<'+tag+'>'+escape(c.text)+'</'+tag+'>';
+      }).join('')+'</tr>').join('')+'</tbody></table>';
+      return html({renderAs:'table',table:b},table,'題目資料表');
+    }).join('');
+  }
   let entries = [], dialog, previousFocus, zoom = 1, baseWidth = 0;
   function reset() { if (dialog?.open) dialog.close(); entries = []; }
   function html(asset, tableHtml, label) {
@@ -76,7 +86,7 @@
     });
     window.addEventListener('resize', () => { if (dialog?.open) paintZoom(); });
   }
-  const api = {presentation, html, reset, bind};
+  const api = {presentation, html, blocks, reset, bind};
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.BearStudentMedia = api;
 })(typeof window !== 'undefined' ? window : globalThis);

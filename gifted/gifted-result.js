@@ -19,7 +19,11 @@ function mount(container,result,task,{viewQuestion}={}){
     summary.append(element('span',q.sourceTitle||'第 '+q.sourceIndex+' 題'),element('b',outcomes[item.outcome]||'已收到'));
     const body=element('div',undefined,'gifted-result-body'),answers=element('dl');
     answers.append(element('dt','你的答案'),element('dd',answerText(q,item.answer)));
-    if(item.correctAnswers?.length)answers.append(element('dt','正確答案'),element('dd',answerText(q,item.correctAnswers)));
+    if(item.correctAnswers?.length)answers.append(element('dt',item.answerRevisionNotice?'原判分答案':'正確答案'),element('dd',answerText(q,item.correctAnswers)));
+    if(item.answerRevisionNotice){
+      answers.append(element('dt','訂正答案'),element('dd',answerText(q,item.referenceCorrectAnswers)));
+      body.append(element('p',item.answerRevisionNotice,'gifted-answer-revision-notice'));
+    }
     body.append(answers,element('p',item.explanation,'gifted-result-explanation'));
     if(typeof viewQuestion==='function'){
       const button=element('button','查看原題');button.type='button';button.onclick=()=>viewQuestion(q.id);body.append(button);

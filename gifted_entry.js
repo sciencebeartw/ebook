@@ -33,7 +33,7 @@
   const back=document.createElement('button');back.type='button';back.textContent='返回聯絡簿';
   back.onclick=async()=>{if(session.readOnly){close(false);return;}const ok=await root.swalConfirm('返回聯絡簿','尚未送出的答案會保留在此裝置，下次可繼續填寫。');if(ok)close(false);};
   frame=document.createElement('iframe');frame.title='資優自然課本作業';
-  const url=new URL('gifted/index.html',location.href);url.searchParams.set('v','20261011-three-entry');url.searchParams.set('plan',assignment.planId);url.searchParams.set('segment',assignment.segmentId);
+  const url=new URL('gifted/index.html',location.href);url.searchParams.set('v','20261011-owner-content');url.searchParams.set('plan',assignment.planId);url.searchParams.set('segment',assignment.segmentId);
   overlay.append(back,frame);document.body.append(overlay);document.body.classList.add('gifted-entry-open');frame.src=url.href;back.focus();
   unsubscribe=auth.onAuthStateChanged(next=>{if(next?.uid!==owner)close(true);});
   return true;
