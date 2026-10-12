@@ -25,6 +25,7 @@ function extractFunction(name) {
 const context = vm.createContext({
   BEAR_SUBJECT: "/science",
   EbookLifecycleApp,
+  ClassSessionPlan: require("../class_session_plan.js"),
   Date,
   Object,
   isRecordFromPostSource: (gradeClassKey, postClassKey) => gradeClassKey === postClassKey,

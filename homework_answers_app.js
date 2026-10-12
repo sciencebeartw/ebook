@@ -43,7 +43,8 @@
         if (cache[k]) return list.map(function(a) {
             var answer = cache[k].find(function(r) { return r.id === a.id && r.revision === a.revision; });
             var title = getDailyPostExamLinkDisplayName(a.title, '作業解答', (getDailyPostDisplayOptions(post).links || {}).examTitleMode);
-            return '<a class="btn-important-tag homework-answer-link" href="' + esc(answer.answerUrl) + '" target="_blank" rel="noopener noreferrer">' + SVG.document + esc(title) + '</a>' + reportForm(post, a, answer);
+            var titleHtml = typeof buildAssessmentLinkHtml === 'function' ? buildAssessmentLinkHtml(title, getStudentActionPostSourceClassName(post, gData.className)) : esc(title);
+            return '<a class="btn-important-tag homework-answer-link" href="' + esc(answer.answerUrl) + '" target="_blank" rel="noopener noreferrer">' + SVG.document + titleHtml + '</a>' + reportForm(post, a, answer);
         }).join('') + '<div class="homework-done-hint">請自行對答案，並用紅筆訂正。</div>';
         if (errors[k]) return '<div class="homework-done-hint" role="status">' + esc(errors[k]) + '</div><button type="button" class="homework-answer-retry" data-homework-answer-retry="' + esc(getHomeworkDoneDomKey(post)) + '">重新載入解答</button>';
         if (!pending[k]) Promise.resolve().then(function() { load(post); });

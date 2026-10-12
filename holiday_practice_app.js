@@ -40,6 +40,10 @@
         }
         return purpose + '｜' + assignment.title;
     }
+    function linkHtml(post, assignment, answer) {
+        var label = linkLabel(post, assignment, answer);
+        return typeof buildAssessmentLinkHtml === 'function' ? buildAssessmentLinkHtml(label, className(post)) : esc(label);
+    }
     function body(post) {
         var a = assignment(post), c = context(post), p = progress(post), now = Date.now();
         if (!a || a.draft) return '';
@@ -48,7 +52,7 @@
         var preview = isAdminMode || isDashboardDraftPreviewMode;
         var color = (P.options(post).links || {}).holidayColor;
         var colorClass = ' post-button-' + (['blue', 'purple', 'slate', 'orange', 'gray'].indexOf(color) > -1 ? color : 'orange');
-        var text = safeLink(a.questionUrl, SVG.document + esc(linkLabel(post, a, false)), colorClass) +
+        var text = safeLink(a.questionUrl, SVG.document + linkHtml(post, a, false), colorClass) +
             '<div class="holiday-deadline-box"><div class="holiday-deadline-hint">請於下次上課 ' + esc(a.dueDate || P.taipeiDate(a.dueAt)) + ' ' + esc(a.dueTime || '') + ' 前回報分數</div></div>';
         if (preview) return text + '<div class="holiday-unlock-actions"><button type="button" class="homework-done-btn holiday-unlock-btn holiday-preview-btn' + colorClass + '" disabled aria-disabled="true">我已完成，顯示答案</button></div>' +
             '<div class="holiday-unlock-hint">這是預覽；學生實際登入後按上方按鈕，才會開啟答案並可回報分數。預覽不記錄學生進度。</div>';
@@ -59,9 +63,9 @@
             text += '<div class="holiday-unlock-actions"><button type="button" class="homework-done-btn holiday-unlock-btn' + colorClass + '" data-holiday-action="unlock" data-assignment="' + esc(id) + '"' + (busy[id] ? ' disabled aria-busy="true"' : '') + '>' + buttonLabel + '</button></div>' +
                 '<div class="holiday-unlock-hint">' + (busy[id] ? '正在安全核對答案，完成後會立即顯示。' : '完成作答後按一下，答案會立即開啟。') + '</div>';
         } else if (answers[id]) {
-            text += safeLink(answers[id], SVG.document + esc(linkLabel(post, a, true)), colorClass);
+            text += safeLink(answers[id], SVG.document + linkHtml(post, a, true), colorClass);
         } else {
-            text += '<div class="holiday-unlock-actions"><button type="button" class="btn-link holiday-answer-btn' + colorClass + '" data-holiday-action="answer" data-assignment="' + esc(id) + '"' + (busy[id] ? ' disabled aria-busy="true"' : '') + '>' + SVG.document + (busy[id] ? '正在取得答案…' : esc(linkLabel(post, a, true))) + '</button></div>';
+            text += '<div class="holiday-unlock-actions"><button type="button" class="btn-link holiday-answer-btn' + colorClass + '" data-holiday-action="answer" data-assignment="' + esc(id) + '"' + (busy[id] ? ' disabled aria-busy="true"' : '') + '>' + SVG.document + (busy[id] ? '正在取得答案…' : linkHtml(post, a, true)) + '</button></div>';
         }
         return text + (label ? '<div class="holiday-progress-hint' + (state === 'missing' ? ' is-missing' : '') + '" role="status">' + esc(label) + '</div>' : '');
     }

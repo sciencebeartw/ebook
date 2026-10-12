@@ -26,12 +26,13 @@
     
     <!-- External Resources -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+    <script src="assessment_labels.js?v=20261012-full-scope"></script>
     <script src="class_session_plan.js?v=20261011-library1"></script>
     <script src="homework_report_status.js?v=20261011-pending1"></script>
     <script src="homework_answers_contract.js?v=20261011-report1"></script>
-    <script src="homework_answers_app.js?v=20261011-pending1"></script>
+    <script src="homework_answers_app.js?v=20261012-full-scope"></script>
     <link rel="stylesheet" href="homework_answers.css?v=20261011-report1">
-    <script src="holiday_practice_app.js?v=holiday-compact-title-20261004"></script>
+    <script src="holiday_practice_app.js?v=20261012-full-scope"></script>
     <!-- holiday-score-card-form-20260921 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
@@ -2090,7 +2091,15 @@
             display: block;
         }
 
+        .assessment-chapter { display:block; overflow-wrap:anywhere; }
+        .assessment-detail { display:block; font-size:.95em; font-weight:400; line-height:1.55; color:#64748b; overflow-wrap:anywhere; }
+        .assessment-detail > span { display:block; }
+        .exam-info { min-width:0; flex:1; }
+        .exam-name, .main-exam-title, .exam-date { overflow-wrap:anywhere; }
+        .card-main { gap:12px; flex-wrap:wrap; }
+        .card-main .score-box { margin-left:auto; }
         .main-exam-range {
+            max-width:100%; box-sizing:border-box; line-height:1.55; overflow-wrap:anywhere;
             font-size: 1.15rem;
             color: #666;
             margin-bottom: 15px;
@@ -2291,6 +2300,10 @@
             border-bottom: 1px dashed rgba(0, 0, 0, 0.1);
             padding-bottom: 5px;
         }
+
+        .ref-hw-item { gap:12px; flex-wrap:wrap; }
+        .ref-hw-item > span { flex:1; min-width:0; overflow-wrap:anywhere; }
+        .ref-hw-item > div { flex-shrink:0; }
 
         .hw-score-val {
             font-size: 1.8rem;
@@ -2511,7 +2524,12 @@
             color: white;
         }
 
-        .textbook-link-part { display: inline-block; max-width: 100%; vertical-align: top; }
+        .textbook-link-part { display: inline; max-width: 100%; vertical-align: top; overflow-wrap:anywhere; }
+        .btn-link, .btn-important-tag, .btn-supplement-tag, .btn-general-tag, .btn-small-tag {
+            min-width:0; max-width:100%; box-sizing:border-box; white-space:normal; overflow-wrap:anywhere; line-height:1.55;
+        }
+        .assessment-link-detail { display:block; font-size:.95em; font-weight:500; margin-top:3px; }
+        .assessment-link-detail > span { display:block; }
 
         /* 學生上傳的連結按鈕 (小標籤) */
         .btn-small-tag {
@@ -7617,11 +7635,24 @@
             return false;
         }
 
-        function renderParsedLink(name, url, className, iconHtml, originalName) {
+        function buildAssessmentLinkHtml(label, className) {
+            var parts = String(label || '').split('｜');
+            var purpose = parts.shift();
+            var range = parts.join('｜');
+            if (!range || !window.AssessmentLabels) return escapeHtml(label);
+            var title = window.AssessmentLabels.describe(range, className);
+            return '<span class="textbook-link-part">' + escapeHtml(purpose + '｜' + title.heading) + '</span>' +
+                (title.detail ? '<span class="assessment-link-detail">' + title.detail.split('｜').map(function(text) { return '<span>' + escapeHtml(text) + '</span>'; }).join('') + '</span>' : '');
+        }
+
+        function renderParsedLink(name, url, className, iconHtml, originalName, assessmentClassName) {
             var rawUrl = decodeBasicHtmlEntities(url);
             var safeRawUrl = escapeHtmlAttr(rawUrl);
             var safeName = name || "連結";
-            if (/^課本作業｜/.test(safeName)) {
+            var titlePrefix = safeName.match(/^(課本作業|上傳課本作業|回家作業卷|作業解答|小考卷|小考答案|隨堂考卷|鑑定考卷|補考卷|補考答案|假期練習卷(?:答案)?)\s*｜/);
+            if (titlePrefix && typeof buildAssessmentLinkHtml === 'function' && window.AssessmentLabels) {
+                safeName = buildAssessmentLinkHtml(decodeBasicHtmlEntities(safeName), assessmentClassName || (typeof gData !== 'undefined' && gData && gData.className) || '');
+            } else if (/^課本作業｜/.test(safeName)) {
                 safeName = safeName.split("｜").map(function(part, index) {
                     return '<span class="textbook-link-part">' + (index ? "｜" : "") + part + '</span>';
                 }).join("");
@@ -8457,9 +8488,7 @@
             var labels = [preview.label];
             if (preview.dual) labels.push('課本作業｜Google表單・整章');
             return '<div class="gifted-homework-draft-preview">' + labels.map(function(label) {
-                return '<span class="btn-important-tag" role="button" aria-disabled="true" style="cursor:default">' + SVG.document + label.split('｜').map(function(part, index) {
-                    return '<span class="textbook-link-part">' + (index ? '｜' : '') + escapeHtml(part) + '</span>';
-                }).join('') + '</span>';
+                return '<span class="btn-important-tag" role="button" aria-disabled="true" style="cursor:default">' + SVG.document + buildAssessmentLinkHtml(label, post.className || (gData && gData.className)) + '</span>';
             }).join('') + '<div style="font-size:0.85rem;color:#64748b;margin-top:6px">按鈕外觀預覽，完成聯絡簿儲存後開放作答。</div></div>';
         }
 
@@ -11232,6 +11261,12 @@
             return "<div class='score-report-section'><div style='font-weight:bold; color:#c0392b; margin-bottom:10px; font-size:1.35rem;'>" + SVG.edit + "回報" + getDailyPostExamTimePrefix(exam) + getDailyPostExamLabel(exam) + missingLabel + "分數</div><div class='input-box'><input type='number' class='score-input' id='" + scoreInputId + "' placeholder='輸入分數'" + valueAttr + "><button class='score-btn' onclick=\"submitScoreReport('" + safeDate + "', '" + post.date + "', '" + (hasExamColIndex ? exam.colIndex : "") + "', '" + escapeInlineJs(exam.exam || "") + "', " + (isUpdate ? "true" : "false") + ")\">" + (isUpdate ? "更新" : "送出") + "</button></div></div>";
         }
 
+        function buildAssessmentTitleHtml(value, className) {
+            var parts = window.AssessmentLabels.describe(value, className);
+            return '<span class="assessment-chapter">' + escapeHtml(parts.heading) + '</span>' +
+                (parts.detail ? '<span class="assessment-detail">' + parts.detail.split('｜').map(function(part) { return '<span>' + escapeHtml(part) + '</span>'; }).join('') + '</span>' : '');
+        }
+
         function buildDailyPostExamCard(post, exam, others, history) {
             if (!exam) return "";
             var scoreReportHtml = "";
@@ -11348,7 +11383,7 @@
                             sDisplay = "<span class='hw-score-val" + hwColorClass + "'>" + m[0] + "</span><span class='score-unit'>" + escapeHtml(u) + "</span>";
                         }
                     }
-                    refHwHtml += "<div class='ref-hw-item'><span>" + o.date + " " + o.exam + "</span><div>" + sDisplay + "</div></div>";
+                    refHwHtml += "<div class='ref-hw-item'><span>" + escapeHtml(o.date) + " " + buildAssessmentTitleHtml(o.exam, o.className || post.storedClassName || post.className || (gData && gData.className)) + "</span><div>" + sDisplay + "</div></div>";
                 });
                 refHwHtml += "</div>";
             }
@@ -11356,7 +11391,7 @@
             var examTitle = getDailyPostExamTimePrefix(exam) + getDailyPostExamLabel(exam) + "成績";
             var pendingExamAttrs = " data-pending-exam-anchor='1' data-exam-id='" + escapeHtmlAttr(exam.examId || '') + "' data-stored-exam-id='" + escapeHtmlAttr(exam.storedExamId || '') + "' data-exam-col-index='" + escapeHtmlAttr(exam.colIndex === undefined || exam.colIndex === null ? '' : exam.colIndex) + "' data-assignment-id='" + escapeHtmlAttr(exam.sourceAssignmentId || '') + "'";
 
-            return "<div class='grade-section'" + pendingExamAttrs + "><div class='main-exam-title'>" + examTitle + "</div><div class='main-exam-range'>" + exam.exam + "</div><div class='main-score'>" + scoreDisplay + "</div>" + logic.statusHtml + "<div class='score-sub'>班平均: " + exam.average + "</div>" + standardHtml + scoreReportHtml + chartHtml + refHwHtml + "</div>";
+            return "<div class='grade-section'" + pendingExamAttrs + "><div class='main-exam-title'>" + examTitle + "</div><div class='main-exam-range'>" + buildAssessmentTitleHtml(exam.exam, exam.className || post.storedClassName || post.className || (gData && gData.className)) + "</div><div class='main-score'>" + scoreDisplay + "</div>" + logic.statusHtml + "<div class='score-sub'>班平均: " + exam.average + "</div>" + standardHtml + scoreReportHtml + chartHtml + refHwHtml + "</div>";
         }
 
         function renderDailyPosts(posts, history) {
@@ -11465,17 +11500,17 @@
                         var upload = name.indexOf("上傳") > -1;
                         var homework = /作業|練習卷/.test(name);
                         if (linkPrefix) {
-                            parsed += keepLink(renderParsedLink(getDailyPostExamLinkDisplayName(name, linkPrefix, (getDailyPostDisplayOptions(post).links || {}).examTitleMode), url, "btn-link", SVG.document, BEAR_SUBJECT === "/science" ? name : ""));
+                            parsed += keepLink(renderParsedLink(getDailyPostExamLinkDisplayName(name, linkPrefix, (getDailyPostDisplayOptions(post).links || {}).examTitleMode), url, "btn-link", SVG.document, BEAR_SUBJECT === "/science" ? name : "", post.storedClassName || post.sourceClassName || post.className || gData.className));
                         } else if (name.indexOf('回家作業卷｜') === 0) {
                             // 上傳／連結小幫手的明確用途只作用於這一份卷，不改同欄參考連結。
                             var originalPaperName = name.slice('回家作業卷｜'.length);
                             var paperTitle = getDailyPostExamLinkDisplayName(originalPaperName, '回家作業卷', (getDailyPostDisplayOptions(post).links || {}).examTitleMode);
-                            parsed += keepLink(renderParsedLink(paperTitle, url, 'btn-important-tag' + colorClass, SVG.document, originalPaperName));
+                            parsed += keepLink(renderParsedLink(paperTitle, url, 'btn-important-tag' + colorClass, SVG.document, originalPaperName, post.storedClassName || post.sourceClassName || post.className || gData.className));
                         } else if (linkMode === "homework" || (linkMode === "auto" && (upload || homework))) {
                             var paper = !upload && (/卷/.test(name) || /\.pdf(?:$|[?#])/i.test(url) || /\.pdf$/i.test(name));
                             var textbook = /^課本作業｜/.test(name);
                             var homeworkName = textbook ? name : paper ? prependDailyPostLinkPurpose(name, "回家作業卷") : getDailyPostUploadLinkDisplayName(name);
-                            parsed += keepLink(renderParsedLink(homeworkName, url, "btn-important-tag" + colorClass, (textbook || paper) ? SVG.document : SVG.upload));
+                            parsed += keepLink(renderParsedLink(homeworkName, url, "btn-important-tag" + colorClass, (textbook || paper) ? SVG.document : SVG.upload, "", post.storedClassName || post.sourceClassName || post.className || gData.className));
                         } else if (linkMode === "supplement") {
                             parsed += keepLink(renderParsedLink(getDailyPostLinkDisplayName(name, linkMode, customLabel), url, "btn-supplement-tag" + colorClass, SVG.clip));
                         } else if (linkMode === "general" || linkMode === "custom") {
@@ -12096,7 +12131,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         <div class='score-card'${pendingOldExamAttrs} onclick='toggleCard(this)'>
             <div class='class-badge'>${escapeHtml(classBadgeText)}</div>
             <div class='card-main'>
-                <div class='exam-info'><span class='exam-date'>${escapeHtml(item.date)}</span><span class='exam-name'>${escapeHtml(item.exam)}</span></div>
+                <div class='exam-info'><span class='exam-date'>${escapeHtml(item.date)}</span><span class='exam-name'>${buildAssessmentTitleHtml(item.exam, item.className || (gData && gData.className))}</span></div>
                 <div class='score-box'>${displayScore}${item.subNote || ""}${logic.statusHtml}<div class='avg-score'>班平均 ${escapeHtml(item.average)}</div></div>
             </div>
             <div class='expand-area'>
