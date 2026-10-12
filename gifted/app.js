@@ -1,7 +1,7 @@
 (function(){'use strict';
 const $=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const query=new URLSearchParams(location.search),transport=window.GiftedStudentTransport;let actor,task,box,answers={},questionIndex=0,busy=false,tabId,releaseTab,conflictTask;
-let mediaRefresh,mediaRetryAt=0,gradeRefresh,submissionResult=null,latestSummary=null,resultRead=null;
+let mediaRefresh,mediaRetryAt=0,gradeRefresh,answerRetry,submissionResult=null,latestSummary=null,resultRead=null;
 // 延用 v17 的分頁鎖：重新整理保留同一草稿；複製分頁取得獨立編輯副本。
 async function reserveTab(){
  if(tabId)return;
@@ -112,13 +112,13 @@ function readResult(){
  return entry.promise;
 }
 function showConflict(server){conflictTask=server;$('conflict').hidden=false;const local=box.snapshot().draft?.answers||{};const label=(q,v)=>{const n=q.choices.indexOf(one(v));return n<0?'未答':String.fromCharCode(65+n);};const differences=task.questions.filter(q=>one(local[q.id])!==one(server.answers[q.id]));$('comparison').innerHTML=differences.length?differences.map(q=>'<p>第 '+q.sourceIndex+' 題：本機 '+label(q,local[q.id])+'／已保存 '+label(q,server.answers[q.id])+'</p>').join(''):'<p>選項相同，保存版本不同；請選擇要保留的版本。</p>';$('studentStatus').textContent='另一個視窗或裝置已更新答案；請先比較版本。';controls();}
-async function load(){gradeRefresh?.dispose();box?.close({erase:false});task=await student('task');submissionResult=null;latestSummary=null;$('result').innerHTML='';$('receipt').textContent='';$('resultStatus').textContent='';$('resultSection').hidden=!task.submission;$('submitSection').hidden=isReadOnly()||!!task.submission;conflictTask=null;$('conflict').hidden=true;$('workspace').hidden=false;$('login').hidden=true;$('studentName').textContent=task.classId+' · '+(transport?transport.studentName:'測試學生 '+actor.toUpperCase());$('studentTitle').innerHTML=esc(task.chapterLabel)+'<span class="scope-label">'+esc(task.label)+'</span>';$('assignmentInfo').textContent='本次 '+task.questions.length+' 題 · '+(task.target.includesPreviousAnswers?'會沿用上週答案，合併計算全章。':'作業欄只登記本次範圍。');
+async function load(){answerRetry?.dispose();gradeRefresh?.dispose();box?.close({erase:false});task=await student('task');submissionResult=null;latestSummary=null;$('result').innerHTML='';$('receipt').textContent='';$('resultStatus').textContent='';$('resultSection').hidden=!task.submission;$('submitSection').hidden=isReadOnly()||!!task.submission;conflictTask=null;$('conflict').hidden=true;$('workspace').hidden=false;$('login').hidden=true;$('studentName').textContent=task.classId+' · '+(transport?transport.studentName:'測試學生 '+actor.toUpperCase());$('studentTitle').innerHTML=esc(task.chapterLabel)+'<span class="scope-label">'+esc(task.label)+'</span>';$('assignmentInfo').textContent='本次 '+task.questions.length+' 題 · '+(task.target.includesPreviousAnswers?'會沿用上週答案，合併計算全章。':'作業欄只登記本次範圍。');
  box=null;
  if(!isReadOnly()){await reserveTab();box=GiftedAnswerOutbox.create({storage:localStorage,scope:{sessionUid:transport?transport.sessionUid:'v21-test-'+(query.get('fixture')||'default')+'-'+actor,planId:task.planId,segmentId:task.segmentId,scopeRevision:task.scopeRevision,tabId},transport:learning});}
  // 收件回覆曾遺失，但重新整理已取得正式收據時，清掉待重送狀態；不重寫伺服器首答。
  if(task.submission&&box?.snapshot().pending)box.resolveConflict(task,'server');
  const local=box?.snapshot()||{};answers=structuredClone(!task.submission&&local.draft?local.draft.answers:task.answers);
- if(local.pending)$('studentStatus').textContent='上次送出尚未確認；請重試原本的送出，不必重填。';
+ if(local.pending)$('studentStatus').textContent='上次送出尚未確認；連線恢復後會自動重試，不必重填。';
  else if(local.draft&&!task.submission&&local.draft.expectedRevision!==task.revision)showConflict(task);
  else $('studentStatus').textContent=isReadOnly()?'老師查看 · '+(task.submission?'學生已提交。':'學生尚未提交。'):local.draft&&!task.submission?'已恢復本機答案。':'可以開始作答。';
  $('question').innerHTML=task.questions.map(q=>`<option value="${q.id}">第 ${q.sourceIndex} 題</option>`).join('');paint();startSummary();
@@ -126,15 +126,35 @@ async function load(){gradeRefresh?.dispose();box?.close({erase:false});task=awa
  document.querySelector('.lead').textContent=isReadOnly()?'老師查看模式：可檢視學生作業、答案與成績。':'提交後會自動登記作業成績，不必另外傳訊息回報。';
  document.querySelector('.homework-reminder').hidden=isReadOnly();
  if(!isReadOnly())GiftedCorrectionRequest.mount($('correctionRequest'),{task,scopeKey:transport?transport.sessionUid:actor,send:learning,reload:load,beforeSubmit:()=>confirmWrite('requestCorrection')});
+ startAnswerRetry();
  if(task.submission)await readResult();
+}
+function startAnswerRetry(){
+ answerRetry?.dispose();answerRetry=null;if(isReadOnly()||!box)return;
+ const originalBox=box,originalTask=task;
+ answerRetry=GiftedAnswerRetry.create({
+  isPending:()=>box===originalBox&&task?.planId===originalTask.planId&&task?.segmentId===originalTask.segmentId&&!task.submission&&!conflictTask&&!!box.snapshot().pending,
+  isOnline:()=>navigator.onLine!==false,isVisible:()=>document.visibilityState!=='hidden',canSend:()=>!busy,
+  send:async()=>{busy=true;controls();$('error').textContent='';try{await flush();}catch(e){error(e);throw e;}finally{busy=false;controls();}},
+  onWaiting:state=>{const labels={offline:'目前沒有網路；答案已保留，連線恢復後會自動送出。',paused:'答案已保留，回到此頁後會自動確認送出。',waiting:'送出結果尚未確認；答案已保留，正在等待自動重試。',sending:'正在自動確認送出，請稍候。',delayed:'連線仍不穩定；答案已保留，會持續自動重試。'};
+   if(labels[state]){$('studentStatus').textContent=labels[state];$('error').textContent='';}}
+ });
+ if(box.snapshot().pending)answerRetry.resume();
 }
 async function flush(){
  if(isReadOnly())throw Error('TEACHER_VIEW_READ_ONLY');
+ const originalBox=box,originalTask=task;
+ if(navigator.onLine===false){answerRetry?.resume();paint();return;}
  let response;
- try{response=await box.flush();}catch(e){
+ try{response=await originalBox.flush();}catch(e){
+  if(box!==originalBox||task!==originalTask)return;
+  answerRetry?.failed(e);
   if(['DRAFT_CONFLICT','FORMAL_ALREADY_SUBMITTED'].includes(e.message)){showConflict(await student('task'));return;}
-  $('studentStatus').textContent='尚未確認送出結果；原答案與送出編號已保留，請按重試。';paint();throw e;
+  if(!GiftedAnswerRetry.isRetryable(e)){$('studentStatus').textContent='送出需要確認；原答案已保留。';paint();throw e;}
+  paint();return;
  }
+ if(box!==originalBox||task!==originalTask)return;
+ if(['submitted','saved'].includes(response.status))answerRetry?.settled();
  if(response.status==='submitted'){
   task.submission=response.result;task.revision=response.result.revision;
   // 交卷後不重載 task，仍須讓更正表單取得本次正式送出的完整答案。
@@ -157,13 +177,14 @@ function initStudent(){for(const event of ['click','keydown','touchstart','scrol
  document.addEventListener('load',e=>{if(e.target.tagName!=='IMG'||!e.target.closest('.student-media,.student-media-dialog'))return;const images=[...document.querySelectorAll('#questionCard img,.student-media-dialog[open] img')];if(images.length&&images.every(i=>i.complete&&i.naturalWidth>0))$('mediaStatus').hidden=true;},true);
  document.querySelectorAll('[data-actor]').forEach(el=>el.onclick=()=>run(el,async()=>{await reserveTab();actor=el.dataset.actor;await load();}));
  $('question').onchange=e=>{questionIndex=task.questions.findIndex(q=>q.id===e.target.value);paint();};$('previous').onclick=()=>{questionIndex--;paint();};$('next').onclick=()=>{questionIndex++;paint();};
- for(const action of ['save','submit'])$(action).onclick=e=>run(e.target,()=>saveOrSubmit(action));$('retry').onclick=e=>run(e.target,flush);
+ for(const action of ['save','submit'])$(action).onclick=e=>run(e.target,()=>saveOrSubmit(action));$('retry').onclick=e=>run(e.target,async()=>{answerRetry?.reset();await flush();});
  $('reloadResult').onclick=e=>run(e.target,readResult);
  $('refreshSummary').onclick=e=>run(e.target,()=>gradeRefresh?.refresh({manual:true}));
- document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')gradeRefresh?.pause();else gradeRefresh?.resume();});
- window.addEventListener('offline',()=>gradeRefresh?.pause());window.addEventListener('online',()=>gradeRefresh?.resume());
- window.addEventListener('pagehide',e=>e.persisted?gradeRefresh?.pause():gradeRefresh?.dispose());
-window.addEventListener('pageshow',e=>{if(e.persisted)gradeRefresh?.resume();});
+ document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){gradeRefresh?.pause();answerRetry?.pause();}else{gradeRefresh?.resume();answerRetry?.resume();}});
+ window.addEventListener('offline',()=>{gradeRefresh?.pause();answerRetry?.pause();answerRetry?.resume();});window.addEventListener('online',()=>{gradeRefresh?.resume();answerRetry?.resume();});
+ window.addEventListener('focus',()=>answerRetry?.resume());
+ window.addEventListener('pagehide',e=>{if(e.persisted){gradeRefresh?.pause();answerRetry?.pause();}else{gradeRefresh?.dispose();answerRetry?.dispose();}});
+window.addEventListener('pageshow',e=>{if(e.persisted){gradeRefresh?.resume();answerRetry?.resume();}});
  for(const [id,choice]of [['useServer','server'],['keepLocal','local']])$(id).onclick=e=>run(e.target,async()=>{const next=box.resolveConflict(conflictTask,choice);task=conflictTask;conflictTask=null;$('conflict').hidden=true;answers=next.draft.answers;paint();if(task.submission)await load();else $('studentStatus').textContent=choice==='server'?'已使用資料庫保存的答案。':'已保留本機答案，請再按儲存或提交。';});
  window.addEventListener('beforeunload',e=>{try{const s=box?.snapshot();if(s?.pending||s?.draft&&!task?.submission&&task.questions.some(q=>one(s.draft.answers[q.id])!==one(task.answers[q.id]))){e.preventDefault();e.returnValue='';}}catch{e.preventDefault();e.returnValue='';}});
 }
