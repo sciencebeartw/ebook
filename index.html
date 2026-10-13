@@ -1276,10 +1276,11 @@
             .student-info { font-size: clamp(1.125rem, calc(20vw - 46px), 2rem); line-height: 1.35; }
             /* 鈴鐺與品牌同排，下方維持原本三個工具橫排，不再多出第三列。 */
             .header-col-actions { display: grid; grid-template-columns: repeat(3, 40px); gap: 4px; }
-            .bears-lab-title { grid-area: 1 / 2 / 2 / 4; align-self: start; justify-self: end; margin: 0; font-size: 1rem; line-height: 1.4; white-space: nowrap; }
+            .bears-lab-title { grid-area: 1 / 1 / 2 / 3; align-self: start; justify-self: end; margin: 0; font-size: 1rem; line-height: 1.4; white-space: nowrap; }
+            .header-col-actions:has(#ebookPushEntry[hidden]) .bears-lab-title { grid-column: 1 / -1; }
             .header-btn-row { display: contents; }
             .header-icon-btn { width: 40px; height: 40px; }
-            #ebookPushEntry { grid-area: 1 / 1; justify-self: center; width: 32px; height: 32px; }
+            #ebookPushEntry { grid-area: 1 / 3; justify-self: end; width: 32px; height: 32px; }
             .header-btn-row .refresh-btn { grid-area: 2 / 1; }
             .header-btn-row .pwd-btn { grid-area: 2 / 2; }
             .header-btn-row .logout-btn { grid-area: 2 / 3; }
