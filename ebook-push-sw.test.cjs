@@ -46,3 +46,12 @@ test('非ebook頁面不得驅動前景通知或標記',async()=>{
     h.events.message({source:{url:'https://evil.example/ebook/'},data:{kind:'ebook_push_foreground',payload:h.data()},waitUntil(){accepted=true;}});
     assert.equal(accepted,false);assert.equal(h.shown.length,0);
 });
+test('七類業務通知顯示標題但不暴露成績／留言；未知類型拒絕',async()=>{
+    const h=setup();
+    for(const type of ['post','bulletin','message','sticker','makeup','grade','homework']) {
+        await h.receive({data:h.data({kind:'ebook_push_event',type,title:'最新學習通知'})});
+        assert.equal(h.shown.at(-1).t,'最新學習通知');assert.equal(h.shown.at(-1).o.body,'請開啟山熊聯絡簿查看最新內容。');
+    }
+    assert.equal(h.shown.length,7);
+    await h.receive({data:h.data({kind:'ebook_push_event',type:'unknown',title:'錯誤'})});assert.equal(h.shown.length,7);
+});

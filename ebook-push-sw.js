@@ -1,9 +1,10 @@
 /* 山熊通知試用 SW：僅推播／點擊／標記，沒有 fetch handler 或離線資料快取。 */
 'use strict';
-const PUSH_VERSION = '20261013-pilot1';
+const PUSH_VERSION = '20261014-events1';
 const validId = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
 function pushData(data) {
-    if (!data || data.kind !== 'ebook_push_test' || !validId(data.notificationId) || !validId(data.recipient) || !['science', 'math'].includes(data.subject)) return null;
+    if (!data || !['ebook_push_test','ebook_push_event'].includes(data.kind) || !validId(data.notificationId) || !validId(data.recipient) || !['science', 'math'].includes(data.subject)) return null;
+    if (data.kind === 'ebook_push_event' && (!['post','bulletin','message','sticker','makeup','grade','homework'].includes(data.type) || typeof data.title !== 'string' || data.title.length > 80)) return null;
     const count = Number(data.count), version = Number(data.version);
     if (!Number.isSafeInteger(count) || count < 0 || count > 40 || !Number.isSafeInteger(version) || version < 0) return null;
     return { ...data, count, version };
@@ -34,8 +35,8 @@ async function present(raw) {
     const url = new URL('index.html', self.registration.scope);
     url.searchParams.set('subject', data.subject); url.searchParams.set('pushNotice', data.notificationId);
     // FCM 僅 data payload，此處是唯一背景顯示點；同事件用固定 tag 取代、不再次提醒。
-    await self.registration.showNotification('手機推播測試', {
-        body: '這是一則測試通知，點開可確認接收與未讀標記。',
+    await self.registration.showNotification(data.kind === 'ebook_push_event' ? data.title : '手機推播測試', {
+        body: data.kind === 'ebook_push_event' ? '請開啟山熊聯絡簿查看最新內容。' : '這是一則測試通知，點開可確認接收與未讀標記。',
         icon: new URL('ebook-icon-192.png', self.registration.scope).href,
         tag: `ebook-${data.notificationId}`, renotify: false,
         data: { url: url.href, notificationId: data.notificationId, subject: data.subject },

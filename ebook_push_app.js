@@ -27,12 +27,13 @@
         if (!state.enabled) return '這台裝置已暫停通知，可隨時重新開啟。';
         return '這台裝置已開啟測試通知。一般家長尚未開放。';
     }
-    const statuses = { queued: '預計 20 秒後發送', processing: '處理中', accepted: '推播服務已接受，請確認各裝置', partial: '部分裝置已送出，其餘已停用或失效', canceled: '已取消', expired: '已逾時，未補送', failed: '裝置失效，請重新開啟', uncertain: '送出結果待確認，未自動重送' };
+    const statuses = { queued: '等待發送', processing: '處理中', accepted: '推播服務已接受，請確認各裝置', partial: '部分裝置已送出，其餘已停用或失效', canceled: '已取消', expired: '已逾時，未補送', failed: '裝置失效，請重新開啟', uncertain: '送出結果待確認，未自動重送' };
     function build() {
         if (dialog) return;
         dialog = document.createElement('dialog'); dialog.className = 'ep-dialog'; dialog.setAttribute('aria-labelledby', 'ep-title');
-        dialog.innerHTML = '<header><h2 id="ep-title">通知設定與教學</h2><button type="button" data-ep="close" aria-label="關閉通知設定">關閉</button></header><div class="ep-body"><p class="ep-state" role="status"></p><p class="ep-note">目前只供系統測試生試用。通知可以關閉，不影響查看聯絡簿與使用 LINE。</p><p class="ep-error" role="alert"></p><div class="ep-actions"><button type="button" class="ep-primary" data-ep="enable">開啟這台裝置通知</button><button type="button" data-ep="pause">暫停這台裝置</button><button type="button" data-ep="refresh">重新確認狀態</button></div><button type="button" data-ep="test">20 秒後傳送測試通知</button><p class="ep-note ep-test-targets"></p><p class="ep-note">只需在其中一台按一次，再將手機與 iPad 回主畫面或鎖定，觀察是否收到。最多每分鐘測試一次；服務接受不代表手機已顯示。</p><h3>最近測試</h3><ul class="ep-log"></ul><details open><summary>iPhone／iPad 如何開啟通知</summary><ol><li>使用 iOS／iPadOS 16.4 或以上，先將聯絡簿加入主畫面。</li><li>從主畫面圖示開啟，以測試生登入，並勾選「保持登入」。老師預覽不能註冊。</li><li>按「開啟這台裝置通知」，在手機提示中選「允許」。</li><li>把本頁核對碼告訴老師，核准後重新確認狀態，再傳送測試通知。</li></ol></details><details><summary>如何關閉、重新開啟</summary><p>本頁可暫停這台裝置；老師也能關閉整個推播試用。手機「設定」的「通知」中找到山熊聯絡簿，可關閉允許通知、聲音或標記。不同 iOS 版本入口可能不同，會依這次實機補充。</p><p>重新開啟只接收新的通知，不補送停用期間的舊提醒。已交給手機系統的通知可能仍顯示。</p></details><details><summary>沒有收到怎麼辦</summary><p>確認從主畫面圖示開啟、裝置已核准、本頁及手機通知開關都開啟，再檢查網路與專注模式。系統不保證即時顯示，也不會突破靜音設定。</p><p>圖示數字代表通知未讀數；讀取通知不代表完成作業。主動登出會解除這台裝置的通知綁定。手機和 iPad 需要各自開啟通知；其中一台暫停不影響另一台。已讀會共用，其他裝置的圖示數字會在重新開啟聯絡簿或收到下一則通知時更新。</p></details><details><summary>後續通知用途</summary><p>聯絡簿、公告、老師留言／回覆、棒卡審核、補考結果、課後成績、作業催繳，會在手機試用通過後逐項接入與驗收。目前只有測試通知。</p></details></div>';
+        dialog.innerHTML = '<header><h2 id="ep-title">通知設定與教學</h2><button type="button" data-ep="close" aria-label="關閉通知設定">關閉</button></header><div class="ep-body"><p class="ep-state" role="status"></p><p class="ep-note">目前只供系統測試生試用。通知可以關閉，不影響查看聯絡簿與使用 LINE。</p><p class="ep-error" role="alert"></p><div class="ep-actions"><button type="button" class="ep-primary" data-ep="enable">開啟這台裝置通知</button><button type="button" data-ep="pause">暫停這台裝置</button><button type="button" data-ep="refresh">重新確認狀態</button></div><button type="button" data-ep="test">20 秒後傳送測試通知</button><p class="ep-note ep-test-targets"></p><p class="ep-note">只需在其中一台按一次，再將手機與 iPad 回主畫面或鎖定，觀察是否收到。最多每分鐘測試一次；服務接受不代表手機已顯示。</p><h3>通知類型</h3><p class="ep-note">設定適用同一帳號的手機與 iPad；每台裝置仍可分別暫停。</p><div class="ep-preferences"></div><h3>最近通知</h3><ul class="ep-log"></ul><details open><summary>iPhone／iPad 如何開啟通知</summary><ol><li>使用 iOS／iPadOS 16.4 或以上，先將聯絡簿加入主畫面。</li><li>從主畫面圖示開啟，以測試生登入，並勾選「保持登入」。老師預覽不能註冊。</li><li>按「開啟這台裝置通知」，在手機提示中選「允許」。</li><li>把本頁核對碼告訴老師，核准後重新確認狀態，再傳送測試通知。</li></ol></details><details><summary>如何關閉、重新開啟</summary><p>本頁可暫停這台裝置；老師也能關閉整個推播試用。手機「設定」的「通知」中找到山熊聯絡簿，可關閉允許通知、聲音或標記。不同 iOS 版本入口可能不同，會依這次實機補充。</p><p>重新開啟只接收新的通知，不補送停用期間的舊提醒。已交給手機系統的通知可能仍顯示。</p></details><details><summary>沒有收到怎麼辦</summary><p>確認從主畫面圖示開啟、裝置已核准、本頁及手機通知開關都開啟，再檢查網路與專注模式。系統不保證即時顯示，也不會突破靜音設定。</p><p>圖示數字代表通知未讀數；讀取通知不代表完成作業。主動登出會解除這台裝置的通知綁定。手機和 iPad 需要各自開啟通知；其中一台暫停不影響另一台。已讀會共用，其他裝置的圖示數字會在重新開啟聯絡簿或收到下一則通知時更新。</p></details><details><summary>後續通知用途</summary><p>聯絡簿、公告、老師留言／回覆、棒卡審核、補考結果、課後成績、作業催繳，已接入系統測試生試用。只有啟用後的新事件會通知，停用期間及歷史資料不補送。</p></details></div>';
         dialog.addEventListener('click', event => { const b = event.target.closest('[data-ep]'); if (b) action(b.dataset.ep, b.dataset.id); });
+        dialog.addEventListener('change', event => { const input = event.target.closest('[data-ep-preference]'); if(input) action('preferences', input.dataset.epPreference, input.checked); });
         document.body.appendChild(dialog);
     }
     function render() {
@@ -40,12 +41,13 @@
         dialog.querySelector('.ep-state').textContent = statusText();
         const count = Number(state && state.approvedDeviceCount) || 0;
         dialog.querySelector('.ep-test-targets').textContent = `目前核准 ${count} 台裝置。測試會送給其中已開啟通知且登入有效的裝置；同一則通知只算一則未讀。`;
+        dialog.querySelector('.ep-preferences').innerHTML = state && state.businessEnabled ? Object.entries(state.kinds || {}).map(([kind,label]) => `<label><input type="checkbox" data-ep-preference="${escape(kind)}" ${state.preferences && state.preferences[kind] === false ? '' : 'checked'} ${busy ? 'disabled' : ''}> ${escape(label)}</label>`).join('') : '<p class="ep-note">老師尚未開啟事件試用。</p>';
         const usable = state && state.mode === 'test_only' && state.ready && capable() && (!ios() || installed());
         dialog.querySelector('[data-ep="enable"]').disabled = busy || !usable || (state.enabled && state.approved);
         dialog.querySelector('[data-ep="pause"]').disabled = busy || !(state && state.enabled);
         dialog.querySelector('[data-ep="test"]').disabled = busy || !usable || Notification.permission !== 'granted' || !(state.enabled && state.approved);
         dialog.querySelector('[data-ep="refresh"]').disabled = busy;
-        dialog.querySelector('.ep-log').innerHTML = state && state.items && state.items.length ? state.items.map(i => `<li><span>${escape(i.title)}<small>${escape(new Date(i.createdAt).toLocaleString('zh-TW'))} · ${escape(statuses[i.status] || '待確認')}</small></span><button type="button" data-ep="read" data-id="${escape(i.id)}" ${i.readAt || busy ? 'disabled' : ''}>${i.readAt ? '已讀' : '標示已讀'}</button></li>`).join('') : '<li>尚無測試通知</li>';
+        dialog.querySelector('.ep-log').innerHTML = state && state.items && state.items.length ? state.items.map(i => `<li><span>${escape(i.title)}<small>${escape(new Date(i.createdAt).toLocaleString('zh-TW'))} · ${escape(statuses[i.status] || '待確認')}</small></span><button type="button" data-ep="read" data-id="${escape(i.id)}" ${i.readAt || busy ? 'disabled' : ''}>${i.readAt ? '已讀' : '標示已讀'}</button>${i.target ? `<button type="button" data-ep="view" data-id="${escape(i.id)}">查看</button>` : ''}</li>`).join('') : '<li>尚無通知</li>';
     }
     async function api(action, extra = {}) {
         const mine = epoch;
@@ -71,6 +73,7 @@
         const module = await timed(import('./ebook_push_messaging.mjs?v=20261013-pilot1'));
         if (mine !== epoch) return;
         registration = reg; bridge = module;
+        reg.update().catch(() => {});
         await timed(bridge.listen({ firebaseConfig: env.firebaseConfig, onMessage: payload => {
             if (mine === epoch && reg.active) reg.active.postMessage({ kind: 'ebook_push_foreground', payload });
         } }));
@@ -92,7 +95,7 @@
         const permission = await Notification.requestPermission();
         unchanged();
         if (permission !== 'granted') throw new Error('尚未允許通知，可依下方教學重新開啟');
-        registration = await timed(navigator.serviceWorker.register('ebook-push-sw.js?v=20261013-pilot1', { scope: './', updateViaCache: 'none' }));
+        registration = await timed(navigator.serviceWorker.register('ebook-push-sw.js?v=20261014-events1', { scope: './', updateViaCache: 'none' }));
         await timed(navigator.serviceWorker.ready);
         unchanged();
         bridge = await timed(import('./ebook_push_messaging.mjs?v=20261013-pilot1'));
@@ -111,12 +114,14 @@
         await syncBadge(true);
         await clearBadge();
     }
-    async function action(name, id) {
+    async function action(name, id, value) {
         if (name === 'close') { dialog.close(); return; }
         if (busy) return;
         const mine = epoch;
         busy = true; dialog.querySelector('.ep-error').textContent = ''; render();
         try {
+            if (name === 'preferences') { state = await api('preferences', {preferences:{[id]:value}}); render(); }
+            if (name === 'view') await viewNotice(id);
             if (name === 'enable') await enable();
             if (name === 'refresh') await refresh();
             if (name === 'pause') { state = await api('pause'); await unsubscribe(); render(); }
@@ -135,11 +140,20 @@
         } catch (error) { if (mine === epoch) dialog.querySelector('.ep-error').textContent = error.message || '操作未完成，請稍後重試'; }
         finally { if (mine === epoch) { busy = false; render(); } }
     }
+    async function viewNotice(id) {
+        const result = await api('open', {notificationId:id});
+        if (result.type !== 'test') {
+            if (!env.navigate || !await env.navigate(result.target)) throw new Error('目前畫面尚未載入這筆內容，請重新整理聯絡簿後再查看。');
+            if(dialog.open) dialog.close();
+        }
+        await api('read', {notificationId:id});
+        await refresh();
+    }
     async function open(notificationId) {
         if (!env || !entry || entry.hidden) return;
         build(); if (!dialog.open) dialog.showModal();
         await action('refresh');
-        if (isId(notificationId)) await action('read', notificationId);
+        if (isId(notificationId)) await action('view', notificationId);
     }
     async function ready(options) {
         const mine = ++epoch; env = options; state = null; binding = null; busy = false;

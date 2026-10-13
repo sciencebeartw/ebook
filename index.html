@@ -4897,8 +4897,8 @@
   <script src="resource_catalog_view.js?v=20261002_resources_time_v1"></script>
   <script src="ebook_resources_app.js?v=20261003_resources_outline_v5"></script>
 
-  <link rel="stylesheet" href="ebook_push.css?v=20261014-header1">
-  <script src="ebook_push_app.js?v=20261014-multidevice1"></script>
+  <link rel="stylesheet" href="ebook_push.css?v=20261014-events1">
+  <script src="ebook_push_app.js?v=20261014-events1"></script>
 
   <!-- Webhook API & Firebase Polyfill (Replace google.script.run) -->
   <script>
@@ -8957,7 +8957,7 @@
             gData = result;
             queueMicrotask(function() { window.EbookPush?.ready({ session: ebookAuthSessionInfo || {}, uid: ebookAuth.currentUser && ebookAuth.currentUser.uid,
                 subject: ebookSubjectParam, preview: isStudentPreviewMode || isDashboardDraftPreviewMode || !!ebookGodSessionInfo,
-                firebaseConfig: firebaseConfig, call: async function(data) { return (await ebookFunctions.httpsCallable('runEbookPushAction', { timeout: 15000 })(data)).data; } }); });
+                firebaseConfig: firebaseConfig, navigate: openEbookPushTarget, call: async function(data) { return (await ebookFunctions.httpsCallable('runEbookPushAction', { timeout: 15000 })(data)).data; } }); });
             queueMicrotask(function() { window.GiftedEbook?.ready({ auth: ebookAuth, result: result, mode: pass, preview: isDashboardDraftPreviewMode, teacherView: !!ebookGodSessionInfo }); });
             activeEbookPromotionContext = result.promotionContext || null;
             resetPopupQueueForEntry();
@@ -9761,6 +9761,34 @@
                 document.getElementById('full-loader').style.display = 'none';
                 swalAlert("更新失敗", (err && err.message) || "登入已失效，請重新登入。", "warning");
             }).refreshStudentData();
+        }
+        async function openEbookPushTarget(target) {
+            if (!target || !gData || isStudentPreviewMode) return false;
+            var kind = target.kind, node = null;
+            if (kind === 'homework') { switchTab(3); return document.getElementById('tab-content-3').style.display !== 'none'; }
+            if (kind === 'bulletin') {
+                switchTab(2);
+                node = Array.from(document.querySelectorAll('[data-push-bulletin-id]')).find(el => el.dataset.pushBulletinId === target.id);
+                if (!node) {
+                    var list = gData.bulletins || [];
+                    var bulletin = (Array.isArray(list) ? list : Object.values(list)).find(b => b.id === target.id && isBulletinEffective(b));
+                    if (bulletin) {
+                        hideEmergencyModal();
+                        popupAnnouncementQueue.unshift(bulletin);
+                        return showNextPopupAnnouncement();
+                    }
+                }
+            } else if (kind === 'grade' || kind === 'makeup') {
+                switchTab(1);
+                node = Array.from(document.querySelectorAll('#tab-content-1 [data-exam-id]')).find(el => el.dataset.examId === target.id || el.dataset.storedExamId === target.id);
+            } else {
+                switchTab(0);
+                node = Array.from(document.querySelectorAll('[data-post-id]')).find(el => kind === 'post' ? el.dataset.postId === target.id : el.dataset.postDate === target.date);
+                if (node && kind === 'message') node = Array.from(node.querySelectorAll('[data-feedback-thread-id]')).find(el => el.dataset.feedbackThreadId === target.id) || node;
+            }
+            if (!node) return false;
+            node.scrollIntoView({behavior:'smooth',block:'start'});
+            return true;
         }
         function switchTab(idx) {
             idx = Number(idx);
@@ -13017,7 +13045,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 }
 
                 cards += `
-            <div class="${cardClass}">
+            <div class="${cardClass}" data-push-bulletin-id="${escapeHtmlAttr(b.id || '')}">
                 <div class="bulletin-header">
                     <div><span class="bulletin-tag ${tagClass}">${escapeHtml(displayLabel)}</span><span class="bulletin-title">${escapeHtml(b.title)}</span></div>
                     ${bulletinDateHtml}
