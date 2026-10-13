@@ -1268,14 +1268,12 @@
         }
 
         @media (max-width: 600px) {
-            .header-bar { grid-template-columns: 64px minmax(0, 1fr); grid-template-areas: "logo info" "tools tools"; gap: 8px 10px; padding: 12px; }
-            .header-col-logo { grid-area: logo; width: 64px; height: 72px; }
+            .header-bar { grid-template-columns: 64px minmax(0, 1fr) 92px; align-items: start; gap: 8px; padding: 12px 10px; }
+            .header-col-logo { align-self: center; width: 64px; height: 72px; }
             .header-logo-full { max-width: 64px; max-height: 72px; }
-            .header-col-info { grid-area: info; padding-top: calc(1.4rem + 6px); }
-            .student-info { font-size: 2rem; }
-            .header-col-actions { display: contents; }
-            .bears-lab-title { grid-area: info; align-self: start; justify-self: end; margin-bottom: 0; font-size: 1rem; line-height: 1.4; white-space: nowrap; }
-            .header-btn-row { grid-area: tools; justify-self: end; gap: 4px; }
+            .student-info { font-size: clamp(1.5rem, 8vw, 2rem); }
+            .bears-lab-title { margin-bottom: 2px; font-size: 1rem; line-height: 1.4; white-space: nowrap; }
+            .header-btn-row { display: grid; grid-template-columns: repeat(2, 44px); gap: 4px; }
         }
 
         .refresh-btn { color: #0ea5e9; }
@@ -7338,7 +7336,7 @@
             <div class="header-bar">
                 <!-- 左欄：LOGO -->
                 <div class="header-col-logo">
-                    <img src="LOGO.png" class="header-logo-full logo-target">
+                    <img src="report-logo-green.png" class="header-logo-full logo-target" alt="山熊科學 Bear’s Lab">
                 </div>
                 
                 <!-- 中欄：上(班級) 下(姓名 + 棒卡) -->
@@ -7804,7 +7802,7 @@
                 '<a class="gifted-feedback-link" href="' + escapeHtmlAttr(url) + '">查看作業與審核進度 →</a></div>';
         }
 
-        const APP_LOGO = "https://www.sciencebear.com.tw/ebook/LOGO.png";
+        const APP_LOGO = "https://www.sciencebear.com.tw/ebook/report-logo-green.png";
         const DEFAULT_HW_TEXT = `1.請記得，要先在課本寫完才能開始上傳。\n2.上傳時注意名字填寫全名，並且前後不要有空格。\n3.送出後記得要查看分數，一題一題訂正在課本上！\n4.未訂正視同作業未完成哦。`;
 
         // ★★★ 全域 SVG 圖示常數 (全部使用單引號屬性，確保可安全內嵌於 JS 字串) ★★★
