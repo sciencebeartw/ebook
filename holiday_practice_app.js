@@ -41,6 +41,8 @@
         return purpose + '｜' + assignment.title;
     }
     function linkHtml(post, assignment, answer) {
+        var named = root.AssessmentNaming && root.AssessmentNaming.find(P.options(post), '', '', answer ? 'holidayAnswerUrl' : 'holidayQuestionUrl');
+        if (named && named.label) return root.AssessmentNaming.labelHtml(named.label);
         var label = linkLabel(post, assignment, answer);
         return typeof buildAssessmentLinkHtml === 'function' ? buildAssessmentLinkHtml(label, className(post)) : esc(label);
     }

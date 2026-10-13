@@ -1,0 +1,16 @@
+<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>學生按鈕名稱驗證</title><style>body{margin:0}iframe{border:0;width:100%;height:100vh;display:block}</style><iframe id="ebook" title="聯絡簿學生預覽" src="../?preview=dashboard-draft"></iframe><script>
+const cls='115小六資優自然週六上午班';
+const links=[
+ {source:'小考:20261011小六資優自然小考理化第11章.pdf',href:'https://example.test/quiz.pdf',label:'小考卷｜常見的力・概念一、二',slot:'quiz'},
+ {source:'小考:20261011 ANS.pdf',href:'https://example.test/quiz-ans.pdf',label:'小考解答｜常見的力・概念一、二',slot:'quiz'},
+ {source:'20261011 補考.pdf',href:'https://example.test/makeup.pdf',label:'補考卷｜有機化合物',slot:'makeup'},
+ {source:'回家作業卷｜理化第10章 有機化合物',href:'https://example.test/home.pdf',label:'回家練習卷｜理化第10章 有機化合物',slot:'hw1'},
+ {source:'很長的補充檔名.docx',href:'https://example.test/force.docx',label:'補充教材｜生活中的力與運動觀察、實驗圖表判讀與應用',originalName:'很長的補充檔名.docx',slot:'note'},
+ {source:'資源網站',href:'https://example.test/link',label:'一般連結｜課後延伸閱讀',slot:'hw2'}
+];
+const post={id:'naming_fixture',className:cls,storedClassName:cls,date:'2026-10-11',title:'第24堂｜資優自然',progress:'理化第11章 常見的力',hw1:'',hw2:'',note:'',quiz:'',makeup:'',displayOptions:{version:6,quiz:{slot1Role:'question',slot2Role:'answer'},homework:{hw2LinkMode:'general'},links:{noteLinkMode:'supplement',labels:links.map(({slot,...row})=>({...row,structured:true})).concat([{role:'holidayQuestionUrl',label:'假期練習卷｜理化第1–8章'},{role:'holidayAnswerUrl',label:'假期練習卷答案｜理化第1–8章'}])},holidayPractice:{assignmentId:'holiday_fixture',revision:'fixture_revision',title:'完整的假期卷原名',questionUrl:'https://example.test/holiday.pdf',dueDate:'2026-10-18',dueTime:'09:00',draft:false}}};
+links.forEach(row=>{post[row.slot]+=(post[row.slot]?'\n':'')+'['+row.source+']'+row.href});
+const frame=document.getElementById('ebook');window.fixtureErrors=[];
+frame.onload=()=>{const w=frame.contentWindow;w.addEventListener('error',e=>fixtureErrors.push(e.message));w.enterDashboardDraftPreview({subject:'science',className:cls,studentName:'測試學生',dailyPosts:[post]});window.fixtureReady=true;};
+window.inspectNaming=()=>{const d=frame.contentDocument;const text=d.body.innerText;const actual=[...d.querySelectorAll('a')];return {ready:fixtureReady,errors:fixtureErrors,matched:links.map(row=>({label:row.label,found:actual.some(a=>a.textContent.includes(row.label))})),holiday:actual.some(a=>a.textContent.includes('假期練習卷｜理化第1–8章')),privateAnswers:actual.filter(a=>/private|holiday-answer/.test(a.href)).length,original:actual.some(a=>a.dataset.fileName==='很長的補充檔名.docx'),width:frame.clientWidth,scroll:d.documentElement.scrollWidth}};
+</script></html>

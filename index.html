@@ -27,12 +27,13 @@
     <!-- External Resources -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
     <script src="assessment_labels.js?v=20261012-full-scope"></script>
+    <script src="assessment_naming.js?v=20261013-editable-1"></script>
     <script src="class_session_plan.js?v=20261011-library1"></script>
     <script src="homework_report_status.js?v=20261011-pending1"></script>
     <script src="homework_answers_contract.js?v=20261011-report1"></script>
-    <script src="homework_answers_app.js?v=20261012-full-scope"></script>
+    <script src="homework_answers_app.js?v=20261013-editable-1"></script>
     <link rel="stylesheet" href="homework_answers.css?v=20261011-report1">
-    <script src="holiday_practice_app.js?v=20261012-full-scope"></script>
+    <script src="holiday_practice_app.js?v=20261013-editable-1"></script>
     <!-- holiday-score-card-form-20260921 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
@@ -7645,12 +7646,13 @@
                 (title.detail ? '<span class="assessment-link-detail">' + title.detail.split('｜').map(function(text) { return '<span>' + escapeHtml(text) + '</span>'; }).join('') + '</span>' : '');
         }
 
-        function renderParsedLink(name, url, className, iconHtml, originalName, assessmentClassName) {
+        function renderParsedLink(name, url, className, iconHtml, originalName, assessmentClassName, literalLabel) {
             var rawUrl = decodeBasicHtmlEntities(url);
             var safeRawUrl = escapeHtmlAttr(rawUrl);
             var safeName = name || "連結";
-            var titlePrefix = safeName.match(/^(課本作業|上傳課本作業|回家作業卷|作業解答|小考卷|小考答案|隨堂考卷|鑑定考卷|補考卷|補考答案|假期練習卷(?:答案)?)\s*｜/);
-            if (titlePrefix && typeof buildAssessmentLinkHtml === 'function' && window.AssessmentLabels) {
+            var titlePrefix = safeName.match(/^(課本作業|上傳課本作業|回家作業卷|作業解答|小考卷|小考答案|小考解答|隨堂考(?:卷|解答)|鑑定考(?:卷|解答)|複習考(?:卷|解答)|輔導(?:卷|解答)|補考卷|補考答案|假期練習卷(?:答案)?)\s*｜/);
+            if (literalLabel && window.AssessmentNaming) safeName = AssessmentNaming.labelHtml(name);
+            else if (titlePrefix && typeof buildAssessmentLinkHtml === 'function' && window.AssessmentLabels) {
                 safeName = buildAssessmentLinkHtml(decodeBasicHtmlEntities(safeName), assessmentClassName || (typeof gData !== 'undefined' && gData && gData.className) || '');
             } else if (/^課本作業｜/.test(safeName)) {
                 safeName = safeName.split("｜").map(function(part, index) {
@@ -11499,7 +11501,11 @@
                         var colorClass = getDailyPostButtonColorClass(color);
                         var upload = name.indexOf("上傳") > -1;
                         var homework = /作業|練習卷/.test(name);
-                        if (linkPrefix) {
+                        var named = window.AssessmentNaming && AssessmentNaming.find(getDailyPostDisplayOptions(post), decodeBasicHtmlEntities(name), decodeBasicHtmlEntities(url));
+                        if (named && named.label) {
+                            var namedClass = linkPrefix ? 'btn-link' : name.indexOf('回家作業卷｜') === 0 || linkMode === 'homework' ? 'btn-important-tag' : linkMode === 'supplement' ? 'btn-supplement-tag' : linkMode === 'general' || linkMode === 'custom' ? 'btn-general-tag' : 'btn-link';
+                            parsed += keepLink(renderParsedLink(named.label, url, namedClass + colorClass, namedClass === 'btn-general-tag' ? SVG.link : namedClass === 'btn-supplement-tag' ? SVG.clip : SVG.document, named.originalName || decodeBasicHtmlEntities(name), '', true));
+                        } else if (linkPrefix) {
                             parsed += keepLink(renderParsedLink(getDailyPostExamLinkDisplayName(name, linkPrefix, (getDailyPostDisplayOptions(post).links || {}).examTitleMode), url, "btn-link", SVG.document, BEAR_SUBJECT === "/science" ? name : "", post.storedClassName || post.sourceClassName || post.className || gData.className));
                         } else if (name.indexOf('回家作業卷｜') === 0) {
                             // 上傳／連結小幫手的明確用途只作用於這一份卷，不改同欄參考連結。
