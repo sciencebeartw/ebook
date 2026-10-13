@@ -1138,17 +1138,17 @@
             padding-bottom: 80px;
         }
 
-                                                        .header-bar {
+        /* ★★★ 手機頁首：姓名區隨內容增高，工具列保留完整點按空間 ★★★ */
+        .header-bar {
             background: #ffffff;
             padding: 8px 10px;
             display: grid;
-            grid-template-columns: auto 1fr auto;
+            grid-template-columns: auto minmax(0, 1fr) auto;
             align-items: center;
             gap: 8px;
             border-bottom: 3px solid var(--primary);
             box-shadow: 0 2px 10px rgba(0,0,0,0.02);
             min-height: 80px;
-            overflow: hidden;
         }
 
         .header-col-logo {
@@ -1172,8 +1172,7 @@
             display: flex;
             flex-direction: column;
             justify-content: center;
-            height: 60px;
-            overflow: hidden;
+            min-width: 0;
             padding-left: 0;
         }
 
@@ -1182,9 +1181,8 @@
             color: #64748b;
             font-weight: 700;
             margin-bottom: 2px;
-            white-space: nowrap;
-            text-overflow: ellipsis;
-            overflow: hidden;
+            line-height: 1.45;
+            overflow-wrap: anywhere;
         }
 
         .name-pill-row {
@@ -1198,9 +1196,9 @@
             font-size: 2.3rem;
             font-weight: 900;
             color: #064e3b;
-            line-height: 1;
-            margin-top: -2px;
-            white-space: nowrap;
+            line-height: 1.5;
+            min-width: 0;
+            overflow-wrap: anywhere;
         }
 
         .sticker-badge-header {
@@ -1223,7 +1221,6 @@
             flex-direction: column;
             align-items: flex-end;
             justify-content: center;
-            height: 60px;
             flex-shrink: 0;
         }
 
@@ -1243,10 +1240,14 @@
         }
 
         .header-icon-btn {
+            box-sizing: border-box;
             text-decoration: none;
             background: #ffffff;
-            width: 28px;
-            height: 28px;
+            width: 44px;
+            height: 44px;
+            padding: 0;
+            flex-shrink: 0;
+            cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -1257,8 +1258,23 @@
         }
         
         .header-icon-btn svg {
-            width: 17px;
-            height: 17px;
+            width: 20px;
+            height: 20px;
+        }
+
+        .header-icon-btn:focus-visible {
+            outline: 3px solid #deac3c;
+            outline-offset: 2px;
+        }
+
+        @media (max-width: 600px) {
+            .header-bar { grid-template-columns: 64px minmax(0, 1fr); gap: 8px 10px; padding: 12px; }
+            .header-col-logo { width: 64px; height: 72px; }
+            .header-logo-full { max-width: 64px; max-height: 72px; }
+            .student-info { font-size: 2rem; }
+            .header-col-actions { grid-column: 1 / -1; flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; }
+            .bears-lab-title { margin-bottom: 0; font-size: 1rem; white-space: nowrap; }
+            .header-btn-row { gap: 4px; }
         }
 
         .refresh-btn { color: #0ea5e9; }
@@ -4872,7 +4888,7 @@
   <script src="resource_catalog_view.js?v=20261002_resources_time_v1"></script>
   <script src="ebook_resources_app.js?v=20261003_resources_outline_v5"></script>
 
-  <link rel="stylesheet" href="ebook_push.css?v=20261013-pilot1">
+  <link rel="stylesheet" href="ebook_push.css?v=20261014-header1">
   <script src="ebook_push_app.js?v=20261013-pilot1"></script>
 
   <!-- Webhook API & Firebase Polyfill (Replace google.script.run) -->
@@ -7318,7 +7334,7 @@
         </div>
 
         <div id="main-screen">
-                                    <div class="header-bar">
+            <div class="header-bar">
                 <!-- 左欄：LOGO -->
                 <div class="header-col-logo">
                     <img src="LOGO.png" class="header-logo-full logo-target">
@@ -7337,6 +7353,9 @@
                 <div class="header-col-actions">
                     <div class="bears-lab-title">Bear's Lab</div>
                     <div class="header-btn-row">
+                        <button id="ebookPushEntry" class="header-icon-btn ebook-push-entry" type="button" hidden onclick="EbookPush.open()" title="通知設定與教學" aria-label="通知設定與教學" aria-haspopup="dialog">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9.5 19.5a2.5 2.5 0 0 0 5 0M12 3V2M5 17.5h14c-1.4-1.5-2-3.1-2-5.5V9a5 5 0 0 0-10 0v3c0 2.4-.6 4-2 5.5Z"/></svg>
+                        </button>
                         <a href="javascript:void(0)" class="header-icon-btn refresh-btn" onclick="doRefresh()" title="重整">
                             <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
                         </a>
@@ -7349,7 +7368,6 @@
                     </div>
                 </div>
             </div>
-            <button id="ebookPushEntry" class="ebook-push-entry" type="button" hidden onclick="EbookPush.open()">通知設定與教學</button>
             <section id="ebookResourcePage" class="er-root" aria-label="段考複習資料" hidden>
                 <div class="er-tools"><button type="button" data-er-action="back">‹ 返回聯絡簿</button><button type="button" data-er-action="list">所有複習資料</button><button type="button" data-er-action="retry">重新整理</button></div>
                 <div id="ebookResourceContent"></div>
