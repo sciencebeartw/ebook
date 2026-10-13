@@ -4872,6 +4872,9 @@
   <script src="resource_catalog_view.js?v=20261002_resources_time_v1"></script>
   <script src="ebook_resources_app.js?v=20261003_resources_outline_v5"></script>
 
+  <link rel="stylesheet" href="ebook_push.css?v=20261013-pilot1">
+  <script src="ebook_push_app.js?v=20261013-pilot1"></script>
+
   <!-- Webhook API & Firebase Polyfill (Replace google.script.run) -->
   <script>
     const qParams = new URLSearchParams(window.location.search);
@@ -7346,6 +7349,7 @@
                     </div>
                 </div>
             </div>
+            <button id="ebookPushEntry" class="ebook-push-entry" type="button" hidden onclick="EbookPush.open()">通知設定與教學</button>
             <section id="ebookResourcePage" class="er-root" aria-label="段考複習資料" hidden>
                 <div class="er-tools"><button type="button" data-er-action="back">‹ 返回聯絡簿</button><button type="button" data-er-action="list">所有複習資料</button><button type="button" data-er-action="retry">重新整理</button></div>
                 <div id="ebookResourceContent"></div>
@@ -8924,6 +8928,9 @@
             var activeSession = ebookAuthSessionInfo || ebookGodSessionInfo || {};
             if (result.pendingPolicy === undefined) result.pendingPolicy = activeSession.pendingPolicy || null;
             gData = result;
+            queueMicrotask(function() { window.EbookPush?.ready({ session: ebookAuthSessionInfo || {}, uid: ebookAuth.currentUser && ebookAuth.currentUser.uid,
+                subject: ebookSubjectParam, preview: isStudentPreviewMode || isDashboardDraftPreviewMode || !!ebookGodSessionInfo,
+                firebaseConfig: firebaseConfig, call: async function(data) { return (await ebookFunctions.httpsCallable('runEbookPushAction', { timeout: 15000 })(data)).data; } }); });
             queueMicrotask(function() { window.GiftedEbook?.ready({ auth: ebookAuth, result: result, mode: pass, preview: isDashboardDraftPreviewMode, teacherView: !!ebookGodSessionInfo }); });
             activeEbookPromotionContext = result.promotionContext || null;
             resetPopupQueueForEntry();
@@ -9696,7 +9703,8 @@
                 .saveBulletin(formData, gPass);
         }
 
-        function doLogout() {
+        async function doLogout() {
+            if (window.EbookPush && !await window.EbookPush.beforeLogout()) return;
             window.GiftedEbook?.close(true);
             if (window.EbookResources) window.EbookResources.reset();
             clearRealtimeListeners();
