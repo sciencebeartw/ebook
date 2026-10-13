@@ -1268,13 +1268,14 @@
         }
 
         @media (max-width: 600px) {
-            .header-bar { grid-template-columns: 64px minmax(0, 1fr); gap: 8px 10px; padding: 12px; }
-            .header-col-logo { width: 64px; height: 72px; }
+            .header-bar { grid-template-columns: 64px minmax(0, 1fr); grid-template-areas: "logo info" "tools tools"; gap: 8px 10px; padding: 12px; }
+            .header-col-logo { grid-area: logo; width: 64px; height: 72px; }
             .header-logo-full { max-width: 64px; max-height: 72px; }
+            .header-col-info { grid-area: info; padding-top: calc(1.4rem + 6px); }
             .student-info { font-size: 2rem; }
-            .header-col-actions { grid-column: 1 / -1; flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; }
-            .bears-lab-title { margin-bottom: 0; font-size: 1rem; white-space: nowrap; }
-            .header-btn-row { gap: 4px; }
+            .header-col-actions { display: contents; }
+            .bears-lab-title { grid-area: info; align-self: start; justify-self: end; margin-bottom: 0; font-size: 1rem; line-height: 1.4; white-space: nowrap; }
+            .header-btn-row { grid-area: tools; justify-self: end; gap: 4px; }
         }
 
         .refresh-btn { color: #0ea5e9; }
@@ -4889,7 +4890,7 @@
   <script src="ebook_resources_app.js?v=20261003_resources_outline_v5"></script>
 
   <link rel="stylesheet" href="ebook_push.css?v=20261014-header1">
-  <script src="ebook_push_app.js?v=20261013-pilot1"></script>
+  <script src="ebook_push_app.js?v=20261014-multidevice1"></script>
 
   <!-- Webhook API & Firebase Polyfill (Replace google.script.run) -->
   <script>
