@@ -27,7 +27,7 @@
     <!-- External Resources -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
     <script src="assessment_labels.js?v=20261012-full-scope"></script>
-    <script src="assessment_naming.js?v=20261013-editable-1"></script>
+    <script src="assessment_naming.js?v=20261013-editable-2"></script>
     <script src="class_session_plan.js?v=20261011-library1"></script>
     <script src="homework_report_status.js?v=20261011-pending1"></script>
     <script src="homework_answers_contract.js?v=20261011-report1"></script>
@@ -11503,8 +11503,9 @@
                         var homework = /作業|練習卷/.test(name);
                         var named = window.AssessmentNaming && AssessmentNaming.find(getDailyPostDisplayOptions(post), decodeBasicHtmlEntities(name), decodeBasicHtmlEntities(url));
                         if (named && named.label) {
-                            var namedClass = linkPrefix ? 'btn-link' : name.indexOf('回家作業卷｜') === 0 || linkMode === 'homework' ? 'btn-important-tag' : linkMode === 'supplement' ? 'btn-supplement-tag' : linkMode === 'general' || linkMode === 'custom' ? 'btn-general-tag' : 'btn-link';
-                            parsed += keepLink(renderParsedLink(named.label, url, namedClass + colorClass, namedClass === 'btn-general-tag' ? SVG.link : namedClass === 'btn-supplement-tag' ? SVG.clip : SVG.document, named.originalName || decodeBasicHtmlEntities(name), '', true));
+                            var namedClass = linkPrefix ? 'btn-link' : name.indexOf('回家作業卷｜') === 0 || linkMode === 'homework' || (linkMode === 'auto' && (upload || homework)) ? 'btn-important-tag' : linkMode === 'supplement' ? 'btn-supplement-tag' : linkMode === 'general' || linkMode === 'custom' ? 'btn-general-tag' : name.indexOf('附件') > -1 ? 'btn-small-tag' : 'btn-link';
+                            var namedIcon = namedClass === 'btn-general-tag' ? SVG.link : namedClass === 'btn-supplement-tag' || namedClass === 'btn-small-tag' ? SVG.clip : namedClass === 'btn-important-tag' && upload && name.indexOf('回家作業卷｜') !== 0 ? SVG.upload : SVG.document;
+                            parsed += keepLink(renderParsedLink(named.label, url, namedClass + (namedClass === 'btn-small-tag' ? '' : colorClass), namedIcon, named.originalName || decodeBasicHtmlEntities(name), '', true));
                         } else if (linkPrefix) {
                             parsed += keepLink(renderParsedLink(getDailyPostExamLinkDisplayName(name, linkPrefix, (getDailyPostDisplayOptions(post).links || {}).examTitleMode), url, "btn-link", SVG.document, BEAR_SUBJECT === "/science" ? name : "", post.storedClassName || post.sourceClassName || post.className || gData.className));
                         } else if (name.indexOf('回家作業卷｜') === 0) {

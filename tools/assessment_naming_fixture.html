@@ -13,4 +13,16 @@ links.forEach(row=>{post[row.slot]+=(post[row.slot]?'\n':'')+'['+row.source+']'+
 const frame=document.getElementById('ebook');window.fixtureErrors=[];
 frame.onload=()=>{const w=frame.contentWindow;w.addEventListener('error',e=>fixtureErrors.push(e.message));w.enterDashboardDraftPreview({subject:'science',className:cls,studentName:'測試學生',dailyPosts:[post]});window.fixtureReady=true;};
 window.inspectNaming=()=>{const d=frame.contentDocument;const text=d.body.innerText;const actual=[...d.querySelectorAll('a')];return {ready:fixtureReady,errors:fixtureErrors,matched:links.map(row=>({label:row.label,found:actual.some(a=>a.textContent.includes(row.label))})),holiday:actual.some(a=>a.textContent.includes('假期練習卷｜理化第1–8章')),privateAnswers:actual.filter(a=>/private|holiday-answer/.test(a.href)).length,original:actual.some(a=>a.dataset.fileName==='很長的補充檔名.docx'),width:frame.clientWidth,scroll:d.documentElement.scrollWidth}};
+window.checkButtonStyles=()=>{
+ const cases=[['上傳課本作業 理化第10章','auto'],['課本作業｜理化第10章','auto'],['回家作業卷｜理化第10章','auto'],['練習卷','auto'],['附件一','auto'],['參考資料','supplement'],['資源網站','general'],['資源網站','custom']],checks=[];
+ const w=frame.contentWindow;
+ for(const [source,mode] of cases){
+  const p={...post,hw1:'['+source+']https://example.test/check',hw2:'',quiz:'',makeup:'',note:'',displayOptions:{homework:{hw1LinkMode:mode},links:{}}};
+  const read=()=>{w.enterDashboardDraftPreview({subject:'science',className:cls,studentName:'測試學生',dailyPosts:[p]});const a=[...frame.contentDocument.querySelectorAll('a')].find(a=>a.href==='https://example.test/check');return {className:a.className,icon:a.querySelector('svg')?.outerHTML,label:a.textContent}};
+  const before=read();p.displayOptions.links.labels=[{source,href:'https://example.test/check',label:'教師改名｜'+source}];const after=read();
+  if(before.className!==after.className || before.icon!==after.icon || after.label!=='教師改名｜'+source) throw Error(JSON.stringify({source,mode,before,after}));
+  checks.push(source+' / '+mode);
+ }
+ w.enterDashboardDraftPreview({subject:'science',className:cls,studentName:'測試學生',dailyPosts:[post]});return {passed:checks.length,checks};
+};
 </script></html>

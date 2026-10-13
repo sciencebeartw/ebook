@@ -20,8 +20,9 @@
             .replace(/^(?:\d{2,3}(?:學年度)?\s*)?(?:小六資優自然|國[一二三]自然(?:超前|總複習|生物|理化))(?:班|週[六日](?:上午|下午|晚上)班)?[\s_｜|：:-]*/, '');
         const kind = scope.match(/^(小考(?:卷)?|隨堂考(?:卷)?|鑑定考(?:卷)?|複習考(?:卷)?|補考(?:卷)?|輔導(?:卷)?|回家作業卷?|回家練習卷?|(?:假期|中秋|連假)(?:作業|練習|複習)?卷?)[\s_｜|：:-]*/);
         if (kind) { type = /^(假期|中秋|連假)/.test(kind[1]) ? '假期題目' : /回家/.test(kind[1]) ? (kind[1].includes('練習') ? '回家練習卷' : '回家作業卷') : kind[1].replace(/卷$/, ''); scope = scope.slice(kind[0].length); }
-        const answer = /(?:\s|_)*(?:ANS|答案(?:卷)?|解答(?:卷)?)$/i.test(scope);
-        scope = scope.replace(/(?:\s|_)*(?:ANS|答案(?:卷)?|解答(?:卷)?)$/i, '').trim();
+        const englishAnswer = /(^|[^a-z])ANS$/i, chineseAnswer = /(?:\s|_)*(?:答案(?:卷)?|解答(?:卷)?)$/;
+        const answer = englishAnswer.test(scope) || chineseAnswer.test(scope);
+        scope = scope.replace(englishAnswer, '$1').replace(chineseAnswer, '').replace(/[\s_]+$/, '');
         if (answer && type === '假期題目') type = '假期答案';
         if (!kind && !/^((生物|理化|地科).*第.+章|第.+章)/.test(scope)) notes.push('請確認卷別與範圍；無法完整辨識的文字已保留。');
         if (root.AssessmentLabels && /^115小六資優自然/.test(c.className || '')) scope = root.AssessmentLabels.fullTitle(scope, c.className);
