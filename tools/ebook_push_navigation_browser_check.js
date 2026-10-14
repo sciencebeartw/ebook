@@ -29,7 +29,7 @@ async (page) => {
             window.toggleCard=n=>n.classList.add('active');
             window.switchTab=i=>{for(let j=0;j<4;j++)document.querySelector('#tab-content-'+j).style.display=i===j?'block':'none';window.scrollTo(0,0);};
             window.__snapshot=()=>({recipient:'b'.repeat(64),eligible:true,mode:'test_only',ready:true,enabled:true,registered:true,approved:true,businessEnabled:true,kinds:{},items:structuredClone(__items),count:__items.filter(i=>!i.readAt).length,version:__version});
-            window.__api=async data=>{__calls.push(data.action+':'+(data.notificationId||''));if(data.action==='status'){const value=__snapshot();await new Promise(r=>setTimeout(r,__delayStatus));if(__failStatus)throw new Error('status離線');return value;}if(data.action==='open'){await new Promise(r=>setTimeout(r,__openDelay));if(__unavailable)throw new Error('内容已移除');const item=__items.find(i=>i.id===data.notificationId);return {type:item.type,target:item.target};}if(data.action==='read'){if(__failRead)throw new Error('已讀暫時離線');__items.find(i=>i.id===data.notificationId).readAt=Date.now();__version++;const result={count:__items.filter(i=>!i.readAt).length,version:__version};await new Promise(r=>setTimeout(r,data.notificationId.startsWith('1')?__readDelay:0));return result;}throw new Error('Unexpected API '+data.action);};
+            window.__api=async data=>{__calls.push(data.action+':'+(data.notificationId||''));if(data.action==='status'){const value=__snapshot();await new Promise(r=>setTimeout(r,__delayStatus));if(__failStatus)throw new Error('status離線');return value;}if(data.action==='open'){await new Promise(r=>setTimeout(r,__openDelay));if(window.__openGate)await __openGate;if(__unavailable)throw new Error('内容已移除');const item=__items.find(i=>i.id===data.notificationId);return {type:item.type,target:item.target};}if(data.action==='read'){if(__failRead)throw new Error('已讀暫時離線');__items.find(i=>i.id===data.notificationId).readAt=Date.now();__version++;const result={count:__items.filter(i=>!i.readAt).length,version:__version};await new Promise(r=>setTimeout(r,data.notificationId.startsWith('1')?__readDelay:0));return result;}throw new Error('Unexpected API '+data.action);};
             window.__setItems=items=>{__items=items.map((t,i)=>({id:(i+1).toString(16).repeat(64),createdAt:Date.now(),status:'accepted',readAt:null,title:t.kind,type:t.kind,target:t}));};
         });
         await page.addScriptTag({content:await (await page.request.get(base+'ebook_push_navigation.js')).text()});
@@ -121,7 +121,7 @@ async (page) => {
     check(await page.evaluate(()=>!EbookPushLaunch.current()&&document.querySelector('.ep-navigation-progress').hidden),'初始化期間收到推播不遺失，完成後清除進度提示');
     for (const width of [320,390,768]) {
         await mount();await page.addStyleTag({url:base+'ebook_push.css'});await page.setViewportSize({width,height:844});
-        await page.evaluate(async target=>{__setItems([target]);await __ready();await EbookPush.open();__openDelay=1200;},targets[2]);
+        await page.evaluate(async target=>{__setItems([target]);await __ready();await EbookPush.open();__openDelay=1200;window.__openGate=new Promise(resolve=>window.__releaseOpen=resolve);},targets[2]);
         await page.locator('.ep-notice-open').click();
         check(await page.evaluate(()=>{
             const p=document.querySelector('.ep-navigation-progress'),r=p.getBoundingClientRect(),s=p.querySelector('span');
@@ -133,6 +133,7 @@ async (page) => {
             check(await page.evaluate(()=>getComputedStyle(document.querySelector('.ep-navigation-progress>span')).animationName==='none'),'減少動態效果時保留文字提示、停止旋轉');
             await page.emulateMedia({reducedMotion:'no-preference'});
         }
+        await page.evaluate(()=>__releaseOpen());
         await page.waitForFunction(()=>__items[0].readAt);
         check(await page.evaluate(()=>document.querySelector('.ep-navigation-progress').hidden),width+'：抵達通知內容後轉圈圈消失');
     }
@@ -148,6 +149,52 @@ async (page) => {
     await page.evaluate(()=>{document.querySelector('.swal2-container').remove();switchTab(3);__dismissedAt=performance.now();});
     await page.waitForFunction(()=>__items[0].readAt);
     check(await page.evaluate(()=>performance.now()-__dismissedAt<800&&EbookPushNavigation.readable(document.querySelector('[data-feedback-key="reply1"]'))),'關閉提醒後800ms內露出通知內容並才記已讀');
+    for (const retry of ['refresh','online','foreground','notification']) {
+        await mount();
+        await page.evaluate(async ({target,retry})=>{
+            __setItems([target]);__failStatus=true;
+            if(retry!=='notification')history.replaceState(null,'','?pushNotice='+__items[0].id);
+            await __ready();__failStatus=false;
+            if(retry==='refresh')await EbookPush.open();
+            if(retry==='online')window.dispatchEvent(new Event('online'));
+            if(retry==='foreground')document.dispatchEvent(new Event('visibilitychange'));
+            if(retry==='notification')__click(__items[0].id);
+        },{target:targets[2],retry});
+        await page.waitForFunction(()=>__items[0].readAt);
+        check(await page.evaluate(()=>!EbookPushLaunch.current()&&!document.querySelector('.ep-dialog').open&&document.querySelector('.ep-navigation-progress').hidden&&__calls.filter(x=>x.startsWith('open:')).length===1&&__calls.filter(x=>x.startsWith('status:')).length===2),'首次讀取失敗後 '+retry+' 可恢復原通知且只重試一次');
+    }
+    await mount();await page.evaluate(async target=>{__setItems([target]);__failStatus=true;await __ready();__failStatus=false;await EbookPush.open();document.querySelector('[data-ep="close"]').click();document.querySelector('.feedback-thread-toggle').click();const n=document.querySelector('[data-feedback-key="reply1"]');window.scrollTo(0,n.getBoundingClientRect().top+scrollY-65);},targets[2]);
+    await page.waitForFunction(()=>__items[0].readAt);
+    check(await page.evaluate(()=>__calls.every(x=>!x.startsWith('open:'))),'首次失敗恢復後，自行閱讀也能正常記已讀');
+    await mount();await page.evaluate(async target=>{__setItems([target]);__failStatus=true;await __ready();__click(__items[0].id);},targets[2]);
+    await page.waitForFunction(()=>document.querySelector('.ep-error').textContent.includes('離線'));
+    check(await page.evaluate(()=>document.querySelector('.ep-dialog').open&&document.querySelector('.ep-navigation-progress').hidden&&!__items[0].readAt),'重試仍離線顯示錯誤並停止轉圈，不提前已讀');
+    for (const surface of ['notification','center']) {
+        await mount();await page.evaluate(async ({target,surface})=>{
+            __setItems([target]);__failStatus=true;await __ready();__failStatus=false;__delayStatus=500;
+            window.__retry=EbookPush.open(surface==='notification'?__items[0].id:undefined);
+            window.__loggedOut=await EbookPush.beforeLogout();await __retry;
+        },{target:targets[2],surface});
+        check(await page.evaluate(()=>__loggedOut&&!document.querySelector('.ep-dialog').open&&document.getElementById('ebookPushEntry').hidden&&(!document.querySelector('.ep-navigation-progress')||document.querySelector('.ep-navigation-progress').hidden)&&__calls.every(x=>!x.startsWith('open:')&&!x.startsWith('read:'))),'載入恢復期間登出會清除 '+surface+' 提示，舊回應不重開通知或記已讀');
+    }
+    await page.route('**/ebook_push_messaging.mjs*',route=>route.fulfill({contentType:'text/javascript',body:'export async function listen(){window.__listens++;if(window.__failListen)throw new Error("連線失敗");} export function disconnect(){window.__disconnects++;}'}));
+    for (const failure of ['status','listener']) {
+        await mount();await page.evaluate(async failure=>{
+            window.__listens=0;window.__disconnects=0;window.__failListen=failure==='listener';
+            Object.defineProperty(window,'Notification',{configurable:true,value:{permission:'granted'}});
+            Object.defineProperty(window,'PushManager',{configurable:true,value:function(){}});
+            __sw.getRegistration=async()=>({active:{postMessage:data=>__badges.push(data.count)},update:async()=>{}});
+            localStorage.setItem('sciencebear.ebook.push.v1:device',JSON.stringify({uid:'synthetic-user',subject:'science',deviceId:'synthetic-device'}));
+            await __ready();
+            if(failure==='status'){__failStatus=true;await __ready();__failStatus=false;}
+            __failListen=false;await EbookPush.open();
+        },failure);
+        check(await page.evaluate(()=>__listens===2),'前景通知 '+failure+' 失敗恢復後會重新建立連線');
+    }
+    await page.unroute('**/ebook_push_messaging.mjs*');
+    await mount();await page.evaluate(async()=>{await EbookPush.ready({uid:'general-parent',subject:'science',session:{studentName:'一般家長'},preview:false,call:__api});window.dispatchEvent(new Event('online'));});
+    await page.waitForTimeout(200);
+    check(await page.evaluate(()=>__calls.length===0),'一般家長恢復網路不呼叫試用通知API');
     await mount();const scopes=await page.evaluate(targets=>targets.map(t=>EbookPushNavigation.find({...t,classKey:'別班'},getEbookPushNavigationContext())===null),targets);check(scopes.every(Boolean),'七類皆不跳往其他班同名資料');
     await page.screenshot({path:'/private/tmp/ebook-push-startup-20261014/flow-'+page.context().browser().browserType().name()+'.png'});
     check(errors.length===0,'無頁面JS例外');

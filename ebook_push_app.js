@@ -226,11 +226,13 @@
         if (mine !== epoch) return;
         registration = reg; bridge = module;
         reg.update().catch(() => {});
-        await timed(bridge.listen({ firebaseConfig: env.firebaseConfig, onMessage: payload => {
-            if (mine === epoch && reg.active) reg.active.postMessage({ kind: 'ebook_push_foreground', payload });
-            if (mine === epoch && !document.hidden) refresh().catch(() => {});
-        } }));
-        if (mine !== epoch) bridge.disconnect();
+        try {
+            await timed(module.listen({ firebaseConfig: env.firebaseConfig, onMessage: payload => {
+                if (mine === epoch && reg.active) reg.active.postMessage({ kind: 'ebook_push_foreground', payload });
+                if (mine === epoch && !document.hidden) refresh().catch(() => {});
+            } }));
+        } catch (error) { if (mine === epoch) bridge = null; throw error; }
+        if (mine !== epoch) module.disconnect();
     }
     async function refresh() {
         if (refreshing) return refreshing;
@@ -238,7 +240,8 @@
         refreshing = (async () => {
             try {
                 applyState(await api('status'));
-                if (!state.eligible) { entry.hidden = true; if (dialog.open) dialog.close(); return; }
+                entry.hidden = !state.eligible;
+                if (!state.eligible) { navigationProgress(false); if (dialog.open) dialog.close(); return; }
                 // 手機角標交給背景同步，站內清單不等待 OS 回應。
                 syncBadge(!state.enabled || state.mode === 'off').catch(() => {});
                 scheduleReadCheck();
@@ -297,14 +300,17 @@
         scheduleReadCheck();
     }
     async function resume() {
-        if (!env || !state || !state.eligible || document.hidden) return;
+        if (!env || env.preview || !env.uid || env.session?.studentName !== '系統測試生' || document.hidden) return;
+        const mine = epoch;
         try {
             await refresh();
+            if (mine !== epoch || !state || !state.eligible) return;
             for (const id of [...pendingReads]) {
                 if (!(state.items || []).some(i => i.id === id && !i.readAt)) { pendingReads.delete(id); savePendingReads(); continue; }
                 await readNotice(id);
             }
             await drainNotice();
+            if (mine === epoch && !bridge) await listen(mine).catch(() => {});
         } catch (_) { /* 狀態失敗不清掉未同步的已讀或點擊。 */ }
     }
     async function enable() {
@@ -347,8 +353,22 @@
         // 背景更新只鎖重新整理按鈕，既有通知仍可立即點入。
         if (name === 'refresh') {
             const refreshEpoch = epoch;
-            try { await refresh(); return true; }
-            catch (error) { if (refreshEpoch === epoch && dialog.open) dialog.querySelector('.ep-error').textContent = error.message || '暫時無法更新通知'; return false; }
+            try {
+                await refresh();
+                if (refreshEpoch !== epoch || !state || !state.eligible) return false;
+                dialog.querySelector('.ep-error').textContent = '';
+                await drainNotice();
+                if (refreshEpoch === epoch && !bridge) await listen(refreshEpoch).catch(() => {});
+                return true;
+            }
+            catch (error) {
+                if (refreshEpoch === epoch) {
+                    navigationProgress(false);
+                    if (pendingNotice && !dialog.open) dialog.showModal();
+                    if (dialog.open) dialog.querySelector('.ep-error').textContent = error.message || '暫時無法更新通知';
+                }
+                return false;
+            }
         }
         if (busy || refreshing && ['preferences','enable','pause','test'].includes(name) || name === 'preferences' && requiredKinds.has(id)) return;
         const mine = epoch, focusedPreference = name === 'preferences' ? document.activeElement : null;
@@ -423,6 +443,8 @@
         if (isId(notificationId)) {
             // 通知直接進內容；不先顯示設定，以免等待來源時閃過設定畫面。
             if (dialog.open) dialog.close();
+            // 首次狀態讀取失敗後，下一次點通知也能重新確認並接續目的地。
+            if (!state) return action('refresh');
             return drainNotice();
         }
         if (!dialog.open) {
@@ -440,6 +462,7 @@
         clearTimeout(observeTimer); observeTimer = null; clearTimeout(dwellTimer); dwellTimer = null;
         if (observer) observer.disconnect();
         if (bridge) bridge.disconnect();
+        bridge = null;
         if (dialog && dialog.open) dialog.close();
         entry = document.getElementById('ebookPushEntry');
         if (!entry) return;
@@ -470,22 +493,32 @@
             if (state.eligible && isId(id)) {
                 await open(id);
             }
+            if (mine !== epoch) return;
             navigationProgress(false);
             watchReading();
             for (const id of [...pendingReads]) if ((state.items || []).some(i => i.id === id && !i.readAt)) await readNotice(id).catch(() => {});
             await listen(mine).catch(() => { if (mine === epoch && dialog) dialog.querySelector('.ep-error').textContent = '前景通知連線暫時失敗，請重新開啟聯絡簿再測試。'; });
-        } catch (_) { if (mine === epoch) { navigationProgress(false); entry.hidden = false; state = null; render(); } /* 試用服務失敗不影響原聯絡簿。 */ }
+        } catch (_) { if (mine === epoch) { navigationProgress(false); entry.hidden = false; state = null; render(); watchReading(); } /* 試用服務失敗不影響原聯絡簿；恢復後仍可偵測實際可見內容。 */ }
     }
     async function beforeLogout() {
         if (busy) { await root.swalAlert('通知設定處理中', '請等這次操作完成後再登出。', 'info'); return false; }
-        if (!env || !binding) { epoch++; if (bridge) bridge.disconnect(); if (observer) observer.disconnect(); env = null; state = null; return true; }
+        const finish = () => {
+            epoch++; navigationProgress(false);
+            if (dialog && dialog.open) dialog.close();
+            if (entry) entry.hidden = true;
+            if (bridge) bridge.disconnect();
+            bridge = null;
+            if (observer) observer.disconnect();
+            env = null; state = null;
+            return true;
+        };
+        if (!env || !binding) return finish();
         let server = false, local = false;
         try { await api('revoke'); server = true; } catch (_) {}
         try { await timed(unsubscribe()); local = true; } catch (_) {}
         if (!server && !local) { await root.swalAlert('尚未完成通知解除', '請恢復網路後再登出，避免這台裝置繼續接收原身分通知。', 'warning'); return false; }
-        saveBinding(null); epoch++; if (dialog && dialog.open) dialog.close(); if (entry) entry.hidden = true;
-        if (observer) observer.disconnect(); env = null; state = null;
-        return true;
+        saveBinding(null);
+        return finish();
     }
     root.addEventListener('ebook-push-click', event => {
         const id = event.detail && event.detail.notificationId;
@@ -502,7 +535,7 @@
     });
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) visibleSince.clear();
-        else if (env && state && state.eligible) resume();
+        else resume();
         scheduleReadCheck();
     });
     root.addEventListener('online', resume);
