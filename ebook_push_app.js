@@ -5,6 +5,7 @@
     const isId = v => typeof v === 'string' && /^[a-f0-9]{64}$/.test(v);
     let env = null, state = null, registration = null, bridge = null, busy = false, epoch = 0;
     let dialog, entry, binding = null, pendingNotice = '', opening = false, badgeSync = 0;
+    let noticeFilter = 'unread';
     let observer = null, observeTimer = null, dwellTimer = null, visibleSince = new Map(), reading = new Set(), pendingReads = new Set();
     function escape(text) { return String(text || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
     function storageKey() { return PREFIX + env.subject; }
@@ -47,6 +48,61 @@
         return { title:'通知已開啟', detail:'有新消息時，會在這台裝置提醒你。', tone:'on' };
     }
     const statuses = { queued: '等待發送', processing: '處理中', accepted: '已送出', partial: '部分裝置已送出', canceled: '已取消', expired: '已逾時', failed: '請重新開啟通知', uncertain: '送出結果待確認' };
+    const noticeLabels = {post:'聯絡簿',bulletin:'重要公告',message:'老師留言',sticker:'棒卡',makeup:'補考',grade:'成績',homework:'作業提醒',test:'測試通知'};
+    const iconPaths = {
+        post:'M4 4h6a3 3 0 0 1 2 1 3 3 0 0 1 2-1h6v15h-6a3 3 0 0 0-2 1 3 3 0 0 0-2-1H4ZM12 5v15',
+        bulletin:'M4 10v5h4l10 4V6L8 10ZM8 15l2 5M21 10v5',
+        message:'M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-6 3V6a2 2 0 0 1 2-2ZM7 9h10M7 13h6',
+        sticker:'m12 3 3 6 6 1-4.5 4.5 1 6.5-5.5-3-5.5 3 1-6.5L3 10l6-1Z',
+        makeup:'M12 3a9 9 0 1 1-8 5M3 3v5h5M12 7v5l3 2',
+        grade:'M5 3h14v18H5ZM8 8h8M8 12h3M8 16h3m3-2 2 2 3-4',
+        homework:'M9 4H5v17h14V4h-4M9 3h6v4H9Zm-1 11 3 3 5-6',
+        bell:'M5 17h14c-2-2-2-4-2-7a5 5 0 0 0-10 0c0 3 0 5-2 7ZM10 21h4M12 2v3',
+        gear:'M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1Z M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0',
+        check:'m5 12 4 4L19 6',chevron:'m9 5 7 7-7 7',close:'m6 6 12 12M18 6 6 18'
+    };
+    function icon(kind) { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="${iconPaths[kind] || iconPaths.bell}"/></svg>`; }
+    const isUnread = item => !item.readAt && !['canceled','expired','failed'].includes(item.status);
+    function renderEntry() {
+        if (!entry) return;
+        const count = state && state.eligible ? Math.max(0, Number(state.count) || 0) : 0;
+        let dot = entry.querySelector('.ep-entry-dot');
+        if (!dot) { dot = document.createElement('span'); dot.className = 'ep-entry-dot'; dot.setAttribute('aria-hidden','true'); entry.appendChild(dot); }
+        dot.hidden = count === 0; dot.textContent = count > 99 ? '99+' : String(count);
+        const label = count ? `通知，${count} 則未讀` : '通知';
+        entry.setAttribute('aria-label',label); entry.title = label;
+    }
+    function noticeTime(value) {
+        const date = new Date(value), today = new Date();
+        if (!Number.isFinite(date.getTime())) return '';
+        const time = date.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false});
+        return date.toDateString() === today.toDateString() ? `今天 ${time}` : date.toLocaleDateString('zh-TW',{month:'numeric',day:'numeric'}) + ' ' + time;
+    }
+    function renderNotices() {
+        const count = Math.max(0, Number(state && state.count) || 0);
+        dialog.querySelector('.ep-unread').textContent = state ? count ? `${count} 則未讀` : '目前沒有未讀通知' : '暫時無法確認通知';
+        dialog.querySelector('.ep-filter-count').textContent = String(count);
+        dialog.querySelectorAll('[data-ep="filter"]').forEach(button => button.setAttribute('aria-pressed',String(button.dataset.id === noticeFilter)));
+        const list = dialog.querySelector('.ep-log');
+        const items = [...(state && state.items || [])].filter(i => noticeFilter === 'all' || isUnread(i))
+            .sort((a,b) => Number(isUnread(b))-Number(isUnread(a)) || Number(b.createdAt)-Number(a.createdAt));
+        const markup = items.map(i => {
+            const unread = isUnread(i), label = noticeLabels[i.type] || '通知';
+            const detail = [label,noticeTime(i.createdAt),!['accepted','partial'].includes(i.status) ? statuses[i.status] : ''].filter(Boolean).join(' · ');
+            return `<li class="ep-notice-row${unread ? ' is-unread' : ''}" data-notice-id="${escape(i.id)}">
+                <button type="button" class="ep-notice-open" data-ep="view" data-id="${escape(i.id)}" ${busy ? 'disabled' : ''}>
+                    <span class="ep-kind-icon" data-kind="${escape(i.type)}">${icon(i.type)}</span><span class="ep-notice-copy"><strong>${escape(i.title)}</strong><small>${escape(detail)}</small></span>
+                    <span class="ep-notice-trailing">${unread ? '<span class="ep-notice-dot" aria-label="未讀"></span>' : icon('chevron')}</span>
+                </button>${unread ? `<button type="button" class="ep-mark" data-ep="read" data-id="${escape(i.id)}" aria-label="將${escape(i.title)}標示已讀" ${busy ? 'disabled' : ''}>${icon('check')}標示已讀</button>` : ''}
+            </li>`;
+        }).join('');
+        // 背景更新若內容相同，保留目前鍵盤焦點與捲動位置。
+        if (list.dataset.markup !== markup) { list.innerHTML = markup; list.dataset.markup = markup; }
+        const empty = dialog.querySelector('.ep-empty'); empty.hidden = items.length > 0;
+        empty.querySelector('strong').textContent = !state ? '暫時無法取得通知' : noticeFilter === 'unread' ? '通知都看完了' : '還沒有通知';
+        empty.querySelector('p').textContent = !state ? '請稍後重新整理通知。' : noticeFilter === 'unread' ? '有新消息時，會在這裡提醒你。' : '老師的新消息會出現在這裡。';
+        empty.querySelector('[data-ep="filter"]').hidden = !state || noticeFilter === 'all' || !(state.items || []).length;
+    }
     let guidePlatform = platform() === 'android' ? 'android' : 'ios';
     const guides = {
         ios: '<ol><li>用 Safari 開啟聯絡簿，按分享，選「加入主畫面」。</li><li>從主畫面圖示登入，勾選「保持登入」。</li><li>按「開啟通知」，在手機提示中選「允許」。</li></ol><p class="ep-note">需要 iOS／iPadOS 16.4 或以上。</p><h4>關閉或重新開啟</h4><p>可在本頁暫停這台裝置。若手機已封鎖通知，到「設定 → 通知 → 山熊聯絡簿」調整「允許通知」，再回本頁重新確認狀態。</p>',
@@ -60,22 +116,25 @@
         if (dialog) return;
         dialog = document.createElement('dialog'); dialog.className = 'ep-dialog'; dialog.setAttribute('aria-labelledby', 'ep-title');
         dialog.innerHTML = `
-            <header><div><p class="ep-eyebrow">山熊聯絡簿</p><h2 id="ep-title">通知設定</h2></div><button type="button" class="ep-close" data-ep="close" aria-label="關閉通知設定">×</button></header>
+            <header><div><p class="ep-eyebrow">山熊聯絡簿</p><div class="ep-title-row"><h2 id="ep-title">通知</h2><span class="ep-unread" role="status" aria-live="polite"></span></div></div><button type="button" class="ep-close" data-ep="close" aria-label="關閉通知">${icon('close')}</button></header>
+            <div class="ep-feed-toolbar"><div class="ep-filters" role="group" aria-label="通知篩選"><button type="button" data-ep="filter" data-id="unread" aria-pressed="true">未讀 <span class="ep-filter-count">0</span></button><button type="button" data-ep="filter" data-id="all" aria-pressed="false">全部</button></div><button type="button" class="ep-feed-refresh" data-ep="refresh">重新整理</button></div>
+            <p class="ep-error" role="alert"></p>
             <div class="ep-body">
+                <section class="ep-inbox" aria-label="通知列表"><ul class="ep-log"></ul><div class="ep-empty" hidden><span class="ep-empty-icon">${icon('check')}</span><strong>通知都看完了</strong><p>有新消息時，會在這裡提醒你。</p><button type="button" data-ep="filter" data-id="all">查看全部通知</button></div></section>
+                <details class="ep-settings"><summary><span class="ep-settings-icon">${icon('gear')}</span><span><strong>通知設定與教學</strong><small class="ep-settings-status"></small></span><span class="ep-settings-chevron">${icon('chevron')}</span></summary><div class="ep-settings-panel">
                 <section class="ep-device" aria-label="這台裝置的通知">
                     <div class="ep-device-row"><div class="ep-state" role="status"><span class="ep-device-label">這台裝置</span><strong class="ep-state-title"></strong></div>
                         <button type="button" class="ep-primary" data-ep="enable">開啟通知</button><button type="button" data-ep="pause">暫停通知</button><button type="button" data-ep="help">查看教學</button>
                     </div><p class="ep-state-detail"></p>
                 </section>
-                <p class="ep-error" role="alert"></p>
                 <section class="ep-types" aria-labelledby="ep-types-title"><div class="ep-section-heading"><h3 id="ep-types-title">通知項目</h3><span class="ep-save" role="status" aria-live="polite"></span></div>
-                    <p class="ep-note">公告與作業催繳為必接收，其餘可自選。設定適用同一帳號的所有裝置。</p><div class="ep-preferences"></div>
+                    <p class="ep-note">手機推播：公告與作業催繳為必接收，其餘可自選。聯絡簿內仍會保留所有新消息。</p><div class="ep-preferences"></div>
                 </section>
-                <p class="ep-reassurance">可暫停這台裝置的通知，聯絡簿與 LINE 照常使用。</p>
+                <p class="ep-reassurance">未開啟或暫停手機通知，仍可在這裡查看新消息與未讀數。LINE 照常使用。</p>
                 <details class="ep-guide"><summary>開啟／關閉通知教學</summary><div class="ep-guide-tabs" aria-label="選擇裝置教學"><button type="button" data-ep="guide" data-id="ios" aria-pressed="false">iPhone／iPad</button><button type="button" data-ep="guide" data-id="android" aria-pressed="false">Android</button></div><div class="ep-guide-content"></div><button type="button" data-ep="refresh">重新確認狀態</button></details>
-                <details class="ep-recent"><summary>最近通知 <span class="ep-unread"></span></summary><ul class="ep-log"></ul></details>
                 <details class="ep-troubleshoot"><summary>沒有收到通知？</summary><p>確認已允許通知、登入時勾選「保持登入」，並檢查網路、勿擾／專注模式及手機的省電設定。</p><p>每台手機或平板都需要各自允許；登出會解除該裝置的通知。重新開啟只接收新消息，不補送暫停期間的通知。</p><p>已讀狀態共用；其他裝置的圖示標記會在開啟聯絡簿或收到下一則通知時更新。Android 的圖示圓點或數字依手機而異。看過提醒不代表完成作業。</p></details>
                 <details class="ep-pilot" hidden><summary>測試工具 <span>僅供系統測試生</span></summary><p class="ep-test-device ep-note"></p><p class="ep-test-targets ep-note"></p><button type="button" data-ep="test">20 秒後傳送測試通知</button><p class="ep-note">任一台按一次，再將手機或平板回主畫面或鎖定。最多每分鐘一次；服務接受不代表裝置已顯示。</p></details>
+                </div></details>
             </div>`;
         dialog.addEventListener('click', event => { const b = event.target.closest('[data-ep]'); if (b) action(b.dataset.ep, b.dataset.id); });
         dialog.addEventListener('change', event => { const input = event.target.closest('[data-ep-preference]'); if(input) action('preferences', input.dataset.epPreference, input.checked); });
@@ -83,6 +142,7 @@
         showGuide();
     }
     function render() {
+        renderEntry();
         if (!dialog) return;
         const info = deviceState(), denied = permission() === 'denied';
         const usable = state && state.mode === 'test_only' && state.ready && capable() && !inApp() && (!ios() || installed());
@@ -91,6 +151,7 @@
         dialog.querySelector('.ep-device').dataset.tone = info.tone;
         dialog.querySelector('.ep-state-title').textContent = info.title;
         dialog.querySelector('.ep-state-detail').textContent = info.detail;
+        dialog.querySelector('.ep-settings-status').textContent = info.title;
         const enableButton = dialog.querySelector('[data-ep="enable"]'), pauseButton = dialog.querySelector('[data-ep="pause"]'), helpButton = dialog.querySelector('[data-ep="help"]');
         enableButton.hidden = on || needsHelp;
         enableButton.disabled = busy || !usable;
@@ -103,7 +164,7 @@
         dialog.querySelector('.ep-test-device').textContent = code;
         dialog.querySelector('.ep-test-targets').textContent = `目前已連結 ${Number(state && state.approvedDeviceCount) || 0} 台裝置。測試送至其中已開啟且登入有效的裝置；同一則只算一則未讀。`;
         dialog.querySelector('[data-ep="test"]').disabled = busy || !usable || !on;
-        dialog.querySelector('[data-ep="refresh"]').disabled = busy;
+        dialog.querySelectorAll('[data-ep="refresh"]').forEach(button => { button.disabled = busy; });
         const preferences = dialog.querySelector('.ep-preferences');
         const kinds = state && state.businessEnabled ? Object.entries(state.kinds || {}).sort(([a],[b]) => Number(requiredKinds.has(b)) - Number(requiredKinds.has(a))) : [];
         const signature = JSON.stringify(kinds);
@@ -112,8 +173,7 @@
             preferences.innerHTML = kinds.length ? kinds.map(([kind,label]) => `<label class="ep-preference-row${requiredKinds.has(kind) ? ' ep-required-row' : ''}"><span>${escape(label)}${kind === 'bulletin' ? '<small>包含緊急公告</small>' : ''}</span>${requiredKinds.has(kind) ? '<span class="ep-fixed">✓ 必接收</span>' : `<span class="ep-switch"><input type="checkbox" role="switch" data-ep-preference="${escape(kind)}"><span class="ep-switch-track" aria-hidden="true"></span></span>`}</label>`).join('') : '<p class="ep-note">通知類型尚未開放。</p>';
         }
         preferences.querySelectorAll('input').forEach(input => { if (!busy) input.checked = !state.preferences || state.preferences[input.dataset.epPreference] !== false; input.disabled = busy; });
-        dialog.querySelector('.ep-unread').textContent = state && state.count ? `${state.count} 則未讀` : '';
-        dialog.querySelector('.ep-log').innerHTML = state && state.items && state.items.length ? state.items.map(i => `<li><span>${escape(i.title)}<small>${escape(new Date(i.createdAt).toLocaleString('zh-TW'))} · ${escape(statuses[i.status] || '待確認')}</small></span><div class="ep-log-actions"><button type="button" data-ep="read" data-id="${escape(i.id)}" ${i.readAt || busy ? 'disabled' : ''}>${i.readAt ? '已讀' : '標示已讀'}</button>${i.target ? `<button type="button" data-ep="view" data-id="${escape(i.id)}" ${busy ? 'disabled' : ''}>查看</button>` : ''}</div></li>`).join('') : '<li class="ep-empty">目前沒有通知</li>';
+        renderNotices();
     }
     async function api(action, extra = {}) {
         const mine = epoch;
@@ -128,9 +188,10 @@
         if (!state || !isId(state.recipient)) return;
         const revision = ++badgeSync, mine = epoch;
         const data = { kind: 'ebook_push_badge', recipient: state.recipient, count: state.count || 0, version: state.version || 0, disabled: !!disabled };
-        const reg = registration || ('serviceWorker' in navigator && await navigator.serviceWorker.getRegistration(new URL('./', location.href).href));
+        let reg = registration;
+        try { if (!reg && 'serviceWorker' in navigator) reg = await navigator.serviceWorker.getRegistration(new URL('./', location.href).href); } catch (_) { /* 手機圖示標記不可阻擋站內收件匣。 */ }
         if (revision !== badgeSync || mine !== epoch) return;
-        if (reg && reg.active) reg.active.postMessage(data);
+        try { if (reg && reg.active) reg.active.postMessage(data); } catch (_) { /* 舊 SW 失效時仍顯示站內未讀。 */ }
         if (disabled || !data.count) await clearBadge();
         else if (navigator.setAppBadge) await navigator.setAppBadge(data.count).catch(() => {});
     }
@@ -150,7 +211,7 @@
     }
     async function refresh() {
         applyState(await api('status'));
-        if (!state.eligible) { entry.hidden = true; if (dialog.open) dialog.close(); return; }
+        if (!state.eligible) { entry.hidden = true; if (dialog.open) dialog.close(); render(); return; }
         await syncBadge(!state.enabled || state.mode === 'off');
         render();
         scheduleReadCheck();
@@ -249,10 +310,12 @@
     }
     async function action(name, id, value) {
         if (name === 'close') { dialog.close(); scheduleReadCheck(); return; }
+        if (name === 'filter' && ['unread','all'].includes(id)) { noticeFilter = id; renderNotices(); dialog.querySelector('.ep-inbox').scrollTop = 0; return; }
         if (name === 'guide' && guides[id]) { guidePlatform = id; showGuide(); return; }
         if (name === 'help') { const guide = dialog.querySelector('.ep-guide'); guide.open = true; guide.querySelector('summary').focus(); guide.scrollIntoView({block:'nearest'}); return; }
         if (busy || name === 'preferences' && requiredKinds.has(id)) return;
         const mine = epoch, focusedPreference = name === 'preferences' ? document.activeElement : null;
+        const focusedNotice = name === 'read' && document.activeElement.closest('.ep-notice-row');
         busy = true; dialog.querySelector('.ep-error').textContent = ''; render();
         try {
             if (name === 'preferences') {
@@ -279,13 +342,15 @@
             }
             return true;
         } catch (error) { if (mine === epoch) { if (name === 'preferences') dialog.querySelector('.ep-save').textContent = '未儲存'; if (!dialog.open) dialog.showModal(); dialog.querySelector('.ep-error').textContent = error.message || '操作未完成，請稍後重試'; } return false; }
-        finally { if (mine === epoch) { busy = false; render(); if (focusedPreference && focusedPreference.isConnected && dialog.open && document.activeElement === document.body) focusedPreference.focus({preventScroll:true}); scheduleReadCheck(); if (!opening && pendingNotice) drainNotice(); } }
+        finally { if (mine === epoch) { busy = false; render(); if (focusedPreference && focusedPreference.isConnected && dialog.open && document.activeElement === document.body) focusedPreference.focus({preventScroll:true}); if (focusedNotice && dialog.open) { const next = dialog.querySelector('.ep-mark:not(:disabled)') || dialog.querySelector('.ep-filters button'); next.focus({preventScroll:true}); } scheduleReadCheck(); if (!opening && pendingNotice) drainNotice(); } }
     }
     async function viewNotice(id) {
         const mine = epoch;
         const result = await api('open', {notificationId:id});
         if (result.type === 'test') {
             // 連線測試沒有內容目的地，確認類型後才顯示通知設定。
+            dialog.querySelector('.ep-settings').open = true;
+            dialog.querySelector('.ep-pilot').open = true;
             if (!dialog.open) dialog.showModal();
         } else {
             // 先關掉對話框再捲動，避免 iOS 對話框焦點還原把位置拉回頁首。
@@ -319,7 +384,12 @@
             if (dialog.open) dialog.close();
             return drainNotice();
         }
-        if (!dialog.open) dialog.showModal();
+        if (!dialog.open) {
+            noticeFilter = 'unread';
+            dialog.querySelectorAll('details').forEach(item => { item.open = false; });
+            dialog.querySelector('.ep-inbox').scrollTop = 0;
+            render(); dialog.showModal();
+        }
         await action('refresh');
     }
     async function ready(options) {
@@ -332,6 +402,7 @@
         entry = document.getElementById('ebookPushEntry');
         if (!entry) return;
         entry.hidden = true;
+        renderEntry(); noticeFilter = 'unread';
         binding = loadBinding();
         if (binding && (binding.uid !== options.uid || binding.subject !== options.subject || options.preview)) {
             // 同一主畫面 App 共用一個 push subscription；切換身分前解除舊裝置。

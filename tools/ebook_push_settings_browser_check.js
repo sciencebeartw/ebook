@@ -29,7 +29,7 @@ async (page) => {
             window.__options={subject:'science',uid:'preview-only',session:{studentName:'系統測試生',rememberDevice:true},call:async d=>{__calls.push(d);if(d.action==='preferences'){await new Promise(r=>setTimeout(r,60));if(__fail)throw new Error('網路暫時無法連線');Object.assign(__state.preferences,d.preferences);}else if(d.action==='pause'){__state.enabled=false;}else if(d.action!=='status')throw new Error('不允許的展示操作：'+d.action);return structuredClone(__state);}};
         },options);
         await page.addScriptTag({url:base+'ebook_push_app.js'});
-        await page.evaluate(async()=>{await EbookPush.ready(__options);await EbookPush.open();await document.fonts.ready;});
+        await page.evaluate(async()=>{await EbookPush.ready(__options);await EbookPush.open();document.querySelector('.ep-settings').open=true;await document.fonts.ready;});
     };
     for(const width of [320,360,390,430,768,1024]){
         await mount({width});
