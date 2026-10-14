@@ -93,7 +93,11 @@
 .ep-dialog .ep-guide-content p{margin:8px 0 14px}
 .ep-dialog .ep-pilot summary span{font-size:11px;color:#89958b;font-weight:400;margin-left:6px}
 .ep-dialog .ep-settings{flex:none;background:#f0f8ef;border-top:1px solid #e3eae4}
-.ep-dialog .ep-settings[open]{padding:0}
+.ep-dialog .ep-settings[open]{padding:0;background:#edf4e8;border-top-color:#a6c19d}
+.ep-dialog .ep-settings[open]>summary{background:#dae9d1;box-shadow:inset 0 -1px #bfd2b6}
+.ep-dialog .ep-settings[open] .ep-device{background:#fbfdf9;border-color:#cbdcc4}
+.ep-dialog .ep-settings[open] .ep-preference-row{border-bottom-color:#d2dfca}
+.ep-dialog .ep-settings[open] :is(.ep-note,.ep-reassurance,.ep-preference-row small){color:#5f735e}
 .ep-dialog .ep-settings>summary{display:flex;align-items:center;gap:12px;padding:18px 22px;min-height:86px;list-style:none;font-weight:400;font-size:17px}
 .ep-dialog .ep-settings>summary::-webkit-details-marker{display:none}
 .ep-dialog .ep-settings>summary>span:nth-child(2){flex:1;min-width:0}
