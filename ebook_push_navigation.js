@@ -28,6 +28,11 @@
         if (!['post', 'message', 'sticker'].includes(target.kind)) return null;
         const posts = all('#tab-content-0 [data-post-id]').filter(n => inClass(n, target, context));
         if (target.kind === 'post') return posts.find(n => n.dataset.postId === target.id) || null;
+        // 僅限指定測試生的手動定位驗收，沒有審核紀錄時不建立假棒卡。
+        if (target.kind === 'sticker' && target.testSection === true && context.studentName === '系統測試生' && context.className === '115小六資優自然週六上午班') {
+            const post = posts.find(n => n.dataset.postId === target.id);
+            return post && post.querySelector('.sticker-apply-box');
+        }
         // 留言／棒卡不能退回整篇聯絡簿，否則尚未看見內容就會誤算已讀。
         for (const post of posts.filter(n => date(n.dataset.postDate) === date(target.date))) {
             const item = all('[data-feedback-key]', post).find(n => n.dataset.feedbackKey === target.id);
@@ -67,6 +72,10 @@
             let node = find(target, context);
             if (!node && target.kind === 'bulletin' && context.openPopup(target)) node = find(target, getContext());
             if (node) {
+                if (target.kind === 'sticker' && target.testSection === true) {
+                    const details = node.closest('details');
+                    if (details) details.open = true;
+                }
                 if (target.kind === 'message') {
                     const thread = node.closest('[data-feedback-thread-id]') || node;
                     const toggle = thread.querySelector('.feedback-thread-toggle[aria-expanded="false"]');

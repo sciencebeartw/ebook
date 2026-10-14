@@ -4959,7 +4959,7 @@
   <script src="ebook_resources_app.js?v=20261003_resources_outline_v5"></script>
 
   <link rel="stylesheet" href="ebook_push.css?v=20261014-parentui1">
-  <script src="ebook_push_navigation.js?v=20261014-navigation1"></script>
+  <script src="ebook_push_navigation.js?v=20261014-navigation2"></script>
   <script src="ebook_push_app.js?v=20261014-directtest1"></script>
 
   <!-- Webhook API & Firebase Polyfill (Replace google.script.run) -->
@@ -7924,6 +7924,7 @@
         var pendingTasksRenderScheduled = false;
         var pendingEntryNoticeReady = false;
         var pendingEntryReminderHandled = false;
+        var pushTargetEntryActive = false;
         var pendingReminderShownSessionIdentity = '';
         var pendingAnchorHighlightTimer = null;
 
@@ -9828,10 +9829,11 @@
         function getEbookPushNavigationContext() {
             if (!gData) return null;
             return {
-                className: gData.className, preview: isStudentPreviewMode || isDashboardDraftPreviewMode || !!ebookGodSessionInfo,
+                className: gData.className, studentName: gData.studentName, preview: isStudentPreviewMode || isDashboardDraftPreviewMode || !!ebookGodSessionInfo,
                 pendingReady: pendingTasksState && pendingTasksState.status === 'ready', switchTab: switchTab, expandGrade: toggleCard,
                 activePopup: activeEmergencyAnnouncement,
                 prepare: function() {
+                    pushTargetEntryActive = true;
                     pendingEntryReminderHandled = true;
                     // 點通知優先看該內容；其他公告留在佇列，不視為已確認。
                     if (activeEmergencyAnnouncement) popupAnnouncementQueue.unshift(activeEmergencyAnnouncement);
@@ -9848,7 +9850,7 @@
                     if (!bulletin) return false;
                     popupAnnouncementQueue = popupAnnouncementQueue.filter(function(b) { return b !== bulletin; });
                     popupAnnouncementQueue.unshift(bulletin);
-                    return showNextPopupAnnouncement();
+                    return showNextPopupAnnouncement(true);
                 }
             };
         }
@@ -13379,6 +13381,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         }
 
         function resetPopupQueueForEntry() {
+            pushTargetEntryActive = false;
             popupAnnouncementQueue = [];
             popupShownIdentitiesForCurrentEntry = {};
             activeEmergencyAnnouncement = null;
@@ -13390,7 +13393,10 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             activeEmergencyAnnouncement = null;
         }
 
-        function showNextPopupAnnouncement() {
+        function showNextPopupAnnouncement(fromPushTarget) {
+            // 通知進入後本次閱覽優先呈現目的地，晚到的公告只排隊。
+            // 不寫略過紀錄；下一次一般登入仍依原公告規則提醒。
+            if (pushTargetEntryActive && fromPushTarget !== true) return false;
             var modal = document.getElementById('emergencyModal');
             if (activeEmergencyAnnouncement) return true;
             var emergency = popupAnnouncementQueue.shift();
