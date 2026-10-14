@@ -1315,12 +1315,13 @@
         }
 
         @media (max-width: 600px) {
-            .header-bar { grid-template-columns: 64px minmax(0, 1fr) 128px; align-items: start; gap: 8px; padding: 8px 10px; min-height: 0; }
-            .header-col-logo { align-self: center; width: 64px; height: 72px; }
-            .header-logo-full { max-width: 64px; max-height: 72px; }
-            .class-info-top { font-size: 0.9rem; line-height: 1.3; }
-            .name-pill-row { gap: 3px; }
-            .student-info { font-size: clamp(1.125rem, calc(20vw - 46px), 2rem); line-height: 1.35; }
+            .header-bar { grid-template-columns: 44px minmax(0, 1fr) 128px; align-items: center; gap: 4px; padding: 8px; min-height: 0; }
+            .header-col-logo { align-self: center; width: 44px; height: 64px; }
+            .header-logo-full { max-width: 44px; max-height: 64px; }
+            .class-info-top { font-size: 0.8rem; line-height: 1.4; }
+            .name-pill-row { gap: 4px; }
+            .student-info { font-size: clamp(1.125rem, calc(10vw - 13px), 1.75rem); line-height: 1.5; }
+            .sticker-badge-header { font-size: 0.75rem; padding: 2px 6px; }
             /* 右側兩排整組上下置中；品牌與鈴鐺同排置中，四顆工具維持相同尺寸。 */
             .header-col-actions { display: grid; grid-template-columns: repeat(3, 40px); gap: 4px; align-self: center; }
             .bears-lab-title { grid-area: 1 / 1 / 2 / 3; align-self: center; justify-self: end; margin: 0; font-size: 1rem; line-height: 1.4; white-space: nowrap; }
@@ -4988,7 +4989,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;900&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <link rel="stylesheet" href="gifted_entry.css?v=20261010-auto-status">
   <link rel="stylesheet" href="ebook_resources.css?v=20261003_resources_mobile_type_v6">
-  <link rel="stylesheet" href="ebook_push.css?v=20261014-progress1">
+  <link rel="stylesheet" href="ebook_push.css?v=20261014-all1">
 </head>
 
 <body>
@@ -5029,8 +5030,8 @@
   <script src="resource_catalog_view.js?v=20261002_resources_time_v1"></script>
   <script src="ebook_resources_app.js?v=20261003_resources_outline_v5"></script>
 
-  <script src="ebook_push_navigation.js?v=20261014-startup1"></script>
-  <script src="ebook_push_app.js?v=20261014-recovery1"></script>
+  <script src="ebook_push_navigation.js?v=20261014-all1"></script>
+  <script src="ebook_push_app.js?v=20261014-all1"></script>
 
   <!-- Webhook API & Firebase Polyfill (Replace google.script.run) -->
   <script>

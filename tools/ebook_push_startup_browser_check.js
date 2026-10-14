@@ -4,7 +4,7 @@ async (browserPage) => {
     const context = await browserPage.context().browser().newContext();
     const page = await context.newPage();
     try {
-    const base = 'http://127.0.0.1:8796/';
+    const base = await browserPage.evaluate(() => new URL('./', location.href).href);
     const html = await (await page.request.get(base+'index.html')).text();
     const checks=[], check=(ok,label)=>{if(!ok)throw new Error(label);checks.push(label);};
     const engine=page.context().browser().browserType().name();
@@ -27,8 +27,7 @@ async (browserPage) => {
     await page.evaluate(()=>window.stop());
     release();
     await page.unrouteAll({behavior:'ignoreErrors'});
-    // WebKit 的截圖會等待已停止文件的字型，該狀態以可見性斷言驗證；Chrome另留實際畫面。
-    if(engine!=='webkit') await page.screenshot({path:'/private/tmp/ebook-push-startup-20261014/startup-'+engine+'.png',timeout:5000});
+    // 已停止的文件可能永遠等不到字型；以可見性與背景斷言驗證這個刻意暫停的狀態。
     await page.goto('about:blank');
     await page.goto(base+'ebook_push.css');
     await page.setContent('<!doctype html><meta charset="utf-8"><div id="splash-screen" style="position:fixed;inset:0;background:#f3faf6">正在開啟</div><div id="appContainer" style="display:none">登入聯絡簿</div>');

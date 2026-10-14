@@ -57,7 +57,7 @@
     function permission() { return 'Notification' in root ? Notification.permission : 'unsupported'; }
     function deviceState() {
         if (!state) return { title:'暫時無法確認', detail:'請稍後按「重新確認狀態」。', tone:'waiting' };
-        if (state.mode !== 'test_only') return { title:'通知服務暫停中', detail:'聯絡簿與 LINE 仍可照常使用。', tone:'waiting' };
+        if (!['test_only','all'].includes(state.mode)) return { title:'通知服務暫停中', detail:'聯絡簿與 LINE 仍可照常使用。', tone:'waiting' };
         if (!state.ready) return { title:'通知準備中', detail:'老師完成設定後，就能開啟通知。', tone:'waiting' };
         if (inApp()) return { title:'請用瀏覽器開啟', detail:ios() ? '請改用 Safari，加入主畫面後開啟。' : '請從 LINE 選單改用 Chrome 開啟聯絡簿。', tone:'waiting' };
         if (ios() && !installed()) return { title:'先加入主畫面', detail:'從主畫面的聯絡簿圖示開啟，就能設定通知。', tone:'waiting' };
@@ -155,7 +155,7 @@
                 <p class="ep-reassurance">未開啟或暫停手機通知，仍可在這裡查看新消息與未讀數。LINE 照常使用。</p>
                 <details class="ep-guide"><summary>開啟／關閉通知教學</summary><div class="ep-guide-tabs" aria-label="選擇裝置教學"><button type="button" data-ep="guide" data-id="ios" aria-pressed="false">iPhone／iPad</button><button type="button" data-ep="guide" data-id="android" aria-pressed="false">Android</button></div><div class="ep-guide-content"></div><button type="button" data-ep="refresh">重新確認狀態</button></details>
                 <details class="ep-troubleshoot"><summary>沒有收到通知？</summary><p>確認已允許通知、登入時勾選「保持登入」，並檢查網路、勿擾／專注模式及手機的省電設定。</p><p>每台手機或平板都需要各自允許；登出會解除該裝置的通知。重新開啟只接收新消息，不補送暫停期間的通知。</p><p>已讀狀態共用；其他裝置的圖示標記會在開啟聯絡簿或收到下一則通知時更新。Android 的圖示圓點或數字依手機而異。看過提醒不代表完成作業。</p></details>
-                <details class="ep-pilot" hidden><summary>測試工具 <span>僅供系統測試生</span></summary><p class="ep-test-device ep-note"></p><p class="ep-test-targets ep-note"></p><button type="button" data-ep="test">20 秒後傳送測試通知</button><p class="ep-note">任一台按一次，再將手機或平板回主畫面或鎖定。最多每分鐘一次；服務接受不代表裝置已顯示。</p></details>
+                <details class="ep-pilot" hidden><summary>測試工具 <span>僅供測試學生</span></summary><p class="ep-test-device ep-note"></p><p class="ep-test-targets ep-note"></p><button type="button" data-ep="test">20 秒後傳送測試通知</button><p class="ep-note">任一台按一次，再將手機或平板回主畫面或鎖定。最多每分鐘一次；服務接受不代表裝置已顯示。</p></details>
                 </div></details>
             </div>`;
         dialog.addEventListener('click', event => { const b = event.target.closest('[data-ep]'); if (b) action(b.dataset.ep, b.dataset.id); });
@@ -167,7 +167,7 @@
         renderEntry();
         if (!dialog) return;
         const info = deviceState(), denied = permission() === 'denied';
-        const usable = state && state.mode === 'test_only' && state.ready && capable() && !inApp() && (!ios() || installed());
+        const usable = state && ['test_only','all'].includes(state.mode) && state.ready && capable() && !inApp() && (!ios() || installed());
         const on = info.tone === 'on';
         const needsHelp = !capable() || inApp() || ios() && !installed() || denied;
         dialog.querySelector('.ep-device').dataset.tone = info.tone;
@@ -180,9 +180,9 @@
         pauseButton.hidden = !on;
         pauseButton.disabled = busy || !!refreshing;
         helpButton.hidden = !needsHelp || on;
-        const pilot = state && state.mode === 'test_only' && env && env.session && env.session.studentName === '系統測試生';
+        const pilot = state && ['test_only','all'].includes(state.mode) && env && env.session && ['系統測試生','測試學生'].includes(env.session.studentName);
         dialog.querySelector('.ep-pilot').hidden = !pilot;
-        const code = '測試期間僅指定的系統測試生可使用。開啟通知後即可測試，不需審核碼；一般家長尚未開放。';
+        const code = '測試學生可在這裡檢查手機與平板是否收到通知。';
         dialog.querySelector('.ep-test-device').textContent = code;
         dialog.querySelector('.ep-test-targets').textContent = `目前已連結 ${Number(state && state.approvedDeviceCount) || 0} 台裝置。測試送至其中已開啟且登入有效的裝置；同一則只算一則未讀。`;
         dialog.querySelector('[data-ep="test"]').disabled = busy || !!refreshing || !usable || !on;
@@ -300,7 +300,7 @@
         scheduleReadCheck();
     }
     async function resume() {
-        if (!env || env.preview || !env.uid || env.session?.studentName !== '系統測試生' || document.hidden) return;
+        if (!env || env.preview || !env.uid || !env.session?.studentName || document.hidden) return;
         const mine = epoch;
         try {
             await refresh();
@@ -437,7 +437,7 @@
         }
     }
     async function open(notificationId) {
-        if (isId(notificationId) && env && !env.preview && env.session?.studentName === '系統測試生') { rememberNotice(notificationId); navigationProgress(!state || state.eligible); }
+        if (isId(notificationId) && env && !env.preview && env.session?.studentName) { rememberNotice(notificationId); navigationProgress(!state || state.eligible); }
         if (!env || !entry || entry.hidden) return;
         build();
         if (isId(notificationId)) {
@@ -476,7 +476,7 @@
         }
         if (mine !== epoch) return;
         const name = options.session && options.session.studentName;
-        if (options.preview || name !== '系統測試生' || !options.uid) return;
+        if (options.preview || !name || !options.uid) return;
         build();
         guidePlatform = platform() === 'android' ? 'android' : 'ios'; showGuide();
         dialog.querySelector('.ep-save').textContent = '';

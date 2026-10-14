@@ -28,7 +28,7 @@ async (page) => {
             window.showNextPopupAnnouncement=()=>{activeEmergencyAnnouncement=popupAnnouncementQueue.shift();document.querySelector('#emergencyModal').style.display='block';return !!activeEmergencyAnnouncement;};
             window.toggleCard=n=>n.classList.add('active');
             window.switchTab=i=>{for(let j=0;j<4;j++)document.querySelector('#tab-content-'+j).style.display=i===j?'block':'none';window.scrollTo(0,0);};
-            window.__snapshot=()=>({recipient:'b'.repeat(64),eligible:true,mode:'test_only',ready:true,enabled:true,registered:true,approved:true,businessEnabled:true,kinds:{},items:structuredClone(__items),count:__items.filter(i=>!i.readAt).length,version:__version});
+            window.__snapshot=()=>({recipient:'b'.repeat(64),eligible:true,mode:'all',ready:true,enabled:true,registered:true,approved:true,businessEnabled:true,kinds:{},items:structuredClone(__items),count:__items.filter(i=>!i.readAt).length,version:__version});
             window.__api=async data=>{__calls.push(data.action+':'+(data.notificationId||''));if(data.action==='status'){const value=__snapshot();await new Promise(r=>setTimeout(r,__delayStatus));if(__failStatus)throw new Error('status離線');return value;}if(data.action==='open'){await new Promise(r=>setTimeout(r,__openDelay));if(window.__openGate)await __openGate;if(__unavailable)throw new Error('内容已移除');const item=__items.find(i=>i.id===data.notificationId);return {type:item.type,target:item.target};}if(data.action==='read'){if(__failRead)throw new Error('已讀暫時離線');__items.find(i=>i.id===data.notificationId).readAt=Date.now();__version++;const result={count:__items.filter(i=>!i.readAt).length,version:__version};await new Promise(r=>setTimeout(r,data.notificationId.startsWith('1')?__readDelay:0));return result;}throw new Error('Unexpected API '+data.action);};
             window.__setItems=items=>{__items=items.map((t,i)=>({id:(i+1).toString(16).repeat(64),createdAt:Date.now(),status:'accepted',readAt:null,title:t.kind,type:t.kind,target:t}));};
         });
@@ -37,7 +37,7 @@ async (page) => {
         await page.addScriptTag({content:navigationAdapters});
         await page.addScriptTag({content:await (await page.request.get(base+'ebook_push_app.js')).text()});
         await page.evaluate(()=>{
-            window.__ready=()=>EbookPush.ready({uid:'synthetic-user',subject:'science',session:{studentName:'系統測試生'},preview:false,call:__api,navigate:openEbookPushTarget,findTarget:t=>EbookPushNavigation.find(t,getEbookPushNavigationContext()),isReadable:EbookPushNavigation.readable});
+            window.__ready=()=>EbookPush.ready({uid:'synthetic-user',subject:'science',session:{studentName:'測試學生'},preview:false,call:__api,navigate:openEbookPushTarget,findTarget:t=>EbookPushNavigation.find(t,getEbookPushNavigationContext()),isReadable:EbookPushNavigation.readable});
             window.__click=id=>__sw.dispatchEvent(new MessageEvent('message',{data:{kind:'ebook_push_click',notificationId:id}}));
         });
     };
@@ -125,7 +125,7 @@ async (page) => {
         await page.locator('.ep-notice-open').click();
         check(await page.evaluate(()=>{
             const p=document.querySelector('.ep-navigation-progress'),r=p.getBoundingClientRect(),s=p.querySelector('span');
-            return !p.hidden&&!document.querySelector('.ep-dialog').open&&!__items[0].readAt&&Math.abs(r.x+r.width/2-innerWidth/2)<2&&Math.abs(r.y+r.height/2-innerHeight/2)<2&&r.left>=16&&r.right<=innerWidth-16&&s.getBoundingClientRect().width===40&&getComputedStyle(s).animationName==='ep-progress-spin';
+            return !p.hidden&&!document.querySelector('.ep-dialog').open&&!__items[0].readAt&&Math.abs(r.x+r.width/2-innerWidth/2)<2&&Math.abs(r.y+r.height/2-innerHeight/2)<2&&r.left>=16&&r.right<=innerWidth-16&&parseFloat(getComputedStyle(s).width)===40&&getComputedStyle(s).animationName==='ep-progress-spin';
         }),width+'：點通知列當下即顯示中央40px轉圈圈，API等待期間不提前已讀');
         if(width===390)await page.screenshot({path:'/private/tmp/ebook-push-progress-20261014/loading-'+page.context().browser().browserType().name()+'.png'});
         if(width===320){
@@ -194,7 +194,7 @@ async (page) => {
     await page.unroute('**/ebook_push_messaging.mjs*');
     await mount();await page.evaluate(async()=>{await EbookPush.ready({uid:'general-parent',subject:'science',session:{studentName:'一般家長'},preview:false,call:__api});window.dispatchEvent(new Event('online'));});
     await page.waitForTimeout(200);
-    check(await page.evaluate(()=>__calls.length===0),'一般家長恢復網路不呼叫試用通知API');
+    check(await page.evaluate(()=>__calls.length>0&&__calls.length<=2&&__calls.every(c=>c.startsWith('status:'))),'一般家長恢復網路僅查詢通知狀態，不重複發送');
     await mount();const scopes=await page.evaluate(targets=>targets.map(t=>EbookPushNavigation.find({...t,classKey:'別班'},getEbookPushNavigationContext())===null),targets);check(scopes.every(Boolean),'七類皆不跳往其他班同名資料');
     await page.screenshot({path:'/private/tmp/ebook-push-startup-20261014/flow-'+page.context().browser().browserType().name()+'.png'});
     check(errors.length===0,'無頁面JS例外');

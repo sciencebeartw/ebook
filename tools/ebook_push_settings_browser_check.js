@@ -6,7 +6,7 @@ async (page) => {
     const html = await (await page.request.get(base+'index.html')).text();
     const styles = [...html.matchAll(/<style[^>]*>[\s\S]*?<\/style>/g)].map(v=>v[0]).join('\n');
     let header = html.split('<div id="main-screen">')[1].split('<section id="ebookResourcePage"')[0];
-    header = header.replace('id="headClass"></div>','id="headClass">小六資優自然週六上午班</div>').replace('id="headName"></div>','id="headName">系統測試生</div>');
+    header = header.replace('id="headClass"></div>','id="headClass">小六資優自然週六上午班</div>').replace('id="headName"></div>','id="headName">測試學生</div>');
     const errors=[], checks=[];
     page.on('pageerror',e=>errors.push(e.message));
     const check=(ok,label)=>{if(!ok)throw new Error(label);checks.push(label);};
@@ -25,8 +25,8 @@ async (page) => {
             Object.defineProperty(navigator,'serviceWorker',{configurable:true,value:sw});
             Object.defineProperty(navigator,'clearAppBadge',{configurable:true,value:async()=>{}});
             window.__calls=[];window.__fail=false;
-            window.__state={eligible:true,mode:'test_only',ready:true,registered:true,approved:true,enabled:true,approvedDeviceCount:2,deviceCode:'TESTONLY',businessEnabled:true,preferences:{},kinds:{post:'聯絡簿',bulletin:'公告',message:'老師留言／回覆',sticker:'棒卡審核',makeup:'補考結果',grade:'課後成績',homework:'作業催繳'},items:[],count:0,version:1,recipient:'a'.repeat(64),...options.state};
-            window.__options={subject:'science',uid:'preview-only',session:{studentName:'系統測試生',rememberDevice:true},call:async d=>{__calls.push(d);if(d.action==='preferences'){await new Promise(r=>setTimeout(r,60));if(__fail)throw new Error('網路暫時無法連線');Object.assign(__state.preferences,d.preferences);}else if(d.action==='pause'){__state.enabled=false;}else if(d.action!=='status')throw new Error('不允許的展示操作：'+d.action);return structuredClone(__state);}};
+            window.__state={eligible:true,mode:'all',ready:true,registered:true,approved:true,enabled:true,approvedDeviceCount:2,deviceCode:'TESTONLY',businessEnabled:true,preferences:{},kinds:{post:'聯絡簿',bulletin:'公告',message:'老師留言／回覆',sticker:'棒卡審核',makeup:'補考結果',grade:'課後成績',homework:'作業催繳'},items:[],count:0,version:1,recipient:'a'.repeat(64),...options.state};
+            window.__options={subject:'science',uid:'preview-only',session:{studentName:'測試學生',rememberDevice:true},call:async d=>{__calls.push(d);if(d.action==='preferences'){await new Promise(r=>setTimeout(r,60));if(__fail)throw new Error('網路暫時無法連線');Object.assign(__state.preferences,d.preferences);}else if(d.action==='pause'){__state.enabled=false;}else if(d.action!=='status')throw new Error('不允許的展示操作：'+d.action);return structuredClone(__state);}};
         },options);
         await page.addScriptTag({url:base+'ebook_push_app.js'});
         await page.evaluate(async()=>{await EbookPush.ready(__options);await EbookPush.open();document.querySelector('.ep-settings').open=true;await document.fonts.ready;});
@@ -80,7 +80,9 @@ async (page) => {
     check(!(await page.locator('.ep-test-device').textContent()).includes('TESTONLY')&&await page.locator('[data-ep="enable"]').isEnabled()&&await page.locator('.ep-state-title').textContent()==='請重新開啟通知','舊待審裝置可重新開啟且不顯示核對碼');
     await mount();
     await page.evaluate(()=>EbookPush.ready({...__options,session:{studentName:'一般家長'}}));
-    check(await page.locator('#ebookPushEntry').isHidden()&&await page.locator('.ep-dialog').evaluate(e=>!e.open),'一般家長仍未開放');
+    check(await page.locator('#ebookPushEntry').isVisible(),'一般家長依伺服器開放範圍顯示通知入口');
+    await page.evaluate(()=>EbookPush.ready({...__options,preview:true}));
+    check(await page.locator('#ebookPushEntry').isHidden(),'行政預覽不可註冊手機推播');
     await mount();await page.emulateMedia({reducedMotion:'reduce'});
     check(await page.locator('.ep-switch-track').first().evaluate(e=>getComputedStyle(e).transitionDuration)==='0s','減少動態效果');
     await page.emulateMedia({reducedMotion:'no-preference'});
