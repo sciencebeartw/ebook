@@ -27,6 +27,10 @@
         try { if (id) sessionStorage.setItem(storageKey() + ':click', id); else sessionStorage.removeItem(storageKey() + ':click'); } catch (_) {}
     }
     function navigationProgress(show, waiting = false) {
+        if (show && !waiting) {
+            const announcement = document.getElementById('emergencyModal');
+            waiting = !!document.querySelector('.swal2-container') || !!(announcement && getComputedStyle(announcement).display !== 'none');
+        }
         if (!progress && show) {
             progress = document.createElement('div');
             progress.className = 'ep-navigation-progress';

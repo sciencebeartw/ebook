@@ -118,10 +118,11 @@
 .ep-dialog .ep-required-row{cursor:default}
 .ep-dialog .ep-fixed{flex-shrink:0;font-size:12px;font-weight:700;color:#4b7958;background:#eef6ef;border-radius:6px;padding:4px 8px}
 
-.ep-navigation-progress{position:fixed;left:50%;bottom:calc(22px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:21000;display:flex;align-items:center;gap:10px;max-width:calc(100vw - 32px);box-sizing:border-box;padding:13px 18px;border:1px solid #bfd2b6;border-radius:14px;background:#f3faf6;color:#214b36;font:600 16px/1.5 system-ui,sans-serif;white-space:nowrap;box-shadow:0 6px 24px #17392b20;pointer-events:none}
+.ep-navigation-progress{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:21000;display:flex;flex-direction:column;align-items:center;gap:16px;width:280px;max-width:calc(100vw - 32px);box-sizing:border-box;padding:26px 20px;border:1px solid #bfd2b6;border-radius:20px;background:#f8fcf5;color:#214b36;font:650 17px/1.5 system-ui,sans-serif;text-align:center;box-shadow:0 12px 48px #17392b30;pointer-events:none}
 .ep-navigation-progress[hidden]{display:none}
-.ep-navigation-progress>span{width:17px;height:17px;flex:none;border:2px solid #cbdcc4;border-top-color:#2c854b;border-radius:50%;animation:ep-progress-spin .8s linear infinite}
+.ep-navigation-progress>span{width:40px;height:40px;box-sizing:border-box;flex:none;border:4px solid #dcebd8;border-top-color:#2c854b;border-radius:50%;animation:ep-progress-spin .8s linear infinite}
 @keyframes ep-progress-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.ep-navigation-progress>span{animation:none}}
 
+.ep-navigation-progress.is-waiting{top:auto;bottom:calc(22px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);flex-direction:row;gap:10px;width:max-content;padding:13px 18px;border-radius:14px;font-size:16px;font-weight:600;box-shadow:0 6px 24px #17392b20}
 .ep-navigation-progress.is-waiting>span{display:none}

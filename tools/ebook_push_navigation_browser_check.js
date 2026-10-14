@@ -119,11 +119,26 @@ async (page) => {
     await mount();await page.evaluate(target=>{__setItems([target]);__delayStatus=500;__openDelay=500;__ready();setTimeout(()=>__click(__items[0].id),40);},targets[2]);
     await page.waitForFunction(()=>__items[0].readAt);
     check(await page.evaluate(()=>!EbookPushLaunch.current()&&document.querySelector('.ep-navigation-progress').hidden),'初始化期間收到推播不遺失，完成後清除進度提示');
-    await mount();await page.evaluate(async target=>{__setItems([target]);await __ready();__openDelay=600;EbookPush.open(__items[0].id);},targets[2]);
-    check(await page.evaluate(()=>!document.querySelector('.ep-navigation-progress').hidden&&!__items[0].readAt),'網路等待期間立即顯示正在開啟，不提前已讀');
-    await page.waitForFunction(()=>__items[0].readAt);
+    for (const width of [320,390,768]) {
+        await mount();await page.addStyleTag({url:base+'ebook_push.css'});await page.setViewportSize({width,height:844});
+        await page.evaluate(async target=>{__setItems([target]);await __ready();await EbookPush.open();__openDelay=1200;},targets[2]);
+        await page.locator('.ep-notice-open').click();
+        check(await page.evaluate(()=>{
+            const p=document.querySelector('.ep-navigation-progress'),r=p.getBoundingClientRect(),s=p.querySelector('span');
+            return !p.hidden&&!document.querySelector('.ep-dialog').open&&!__items[0].readAt&&Math.abs(r.x+r.width/2-innerWidth/2)<2&&Math.abs(r.y+r.height/2-innerHeight/2)<2&&r.left>=16&&r.right<=innerWidth-16&&s.getBoundingClientRect().width===40&&getComputedStyle(s).animationName==='ep-progress-spin';
+        }),width+'：點通知列當下即顯示中央40px轉圈圈，API等待期間不提前已讀');
+        if(width===390)await page.screenshot({path:'/private/tmp/ebook-push-progress-20261014/loading-'+page.context().browser().browserType().name()+'.png'});
+        if(width===320){
+            await page.emulateMedia({reducedMotion:'reduce'});
+            check(await page.evaluate(()=>getComputedStyle(document.querySelector('.ep-navigation-progress>span')).animationName==='none'),'減少動態效果時保留文字提示、停止旋轉');
+            await page.emulateMedia({reducedMotion:'no-preference'});
+        }
+        await page.waitForFunction(()=>__items[0].readAt);
+        check(await page.evaluate(()=>document.querySelector('.ep-navigation-progress').hidden),width+'：抵達通知內容後轉圈圈消失');
+    }
     await mount();await page.addStyleTag({url:base+'ebook_push.css'});
     await page.evaluate(async target=>{__setItems([target]);await __ready();popupAnnouncementQueue=[gData.bulletins[0]];showNextPopupAnnouncement();__openDelay=250;EbookPush.open(__items[0].id);},targets[2]);
+    check(await page.evaluate(()=>document.querySelector('.ep-navigation-progress').classList.contains('is-waiting')&&getComputedStyle(document.querySelector('.ep-navigation-progress')).top!=='50%'),'API尚未回應時也尊重公告優先，不顯示中央載入卡');
     await page.waitForTimeout(600);
     check(await page.evaluate(()=>!!activeEmergencyAnnouncement&&!__items[0].readAt&&document.querySelector('.ep-navigation-progress').textContent.includes('提醒關閉後')),'公告優先顯示期間，通知在背景定位但不記已讀');
     await page.evaluate(()=>{hideEmergencyModal();document.body.insertAdjacentHTML('beforeend','<div class="swal2-container" style="position:fixed;inset:0;z-index:5000;background:white">待完成提醒</div>');});
