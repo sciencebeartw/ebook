@@ -12,6 +12,9 @@ async (page) => {
         await page.setContent(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;font-family:sans-serif}.sticky-wrapper{position:sticky;top:0;height:50px;background:white;z-index:2}.gap{height:950px}.item{padding:12px;min-height:65px;border:1px solid green;margin:8px}.feedback-thread-replies[hidden]{display:none}.ep-dialog{max-width:350px;max-height:85vh}#emergencyModal{display:none;position:fixed;inset:50px 0 0;background:white;z-index:5}</style></head><body><button id="ebookPushEntry" hidden>通知</button><main id="main-screen"><nav class="sticky-wrapper">聯絡簿｜成績｜公告｜待完成</nav><div id="tab-content-0"><div class="gap"></div><article class="item" data-post-id="post1" data-post-date="2026/10/11" data-source-class-key="班級"><div class="post-header">聯絡簿內容</div><div class="gap"></div><section data-feedback-thread-id="parent1"><div class="item" data-feedback-key="parent1" data-feedback-role="student">家長留言</div><button class="feedback-thread-toggle" aria-expanded="false" onclick="this.setAttribute('aria-expanded','true');this.nextElementSibling.hidden=false">展開回覆</button><div class="feedback-thread-replies" hidden><div class="item" data-feedback-key="reply1" data-feedback-role="teacher">老師回覆</div></div></section><div class="item" data-feedback-key="sticker1">棒卡核准紀錄</div></article></div><div id="tab-content-1" style="display:none"><div class="gap"></div><div class="item score-card" data-pending-exam-anchor="1" data-exam-id="exam1" data-source-class-key="班級">成績 80 分、補考結果</div></div><div id="tab-content-2" style="display:none"><div class="gap"></div><article class="item" data-push-bulletin-id="bulletin1" data-source-class-key="班級">公告內容</article></div><div id="tab-content-3" style="display:none"><div class="pending-page-summary item">待完成項目</div></div><div class="gap"></div></main><div id="emergencyModal"><div class="item" id="emergencyContent">緊急公告內容</div></div></body></html>`);
         await page.evaluate(()=>{
             window.__calls=[];window.__badges=[];window.__version=1;window.__items=[];window.__delayStatus=0;window.__failRead=false;window.__failStatus=false;window.__openDelay=0;window.__unavailable=false;window.__readDelay=0;
+            window.__settingsOpenings=0;
+            const showModal=HTMLDialogElement.prototype.showModal;
+            HTMLDialogElement.prototype.showModal=function(){if(this.classList.contains('ep-dialog'))__settingsOpenings++;return showModal.call(this);};
             localStorage.clear();sessionStorage.clear();
             window.__sw=new EventTarget();__sw.getRegistration=async()=>({active:{postMessage:data=>__badges.push(data.count)}});
             Object.defineProperty(navigator,'serviceWorker',{configurable:true,value:__sw});
@@ -41,7 +44,21 @@ async (page) => {
         await mount();await page.evaluate(async target=>{__setItems([target]);await __ready();await EbookPush.open(__items[0].id);},target);
         const r=await page.evaluate(()=>({read:!!__items[0].readAt,badge:__badges.at(-1),open:document.querySelector('.ep-dialog').open,visible:!!EbookPushNavigation.find(__items[0].target,getEbookPushNavigationContext())}));
         check(r.read&&r.badge===0&&!r.open&&r.visible,'七類點入與已讀：'+target.kind);
+        check(await page.evaluate(()=>__settingsOpenings===0),'整段導頁不曾顯示設定：'+target.kind);
     }
+    await mount();await page.evaluate(async target=>{__setItems([target]);await __ready();__openDelay=600;__click(__items[0].id);},targets[2]);
+    await page.waitForTimeout(200);
+    check(await page.evaluate(()=>!document.querySelector('.ep-dialog').open&&__settingsOpenings===0&&!__items[0].readAt),'背景通知等待來源時不閃設定、不提前已讀');
+    await page.waitForFunction(()=>__items[0].readAt);
+    check(await page.evaluate(()=>__settingsOpenings===0&&__badges.at(-1)===0),'背景通知完成定位與已讀，全程不開設定');
+    await mount();await page.evaluate(async target=>{__setItems([target]);await __ready();await EbookPush.open();},targets[2]);
+    check(await page.evaluate(()=>document.querySelector('.ep-dialog').open&&__settingsOpenings===1),'主動按鈴鐺仍開啟設定');
+    await page.evaluate(()=>{__openDelay=400;__click(__items[0].id);});
+    check(await page.evaluate(()=>!document.querySelector('.ep-dialog').open&&__settingsOpenings===1),'設定已開啟時點通知立即關閉設定');
+    await page.waitForFunction(()=>__items[0].readAt);
+    check(await page.evaluate(()=>__settingsOpenings===1&&__badges.at(-1)===0),'從設定轉入內容不重開設定');
+    await mount();await page.evaluate(async()=>{__setItems([{kind:'test'}]);await __ready();await EbookPush.open(__items[0].id);});
+    check(await page.evaluate(()=>document.querySelector('.ep-dialog').open&&__settingsOpenings===1&&!!__items[0].readAt),'純連線測試仍顯示設定並記已讀');
     await mount();await page.evaluate(async()=>{__setItems([{kind:'bulletin',id:'popup1',classKey:'班級'}]);await __ready();await EbookPush.open(__items[0].id);});
     check(await page.evaluate(()=>!!__items[0].readAt&&activeEmergencyAnnouncement.id==='popup1'),'僅彈窗公告直接顯示');
     await mount();await page.evaluate(async targets=>{__setItems([targets[2],targets[1]]);await __ready();document.querySelector('.feedback-thread-toggle').click();const node=EbookPushNavigation.find(__items[0].target,getEbookPushNavigationContext());window.scrollTo(0,node.getBoundingClientRect().top+scrollY-70);},targets);
@@ -72,7 +89,7 @@ async (page) => {
     await page.evaluate(async()=>{document.querySelector('.feedback-thread-replies').insertAdjacentHTML('afterbegin','<div class="gap"></div>');await EbookPush.open(__items[0].id);});
     check(await page.evaluate(()=>!!__items[0].readAt&&EbookPushNavigation.readable(document.querySelector('[data-feedback-key="reply1"]'))),'長討論串展開並捲到老師回覆');
     await mount();await page.evaluate(async target=>{__setItems([target]);history.replaceState(null,'','?pushNotice='+__items[0].id);await __ready();},targets[1]);
-    check(await page.evaluate(()=>!!__items[0].readAt&&!new URL(location.href).searchParams.has('pushNotice')),'冷啟動URL完成導頁後才清除');
+    check(await page.evaluate(()=>!!__items[0].readAt&&!new URL(location.href).searchParams.has('pushNotice')&&__settingsOpenings===0),'冷啟動URL完成導頁後才清除、全程不開設定');
     await mount();await page.evaluate(async target=>{__setItems([target]);await __ready();document.querySelector('[data-push-bulletin-id]').dataset.sourceClassKey='全校';await EbookPush.open(__items[0].id);},targets[1]);
     check(await page.evaluate(()=>!!__items[0].readAt),'全校公告亦能從本班通知開啟');
     await mount();await page.evaluate(async()=>{__setItems([{kind:'bulletin',id:'popup1',classKey:'班級'}]);await __ready();popupAnnouncementQueue=[gData.bulletins[0]];showNextPopupAnnouncement();});

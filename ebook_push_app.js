@@ -284,7 +284,10 @@
     async function viewNotice(id) {
         const mine = epoch;
         const result = await api('open', {notificationId:id});
-        if (result.type !== 'test') {
+        if (result.type === 'test') {
+            // 連線測試沒有內容目的地，確認類型後才顯示通知設定。
+            if (!dialog.open) dialog.showModal();
+        } else {
             // 先關掉對話框再捲動，避免 iOS 對話框焦點還原把位置拉回頁首。
             if(dialog.open) dialog.close();
             if (!env.navigate || !await env.navigate(result.target, () => mine === epoch)) throw new Error('目前畫面尚未載入這筆內容，請重新整理聯絡簿後再查看。');
@@ -310,8 +313,13 @@
     async function open(notificationId) {
         if (isId(notificationId) && env) rememberNotice(notificationId);
         if (!env || !entry || entry.hidden) return;
-        build(); if (!dialog.open) dialog.showModal();
-        if (isId(notificationId)) return drainNotice();
+        build();
+        if (isId(notificationId)) {
+            // 通知直接進內容；不先顯示設定，以免等待來源時閃過設定畫面。
+            if (dialog.open) dialog.close();
+            return drainNotice();
+        }
+        if (!dialog.open) dialog.showModal();
         await action('refresh');
     }
     async function ready(options) {
