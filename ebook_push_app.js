@@ -4,7 +4,7 @@
     const requiredKinds = new Set(['bulletin', 'homework']);
     const isId = v => typeof v === 'string' && /^[a-f0-9]{64}$/.test(v);
     let env = null, state = null, registration = null, bridge = null, busy = false, epoch = 0;
-    let dialog, entry, binding = null, pendingNotice = '', opening = false, badgeSync = 0;
+    let dialog, previewDialog, entry, binding = null, pendingNotice = '', opening = false, badgeSync = 0;
     let noticeFilter = 'unread', refreshing = null, progress = null;
     let observer = null, observeTimer = null, dwellTimer = null, visibleSince = new Map(), reading = new Set(), pendingReads = new Set();
     function escape(text) { return String(text || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -91,7 +91,7 @@
         let dot = entry.querySelector('.ep-entry-dot');
         if (!dot) { dot = document.createElement('span'); dot.className = 'ep-entry-dot'; dot.setAttribute('aria-hidden','true'); entry.appendChild(dot); }
         dot.hidden = count === 0; dot.textContent = count > 99 ? '99+' : String(count);
-        const label = count ? `通知，${count} 則未讀` : '通知';
+        const label = env && env.preview ? '通知（學生視角預覽）' : count ? `通知，${count} 則未讀` : '通知';
         entry.setAttribute('aria-label',label); entry.title = label;
     }
     function noticeTime(value) {
@@ -133,6 +133,34 @@
     function showGuide() {
         dialog.querySelector('.ep-guide-content').innerHTML = guides[guidePlatform];
         dialog.querySelectorAll('[data-ep="guide"]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.id === guidePlatform)));
+    }
+    function openPreview() {
+        if (!previewDialog) {
+            previewDialog = document.createElement('dialog');
+            previewDialog.className = 'ep-dialog ep-preview-dialog';
+            previewDialog.setAttribute('aria-labelledby', 'ep-preview-title');
+            previewDialog.innerHTML = `
+                <header><div><p class="ep-eyebrow">山熊聯絡簿</p><div class="ep-title-row"><h2 id="ep-preview-title">通知</h2><span class="ep-unread">學生視角預覽</span></div></div><button type="button" class="ep-close" data-preview-close aria-label="關閉通知">${icon('close')}</button></header>
+                <div class="ep-body">
+                    <section class="ep-preview-note"><h3>目前是管理員預覽</h3><p>通知紀錄與推播設定，請使用學生帳號登入查看。預覽時不會將這台裝置綁定給學生，也不會改變通知的已讀狀態。</p></section>
+                    <h3>家長如何開啟手機推播</h3>
+                    <div class="ep-guide-tabs" aria-label="選擇裝置教學"><button type="button" data-preview-guide="ios">iPhone／iPad</button><button type="button" data-preview-guide="android">Android</button></div>
+                    <div class="ep-guide-content"></div>
+                </div>`;
+            previewDialog.addEventListener('click', event => {
+                if (event.target.closest('[data-preview-close]')) previewDialog.close();
+                const button = event.target.closest('[data-preview-guide]');
+                if (button) showPreviewGuide(button.dataset.previewGuide);
+            });
+            document.body.appendChild(previewDialog);
+        }
+        showPreviewGuide(platform() === 'android' ? 'android' : 'ios');
+        if (!previewDialog.open) previewDialog.showModal();
+    }
+    function showPreviewGuide(key) {
+        if (!guides[key]) return;
+        previewDialog.querySelector('.ep-guide-content').innerHTML = guides[key];
+        previewDialog.querySelectorAll('[data-preview-guide]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.previewGuide === key)));
     }
     function build() {
         if (dialog) return;
@@ -199,6 +227,7 @@
         renderNotices();
     }
     async function api(action, extra = {}) {
+        if (!env || env.preview) throw new Error('學生視角預覽不會變更通知');
         const mine = epoch;
         const result = await timed(env.call({ action, deviceId: binding && binding.deviceId || '', ...extra }));
         if (mine !== epoch) throw new Error('登入身分已變更，請重新開啟通知設定');
@@ -347,6 +376,7 @@
     }
     async function action(name, id, value) {
         if (name === 'close') { dialog.close(); scheduleReadCheck(); return; }
+        if (!env || env.preview) return;
         if (name === 'filter' && ['unread','all'].includes(id)) { noticeFilter = id; renderNotices(); dialog.querySelector('.ep-inbox').scrollTop = 0; return; }
         if (name === 'guide' && guides[id]) { guidePlatform = id; showGuide(); return; }
         if (name === 'help') { const guide = dialog.querySelector('.ep-guide'); guide.open = true; guide.querySelector('summary').focus(); guide.scrollIntoView({block:'nearest'}); return; }
@@ -439,6 +469,7 @@
     async function open(notificationId) {
         if (isId(notificationId) && env && !env.preview && env.session?.studentName) { rememberNotice(notificationId); navigationProgress(!state || state.eligible); }
         if (!env || !entry || entry.hidden) return;
+        if (env.preview) { openPreview(); return; }
         build();
         if (isId(notificationId)) {
             // 通知直接進內容；不先顯示設定，以免等待來源時閃過設定畫面。
@@ -464,19 +495,22 @@
         if (bridge) bridge.disconnect();
         bridge = null;
         if (dialog && dialog.open) dialog.close();
+        if (previewDialog && previewDialog.open) previewDialog.close();
         entry = document.getElementById('ebookPushEntry');
         if (!entry) return;
         entry.hidden = true;
         renderEntry(); noticeFilter = 'unread';
+        // 管理員預覽只提供入口與教學，不讀寫通知，也不解除原裝置綁定。
+        if (options.preview) { entry.hidden = false; return; }
         binding = loadBinding();
-        if (binding && (binding.uid !== options.uid || binding.subject !== options.subject || options.preview)) {
+        if (binding && (binding.uid !== options.uid || binding.subject !== options.subject)) {
             // 同一主畫面 App 共用一個 push subscription；切換身分前解除舊裝置。
             try { await timed(unsubscribe()); if (mine !== epoch) return; saveBinding(null); }
             catch (_) { binding = null; return; }
         }
         if (mine !== epoch) return;
         const name = options.session && options.session.studentName;
-        if (options.preview || !name || !options.uid) return;
+        if (!name || !options.uid) return;
         build();
         guidePlatform = platform() === 'android' ? 'android' : 'ios'; showGuide();
         dialog.querySelector('.ep-save').textContent = '';
@@ -505,6 +539,7 @@
         const finish = () => {
             epoch++; navigationProgress(false);
             if (dialog && dialog.open) dialog.close();
+            if (previewDialog && previewDialog.open) previewDialog.close();
             if (entry) entry.hidden = true;
             if (bridge) bridge.disconnect();
             bridge = null;

@@ -88,6 +88,11 @@
 .ep-dialog .ep-guide-tabs button{flex:1;padding:9px 8px}
 .ep-dialog .ep-guide-tabs [aria-pressed="true"]{color:#2d653e;border-color:#7ca787;background:#eef6ef;font-weight:700}
 .ep-dialog .ep-guide-content{color:#536d5d;font-size:14px}
+.ep-preview-dialog .ep-body{display:block;overflow-y:auto;padding:20px 22px;overscroll-behavior:contain}
+.ep-preview-dialog .ep-preview-note{padding:16px;margin-bottom:24px;border:1px solid #e7dcb7;border-radius:14px;background:#fff9e9;color:#665022}
+.ep-preview-dialog .ep-preview-note p{margin:8px 0 0}
+.ep-preview-dialog .ep-guide-tabs{margin-top:14px}
+.ep-preview-dialog .ep-guide-content ol{padding-left:24px}
 .ep-dialog .ep-guide-content ol{padding-left:24px;margin:0}
 .ep-dialog .ep-guide-content li{padding:0 0 8px 3px}
 .ep-dialog .ep-guide-content p{margin:8px 0 14px}

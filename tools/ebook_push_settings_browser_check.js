@@ -81,8 +81,35 @@ async (page) => {
     await mount();
     await page.evaluate(()=>EbookPush.ready({...__options,session:{studentName:'一般家長'}}));
     check(await page.locator('#ebookPushEntry').isVisible(),'一般家長依伺服器開放範圍顯示通知入口');
-    await page.evaluate(()=>EbookPush.ready({...__options,preview:true}));
-    check(await page.locator('#ebookPushEntry').isHidden(),'行政預覽不可註冊手機推播');
+    await page.evaluate(async()=>{
+        window.__beforePreview=__calls.length;window.__deviceEffects=[];
+        window.__savedBinding=JSON.stringify({uid:'another-student',subject:'math',deviceId:'b'.repeat(64)});
+        localStorage.setItem('sciencebear.ebook.push.v1:device',__savedBinding);
+        navigator.serviceWorker.getRegistration=async()=>{__deviceEffects.push('registration');return null;};
+        navigator.clearAppBadge=async()=>{__deviceEffects.push('badge');};
+        Notification.requestPermission=async()=>{__deviceEffects.push('permission');return 'granted';};
+        await EbookPush.ready({...__options,preview:true,session:{},uid:undefined});
+    });
+    check(await page.locator('#ebookPushEntry').isVisible(),'行政預覽沒有學生登入憑證也顯示通知入口');
+    check(await page.locator('#ebookPushEntry').getAttribute('aria-label')==='通知（學生視角預覽）','入口標示學生視角預覽');
+    await page.locator('#ebookPushEntry').click();
+    check(await page.locator('.ep-preview-dialog').isVisible()&&(await page.locator('.ep-preview-note').textContent()).includes('目前是管理員預覽'),'點鈴鐺顯示清楚的管理員預覽說明');
+    check(await page.locator('.ep-preview-dialog [data-ep], .ep-preview-dialog input, .ep-preview-dialog .ep-log').count()===0,'預覽不提供註冊、測試發送、偏好修改或假通知清單');
+    check(await page.locator('.ep-preview-dialog [data-preview-guide="ios"]').getAttribute('aria-pressed')==='true','預覽依裝置顯示 iPhone 教學');
+    await page.locator('[data-preview-guide="android"]').click();
+    check((await page.locator('.ep-preview-dialog .ep-guide-content').textContent()).includes('Chrome'),'預覽可切換 Android 教學');
+    await page.locator('[data-preview-guide="ios"]').click();
+    for(const size of [{width:320,height:568},{width:390,height:844},{width:820,height:1180},{width:568,height:320}]){
+        await page.setViewportSize(size);
+        check(await page.evaluate(()=>{const d=document.querySelector('.ep-preview-dialog'),b=d.querySelector('.ep-body');b.scrollTop=b.scrollHeight;const close=d.querySelector('.ep-close').getBoundingClientRect();return d.scrollWidth<=d.clientWidth&&b.scrollWidth<=b.clientWidth&&b.scrollTop+b.clientHeight>=b.scrollHeight-2&&close.top>=0&&close.bottom<=innerHeight;}),'預覽無橫向溢出、教學底部可達、關閉可見 '+size.width+'x'+size.height);
+    }
+    await page.evaluate(()=>EbookPush.open('a'.repeat(64)));
+    check(await page.evaluate(()=>__calls.length===__beforePreview&&__deviceEffects.length===0&&localStorage.getItem('sciencebear.ebook.push.v1:device')===__savedBinding),'預覽與通知點擊不讀寫 API、不動裝置權限與原綁定');
+    await page.evaluate(()=>EbookPush.beforeLogout());
+    check(await page.locator('.ep-preview-dialog').isHidden()&&await page.locator('#ebookPushEntry').isHidden(),'離開預覽收起入口與視窗');
+    check(await page.evaluate(()=>__calls.length===__beforePreview&&__deviceEffects.length===0&&localStorage.getItem('sciencebear.ebook.push.v1:device')===__savedBinding),'預覽登出保留原裝置綁定');
+    await page.evaluate(async()=>{localStorage.removeItem('sciencebear.ebook.push.v1:device');await EbookPush.ready(__options);await EbookPush.open();});
+    check(await page.locator('.ep-dialog:not(.ep-preview-dialog)').isVisible()&&await page.locator('.ep-preview-dialog').isHidden(),'切回學生登入恢復正常通知中心');
     await mount();await page.emulateMedia({reducedMotion:'reduce'});
     check(await page.locator('.ep-switch-track').first().evaluate(e=>getComputedStyle(e).transitionDuration)==='0s','減少動態效果');
     await page.emulateMedia({reducedMotion:'no-preference'});
