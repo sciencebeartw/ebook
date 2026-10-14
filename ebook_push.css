@@ -1,9 +1,70 @@
-.ebook-push-entry{margin:0;color:#274e3d;font:inherit}.ebook-push-entry svg{width:24px;height:24px}.ebook-push-entry[hidden]{display:none}
-.ep-dialog{width:min(560px,calc(100% - 24px));max-height:90dvh;padding:0;border:0;border-radius:16px;color:#233c32;background:#fff;box-shadow:0 16px 60px #0004}.ep-dialog::backdrop{background:#172b2566}.ep-dialog header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #dde4e0}.ep-dialog h2{font-size:20px;margin:0}.ep-dialog button{min-height:44px;padding:10px 14px;border:1px solid #bbcfc5;border-radius:8px;font:inherit;cursor:pointer;background:white;color:#294c3d}.ep-dialog button:disabled{opacity:.5;cursor:wait}.ep-dialog .ep-body{padding:16px 20px}.ep-dialog p,.ep-dialog li{line-height:1.7}.ep-dialog .ep-state{background:#edf4ef;padding:12px;border-radius:8px}.ep-dialog .ep-actions{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}.ep-dialog .ep-primary{background:#315947;color:#fff;border-color:#315947}.ep-dialog .ep-danger{color:#9a332e}.ep-dialog details{border-top:1px solid #e0e7e2;padding:12px 0}.ep-dialog summary{min-height:32px;cursor:pointer;font-weight:600}.ep-dialog ol,.ep-dialog ul{padding-left:24px}.ep-dialog .ep-log{list-style:none;padding:0}.ep-dialog .ep-log li{border-bottom:1px solid #e2e8e4;padding:8px 0;display:flex;justify-content:space-between;gap:10px;align-items:center}.ep-dialog .ep-log small{display:block;color:#607168}.ep-dialog .ep-error{color:#a2342c;white-space:pre-wrap;overflow-wrap:anywhere}.ep-dialog .ep-note{font-size:14px;color:#5b6b62}.ep-dialog button:focus-visible,.ebook-push-entry:focus-visible{outline:3px solid #deac3c;outline-offset:2px}
-@media(max-width:360px){.ep-dialog header,.ep-dialog .ep-body{padding:14px}.ep-dialog .ep-actions button{width:100%}}
+.ebook-push-entry{margin:0;color:#274e3d;font:inherit}
+.ebook-push-entry svg{width:24px;height:24px}
+.ebook-push-entry[hidden],.ep-dialog [hidden]{display:none!important}
+.ep-dialog{box-sizing:border-box;width:min(520px,calc(100% - 24px));max-height:92dvh;padding:0;border:1px solid #e1e9e3;border-radius:22px;color:#233c32;background:#fff;box-shadow:0 18px 65px #17392b26;overscroll-behavior:contain;scroll-padding-top:94px}
+.ep-dialog::backdrop{background:#16372b66}
+.ep-dialog *{box-sizing:border-box}
+.ep-dialog header{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;padding:16px 22px;background:#fff;border-bottom:1px solid #e6ece7}
+.ep-dialog .ep-eyebrow{font-size:12px;color:#738478;margin:0 0 3px;letter-spacing:.08em}
+.ep-dialog h2{font-size:22px;line-height:1.4;margin:0;font-weight:700}
+.ep-dialog h3{font-size:17px;line-height:1.5;margin:0}
+.ep-dialog h4{font-size:15px;margin:20px 0 8px}
+.ep-dialog button{min-height:44px;padding:9px 14px;border:1px solid #c7d7cc;border-radius:10px;font:inherit;font-size:14px;cursor:pointer;background:#fff;color:#315c44}
+.ep-dialog button:disabled{opacity:.5;cursor:default}
+.ep-dialog .ep-close{width:44px;padding:0;border:0;background:#f1f5f2;font-family:Arial,sans-serif;font-size:28px;font-weight:400;line-height:1}
+.ep-dialog .ep-body{padding:20px 22px 12px}
+.ep-dialog p,.ep-dialog li{font-size:14px;line-height:1.75}
+.ep-dialog .ep-device{padding:16px;background:#f0f7f1;border-radius:14px;border:1px solid #deebe0}
+.ep-dialog .ep-device-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
+.ep-dialog .ep-state{min-width:0;margin:0;flex:1 1 140px}
+.ep-dialog .ep-device-label{display:block;font-size:12px;color:#6b8171;margin-bottom:5px}
+.ep-dialog .ep-state-title{display:block;font-size:18px;line-height:1.4;color:#36523f}
+.ep-dialog .ep-state-title::before{content:'';display:inline-block;vertical-align:2px;width:8px;height:8px;border-radius:50%;background:#a2b0a5;margin-right:8px}
+.ep-dialog [data-tone="on"] .ep-state-title::before{background:#31a05b}
+.ep-dialog [data-tone="waiting"] .ep-state-title::before{background:#bd8a3d}
+.ep-dialog .ep-state-detail{margin:10px 0 0;font-size:13px;color:#607565}
+.ep-dialog .ep-primary{background:#34774d;color:#fff;border-color:#34774d}
+.ep-dialog .ep-types{margin-top:24px}
+.ep-dialog .ep-section-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.ep-dialog .ep-save{font-size:12px;color:#52745d;white-space:nowrap}
+.ep-dialog .ep-note{font-size:13px;color:#758279;margin:7px 0 12px}
+.ep-dialog .ep-preferences{display:grid;grid-template-columns:minmax(0,1fr)}
+.ep-dialog .ep-preference-row{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:49px;padding:10px 2px;border-bottom:1px solid #edf1ee;cursor:pointer;font-size:15px;line-height:1.5}
+.ep-dialog .ep-preference-row:last-child{border-bottom:0}
+.ep-dialog .ep-preference-row small{display:block;font-size:12px;color:#7a887e;margin-top:2px}
+.ep-dialog .ep-switch{position:relative;display:block;width:46px;height:28px;flex:0 0 46px}
+.ep-dialog .ep-switch input{position:absolute;inset:0;opacity:0;width:100%;height:100%;margin:0;z-index:1;cursor:pointer}
+.ep-dialog .ep-switch-track{display:block;width:100%;height:100%;border-radius:20px;background:#cbd5ce;transition:background .15s ease}
+.ep-dialog .ep-switch-track::after{content:'';position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:white;box-shadow:0 1px 3px #18302326;transition:transform .15s ease}
+.ep-dialog .ep-switch input:checked+.ep-switch-track{background:#398750}
+.ep-dialog .ep-switch input:checked+.ep-switch-track::after{transform:translateX(18px)}
+.ep-dialog .ep-switch input:disabled+.ep-switch-track{opacity:.5}
+.ep-dialog .ep-switch input:focus-visible+.ep-switch-track{outline:3px solid #c18c30;outline-offset:3px}
+.ep-dialog .ep-reassurance{color:#7b897f;font-size:12px;margin:14px 0 20px}
+.ep-dialog details{border-top:1px solid #e7ede8;padding:0;scroll-margin-top:94px}
+.ep-dialog summary{min-height:52px;padding:14px 0;cursor:pointer;font-size:14px;font-weight:700;line-height:1.7}
+.ep-dialog details>p{color:#617368}
+.ep-dialog details[open]{padding-bottom:14px}
+.ep-dialog .ep-guide-tabs{display:flex;gap:8px;margin:2px 0 16px}
+.ep-dialog .ep-guide-tabs button{flex:1;padding:9px 8px}
+.ep-dialog .ep-guide-tabs [aria-pressed="true"]{color:#2d653e;border-color:#7ca787;background:#eef6ef;font-weight:700}
+.ep-dialog .ep-guide-content{color:#536d5d;font-size:14px}
+.ep-dialog .ep-guide-content ol{padding-left:24px;margin:0}
+.ep-dialog .ep-guide-content li{padding:0 0 8px 3px}
+.ep-dialog .ep-guide-content p{margin:8px 0 14px}
+.ep-dialog .ep-pilot summary span{font-size:11px;color:#89958b;font-weight:400;margin-left:6px}
+.ep-dialog .ep-unread{font-size:12px;color:#678970;font-weight:400;margin-left:8px}
+.ep-dialog .ep-log{list-style:none;padding:0;margin:0}
+.ep-dialog .ep-log li{border-bottom:1px solid #e6ece7;padding:12px 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+.ep-dialog .ep-log li>span{flex:1 1 170px}
+.ep-dialog .ep-log small{display:block;color:#87948b;font-size:12px}
+.ep-dialog .ep-log-actions{display:flex;gap:8px}
+.ep-dialog .ep-empty{color:#86938a}
+.ep-dialog .ep-error{color:#a43d34;white-space:pre-wrap;overflow-wrap:anywhere;margin:12px 0;font-size:13px}
+.ep-dialog .ep-error:empty{display:none}
+.ep-dialog button:focus-visible,.ep-dialog summary:focus-visible,.ebook-push-entry:focus-visible{outline:3px solid #c18c30;outline-offset:3px}
+@media(max-width:360px){.ep-dialog header{padding:14px 16px}.ep-dialog .ep-body{padding:16px 16px 10px}.ep-dialog .ep-device{padding:14px}.ep-dialog .ep-device-row{gap:10px}.ep-dialog .ep-state{flex-basis:120px}.ep-dialog .ep-state-title{font-size:17px}.ep-dialog button{padding:9px 11px}}
+@media(prefers-reduced-motion:reduce){.ep-dialog .ep-switch-track,.ep-dialog .ep-switch-track::after{transition:none}}
 
-.ep-preferences { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-bottom:16px; }
-.ep-preferences label { display:flex; align-items:center; gap:6px; min-height:44px; }
-.ep-preferences input { width:20px; height:20px; flex-shrink:0; }
-.ep-log li { flex-wrap:wrap; }
-.ep-log li > span { flex:1 1 160px; }
+.ep-dialog .ep-required-row{cursor:default}
+.ep-dialog .ep-fixed{flex-shrink:0;font-size:12px;font-weight:700;color:#4b7958;background:#eef6ef;border-radius:6px;padding:4px 8px}
