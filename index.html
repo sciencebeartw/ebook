@@ -4899,7 +4899,8 @@
   <script src="ebook_resources_app.js?v=20261003_resources_outline_v5"></script>
 
   <link rel="stylesheet" href="ebook_push.css?v=20261014-events1">
-  <script src="ebook_push_app.js?v=20261014-events1"></script>
+  <script src="ebook_push_navigation.js?v=20261014-navigation1"></script>
+  <script src="ebook_push_app.js?v=20261014-navigation1"></script>
 
   <!-- Webhook API & Firebase Polyfill (Replace google.script.run) -->
   <script>
@@ -8958,7 +8959,7 @@
             gData = result;
             queueMicrotask(function() { window.EbookPush?.ready({ session: ebookAuthSessionInfo || {}, uid: ebookAuth.currentUser && ebookAuth.currentUser.uid,
                 subject: ebookSubjectParam, preview: isStudentPreviewMode || isDashboardDraftPreviewMode || !!ebookGodSessionInfo,
-                firebaseConfig: firebaseConfig, navigate: openEbookPushTarget, call: async function(data) { return (await ebookFunctions.httpsCallable('runEbookPushAction', { timeout: 15000 })(data)).data; } }); });
+                firebaseConfig: firebaseConfig, navigate: openEbookPushTarget, findTarget: function(target) { return window.EbookPushNavigation.find(target, getEbookPushNavigationContext()); }, isReadable: function(node) { return window.EbookPushNavigation.readable(node); }, call: async function(data) { return (await ebookFunctions.httpsCallable('runEbookPushAction', { timeout: 15000 })(data)).data; } }); });
             queueMicrotask(function() { window.GiftedEbook?.ready({ auth: ebookAuth, result: result, mode: pass, preview: isDashboardDraftPreviewMode, teacherView: !!ebookGodSessionInfo }); });
             activeEbookPromotionContext = result.promotionContext || null;
             resetPopupQueueForEntry();
@@ -9763,33 +9764,35 @@
                 swalAlert("更新失敗", (err && err.message) || "登入已失效，請重新登入。", "warning");
             }).refreshStudentData();
         }
-        async function openEbookPushTarget(target) {
-            if (!target || !gData || isStudentPreviewMode) return false;
-            var kind = target.kind, node = null;
-            if (kind === 'homework') { switchTab(3); return document.getElementById('tab-content-3').style.display !== 'none'; }
-            if (kind === 'bulletin') {
-                switchTab(2);
-                node = Array.from(document.querySelectorAll('[data-push-bulletin-id]')).find(el => el.dataset.pushBulletinId === target.id);
-                if (!node) {
+        function getEbookPushNavigationContext() {
+            if (!gData) return null;
+            return {
+                className: gData.className, preview: isStudentPreviewMode || isDashboardDraftPreviewMode || !!ebookGodSessionInfo,
+                pendingReady: pendingTasksState && pendingTasksState.status === 'ready', switchTab: switchTab, expandGrade: toggleCard,
+                activePopup: activeEmergencyAnnouncement,
+                prepare: function() {
+                    pendingEntryReminderHandled = true;
+                    // 點通知優先看該內容；其他公告留在佇列，不視為已確認。
+                    if (activeEmergencyAnnouncement) popupAnnouncementQueue.unshift(activeEmergencyAnnouncement);
+                    hideEmergencyModal();
+                    var popup = window.Swal && Swal.getPopup();
+                    if (popup && popup.classList.contains('pending-reminder-swal')) Swal.close();
+                },
+                openPopup: function(target) {
                     var list = gData.bulletins || [];
-                    var bulletin = (Array.isArray(list) ? list : Object.values(list)).find(b => b.id === target.id && isBulletinEffective(b));
-                    if (bulletin) {
-                        hideEmergencyModal();
-                        popupAnnouncementQueue.unshift(bulletin);
-                        return showNextPopupAnnouncement();
-                    }
+                    var bulletin = (Array.isArray(list) ? list : Object.values(list)).find(function(b) {
+                        var sourceClass = safeKey(b.sourceClassKey || b.className || gData.className);
+                        return b.id === target.id && (sourceClass === safeKey(target.classKey) || sourceClass === '全校' && safeKey(gData.className) === safeKey(target.classKey)) && isBulletinEffective(b);
+                    });
+                    if (!bulletin) return false;
+                    popupAnnouncementQueue = popupAnnouncementQueue.filter(function(b) { return b !== bulletin; });
+                    popupAnnouncementQueue.unshift(bulletin);
+                    return showNextPopupAnnouncement();
                 }
-            } else if (kind === 'grade' || kind === 'makeup') {
-                switchTab(1);
-                node = Array.from(document.querySelectorAll('#tab-content-1 [data-exam-id]')).find(el => el.dataset.examId === target.id || el.dataset.storedExamId === target.id);
-            } else {
-                switchTab(0);
-                node = Array.from(document.querySelectorAll('[data-post-id]')).find(el => kind === 'post' ? el.dataset.postId === target.id : el.dataset.postDate === target.date);
-                if (node && kind === 'message') node = Array.from(node.querySelectorAll('[data-feedback-thread-id]')).find(el => el.dataset.feedbackThreadId === target.id) || node;
-            }
-            if (!node) return false;
-            node.scrollIntoView({behavior:'smooth',block:'start'});
-            return true;
+            };
+        }
+        async function openEbookPushTarget(target, isCurrent) {
+            return window.EbookPushNavigation.navigate(target, function() { return !isCurrent || isCurrent() ? getEbookPushNavigationContext() : null; });
         }
         function switchTab(idx) {
             idx = Number(idx);
@@ -11872,7 +11875,7 @@
                     var bodyClass = isTeacher ? "teacher-body" : "";
                     var avatarChar = isTeacher ? teacherAvatarChar : studentAvatarChar;
                     var content = entry && entry.displayContent !== undefined ? entry.displayContent : item.content;
-                    return "<div class='history-msg" + (nested ? " feedback-thread-reply" : "") + "' data-feedback-key='" + escapeHtmlAttr(entry && entry.key || "") + "'>" +
+                    return "<div class='history-msg" + (nested ? " feedback-thread-reply" : "") + "' data-feedback-key='" + escapeHtmlAttr(entry && entry.key || "") + "' data-feedback-role='" + (isTeacher ? "teacher" : "student") + "'>" +
                         "<div class='history-msg-avatar " + avatarClass + "'>" + escapeHtml(avatarChar) + "</div>" +
                         "<div class='history-msg-body " + bodyClass + "'>" + renderGiftedFeedback(item, content || "") +
                         "<div class='history-msg-time'>" + escapeHtml((item.time || "").substring(5, 16)) + "</div></div></div>";
@@ -11915,9 +11918,9 @@
                                 };
                                 stickerReviewHtml = buildGodStickerReviewActions(stickerContextKey);
                             }
-                            historyHtml += "<div class='history-msg'><div class='history-msg-avatar " + stickerAvatarClass + "'>" + escapeHtml(stickerAvatarChar) + "</div><div class='history-msg-body " + bodyCls + "'><span>" + icon + safeStickerReason + "</span><span class='" + badgeCls + "'>" + escapeHtml(formatStickerCountText(stickerData.count)) + "</span><br><span class='sticker-status " + statusClass + "'>" + (statusKind === "approved" ? SVG.check : (statusKind === "rejected" ? SVG.cross : SVG.hourglass)) + safeStatusLabel + "</span><div class='history-msg-time'>" + escapeHtml((h.time || "").substring(5, 16)) + "</div>" + stickerReviewHtml + "</div></div>";
+                            historyHtml += "<div class='history-msg' data-feedback-key='" + escapeHtmlAttr(h.fbKey || h.id || "") + "'><div class='history-msg-avatar " + stickerAvatarClass + "'>" + escapeHtml(stickerAvatarChar) + "</div><div class='history-msg-body " + bodyCls + "'><span>" + icon + safeStickerReason + "</span><span class='" + badgeCls + "'>" + escapeHtml(formatStickerCountText(stickerData.count)) + "</span><br><span class='sticker-status " + statusClass + "'>" + (statusKind === "approved" ? SVG.check : (statusKind === "rejected" ? SVG.cross : SVG.hourglass)) + safeStatusLabel + "</span><div class='history-msg-time'>" + escapeHtml((h.time || "").substring(5, 16)) + "</div>" + stickerReviewHtml + "</div></div>";
                         } else {
-                            historyHtml += "<div class='history-msg'><div class='history-msg-avatar " + avatarClass + "'>" + escapeHtml(avatarChar) + "</div><div class='history-msg-body " + bodyClass + "'>" + renderGiftedFeedback(h, h.content || "") + "<div class='history-msg-time'>" + escapeHtml((h.time || "").substring(5, 16)) + "</div></div></div>";
+                            historyHtml += "<div class='history-msg' data-feedback-key='" + escapeHtmlAttr(h.fbKey || h.id || "") + "'><div class='history-msg-avatar " + avatarClass + "'>" + escapeHtml(avatarChar) + "</div><div class='history-msg-body " + bodyClass + "'>" + renderGiftedFeedback(h, h.content || "") + "<div class='history-msg-time'>" + escapeHtml((h.time || "").substring(5, 16)) + "</div></div></div>";
                         }
                         return;
                     }
@@ -12197,7 +12200,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 var oldStandardHtml = isMathAdvancedGuidance
                     ? ((mathGuidanceStandard && mathGuidanceStandard.guidanceThreshold > 0) ? "<div class='detail-box'>" + SVG.target + " 輔導標準：" + escapeHtml(mathGuidanceStandard.guidanceThreshold) + "分</div>" : "")
                     : ((item.note && !isHomeworkColumnTitle((item.date || "") + (item.exam || ""))) ? "<div class='detail-box'>" + SVG.target + " 補考標準：" + escapeHtml(item.note) + "</div>" : "");
-                var pendingOldExamAttrs = " data-pending-exam-anchor='1' data-exam-id='" + escapeHtmlAttr(item.examId || '') + "' data-stored-exam-id='" + escapeHtmlAttr(item.storedExamId || '') + "' data-exam-col-index='" + escapeHtmlAttr(item.colIndex === undefined || item.colIndex === null ? '' : item.colIndex) + "'";
+                var pendingOldExamAttrs = " data-source-class-key='" + escapeHtmlAttr(safeKey(item.storedClassKey || item.sourceClassKey || item.className || gData.className)) + "' data-pending-exam-anchor='1' data-exam-id='" + escapeHtmlAttr(item.examId || '') + "' data-stored-exam-id='" + escapeHtmlAttr(item.storedExamId || '') + "' data-exam-col-index='" + escapeHtmlAttr(item.colIndex === undefined || item.colIndex === null ? '' : item.colIndex) + "'";
                 html += `
         <div class='score-card'${pendingOldExamAttrs} onclick='toggleCard(this)'>
             <div class='class-badge'>${escapeHtml(classBadgeText)}</div>
@@ -13046,7 +13049,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 }
 
                 cards += `
-            <div class="${cardClass}" data-push-bulletin-id="${escapeHtmlAttr(b.id || '')}">
+            <div class="${cardClass}" data-push-bulletin-id="${escapeHtmlAttr(b.id || '')}" data-source-class-key="${escapeHtmlAttr(safeKey(b.sourceClassKey || b.className || gData.className))}">
                 <div class="bulletin-header">
                     <div><span class="bulletin-tag ${tagClass}">${escapeHtml(displayLabel)}</span><span class="bulletin-title">${escapeHtml(b.title)}</span></div>
                     ${bulletinDateHtml}

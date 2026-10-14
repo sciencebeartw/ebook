@@ -1,6 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
 const source=fs.readFileSync(__dirname+'/ebook-push-sw.js','utf8');
+const {MessageChannel}=require('node:worker_threads');
 const id='a'.repeat(64),rid='b'.repeat(64),scope='https://www.sciencebear.com.tw/ebook/';
 function setup(windows=[]) {
     const events={},shown=[],badges=[],opened=[],stored=new Map();let receive;
@@ -9,7 +10,7 @@ function setup(windows=[]) {
             const tx={};tx.objectStore=()=>({get:key=>{const req={};queueMicrotask(()=>{req.result=stored.get(key);req.onsuccess();queueMicrotask(()=>tx.oncomplete());});return req;},put:(v,key)=>stored.set(key,v)});return tx;
         }};open.onsuccess();});return open;
     }};
-    const context=vm.createContext({URL,Number,indexedDB,firebaseConfig:{},importScripts(){},
+    const context=vm.createContext({URL,Number,indexedDB,MessageChannel,setTimeout,clearTimeout,firebaseConfig:{},importScripts(){},
         self:{addEventListener:(n,fn)=>events[n]=fn,registration:{scope,showNotification:async(t,o)=>shown.push({t,o})},navigator:{setAppBadge:async n=>badges.push(n),clearAppBadge:async()=>badges.push(0)},skipWaiting(){}},
         clients:{matchAll:async()=>windows,openWindow:async url=>opened.push(url),claim:async()=>{}},
         firebase:{initializeApp(){},messaging:()=>({onBackgroundMessage:fn=>receive=fn})}});
@@ -34,12 +35,18 @@ test('已讀版本不被延迟推播覆蓋；暫停保持清除，明確開啟�
 });
 test('點擊只回正確科目，既有頁面不重載；不信任推播任意URL',async()=>{
     const messages=[];let focused=0;
-    const h=setup([{url:scope+'index.html?subject=science',postMessage:p=>messages.push(p),focus:()=>focused++}]);
+    const h=setup([{url:scope+'index.html?subject=science',postMessage:(p,ports)=>{messages.push(p);ports[0].postMessage({received:true});ports[0].close();},focus:()=>focused++}]);
     await h.click({notificationId:id,subject:'science',url:'https://evil.example'});
     assert.equal(focused,1);assert.equal(messages[0].notificationId,id);assert.equal(h.opened.length,0);
     await h.click({notificationId:id,subject:'math',url:'https://evil.example'});
     assert.equal(new URL(h.opened[0]).origin,'https://www.sciencebear.com.tw');assert.equal(new URL(h.opened[0]).searchParams.get('subject'),'math');
     await h.click({notificationId:'bad',subject:'science'});assert.equal(h.opened.length,1);
+});
+test('頁面尚未接住點擊時改用URL接續，不遺失通知識別',async()=>{
+    const urls=[];let focused=0;
+    const h=setup([{url:scope,postMessage(_p,ports){ports[0].close();},navigate:async url=>{urls.push(url);return {focus:()=>focused++};}}]);
+    await h.click({notificationId:id,subject:'science'});
+    assert.equal(new URL(urls[0]).searchParams.get('pushNotice'),id);assert.equal(focused,1);assert.equal(h.opened.length,0);
 });
 test('非ebook頁面不得驅動前景通知或標記',async()=>{
     const h=setup();let accepted=false;

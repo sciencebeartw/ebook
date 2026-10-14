@@ -1,6 +1,6 @@
 /* 山熊通知試用 SW：僅推播／點擊／標記，沒有 fetch handler 或離線資料快取。 */
 'use strict';
-const PUSH_VERSION = '20261014-events1';
+const PUSH_VERSION = '20261014-navigation1';
 const validId = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
 function pushData(data) {
     if (!data || !['ebook_push_test','ebook_push_event'].includes(data.kind) || !validId(data.notificationId) || !validId(data.recipient) || !['science', 'math'].includes(data.subject)) return null;
@@ -55,7 +55,23 @@ self.addEventListener('notificationclick', event => {
             const u = new URL(c.url);
             return u.origin === url.origin && [new URL(self.registration.scope).pathname, url.pathname].includes(u.pathname) && (u.searchParams.get('subject') || 'science') === data.subject;
         });
-        if (existing) { existing.postMessage({ kind: 'ebook_push_click', notificationId: data.notificationId }); return existing.focus(); }
+        if (existing) {
+            // 頁面剛啟動時可能還沒掛好 message listener；收到確認才只 focus。
+            const received = await new Promise(resolve => {
+                const channel = new MessageChannel();
+                const finish = value => { clearTimeout(timer); channel.port1.close(); resolve(value); };
+                const timer = setTimeout(() => finish(false), 1200);
+                channel.port1.onmessage = e => finish(e.data && e.data.received === true);
+                try { existing.postMessage({ kind: 'ebook_push_click', notificationId: data.notificationId }, [channel.port2]); }
+                catch (_) { finish(false); }
+            });
+            if (received) return existing.focus();
+            // 未被接住的點擊放進 URL，讓登入／冷啟動完成後還能接續。
+            if (existing.navigate) {
+                const navigated = await existing.navigate(url.href).catch(() => null);
+                if (navigated) return navigated.focus();
+            }
+        }
         return clients.openWindow(url.href);
     })());
 });
