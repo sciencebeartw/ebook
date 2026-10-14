@@ -1268,6 +1268,20 @@
             outline-offset: 2px;
         }
 
+        @media (min-width: 601px) {
+            /* 平板同樣維持兩排：品牌右側是鈴鐺，下排是三個原有工具。 */
+            .header-col-actions { display: grid; grid-template-columns: repeat(3, 52px); column-gap: 6px; row-gap: 2px; align-self: center; }
+            .bears-lab-title { grid-area: 1 / 1 / 2 / 3; align-self: center; justify-self: end; margin: 0; line-height: 1.4; white-space: nowrap; }
+            .header-col-actions:has(#ebookPushEntry[hidden]) .bears-lab-title { grid-column: 1 / -1; }
+            .header-btn-row { display: contents; }
+            .header-icon-btn { justify-self: end; }
+            #ebookPushEntry { grid-area: 1 / 3; }
+            #ebookPushEntry svg { width: 20px; height: 20px; }
+            .header-btn-row .refresh-btn { grid-area: 2 / 1; }
+            .header-btn-row .pwd-btn { grid-area: 2 / 2; }
+            .header-btn-row .logout-btn { grid-area: 2 / 3; }
+        }
+
         @media (max-width: 600px) {
             .header-bar { grid-template-columns: 64px minmax(0, 1fr) 128px; align-items: start; gap: 8px; padding: 8px 10px; min-height: 0; }
             .header-col-logo { align-self: center; width: 64px; height: 72px; }
@@ -4958,9 +4972,9 @@
   <script src="resource_catalog_view.js?v=20261002_resources_time_v1"></script>
   <script src="ebook_resources_app.js?v=20261003_resources_outline_v5"></script>
 
-  <link rel="stylesheet" href="ebook_push.css?v=20261014-inbox1">
+  <link rel="stylesheet" href="ebook_push.css?v=20261014-inbox2">
   <script src="ebook_push_navigation.js?v=20261014-navigation2"></script>
-  <script src="ebook_push_app.js?v=20261014-inbox1"></script>
+  <script src="ebook_push_app.js?v=20261014-inbox2"></script>
 
   <!-- Webhook API & Firebase Polyfill (Replace google.script.run) -->
   <script>

@@ -89,7 +89,7 @@
         const markup = items.map(i => {
             const unread = isUnread(i), label = noticeLabels[i.type] || '通知';
             const detail = [label,noticeTime(i.createdAt),!['accepted','partial'].includes(i.status) ? statuses[i.status] : ''].filter(Boolean).join(' · ');
-            return `<li class="ep-notice-row${unread ? ' is-unread' : ''}" data-notice-id="${escape(i.id)}">
+            return `<li class="ep-notice-row${unread ? ' is-unread' : ''}" data-notice-id="${escape(i.id)}" data-kind="${escape(i.type)}">
                 <button type="button" class="ep-notice-open" data-ep="view" data-id="${escape(i.id)}" ${busy ? 'disabled' : ''}>
                     <span class="ep-kind-icon" data-kind="${escape(i.type)}">${icon(i.type)}</span><span class="ep-notice-copy"><strong>${escape(i.title)}</strong><small>${escape(detail)}</small></span>
                     <span class="ep-notice-trailing">${unread ? '<span class="ep-notice-dot" aria-label="未讀"></span>' : icon('chevron')}</span>
