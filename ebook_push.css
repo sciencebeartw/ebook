@@ -2,7 +2,8 @@
 .ebook-push-entry svg{width:24px;height:24px}
 .ebook-push-entry[hidden],.ebook-push-entry [hidden],.ep-dialog [hidden]{display:none!important}
 .ebook-push-entry .ep-entry-dot{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 4px;border:2px solid #fff;border-radius:12px;background:#db334c;color:#fff;font:700 10px/14px Arial,sans-serif;text-align:center;pointer-events:none}
-.ep-dialog{box-sizing:border-box;width:min(560px,calc(100% - 24px));height:fit-content;min-height:min(460px,calc(100dvh - 32px));max-height:min(760px,calc(100dvh - 32px));padding:0;margin:auto;border:1px solid #e1e9e3;border-radius:24px;color:#233c32;background:#fff;box-shadow:0 24px 80px #17392b30;overflow:hidden;overscroll-behavior:contain}
+/* 高度依可用畫面決定，避免少量通知讓列表縮短；保留瀏海與主畫面指示條安全邊界。 */
+.ep-dialog{--ep-top-gap:max(12px,env(safe-area-inset-top,0px));--ep-bottom-gap:max(12px,env(safe-area-inset-bottom,0px));--ep-left-gap:max(12px,env(safe-area-inset-left,0px));--ep-right-gap:max(12px,env(safe-area-inset-right,0px));box-sizing:border-box;width:min(560px,calc(100% - var(--ep-left-gap) - var(--ep-right-gap)));height:calc(100vh - var(--ep-top-gap) - var(--ep-bottom-gap));height:calc(100dvh - var(--ep-top-gap) - var(--ep-bottom-gap));max-height:960px;inset:var(--ep-top-gap) var(--ep-right-gap) var(--ep-bottom-gap) var(--ep-left-gap);padding:0;margin:auto;border:1px solid #e1e9e3;border-radius:24px;color:#233c32;background:#fff;box-shadow:0 24px 80px #17392b30;overflow:hidden;overscroll-behavior:contain}
 .ep-dialog[open]{display:flex;flex-direction:column}
 .ep-dialog::backdrop{background:#16372b66;backdrop-filter:blur(3px)}
 .ep-dialog *{box-sizing:border-box}
@@ -17,7 +18,7 @@
 .ep-dialog button:disabled{opacity:.5;cursor:default}
 .ep-dialog .ep-close{display:grid;place-items:center;width:44px;padding:0;border:0;background:#fff;border-radius:50%;box-shadow:0 2px 8px #2352350a;flex-shrink:0}
 .ep-dialog .ep-close svg{width:21px;height:21px}
-.ep-dialog .ep-body{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden}
+.ep-dialog .ep-body{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;container-type:size}
 .ep-dialog p,.ep-dialog li{font-size:14px;line-height:1.75}
 .ep-dialog .ep-unread{font-size:14px;color:#3d734c;font-weight:650;background:#e0f0df;border-radius:20px;padding:4px 10px}
 .ep-dialog .ep-feed-toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 22px 16px;flex:none;border-bottom:1px solid #e8efe5;background:linear-gradient(115deg,#effaf0,#f9fcf4)}
@@ -102,12 +103,13 @@
 .ep-dialog .ep-settings-icon svg{width:24px;height:24px}
 .ep-dialog .ep-settings-chevron svg{width:16px;height:16px;transform:rotate(-90deg);color:#7e9585}
 .ep-dialog .ep-settings[open]>.ep-settings-chevron svg,.ep-dialog .ep-settings[open]>summary .ep-settings-chevron svg{transform:rotate(90deg)}
-.ep-dialog .ep-settings-panel{max-height:45dvh;overflow-y:auto;overscroll-behavior:contain;padding:0 22px 16px;scrollbar-width:thin}
+.ep-dialog .ep-settings-panel{max-height:45dvh;max-height:min(45dvh,calc(100cqh - 120px));overflow-y:auto;overscroll-behavior:contain;padding:0 22px 16px;scrollbar-width:thin}
 .ep-dialog .ep-error{flex:none;color:#a43d34;background:#fff5f1;white-space:pre-wrap;overflow-wrap:anywhere;margin:0;padding:10px 22px;font-size:13px;max-height:20dvh;overflow:auto}
 .ep-dialog .ep-error:empty{display:none}
 .ep-dialog button:focus-visible,.ep-dialog summary:focus-visible,.ebook-push-entry:focus-visible{outline:3px solid #c18c30;outline-offset:-3px}
+@media(max-width:600px){.ep-dialog{max-height:none}}
 @media(max-width:360px){.ep-dialog header{padding:18px 16px 10px}.ep-dialog .ep-feed-toolbar{padding:0 16px 10px}.ep-dialog .ep-notice-open{grid-template-columns:38px minmax(0,1fr) 8px;gap:9px;padding:14px 10px 12px}.ep-dialog .ep-kind-icon{width:38px;height:38px;border-radius:12px}.ep-dialog .ep-settings>summary{padding:14px 16px}.ep-dialog .ep-settings-panel{padding:0 16px 14px}.ep-dialog .ep-device{padding:14px}.ep-dialog .ep-device-row{gap:10px}.ep-dialog .ep-state{flex-basis:120px}.ep-dialog .ep-state-title{font-size:17px}.ep-dialog button{padding:9px 11px}}
-@media(max-height:500px){.ep-dialog header{padding-top:12px}.ep-dialog .ep-eyebrow{display:none}.ep-dialog .ep-settings>summary{min-height:60px;padding-top:10px;padding-bottom:10px}.ep-dialog .ep-settings-panel{max-height:38dvh}}
+@media(max-height:500px){.ep-dialog .ep-error{max-height:40px}.ep-dialog header{padding-top:12px}.ep-dialog .ep-eyebrow{display:none}.ep-dialog .ep-settings>summary{min-height:60px;padding-top:10px;padding-bottom:10px}.ep-dialog .ep-settings-panel{max-height:38dvh;max-height:min(38dvh,calc(100cqh - 78px))}.ep-dialog .ep-body:has(>.ep-settings[open])>.ep-inbox{display:none}}
 @media(prefers-reduced-motion:reduce){.ep-dialog .ep-switch-track,.ep-dialog .ep-switch-track::after{transition:none}}
 .ep-dialog .ep-required-row{cursor:default}
 .ep-dialog .ep-fixed{flex-shrink:0;font-size:12px;font-weight:700;color:#4b7958;background:#eef6ef;border-radius:6px;padding:4px 8px}
