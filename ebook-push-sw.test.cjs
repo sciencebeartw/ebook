@@ -53,6 +53,12 @@ test('非ebook頁面不得驅動前景通知或標記',async()=>{
     h.events.message({source:{url:'https://evil.example/ebook/'},data:{kind:'ebook_push_foreground',payload:h.data()},waitUntil(){accepted=true;}});
     assert.equal(accepted,false);assert.equal(h.shown.length,0);
 });
+test('背景頁面先被喚醒才能回覆接收確認，不等待1200ms才顯示',async()=>{
+    let port,focused=false,navigated=false;
+    const h=setup([{url:scope,postMessage(_p,ports){port=ports[0];},focus:async()=>{focused=true;port.postMessage({received:true});port.close();},navigate:async()=>{navigated=true;}}]);
+    const start=Date.now();await h.click({notificationId:id,subject:'science'});
+    assert(focused);assert.equal(navigated,false);assert.equal(h.opened.length,0);assert(Date.now()-start<500);
+});
 test('七類業務通知顯示標題但不暴露成績／留言；未知類型拒絕',async()=>{
     const h=setup();
     for(const type of ['post','bulletin','message','sticker','makeup','grade','homework']) {

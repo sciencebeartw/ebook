@@ -24,18 +24,50 @@
     <link rel="apple-touch-icon" href="ebook-touch-icon.png">
     <link rel="icon" type="image/png" sizes="192x192" href="ebook-icon-192.png">
     
+    <!-- ★★★ 提早接住推播：不等待 Firebase / 字型 / 登入載入 ★★★ -->
+    <script id="ebook-push-launch">
+    (function () {
+        var prefix = 'sciencebear.ebook.push.v1:';
+        var subject = new URL(location.href).searchParams.get('subject') === 'math' ? 'math' : 'science';
+        var key = prefix + subject + ':click', pending = '';
+        var valid = function (id) { return typeof id === 'string' && /^[a-f0-9]{64}$/.test(id); };
+        function current() {
+            if (valid(pending)) return pending;
+            var id = new URL(location.href).searchParams.get('pushNotice');
+            if (valid(id)) return id;
+            try { id = sessionStorage.getItem(key); } catch (_) {}
+            return valid(id) ? id : '';
+        }
+        function remember(id) {
+            if (!valid(id)) return;
+            pending = id;
+            try { sessionStorage.setItem(key, id); } catch (_) {}
+        }
+        function clear(id) {
+            if (current() !== id) return;
+            pending = '';
+            try { sessionStorage.removeItem(key); } catch (_) {}
+            var url = new URL(location.href);
+            url.searchParams.delete('pushNotice');
+            history.replaceState(null, '', url);
+        }
+        window.EbookPushLaunch = { current: current, remember: remember, clear: clear };
+        if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', function (event) {
+            var data = event.data || {};
+            if (data.kind !== 'ebook_push_click' || !valid(data.notificationId) || data.subject && data.subject !== subject) return;
+            remember(data.notificationId);
+            if (event.ports && event.ports[0]) event.ports[0].postMessage({ received: true });
+            window.dispatchEvent(new CustomEvent('ebook-push-click', { detail: { notificationId: data.notificationId } }));
+        });
+    })();
+    </script>
+    <meta name="theme-color" content="#f3faf6">
+    <style>html { background: #f3faf6; } #splash-status { margin: 22px 0 0; color: #315c44; font: 16px/1.6 system-ui, sans-serif; }</style>
+
     <!-- External Resources -->
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-    <script src="assessment_labels.js?v=20261012-full-scope"></script>
-    <script src="assessment_naming.js?v=20261013-editable-2"></script>
-    <script src="class_session_plan.js?v=20261011-library1"></script>
-    <script src="homework_report_status.js?v=20261011-pending1"></script>
-    <script src="homework_answers_contract.js?v=20261011-report1"></script>
-    <script src="homework_answers_app.js?v=20261013-editable-1"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="homework_answers.css?v=20261011-report1">
-    <script src="holiday_practice_app.js?v=20261013-editable-1"></script>
     <!-- holiday-score-card-form-20260921 -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         [data-holiday-card] { margin-top: 12px; }
         [data-holiday-card] .holiday-deadline-box {
@@ -4952,6 +4984,32 @@
 
         </style>
 
+
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;900&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="gifted_entry.css?v=20261010-auto-status">
+  <link rel="stylesheet" href="ebook_resources.css?v=20261003_resources_mobile_type_v6">
+  <link rel="stylesheet" href="ebook_push.css?v=20261014-startup1">
+</head>
+
+<body>
+    <!-- 啟動畫面層 -->
+    <div id="splash-screen">
+        <!-- 預設狀態：Logo + 呼吸動畫 -->
+        <div id="splash-default" style="text-align:center;">
+            <img src="report-logo-green.png" class="splash-logo" width="1261" height="1568" alt="山熊科學 Bear’s Lab">
+            <p id="splash-status" role="status">正在開啟聯絡簿…</p>
+        </div>
+    </div>
+
+    <script src="assessment_labels.js?v=20261012-full-scope"></script>
+    <script src="assessment_naming.js?v=20261013-editable-2"></script>
+    <script src="class_session_plan.js?v=20261011-library1"></script>
+    <script src="homework_report_status.js?v=20261011-pending1"></script>
+    <script src="homework_answers_contract.js?v=20261011-report1"></script>
+    <script src="homework_answers_app.js?v=20261013-editable-1"></script>
+    <script src="holiday_practice_app.js?v=20261013-editable-1"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -4968,13 +5026,11 @@
   <script src="ebook_feedback_threads_app.js?v=20260822_feedback_threads_v1"></script>
   <script src="ebook_score_distribution.js?v=equal-high-score-chart-20260922"></script>
 
-  <link rel="stylesheet" href="ebook_resources.css?v=20261003_resources_mobile_type_v6">
   <script src="resource_catalog_view.js?v=20261002_resources_time_v1"></script>
   <script src="ebook_resources_app.js?v=20261003_resources_outline_v5"></script>
 
-  <link rel="stylesheet" href="ebook_push.css?v=20261014-inbox4">
-  <script src="ebook_push_navigation.js?v=20261014-navigation2"></script>
-  <script src="ebook_push_app.js?v=20261014-inbox2"></script>
+  <script src="ebook_push_navigation.js?v=20261014-startup1"></script>
+  <script src="ebook_push_app.js?v=20261014-startup1"></script>
 
   <!-- Webhook API & Firebase Polyfill (Replace google.script.run) -->
   <script>
@@ -7006,18 +7062,6 @@
     window.google = { script: { run: proxyRunner } };
   </script>
 
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="gifted_entry.css?v=20261010-auto-status">
-</head>
-
-<body>
-    <!-- 啟動畫面層 -->
-    <div id="splash-screen">
-        <!-- 預設狀態：Logo + 呼吸動畫 -->
-        <div id="splash-default" style="text-align:center;">
-            <img src="report-logo-green.png" class="splash-logo" width="1261" height="1568" alt="山熊科學 Bear’s Lab">
-        </div>
-    </div>
 
     <!-- LINE/FB/IG 偵測到時顯示的全頁教學層（初始隱藏）-->
     <div id="line-tutorial-overlay" style="
@@ -7074,11 +7118,11 @@
                     var splash = document.getElementById('splash-screen');
                     var app = document.getElementById('appContainer');
                     if (!splash || !app) return;
+                    app.style.display = 'block';
                     splash.style.transition = 'opacity 0.4s ease';
                     splash.style.opacity = '0';
                     setTimeout(function() {
                         splash.style.display = 'none';
-                        app.style.display = 'block';
                         if (typeof window.syncEbookPwaHomeGuide === 'function') window.syncEbookPwaHomeGuide();
                     }, 400);
                 };
@@ -7938,7 +7982,6 @@
         var pendingTasksRenderScheduled = false;
         var pendingEntryNoticeReady = false;
         var pendingEntryReminderHandled = false;
-        var pushTargetEntryActive = false;
         var pendingReminderShownSessionIdentity = '';
         var pendingAnchorHighlightTimer = null;
 
@@ -9846,16 +9889,8 @@
                 className: gData.className, studentName: gData.studentName, preview: isStudentPreviewMode || isDashboardDraftPreviewMode || !!ebookGodSessionInfo,
                 pendingReady: pendingTasksState && pendingTasksState.status === 'ready', switchTab: switchTab, expandGrade: toggleCard,
                 activePopup: activeEmergencyAnnouncement,
-                prepare: function() {
-                    pushTargetEntryActive = true;
-                    pendingEntryReminderHandled = true;
-                    // 點通知優先看該內容；其他公告留在佇列，不視為已確認。
-                    if (activeEmergencyAnnouncement) popupAnnouncementQueue.unshift(activeEmergencyAnnouncement);
-                    hideEmergencyModal();
-                    var popup = window.Swal && Swal.getPopup();
-                    if (popup && popup.classList.contains('pending-reminder-swal')) Swal.close();
-                },
                 openPopup: function(target) {
+                    if (activeEmergencyAnnouncement || document.querySelector('.swal2-container')) return false;
                     var list = gData.bulletins || [];
                     var bulletin = (Array.isArray(list) ? list : Object.values(list)).find(function(b) {
                         var sourceClass = safeKey(b.sourceClassKey || b.className || gData.className);
@@ -9868,8 +9903,8 @@
                 }
             };
         }
-        async function openEbookPushTarget(target, isCurrent) {
-            return window.EbookPushNavigation.navigate(target, function() { return !isCurrent || isCurrent() ? getEbookPushNavigationContext() : null; });
+        async function openEbookPushTarget(target, isCurrent, onWaiting) {
+            return window.EbookPushNavigation.navigate(target, function() { return !isCurrent || isCurrent() ? getEbookPushNavigationContext() : null; }, onWaiting);
         }
         function switchTab(idx) {
             idx = Number(idx);
@@ -13395,7 +13430,6 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         }
 
         function resetPopupQueueForEntry() {
-            pushTargetEntryActive = false;
             popupAnnouncementQueue = [];
             popupShownIdentitiesForCurrentEntry = {};
             activeEmergencyAnnouncement = null;
@@ -13408,9 +13442,6 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         }
 
         function showNextPopupAnnouncement(fromPushTarget) {
-            // 通知進入後本次閱覽優先呈現目的地，晚到的公告只排隊。
-            // 不寫略過紀錄；下一次一般登入仍依原公告規則提醒。
-            if (pushTargetEntryActive && fromPushTarget !== true) return false;
             var modal = document.getElementById('emergencyModal');
             if (activeEmergencyAnnouncement) return true;
             var emergency = popupAnnouncementQueue.shift();

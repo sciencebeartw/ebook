@@ -59,18 +59,25 @@
         const hit = document.elementFromPoint(x, y + Math.min(h / 2, 24));
         return !!hit && (node === hit || node.contains(hit));
     }
-    async function navigate(target, getContext) {
+    function covered() {
+        const emergency = document.getElementById('emergencyModal');
+        return !!document.querySelector('.swal2-container, dialog[open]') || !!(emergency && getComputedStyle(emergency).display !== 'none');
+    }
+    async function navigate(target, getContext, onWaiting) {
         let context = getContext();
         if (!target || !context || context.preview || !['post','bulletin','message','sticker','makeup','grade','homework'].includes(target.kind)) return false;
         const tab = target.kind === 'bulletin' ? 2 : ['grade','makeup'].includes(target.kind) ? 1 : target.kind === 'homework' ? 3 : 0;
-        context.prepare();
         context.switchTab(tab);
-        const until = Date.now() + 8000;
+        let until = Date.now() + 8000, positioned = null, wasCovered = false;
         do {
             context = getContext();
             if (!context || context.preview) return false;
             let node = find(target, context);
-            if (!node && target.kind === 'bulletin' && context.openPopup(target)) node = find(target, getContext());
+            if (!node && target.kind === 'bulletin' && !covered() && context.openPopup(target)) node = find(target, getContext());
+            const blocked = covered() && !(node && node.closest('#emergencyModal') && !document.querySelector('.swal2-container, dialog[open]'));
+            if (onWaiting) onWaiting(blocked);
+            // 公告／待完成優先，閱讀提醒的時間不算內容載入逾時。
+            if (blocked) until = Date.now() + 8000;
             if (node) {
                 if (target.kind === 'sticker' && target.testSection === true) {
                     const details = node.closest('details');
@@ -84,12 +91,21 @@
                 if (target.kind === 'grade' || target.kind === 'makeup') {
                     if (!node.classList.contains('active')) context.expandGrade(node);
                 }
-                const sticky = document.querySelector('.sticky-wrapper');
-                const offset = sticky ? sticky.getBoundingClientRect().height + 12 : 12;
-                if (!node.closest('#emergencyModal')) window.scrollTo({top: Math.max(0, window.scrollY + node.getBoundingClientRect().top - offset), behavior:'instant'});
-                await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-                if (readable(node)) return true;
+                if (positioned !== node || !blocked && wasCovered) {
+                    // 背景先定位；關閉待完成會切分頁／恢復捲動，再對齊一次目的地。
+                    context.switchTab(tab);
+                    const sticky = document.querySelector('.sticky-wrapper');
+                    const offset = sticky ? sticky.getBoundingClientRect().height + 12 : 12;
+                    if (!node.closest('#emergencyModal')) window.scrollTo({top: Math.max(0, window.scrollY + node.getBoundingClientRect().top - offset), behavior:'instant'});
+                    positioned = node;
+                }
+                if (!blocked) {
+                    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                    if (readable(node)) return true;
+                    positioned = null;
+                }
             }
+            wasCovered = blocked;
             await new Promise(resolve => setTimeout(resolve, 160));
         } while (Date.now() < until);
         return false;

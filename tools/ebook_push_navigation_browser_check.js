@@ -4,6 +4,7 @@ async (page) => {
     const base = await page.evaluate(()=>new URL('./',location.href).href);
     const html = await (await page.request.get(base+'index.html')).text();
     const navigationAdapters = html.slice(html.indexOf('        function getEbookPushNavigationContext()'),html.indexOf('        function switchTab(idx)',html.indexOf('        function getEbookPushNavigationContext()')));
+    const launch = html.match(/<script id="ebook-push-launch">([\s\S]*?)<\/script>/)[1];
     const results=[], errors=[];page.on('pageerror', e=>errors.push(e.message));
     const check=(ok,msg)=>{if(!ok)throw new Error(msg);results.push(msg);};
     const mount=async()=>{
@@ -32,6 +33,7 @@ async (page) => {
             window.__setItems=items=>{__items=items.map((t,i)=>({id:(i+1).toString(16).repeat(64),createdAt:Date.now(),status:'accepted',readAt:null,title:t.kind,type:t.kind,target:t}));};
         });
         await page.addScriptTag({content:await (await page.request.get(base+'ebook_push_navigation.js')).text()});
+        await page.addScriptTag({content:launch});
         await page.addScriptTag({content:navigationAdapters});
         await page.addScriptTag({content:await (await page.request.get(base+'ebook_push_app.js')).text()});
         await page.evaluate(()=>{
@@ -109,8 +111,30 @@ async (page) => {
     await mount();await page.evaluate(async target=>{__setItems([target,target]);await __ready();__readDelay=400;document.querySelector('.feedback-thread-toggle').click();const n=EbookPushNavigation.find(target,getEbookPushNavigationContext());window.scrollTo(0,n.getBoundingClientRect().top+scrollY-65);},targets[2]);
     await page.waitForFunction(()=>__items.every(i=>i.readAt));await page.waitForTimeout(900);
     check(await page.evaluate(()=>__badges.at(-1)===0&&__calls.filter(x=>x.startsWith('read:')).length===2),'同畫面兩則已讀回應亂序仍歸零且不重送');
+    await mount();await page.evaluate(async target=>{__setItems([target]);await __ready();__delayStatus=1800;EbookPush.open();},targets[2]);
+    check(await page.evaluate(()=>!document.querySelector('.ep-notice-open').disabled&&document.querySelector('.ep-feed-refresh').textContent==='更新中…'),'背景更新時通知文字不變灰、可立即點擊');
+    await page.locator('.ep-notice-open').click();
+    await page.waitForFunction(()=>__items[0].readAt);
+    check(await page.evaluate(()=>__calls.filter(x=>x.startsWith('open:')).length===1),'清單背景更新尚未完成也能開始導頁');
+    await mount();await page.evaluate(target=>{__setItems([target]);__delayStatus=500;__openDelay=500;__ready();setTimeout(()=>__click(__items[0].id),40);},targets[2]);
+    await page.waitForFunction(()=>__items[0].readAt);
+    check(await page.evaluate(()=>!EbookPushLaunch.current()&&document.querySelector('.ep-navigation-progress').hidden),'初始化期間收到推播不遺失，完成後清除進度提示');
+    await mount();await page.evaluate(async target=>{__setItems([target]);await __ready();__openDelay=600;EbookPush.open(__items[0].id);},targets[2]);
+    check(await page.evaluate(()=>!document.querySelector('.ep-navigation-progress').hidden&&!__items[0].readAt),'網路等待期間立即顯示正在開啟，不提前已讀');
+    await page.waitForFunction(()=>__items[0].readAt);
+    await mount();await page.addStyleTag({url:base+'ebook_push.css'});
+    await page.evaluate(async target=>{__setItems([target]);await __ready();popupAnnouncementQueue=[gData.bulletins[0]];showNextPopupAnnouncement();__openDelay=250;EbookPush.open(__items[0].id);},targets[2]);
+    await page.waitForTimeout(600);
+    check(await page.evaluate(()=>!!activeEmergencyAnnouncement&&!__items[0].readAt&&document.querySelector('.ep-navigation-progress').textContent.includes('提醒關閉後')),'公告優先顯示期間，通知在背景定位但不記已讀');
+    await page.evaluate(()=>{hideEmergencyModal();document.body.insertAdjacentHTML('beforeend','<div class="swal2-container" style="position:fixed;inset:0;z-index:5000;background:white">待完成提醒</div>');});
+    await page.waitForTimeout(400);
+    check(await page.evaluate(()=>!__items[0].readAt),'待完成提醒接續顯示期間也不提前已讀');
+    await page.screenshot({path:'/private/tmp/ebook-push-startup-20261014/waiting-'+page.context().browser().browserType().name()+'.png'});
+    await page.evaluate(()=>{document.querySelector('.swal2-container').remove();switchTab(3);__dismissedAt=performance.now();});
+    await page.waitForFunction(()=>__items[0].readAt);
+    check(await page.evaluate(()=>performance.now()-__dismissedAt<800&&EbookPushNavigation.readable(document.querySelector('[data-feedback-key="reply1"]'))),'關閉提醒後800ms內露出通知內容並才記已讀');
     await mount();const scopes=await page.evaluate(targets=>targets.map(t=>EbookPushNavigation.find({...t,classKey:'別班'},getEbookPushNavigationContext())===null),targets);check(scopes.every(Boolean),'七類皆不跳往其他班同名資料');
-    await page.screenshot({path:'/private/tmp/ebook-push-navigation-20261014/flow-'+page.context().browser().browserType().name()+'.png'});
+    await page.screenshot({path:'/private/tmp/ebook-push-startup-20261014/flow-'+page.context().browser().browserType().name()+'.png'});
     check(errors.length===0,'無頁面JS例外');
     return {engine:page.context().browser().browserType().name(),passed:results.length,checks:results,errors};
 }

@@ -5,7 +5,7 @@
     const isId = v => typeof v === 'string' && /^[a-f0-9]{64}$/.test(v);
     let env = null, state = null, registration = null, bridge = null, busy = false, epoch = 0;
     let dialog, entry, binding = null, pendingNotice = '', opening = false, badgeSync = 0;
-    let noticeFilter = 'unread';
+    let noticeFilter = 'unread', refreshing = null, progress = null;
     let observer = null, observeTimer = null, dwellTimer = null, visibleSince = new Map(), reading = new Set(), pendingReads = new Set();
     function escape(text) { return String(text || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
     function storageKey() { return PREFIX + env.subject; }
@@ -19,8 +19,26 @@
     function readKey() { return PREFIX + 'read:' + env.subject + ':' + env.uid; }
     function savePendingReads() { try { localStorage.setItem(readKey(), JSON.stringify([...pendingReads].slice(0, 40))); } catch (_) {} }
     function rememberNotice(id) {
+        if (root.EbookPushLaunch) {
+            if (id) root.EbookPushLaunch.remember(id);
+            else root.EbookPushLaunch.clear(pendingNotice);
+        }
         pendingNotice = id;
         try { if (id) sessionStorage.setItem(storageKey() + ':click', id); else sessionStorage.removeItem(storageKey() + ':click'); } catch (_) {}
+    }
+    function navigationProgress(show, waiting = false) {
+        if (!progress && show) {
+            progress = document.createElement('div');
+            progress.className = 'ep-navigation-progress';
+            progress.setAttribute('role', 'status');
+            progress.innerHTML = '<span aria-hidden="true"></span>正在開啟通知內容…';
+            document.body.appendChild(progress);
+        }
+        if (progress) {
+            progress.hidden = !show;
+            progress.classList.toggle('is-waiting', waiting);
+            progress.lastChild.textContent = waiting ? '提醒關閉後將顯示通知內容' : '正在開啟通知內容…';
+        }
     }
     async function timed(work) {
         let timer;
@@ -154,17 +172,18 @@
         dialog.querySelector('.ep-settings-status').textContent = info.title;
         const enableButton = dialog.querySelector('[data-ep="enable"]'), pauseButton = dialog.querySelector('[data-ep="pause"]'), helpButton = dialog.querySelector('[data-ep="help"]');
         enableButton.hidden = on || needsHelp;
-        enableButton.disabled = busy || !usable;
+        enableButton.disabled = busy || !!refreshing || !usable;
         pauseButton.hidden = !on;
-        pauseButton.disabled = busy;
+        pauseButton.disabled = busy || !!refreshing;
         helpButton.hidden = !needsHelp || on;
         const pilot = state && state.mode === 'test_only' && env && env.session && env.session.studentName === '系統測試生';
         dialog.querySelector('.ep-pilot').hidden = !pilot;
         const code = '測試期間僅指定的系統測試生可使用。開啟通知後即可測試，不需審核碼；一般家長尚未開放。';
         dialog.querySelector('.ep-test-device').textContent = code;
         dialog.querySelector('.ep-test-targets').textContent = `目前已連結 ${Number(state && state.approvedDeviceCount) || 0} 台裝置。測試送至其中已開啟且登入有效的裝置；同一則只算一則未讀。`;
-        dialog.querySelector('[data-ep="test"]').disabled = busy || !usable || !on;
-        dialog.querySelectorAll('[data-ep="refresh"]').forEach(button => { button.disabled = busy; });
+        dialog.querySelector('[data-ep="test"]').disabled = busy || !!refreshing || !usable || !on;
+        dialog.querySelectorAll('[data-ep="refresh"]').forEach(button => { button.disabled = busy || !!refreshing; });
+        dialog.querySelector('.ep-feed-refresh').textContent = refreshing ? '更新中…' : '重新整理';
         const preferences = dialog.querySelector('.ep-preferences');
         const kinds = state && state.businessEnabled ? Object.entries(state.kinds || {}).sort(([a],[b]) => Number(requiredKinds.has(b)) - Number(requiredKinds.has(a))) : [];
         const signature = JSON.stringify(kinds);
@@ -172,7 +191,7 @@
             preferences.dataset.signature = signature;
             preferences.innerHTML = kinds.length ? kinds.map(([kind,label]) => `<label class="ep-preference-row${requiredKinds.has(kind) ? ' ep-required-row' : ''}"><span>${escape(label)}${kind === 'bulletin' ? '<small>包含緊急公告</small>' : ''}</span>${requiredKinds.has(kind) ? '<span class="ep-fixed">✓ 必接收</span>' : `<span class="ep-switch"><input type="checkbox" role="switch" data-ep-preference="${escape(kind)}"><span class="ep-switch-track" aria-hidden="true"></span></span>`}</label>`).join('') : '<p class="ep-note">通知類型尚未開放。</p>';
         }
-        preferences.querySelectorAll('input').forEach(input => { if (!busy) input.checked = !state.preferences || state.preferences[input.dataset.epPreference] !== false; input.disabled = busy; });
+        preferences.querySelectorAll('input').forEach(input => { if (!busy) input.checked = !state.preferences || state.preferences[input.dataset.epPreference] !== false; input.disabled = busy || !!refreshing; });
         renderNotices();
     }
     async function api(action, extra = {}) {
@@ -210,11 +229,19 @@
         if (mine !== epoch) bridge.disconnect();
     }
     async function refresh() {
-        applyState(await api('status'));
-        if (!state.eligible) { entry.hidden = true; if (dialog.open) dialog.close(); render(); return; }
-        await syncBadge(!state.enabled || state.mode === 'off');
+        if (refreshing) return refreshing;
+        const mine = epoch;
+        refreshing = (async () => {
+            try {
+                applyState(await api('status'));
+                if (!state.eligible) { entry.hidden = true; if (dialog.open) dialog.close(); return; }
+                // 手機角標交給背景同步，站內清單不等待 OS 回應。
+                syncBadge(!state.enabled || state.mode === 'off').catch(() => {});
+                scheduleReadCheck();
+            } finally { if (mine === epoch) { refreshing = null; render(); } }
+        })();
         render();
-        scheduleReadCheck();
+        return refreshing;
     }
     async function readNotice(id) {
         if (reading.has(id)) return false;
@@ -286,7 +313,7 @@
         const permission = await Notification.requestPermission();
         unchanged();
         if (permission !== 'granted') throw new Error('尚未允許通知，可依下方教學重新開啟');
-        registration = await timed(navigator.serviceWorker.register('ebook-push-sw.js?v=20261014-navigation1', { scope: './', updateViaCache: 'none' }));
+        registration = await timed(navigator.serviceWorker.register('ebook-push-sw.js?v=20261014-startup1', { scope: './', updateViaCache: 'none' }));
         await timed(navigator.serviceWorker.ready);
         unchanged();
         bridge = await timed(import('./ebook_push_messaging.mjs?v=20261013-pilot1'));
@@ -313,7 +340,13 @@
         if (name === 'filter' && ['unread','all'].includes(id)) { noticeFilter = id; renderNotices(); dialog.querySelector('.ep-inbox').scrollTop = 0; return; }
         if (name === 'guide' && guides[id]) { guidePlatform = id; showGuide(); return; }
         if (name === 'help') { const guide = dialog.querySelector('.ep-guide'); guide.open = true; guide.querySelector('summary').focus(); guide.scrollIntoView({block:'nearest'}); return; }
-        if (busy || name === 'preferences' && requiredKinds.has(id)) return;
+        // 背景更新只鎖重新整理按鈕，既有通知仍可立即點入。
+        if (name === 'refresh') {
+            const refreshEpoch = epoch;
+            try { await refresh(); return true; }
+            catch (error) { if (refreshEpoch === epoch && dialog.open) dialog.querySelector('.ep-error').textContent = error.message || '暫時無法更新通知'; return false; }
+        }
+        if (busy || refreshing && ['preferences','enable','pause','test'].includes(name) || name === 'preferences' && requiredKinds.has(id)) return;
         const mine = epoch, focusedPreference = name === 'preferences' ? document.activeElement : null;
         const focusedNotice = name === 'read' && document.activeElement.closest('.ep-notice-row');
         busy = true; dialog.querySelector('.ep-error').textContent = ''; render();
@@ -326,7 +359,6 @@
             }
             if (name === 'view') await viewNotice(id);
             if (name === 'enable') await enable();
-            if (name === 'refresh') await refresh();
             if (name === 'pause') { state = await api('pause'); await unsubscribe(); render(); }
             if (name === 'read') await readNotice(id);
             if (name === 'test') {
@@ -346,19 +378,24 @@
     }
     async function viewNotice(id) {
         const mine = epoch;
-        const result = await api('open', {notificationId:id});
-        if (result.type === 'test') {
-            // 連線測試沒有內容目的地，確認類型後才顯示通知設定。
-            dialog.querySelector('.ep-settings').open = true;
-            dialog.querySelector('.ep-pilot').open = true;
-            if (!dialog.open) dialog.showModal();
-        } else {
-            // 先關掉對話框再捲動，避免 iOS 對話框焦點還原把位置拉回頁首。
-            if(dialog.open) dialog.close();
-            if (!env.navigate || !await env.navigate(result.target, () => mine === epoch)) throw new Error('目前畫面尚未載入這筆內容，請重新整理聯絡簿後再查看。');
-        }
-        if (mine !== epoch) return;
-        await readNotice(id);
+        navigationProgress(true);
+        if (dialog.open) dialog.close();
+        try {
+            const result = await api('open', {notificationId:id});
+            if (result.type === 'test') {
+                // 連線測試沒有內容目的地，確認類型後才顯示通知設定。
+                dialog.querySelector('.ep-settings').open = true;
+                dialog.querySelector('.ep-pilot').open = true;
+                if (!dialog.open) dialog.showModal();
+            } else {
+                // 先關掉對話框再捲動，避免 iOS 對話框焦點還原把位置拉回頁首。
+                if(dialog.open) dialog.close();
+                if (!env.navigate || !await env.navigate(result.target, () => mine === epoch, waiting => { if (mine === epoch) navigationProgress(true, waiting); })) throw new Error('目前畫面尚未載入這筆內容，請重新整理聯絡簿後再查看。');
+            }
+            if (mine !== epoch) return;
+            navigationProgress(false);
+            await readNotice(id);
+        } finally { if (mine === epoch) navigationProgress(false); }
     }
     async function drainNotice() {
         if (opening || busy || !pendingNotice || !state || !state.eligible) return;
@@ -376,7 +413,7 @@
         }
     }
     async function open(notificationId) {
-        if (isId(notificationId) && env) rememberNotice(notificationId);
+        if (isId(notificationId) && env && !env.preview && env.session?.studentName === '系統測試生') { rememberNotice(notificationId); navigationProgress(!state || state.eligible); }
         if (!env || !entry || entry.hidden) return;
         build();
         if (isId(notificationId)) {
@@ -393,7 +430,8 @@
         await action('refresh');
     }
     async function ready(options) {
-        const mine = ++epoch; env = options; state = null; binding = null; busy = false;
+        const mine = ++epoch; env = options; state = null; binding = null; busy = false; refreshing = null;
+        navigationProgress(false);
         pendingNotice = ''; opening = false; reading = new Set(); pendingReads = new Set(); visibleSince.clear();
         clearTimeout(observeTimer); observeTimer = null; clearTimeout(dwellTimer); dwellTimer = null;
         if (observer) observer.disconnect();
@@ -418,17 +456,21 @@
         dialog.querySelectorAll('details').forEach(item => { item.open = false; });
         try { pendingReads = new Set((JSON.parse(localStorage.getItem(readKey()) || '[]') || []).filter(isId).slice(0,40)); } catch (_) {}
         try {
+            let launchId = root.EbookPushLaunch && root.EbookPushLaunch.current();
+            if (!launchId) { try { launchId = new URL(location.href).searchParams.get('pushNotice') || sessionStorage.getItem(storageKey() + ':click'); } catch (_) {} }
+            if (isId(launchId)) { rememberNotice(launchId); navigationProgress(true); }
             await refresh();
             if (mine !== epoch) return;
             entry.hidden = !state.eligible;
-            const id = new URL(location.href).searchParams.get('pushNotice') || sessionStorage.getItem(storageKey() + ':click');
+            const id = pendingNotice;
             if (state.eligible && isId(id)) {
                 await open(id);
             }
+            navigationProgress(false);
             watchReading();
             for (const id of [...pendingReads]) if ((state.items || []).some(i => i.id === id && !i.readAt)) await readNotice(id).catch(() => {});
             await listen(mine).catch(() => { if (mine === epoch && dialog) dialog.querySelector('.ep-error').textContent = '前景通知連線暫時失敗，請重新開啟聯絡簿再測試。'; });
-        } catch (_) { if (mine === epoch) { entry.hidden = false; state = null; render(); } /* 試用服務失敗不影響原聯絡簿。 */ }
+        } catch (_) { if (mine === epoch) { navigationProgress(false); entry.hidden = false; state = null; render(); } /* 試用服務失敗不影響原聯絡簿。 */ }
     }
     async function beforeLogout() {
         if (busy) { await root.swalAlert('通知設定處理中', '請等這次操作完成後再登出。', 'info'); return false; }
@@ -441,13 +483,17 @@
         if (observer) observer.disconnect(); env = null; state = null;
         return true;
     }
-    if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', event => {
+    root.addEventListener('ebook-push-click', event => {
+        const id = event.detail && event.detail.notificationId;
+        if (isId(id) && env) open(id);
+    });
+    if (!root.EbookPushLaunch && 'serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', event => {
         const data = event.data || {};
         if (data.kind === 'ebook_push_click' && isId(data.notificationId)) {
             const subject = new URL(location.href).searchParams.get('subject') || 'science';
-            sessionStorage.setItem(PREFIX + subject + ':click', data.notificationId);
+            try { sessionStorage.setItem(PREFIX + subject + ':click', data.notificationId); } catch (_) {}
             if (event.ports && event.ports[0]) event.ports[0].postMessage({received:true});
-            if (env && state && state.eligible) open(data.notificationId);
+            if (env) open(data.notificationId);
         }
     });
     document.addEventListener('visibilitychange', () => {
