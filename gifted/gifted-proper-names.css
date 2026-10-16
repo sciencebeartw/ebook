@@ -1,0 +1,7 @@
+/* A proper-name mark is a thin continuous line, not a hyperlink. */
+.gifted-proper-name {
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: .18em;
+  text-decoration-skip-ink: none;
+}

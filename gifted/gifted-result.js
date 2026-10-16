@@ -30,6 +30,7 @@ function mount(container,result,task,{viewQuestion}={}){
     }
     details.append(summary,body);section.append(details);
   }
+  root.GiftedProperNames?.decorate(section);
   container.append(section);return true;
 }
 const api={mount,answerText};if(typeof module==='object'&&module.exports)module.exports=api;else root.GiftedResult=api;
