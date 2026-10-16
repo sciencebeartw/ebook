@@ -3,6 +3,7 @@
   // Presentation only: never insert markup into stored questions, answers or reviews.
   const characters=['Super羊','冠冠河馬','可可豆','大尾狼','小彥雀','小華貓','巧易狐','放電蛙','無尾東','爆破熊','羊駝','葉葉兔','藍鷹博士','西米鹿','詩蟻獸','霹靂喵','鹽水鵝','黛比虎','暴走狐','卡吉兔','小焰雀'];
   const people=['心儀','列文虎克','虎克','孟德爾','達爾文','林奈','牛頓','伽利略','法拉第','哈雷','哥白尼','愛因斯坦','愛迪生','阿基米德','拉馬克','波以耳','奧斯特','厄斯特','伽伐尼','勒朗社','馬克士威','阿瑞尼士','伏特','安培','SvanteAugustArrhenius'];
+  people.push('奧斯華德');
   const names=[...characters,...people].sort((a,b)=>b.length-a.length);
   const pattern=names.map(n=>n.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|');
   const escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
