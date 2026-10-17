@@ -5008,7 +5008,7 @@
     <script src="class_session_plan.js?v=20261011-library1"></script>
     <script src="homework_report_status.js?v=20261011-pending1"></script>
     <script src="homework_answers_contract.js?v=20261011-report1"></script>
-    <script src="homework_answers_app.js?v=20261013-editable-1"></script>
+    <script src="homework_answers_app.js?v=20261017-responsive-1"></script>
     <script src="holiday_practice_app.js?v=20261013-editable-1"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
@@ -11055,10 +11055,13 @@
             var done = !!(doneRecord && doneRecord.status === "done");
             var holiday = getDailyPostDisplayOptions(post).holidayPractice;
             var btnText = done ? "✓ 已回報完成" : (holiday && !holiday.draft ? "我已完成本次一般作業" : "我已完成本次所有作業");
+            var completing = window.HomeworkAnswersApp && HomeworkAnswersApp.isCompleting(post);
+            if (completing && !done) btnText = "正在確認完成…";
             var doneClass = done ? " done" : "";
-            var disabled = done ? " disabled" : "";
+            var disabled = done || completing ? " disabled" : "";
             var hasAnswers = window.HomeworkAnswersApp && HomeworkAnswersApp.has(post);
             var hint = done ? "已記錄到作業完成回報。" : (hasAnswers ? "完成作業後按一下，即可查看解答並訂正。" : "完成作業後按一下，老師會看到你的回報。");
+            if (completing && !done) hint = "正在處理，請稍候，不需要重複按。";
             return "<div class='homework-done-box' id='homework-done-box-" + homeworkDoneDomKey + "'>" +
                 "<button class='homework-done-btn" + doneClass + "' id='homework-done-btn-" + homeworkDoneDomKey + "' onclick=\"submitHomeworkDone('" + homeworkDoneDomKey + "')\"" + disabled + ">" + btnText + "</button>" +
                 "<div class='homework-done-hint' id='homework-done-hint-" + homeworkDoneDomKey + "'>" + hint + "</div>" +
@@ -12738,6 +12741,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var btn = document.getElementById("homework-done-btn-" + homeworkDoneDomKey);
             var hint = document.getElementById("homework-done-hint-" + homeworkDoneDomKey);
             if (!btn || btn.disabled) return;
+            var completionToken = window.HomeworkAnswersApp ? HomeworkAnswersApp.beginCompletion(post) : null;
+            if (window.HomeworkAnswersApp && !completionToken) return;
             var originalText = btn.innerText;
             btn.disabled = true;
             btn.innerText = "回報中...";
@@ -12754,6 +12759,9 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 sourceItemId: (post && (post.id || post.dailyPostId)) || ""
             };
             google.script.run.withSuccessHandler(function(res) {
+                if (window.HomeworkAnswersApp && !HomeworkAnswersApp.isCurrentCompletion(completionToken)) return;
+                btn = document.getElementById("homework-done-btn-" + homeworkDoneDomKey) || btn;
+                hint = document.getElementById("homework-done-hint-" + homeworkDoneDomKey) || hint;
                 if (res && res.success) {
                     var dateKey = getHomeworkDoneDateKey(realDate);
                     var doneRecord = {
@@ -12782,12 +12790,17 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     if (window.HomeworkAnswersApp) HomeworkAnswersApp.completed(post);
                     schedulePendingTasksRecompute();
                 } else {
+                    if (window.HomeworkAnswersApp) HomeworkAnswersApp.completionFailed(post);
                     btn.disabled = false;
                     btn.innerText = originalText;
                     if (hint) hint.innerText = "回報失敗，請稍後再試。";
                     swalAlert("作業完成回報失敗", (res && res.msg) || "未知錯誤", "warning");
                 }
             }).withFailureHandler(function(e) {
+                if (window.HomeworkAnswersApp && !HomeworkAnswersApp.isCurrentCompletion(completionToken)) return;
+                btn = document.getElementById("homework-done-btn-" + homeworkDoneDomKey) || btn;
+                hint = document.getElementById("homework-done-hint-" + homeworkDoneDomKey) || hint;
+                if (window.HomeworkAnswersApp) HomeworkAnswersApp.completionFailed(post);
                 btn.disabled = false;
                 btn.innerText = originalText;
                 if (hint) hint.innerText = "連線不穩，請稍後再試。";
