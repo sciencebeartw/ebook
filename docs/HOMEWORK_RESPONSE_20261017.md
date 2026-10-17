@@ -1,6 +1,6 @@
 # 一般作業完成後報分框等待修正
 
-狀態：本機完成、尚未發布。基底為正式 origin/main `eea6440`，主 checkout 既有變更未動。
+狀態：使用者已授權，667f24c已推main並完成雙網域HTML／模組SHA讀回。基底為正式 origin/main `eea6440`，主 checkout 既有變更未動。
 
 ## 問題與修改
 
@@ -24,3 +24,7 @@
 僅 eBook 前端兩檔及回歸測試。sciencebear-admin 沿用既有單篇單生 API 次數／資料範圍；不加讀取、listener、輪詢、Storage 或任何其他 Firebase 專案流量。Functions、GAS、Rules、Sheet 與學生分數未修改。這一版縮短報分框的顯示等待，不縮短後端排隊／GAS 服務時間。
 
 已唯讀查近期 `submitHomeworkDone` 效能紀錄（結構與文字格式），均無符合資料，不能由此斷定不存在慢請求。正式發布需確認；發布時重新 fetch 檢查 origin/main，不得覆蓋別輪變更，再 scoped commit/push 及兩正式網址資產 hash 讀回。
+
+## 發布後驗收
+
+2026-10-17以與正式資產SHA相同的模組合成故障注入：Chrome四尺寸報分框52／45／33／35ms，WebKit68／49／41／40ms；後端callback暫停仍可填0、送出鎖定、完成與答案確認後保留0並可成功回報。僅合成資料，未代交正式學生作業。此數字不是後端／實體LINE效能承諾。正式學生前端沒有新增API／listener。
