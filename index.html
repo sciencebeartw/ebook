@@ -11,6 +11,7 @@
     <base target="_top">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- release:20261017-natural-button-wrap -->
     <title>山熊科學數位聯絡簿</title>
     
     <!-- PWA Settings -->
@@ -2603,8 +2604,8 @@
         .btn-link, .btn-important-tag, .btn-supplement-tag, .btn-general-tag, .btn-small-tag {
             min-width:0; max-width:100%; box-sizing:border-box; white-space:normal; overflow-wrap:anywhere; line-height:1.55;
         }
-        .assessment-link-detail { display:block; font-size:.95em; font-weight:500; margin-top:3px; }
-        .assessment-link-detail > span { display:block; }
+        .assessment-link-detail { display:inline; font:inherit; }
+        .assessment-link-detail > span { display:inline; }
 
         /* 學生上傳的連結按鈕 (小標籤) */
         .btn-small-tag {
@@ -7796,7 +7797,7 @@
             if (!range || !window.AssessmentLabels) return escapeHtml(label);
             var title = window.AssessmentLabels.describe(range, className);
             return '<span class="textbook-link-part">' + escapeHtml(purpose + '｜' + title.heading) + '</span>' +
-                (title.detail ? '<span class="assessment-link-detail">' + title.detail.split('｜').map(function(text) { return '<span>' + escapeHtml(text) + '</span>'; }).join('') + '</span>' : '');
+                (title.detail ? '<span class="assessment-link-detail"> ' + title.detail.split('｜').map(function(text) { return '<span>' + escapeHtml(text) + '</span>'; }).join('｜') + '</span>' : '');
         }
 
         function renderParsedLink(name, url, className, iconHtml, originalName, assessmentClassName, literalLabel) {

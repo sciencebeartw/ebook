@@ -66,7 +66,7 @@ const homeworkFile = '20261010 國二自然超前班 回家作業 高中補充 �
 assert.equal(c.getDailyPostExamLinkDisplayName(homeworkFile, '回家作業卷'), '回家作業卷｜高中補充 拋體運動');
 assert.equal(c.getDailyPostExamLinkDisplayName(homeworkFile, '回家作業卷', 'full'), '回家作業卷｜' + homeworkFile);
 // Display labels must not replace the Office preview/download filename.
-assert(ebook.includes('SVG.document, BEAR_SUBJECT === "/science" ? name : "")'));
+assert(ebook.includes('SVG.document, BEAR_SUBJECT === "/science" ? name : "", post.storedClassName || post.sourceClassName || post.className || gData.className)'));
 const linkContext = { decodeBasicHtmlEntities: String, escapeHtmlAttr: String, isOfficeDocumentLink: name => name.endsWith('.doc'), getOfficePreviewUrl: () => 'https://preview.test', getOfficeDownloadFileName: name => name };
 vm.createContext(linkContext); vm.runInContext(extract(ebook, 'renderParsedLink'), linkContext);
 const link = linkContext.renderParsedLink('補考卷｜大氣', 'https://files.test/opaque', 'btn-link', '<svg></svg>', samples[2][0]);
