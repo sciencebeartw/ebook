@@ -5025,7 +5025,7 @@
   <script src="gifted_assignment_visibility.js?v=20261011-library1"></script>
   <script src="gifted_homework_full_scores.js?v=20260720_geo3_question_count_v2"></script>
   <script src="ebook_pending_tasks_app.js?v=20261011-contactbook1-20261011-homework-score"></script>
-  <script src="ebook_feedback_threads_app.js?v=20260822_feedback_threads_v1"></script>
+  <script src="ebook_feedback_threads_app.js?v=20261018-correction-reply"></script>
   <script src="ebook_score_distribution.js?v=equal-high-score-chart-20260922"></script>
 
   <script src="resource_catalog_view.js?v=20261002_resources_time_v1"></script>
@@ -7929,9 +7929,9 @@
             var reason = parts.join('\n更正原因：').replace(/\n首次成績維持不變，待老師核准。\s*$/, '').trim();
             var url = '?gifted=' + encodeURIComponent(marker[1]) + '&segment=' + encodeURIComponent(marker[2]);
             // 「已送出」描述這筆申請事件，不能用留言已讀狀態推論是否核准。
-            return '<div class="gifted-feedback-card"><div class="gifted-feedback-heading"><strong>作業更正申請</strong><span class="gifted-feedback-badge">已送出</span></div>' +
+            return '<div class="gifted-feedback-card"><div class="gifted-feedback-heading"><strong>誤填答案更正申請</strong><span class="gifted-feedback-badge">已送出</span></div>' +
                 '<p class="gifted-feedback-title">' + escapeHtml(title) + '</p><p class="gifted-feedback-reason"><span>更正原因</span>' + escapeHtml(reason) + '</p>' +
-                '<p class="gifted-feedback-hint">老師核准後才會更新成績，審核進度可至作業頁查看。</p>' +
+                '<p class="gifted-feedback-hint">訂正請在課本上用紅筆完成；這裡只更正與課本原答案不一致的上傳誤填。老師核准後才會更新成績，審核進度可至作業頁查看。</p>' +
                 '<a class="gifted-feedback-link" href="' + escapeHtmlAttr(url) + '">查看作業與審核進度 →</a></div>';
         }
 

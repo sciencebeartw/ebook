@@ -225,3 +225,9 @@ assert.strictEqual(operational.operational.length, 2, 'operational cards must no
 assert.deepStrictEqual(operational.blocks.map(block => block.kind), ['thread', 'operational', 'operational']);
 
 console.log('✓ eBook feedback thread helper tests passed');
+
+{
+ const result=threads.buildFeedbackThreads([feedback({fbKey:'correction',type:'作業更正申請'}),feedback({fbKey:'result',type:'阿喵老師回覆',actorRole:'teacher',source:'dashboard_admin',replyToFeedbackKey:'correction',content:'作業更正申請未通過。'})]);
+ assert.strictEqual(result.threads.length,1);assert.strictEqual(result.operational.length,0);assert(threads.isReplyableFeedback({type:'作業更正申請'}));
+ assert(result.threads[0].messages.some(x=>x.key==='result'));
+}

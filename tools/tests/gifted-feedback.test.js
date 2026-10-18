@@ -6,7 +6,7 @@ const context={encodeURIComponent,escapeHtml,escapeHtmlAttr:escapeHtml,parseBtn:
 const marker='[gifted-correction:hw_'+'a'.repeat(64)+':week-1:cr_abcdefghijklmnop]';
 const item={type:'作業更正申請',content:'理化第11章 常見的力｜概念一、二\n更正原因：<img src=x onerror=alert(1)>\n補充原因\n首次成績維持不變，待老師核准。\n'+marker};
 const before=JSON.stringify(item),out=context.renderGiftedFeedback(item,item.content);
-assert(out.includes('作業更正申請'));assert(out.includes('已送出'));assert(out.includes('補充原因'));assert(out.includes('&lt;img'));assert(!out.includes('<img'));assert(!out.includes('gifted-correction:'));assert(!out.includes('待老師核准'));assert(out.includes('?gifted=hw_'));assert(out.includes('week-1'));assert.equal(JSON.stringify(item),before);
+assert(out.includes('誤填答案更正申請'));assert(out.includes('課本上用紅筆完成'));assert(out.includes('查看作業與審核進度')); assert(out.includes('已送出'));assert(out.includes('補充原因'));assert(out.includes('&lt;img'));assert(!out.includes('<img'));assert(!out.includes('gifted-correction:'));assert(!out.includes('待老師核准'));assert(out.includes('?gifted=hw_'));assert(out.includes('week-1'));assert.equal(JSON.stringify(item),before);
 assert.equal(context.renderGiftedFeedback({type:'學生留言'},'普通留言'), '普通留言');
 assert.equal(context.renderGiftedFeedback(null,null),'');
 assert(html.includes('renderGiftedFeedback(item, content'));assert(html.includes('renderGiftedFeedback(h, h.content'));

@@ -9,7 +9,8 @@
         "學生留言": true,
         "家長留言": true,
         "家長/學生": true,
-        "作業上傳": true
+        "作業上傳": true,
+        "作業更正申請": true
     };
     var OPERATIONAL_TYPES = {
         "棒卡申請": true,
