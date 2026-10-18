@@ -1,5 +1,6 @@
 (function(){'use strict';
 const $=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const questionLabel=q=>q.paperLabel||'章內第 '+q.sourceIndex+' 題';
 const query=new URLSearchParams(location.search),transport=window.GiftedStudentTransport;let actor,task,box,answers={},questionIndex=0,busy=false,tabId,releaseTab,conflictTask;
 let mediaRefresh,mediaRetryAt=0,gradeRefresh,answerRetry,submissionResult=null,latestSummary=null,resultRead=null;
 // 延用 v17 的分頁鎖：重新整理保留同一草稿；複製分頁取得獨立編輯副本。
@@ -53,13 +54,13 @@ function paintAnswerGrid(){
   const state=wrong?'needs-correction':pending?'awaiting-grading':item?.outcome==='correct'||one(value)?'answered':'';
   const status=wrong?(correct?'，正確答案 '+correct:'，待訂正'):pending?'，待老師批改':item?.outcome==='correct'?'，答對':'';
   needsCorrection=needsCorrection||wrong;
-  return `<button type="button" class="${state}" data-index="${i}" aria-current="${i===questionIndex}" aria-label="${esc('章內第 '+q.sourceIndex+' 題，原答 '+original+status)}"><span>${esc(q.sourceIndex)} ${hasKey?'<s>'+esc(original)+'</s>':esc(original)}</span>${hasKey?'<span class="answer-correction">→ 正確 '+esc(correct)+'</span>':wrong?'<span class="answer-correction">待訂正</span>':pending?'<span class="answer-pending">待批</span>':''}</button>`;
+  return `<button type="button" class="${state}" data-index="${i}" aria-current="${i===questionIndex}" aria-label="${esc(questionLabel(q)+'，原答 '+original+status)}"><span>${esc(q.paperLabel||q.sourceIndex)} ${hasKey?'<s>'+esc(original)+'</s>':esc(original)}</span>${hasKey?'<span class="answer-correction">→ 正確 '+esc(correct)+'</span>':wrong?'<span class="answer-correction">待訂正</span>':pending?'<span class="answer-pending">待批</span>':''}</button>`;
  }).join('');
  $('answerGrid').querySelectorAll('button').forEach(el=>el.onclick=()=>{questionIndex=Number(el.dataset.index);paint();});
  $('answerGridHelp').hidden=!needsCorrection;
 }
 function paint(){BearStudentMedia.bind($('questionCard'));BearStudentMedia.reset();const q=task.questions[questionIndex];$('count').textContent='已填 '+valuesCount()+' / '+task.questions.length+' 題';$('question').value=q.id;
- $('questionCard').innerHTML=(q.groupContext?'<p>'+esc(q.groupContext)+'</p>':'')+'<p><strong>章內第 '+q.sourceIndex+' 題</strong></p><p>'+esc(q.prompt)+'</p>'+BearStudentMedia.blocks(q.bodyBlocks)+q.media.map(m=>BearStudentMedia.html(m,'','第 '+q.sourceIndex+' 題圖表')).join('')+q.options.map(o=>`<label class="option"><input type="radio" name="answer" value="${esc(o.id)}" ${one(answers[q.id])===o.id?'checked':''} ${task.submission?'disabled':''}><span>${esc(o.text)}${(o.media||[]).map(m=>BearStudentMedia.html(m,'','選項圖表')).join('')}</span></label>`).join('');
+ $('questionCard').innerHTML=(q.groupContext?'<p>'+esc(q.groupContext)+'</p>':'')+'<p><strong>'+esc(questionLabel(q))+'</strong></p><p>'+esc(q.prompt)+'</p>'+BearStudentMedia.blocks(q.bodyBlocks)+q.media.map(m=>BearStudentMedia.html(m,'',questionLabel(q)+'圖表')).join('')+q.options.map(o=>`<label class="option"><input type="radio" name="answer" value="${esc(o.id)}" ${one(answers[q.id])===o.id?'checked':''} ${task.submission?'disabled':''}><span>${esc(o.text)}${(o.media||[]).map(m=>BearStudentMedia.html(m,'','選項圖表')).join('')}</span></label>`).join('');
  window.GiftedProperNames?.decorate($('questionCard'),q.prompt);
  $('questionCard').querySelectorAll('input[name=answer]').forEach(el=>el.onchange=()=>{if(isReadOnly())return;try{answers[q.id]=el.value;box.saveLocalDraft(answers,task.revision);$('studentStatus').textContent='已暫存本機；送出後才正式登記。';paint();}catch(e){error(e);}});
  paintAnswerGrid();
@@ -96,7 +97,7 @@ function renderResult(result){
  const items=[...result.items].sort((a,b)=>(a.outcome==='correct')-(b.outcome==='correct'));
  const wrong=items.filter(i=>['wrong','blank'].includes(i.outcome)).length;
  $('resultTitle').textContent=wrong?'需要訂正 '+wrong+' 題':'每題作答結果';
- $('result').innerHTML=items.map(item=>{const q=task.questions.find(q=>q.id===item.questionId);return `<button type="button" data-question-id="${esc(q.id)}" class="result ${['wrong','blank'].includes(item.outcome)?'wrong':''}">章內第 ${q.sourceIndex} 題 · ${outcomes[item.outcome]}</button>`;}).join('');
+ $('result').innerHTML=items.map(item=>{const q=task.questions.find(q=>q.id===item.questionId);return `<button type="button" data-question-id="${esc(q.id)}" class="result ${['wrong','blank'].includes(item.outcome)?'wrong':''}">${esc(questionLabel(q))} · ${outcomes[item.outcome]}</button>`;}).join('');
  $('result').querySelectorAll('[data-question-id]').forEach(el=>el.onclick=()=>viewQuestion(el.dataset.questionId));
  if(window.GiftedResult)GiftedResult.mount($('result'),result,task,{viewQuestion});
  if(result.correction)$('studentStatus').textContent='老師已更正 · '+new Date(result.correction.correctedAt).toLocaleString('zh-TW')+' · '+result.correction.reason;
@@ -112,7 +113,7 @@ function readResult(){
  }).finally(()=>{if(resultRead===entry)resultRead=null;});
  return entry.promise;
 }
-function showConflict(server){conflictTask=server;$('conflict').hidden=false;const local=box.snapshot().draft?.answers||{};const label=(q,v)=>{const n=q.choices.indexOf(one(v));return n<0?'未答':String.fromCharCode(65+n);};const differences=task.questions.filter(q=>one(local[q.id])!==one(server.answers[q.id]));$('comparison').innerHTML=differences.length?differences.map(q=>'<p>第 '+q.sourceIndex+' 題：本機 '+label(q,local[q.id])+'／已保存 '+label(q,server.answers[q.id])+'</p>').join(''):'<p>選項相同，保存版本不同；請選擇要保留的版本。</p>';$('studentStatus').textContent='另一個視窗或裝置已更新答案；請先比較版本。';controls();}
+function showConflict(server){conflictTask=server;$('conflict').hidden=false;const local=box.snapshot().draft?.answers||{};const label=(q,v)=>{const n=q.choices.indexOf(one(v));return n<0?'未答':String.fromCharCode(65+n);};const differences=task.questions.filter(q=>one(local[q.id])!==one(server.answers[q.id]));$('comparison').innerHTML=differences.length?differences.map(q=>'<p>'+esc(questionLabel(q))+'：本機 '+label(q,local[q.id])+'／已保存 '+label(q,server.answers[q.id])+'</p>').join(''):'<p>選項相同，保存版本不同；請選擇要保留的版本。</p>';$('studentStatus').textContent='另一個視窗或裝置已更新答案；請先比較版本。';controls();}
 async function load(){answerRetry?.dispose();gradeRefresh?.dispose();box?.close({erase:false});task=await student('task');submissionResult=null;latestSummary=null;$('result').innerHTML='';$('receipt').textContent='';$('resultStatus').textContent='';$('resultSection').hidden=!task.submission;$('submitSection').hidden=isReadOnly()||!!task.submission;conflictTask=null;$('conflict').hidden=true;$('workspace').hidden=false;$('login').hidden=true;$('studentName').textContent=task.classId+' · '+(transport?transport.studentName:'測試學生 '+actor.toUpperCase());$('studentTitle').innerHTML=esc(task.chapterLabel)+'<span class="scope-label">'+esc(task.label)+'</span>';$('assignmentInfo').textContent='本次 '+task.questions.length+' 題 · '+(task.target.includesPreviousAnswers?'會沿用上週答案，合併計算全章。':'作業欄只登記本次範圍。');
  box=null;
  if(!isReadOnly()){await reserveTab();box=GiftedAnswerOutbox.create({storage:localStorage,scope:{sessionUid:transport?transport.sessionUid:'v21-test-'+(query.get('fixture')||'default')+'-'+actor,planId:task.planId,segmentId:task.segmentId,scopeRevision:task.scopeRevision,tabId},transport:learning});}
@@ -122,7 +123,7 @@ async function load(){answerRetry?.dispose();gradeRefresh?.dispose();box?.close(
  if(local.pending)$('studentStatus').textContent='上次送出尚未確認；連線恢復後會自動重試，不必重填。';
  else if(local.draft&&!task.submission&&local.draft.expectedRevision!==task.revision)showConflict(task);
  else $('studentStatus').textContent=isReadOnly()?'老師查看 · '+(task.submission?'學生已提交。':'學生尚未提交。'):local.draft&&!task.submission?'已恢復本機答案。':'可以開始作答。';
- $('question').innerHTML=task.questions.map(q=>`<option value="${q.id}">第 ${q.sourceIndex} 題</option>`).join('');paint();startSummary();
+ $('question').innerHTML=task.questions.map(q=>`<option value="${q.id}">${esc(questionLabel(q))}</option>`).join('');paint();startSummary();
  $('correctionRequest').hidden=true;$('correctionRequest').innerHTML='';
  document.querySelector('.lead').textContent=isReadOnly()?'老師查看模式：可檢視學生作業、答案與成績。':'提交後會自動登記作業成績，不必另外傳訊息回報。';
  document.querySelector('.homework-reminder').hidden=isReadOnly();

@@ -16,7 +16,7 @@ function mount(container,result,task,{viewQuestion}={}){
   for(const item of available){
     const q=questions.get(item.questionId),details=element('details'),summary=element('summary');
     details.className=item.outcome==='correct'?'correct':'needs-correction';
-    summary.append(element('span',q.sourceTitle||'第 '+q.sourceIndex+' 題'),element('b',outcomes[item.outcome]||'已收到'));
+    summary.append(element('span',q.paperLabel||q.sourceTitle||'第 '+q.sourceIndex+' 題'),element('b',outcomes[item.outcome]||'已收到'));
     const body=element('div',undefined,'gifted-result-body'),answers=element('dl');
     answers.append(element('dt','你的答案'),element('dd',answerText(q,item.answer)));
     if(item.correctAnswers?.length)answers.append(element('dt',item.answerRevisionNotice?'原判分答案':'正確答案'),element('dd',answerText(q,item.correctAnswers)));
