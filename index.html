@@ -9940,13 +9940,13 @@
             var rawScore = sheetScore === undefined || sheetScore === null ? "" : String(sheetScore).trim();
             var reportedMatch = String(reportedScoreText === undefined || reportedScoreText === null ? "" : reportedScoreText).match(/(\d+(\.\d+)?)/);
             var sheetMatch = rawScore.match(/(\d+(\.\d+)?)/);
-            if (!rawScore || rawScore.indexOf("假") === -1 || !sheetMatch || !reportedMatch) return "unfilled";
+            if (!/^\d+(?:\.\d+)?假?$/.test(rawScore) || !sheetMatch || !reportedMatch) return "unfilled";
             return Number(sheetMatch[0]) === Number(reportedMatch[0]) ? "filled" : "teacher_corrected";
         }
 
         function getLatestMakeupReportInfo(exam, feedbackHistory) {
             if (!feedbackHistory || feedbackHistory.length === 0) return null;
-            var rawScore = (exam.score || "").toString();
+            var rawScore = String(exam.score === undefined || exam.score === null ? "" : exam.score);
             var isHomePractice = isHomePracticeScoreTitle((exam.date || "") + (exam.exam || ""));
             var isHw = !isHomePractice && (isHomeworkColumnTitle((exam.date || "") + (exam.exam || "")) || isHomeworkMissingScore(rawScore));
             if (isHw && !ClassSessionPlan.isSelfMarked(exam)) return null;
@@ -9977,7 +9977,7 @@
                     content: fb.content || "",
                     reportedScoreText: reportedText,
                     reportedScoreNum: reportedNum,
-                    scoreValue: reportedText + "假",
+                    scoreValue: reportedText + (/假$/.test(rawScore.trim()) ? "假" : ""),
                     sheetScore: rawScore,
                     status: status
                 };
@@ -10021,7 +10021,7 @@
         }
 
         function getDisplayLogic(exam, feedbackHistory) {
-            var rawScore = (exam.score || "").toString();
+            var rawScore = String(exam.score === undefined || exam.score === null ? "" : exam.score);
             var sheetNum = exam.scoreNum;
             var myColor = (exam.cellColor || "").toLowerCase();
             var isHomePractice = isHomePracticeScoreTitle((exam.date || "") + (exam.exam || ""));
@@ -10072,14 +10072,14 @@
                     result.effectiveNum = sheetNum;
                     result.mainScore = sheetNum;
                     result.statusHtml += "<div class='home-exam-tag' data-absence-score-tag='1'>(請假回報)</div>";
-                    if (overrideNum !== null && overrideNum !== sheetNum) {
-                        result.teacherCorrected = true;
-                        result.reportedScoreNum = overrideNum;
-                        result.statusHtml += "<div class='home-exam-tag'>(老師已更正：原回報 " + overrideNum + " 分)</div>";
-                    }
                 } else {
                     result.effectiveNum = sheetNum;
                     result.mainScore = sheetNum;
+                }
+                if (overrideNum !== null && overrideNum !== sheetNum) {
+                    result.teacherCorrected = true;
+                    result.reportedScoreNum = overrideNum;
+                    result.statusHtml += "<div class='home-exam-tag'>(老師已更正：原回報 " + overrideNum + " 分)</div>";
                 }
                 if (exam.myBucket === 4) result.mainClass = " score-green";
                 else if (exam.myBucket <= 1 && exam.myBucket >= 0) result.mainClass = " score-red";
@@ -14587,7 +14587,10 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 swalAlert('分數超出範圍', '分數請填 0 到 ' + EBOOK_SCORE_MAX + '。', 'warning');
                 return;
             }
-            var finalScore = scoreText + '假';
+            var currentExam = (gData.grades || []).find(function(exam) {
+                return String(exam.colIndex) === String(context.examColIndex);
+            });
+            var finalScore = scoreText + (/假$/.test(String(currentExam && currentExam.score || '').trim()) ? '假' : '');
             var ok = await swalConfirm('老師直接回填缺考分數', '確定要把 ' + gData.studentName + ' 這個缺考欄位寫回大表為「' + finalScore + '」嗎？');
             if (!ok) return;
 
