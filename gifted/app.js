@@ -12,14 +12,18 @@ async function reserveTab(){
  if(!await acquire(id)){id=crypto.randomUUID();if(!await acquire(id))throw Error('無法保留作答分頁，請重新開啟。');}
  sessionStorage.setItem('gifted-homework-tab',id);tabId=id;
 }
-async function api(url,body,token){const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify(body),signal:AbortSignal.timeout(15000)});const value=await response.json();if(!response.ok)throw Error(value.error||'連線失敗');return value;}
+async function api(url,body,token){
+ const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);
+ try{const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify(body),signal:controller.signal});const value=await response.json();if(!response.ok)throw Error(value.error||'連線失敗');return value;}
+ finally{clearTimeout(timeout);}
+}
 const credential=()=> 'synthetic-token-'+(query.get('fixture')?query.get('fixture')+'-':'')+actor;
 const student=(action,body={})=>transport?transport.request({action,planId:query.get('plan'),segmentId:query.get('segment'),...body}):api('/api/student',{action,planId:query.get('plan'),segmentId:query.get('segment'),...body},credential());
 const learning=body=>transport?transport.request(body):api('/api/learning',body,credential());
 const isReadOnly=()=>transport?.readOnly===true||task?.readOnly===true;
 const confirmWrite=action=>transport?.confirmWrite?transport.confirmWrite(action):Promise.resolve(true);
 const messages={TEACHER_VIEW_READ_ONLY:'老師查看模式只能檢視，不能替學生送出或更正答案。',IDENTITY_MAPPING_REQUIRED:'這個帳號的線上作業尚未開通，請聯絡老師協助；電子聯絡簿仍可正常使用。',PILOT_STUDENT_REQUIRED:'這個帳號的線上作業尚未開通，請聯絡老師協助。',ENROLLMENT_INACTIVE:'這個帳號的作業使用資格需要老師確認，請聯絡老師協助。',ROSTER_CHANGED:'學生資料已更新，請返回聯絡簿重新登入；若仍無法作答，請聯絡老師。',LOGIN_REQUIRED:'登入已過期，請返回聯絡簿重新登入；尚未送出的答案已保留。',ASSIGNMENT_NOT_OPEN:'這份作業目前尚未開放或已截止。',ASSIGNMENT_UNAVAILABLE:'作業尚未準備完成，請稍後再試。',PUBLISHED_POST_NOT_READY:'聯絡簿正在同步，請稍後再試。',PUBLISHED_POST_LINK_MISMATCH:'本堂作業設定已變更，請從最新聯絡簿重新開啟。',HOMEWORK_POST_CONFLICT:'本堂作業發布時間或連結已變更，請由老師確認。',TRY_LATER:'操作較頻繁，請稍後重試。',CLASS_NOT_AUTHORIZED:'這份作業不屬於目前登入的班級。',RETRY_OR_CHECK_RECEIPT:'尚未確認伺服器結果，原答案已保留，請稍後重試。'};
-function error(e){$('error').textContent=messages[e.message]||e.message;}
+function error(e){$('error').textContent=messages[e.message]||e.message;if(!task)$('login').textContent='作業暫時無法載入，請返回聯絡簿後重新開啟。';}
 async function refreshMedia(){
  if(!task||mediaRefresh)return;
  $('mediaStatus').hidden=false;

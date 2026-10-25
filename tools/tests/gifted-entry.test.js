@@ -2,9 +2,9 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
 const code=fs.readFileSync(path.resolve(__dirname,'../../gifted_entry.js'),'utf8');
 const plan='hw_'+'a'.repeat(64);
-function setup(enabled=true,deepLink=true){const values=new Map(),elements=[],listeners=[],events={};const storage={get length(){return values.size;},key:i=>[...values.keys()][i],removeItem:k=>values.delete(k)};
+function setup(enabled=true,deepLink=true,overrides={}){const values=new Map(),elements=[],listeners=[],events={};const storage={get length(){return values.size;},key:i=>[...values.keys()][i],removeItem:k=>values.delete(k)};
 const document={addEventListener:(name,fn)=>events[name]=fn,body:{append:e=>elements.push(e),classList:{add(){},remove(){}}},createElement:tag=>({tag,contentWindow:{},setAttribute(){},focus(){},children:[],append(...items){this.children.push(...items);},remove(){const i=elements.indexOf(this);if(i>=0)elements.splice(i,1);}})};
-let resolveFetch;const context={URL,URLSearchParams,AbortSignal,location:{href:'https://school.example/ebook/'+(deepLink?'?gifted='+plan+'&segment=week-1':''),search:deepLink?'?gifted='+plan+'&segment=week-1':''},localStorage:storage,document,GIFTED_HOMEWORK_RELEASE:{enabled,studentApi:'https://api.example/student'},fetch:()=>new Promise(r=>{resolveFetch=r;})};context.window=context;
+let resolveFetch;const context={URL,URLSearchParams,AbortController,setTimeout,clearTimeout,location:{href:'https://school.example/ebook/'+(deepLink?'?gifted='+plan+'&segment=week-1':''),search:deepLink?'?gifted='+plan+'&segment=week-1':''},localStorage:storage,document,GIFTED_HOMEWORK_RELEASE:{enabled,studentApi:'https://api.example/student'},fetch:()=>new Promise(r=>{resolveFetch=r;})};Object.assign(context,overrides);context.window=context;
 vm.createContext(context);vm.runInContext(code,context);
 const auth={currentUser:{uid:'student-a',getIdToken:async()=> 'opaque'},onAuthStateChanged(fn){listeners.push(fn);return()=>{};}};
 const ready=extra=>context.GiftedEbook.ready({auth,result:{studentName:'合成學生'},mode:'remembered_session',...extra});
@@ -67,4 +67,31 @@ test('Dashboard student preview prompts before formal actions, preserves cancell
  transport.activity();assert.equal(activity,1);
  const pending=transport.request({action:'submit'});await new Promise(setImmediate);f.resolveFetch();await pending;
  f.ui.close(true);await assert.rejects(transport.confirmWrite('submit'),/LOGIN_REQUIRED/);assert.throws(()=>transport.activity(),/LOGIN_REQUIRED/);
+});
+
+test('iPad without AbortSignal.timeout reads homework and releases its timeout',async()=>{
+ const timers=new Map();let signal;
+ const f=setup(true,true,{AbortSignal:{},setTimeout:(fn,ms)=>{assert.equal(ms,30000);timers.set(1,fn);return 1;},clearTimeout:id=>timers.delete(id),fetch:async(url,input)=>{signal=input.signal;return {ok:true,json:async()=>({loaded:true})};}});
+ f.ready();const transport=f.ui.getTransport(f.elements[0].children[1].contentWindow);
+ assert.equal((await transport.request({action:'task'})).loaded,true);
+ assert.equal(signal.aborted,false);assert.equal(timers.size,0);
+});
+test('homework request still aborts on timeout and cleans up after network failure',async()=>{
+ let expire,cleared=0;
+ const f=setup(true,true,{AbortSignal:{},setTimeout:fn=>{expire=fn;return 1;},clearTimeout:()=>cleared++,fetch:(url,input)=>new Promise((resolve,reject)=>input.signal.addEventListener('abort',()=>reject(new DOMException('Aborted','AbortError'))))});
+ f.ready();const pending=f.ui.getTransport(f.elements[0].children[1].contentWindow).request({action:'task'});
+ await new Promise(setImmediate);expire();await assert.rejects(pending,{name:'AbortError'});assert.equal(cleared,1);
+ f.context.fetch=async()=>{throw new TypeError('offline');};
+ await assert.rejects(f.ui.getTransport(f.elements[0].children[1].contentWindow).request({action:'task'}),/offline/);assert.equal(cleared,2);
+});
+
+test('standalone homework transport also supports browsers without AbortSignal.timeout',async()=>{
+ const source=fs.readFileSync(path.resolve(__dirname,'../../gifted/app.js'),'utf8');
+ const apiSource=source.slice(source.indexOf('async function api('),source.indexOf('const credential='));
+ let expire,cleared=0;
+ const ctx={AbortSignal:{},AbortController,setTimeout:fn=>{expire=fn;return 1;},clearTimeout:()=>cleared++,fetch:async()=>({ok:true,json:async()=>({loaded:true})})};
+ vm.createContext(ctx);vm.runInContext(apiSource,ctx);
+ assert.equal((await ctx.api('/api/student',{action:'task'},'synthetic-token')).loaded,true);assert.equal(cleared,1);
+ ctx.fetch=(url,input)=>new Promise((resolve,reject)=>input.signal.addEventListener('abort',()=>reject(new DOMException('Aborted','AbortError'))));
+ const pending=ctx.api('/api/student',{action:'task'},'synthetic-token');expire();await assert.rejects(pending,{name:'AbortError'});assert.equal(cleared,2);
 });
