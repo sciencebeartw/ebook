@@ -4992,6 +4992,21 @@
 <link rel="stylesheet" href="gifted_entry.css?v=20261010-auto-status">
   <link rel="stylesheet" href="ebook_resources.css?v=20261003_resources_mobile_type_v6">
   <link rel="stylesheet" href="ebook_push.css?v=20261015-preview1">
+    <script src="fastwrite_config.js?v=20261018"></script>
+    <script src="fastwrite_production_transport.js?v=20261018"></script>
+    <script src="fastwrite_message_bridge.js?v=20261018"></script>
+    <script src="fastwrite_realtime.js?v=20261018"></script>
+    <script src="fastwrite_ebook_realtime.js?v=20261018"></script>
+    <script src="fastwrite_grade_reader.js?v=20261018"></script>
+    <script src="fastwrite_grade_dom.js?v=20261018"></script>
+    <script src="fastwrite_ebook_grades.js?v=20261018"></script>
+    <script src="fastwrite_dashboard_score_bridge.js?v=20261018"></script>
+    <script src="fastwrite_god_score_bridge.js?v=20261018"></script>
+<script src="fastwrite_sticker_reader.js?v=20261019"></script>
+<script src="fastwrite_student_stickers.js?v=20261020"></script>
+<script src="fastwrite_ebook_stickers.js?v=20261019"></script>
+<script src="fastwrite_dashboard_stickers.js?v=20261019"></script>
+<script src="fastwrite_god_stickers.js?v=20261019"></script>
 </head>
 
 <body>
@@ -5082,6 +5097,68 @@
       return (prefix || "ebook_stable") + "_" + (h1 >>> 0).toString(36) + (h2 >>> 0).toString(36);
     }
 
+
+var productionMessageBridge;
+function getProductionMessageBridge() {
+ var scopes=window.MESSAGE_FASTWRITE_SCOPES;
+ if(!Array.isArray(scopes))throw Error('留言設定未載入，請重新整理');
+ if(!scopes.length)return null;
+ if(!productionMessageBridge)productionMessageBridge=window.MessageFastWriteBridge.create({scopes:scopes,storage:window.localStorage,
+  getUid:function(){return ebookFirebaseApp.auth().currentUser?.uid;},
+  getSessionId:function(){return ebookGodSessionId;},
+  callableFor:function(mode){return ebookFunctions.httpsCallable(mode==='student'?'runEbookStudentAction':mode==='god'?'runEbookGodAdminAction':'runEbookGasAdminAction',{timeout:30000});},
+  hash:async function(parts){return Array.from(new Uint8Array(await window.crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(parts))))).map(function(x){return x.toString(16).padStart(2,'0');}).join('');}
+ });return productionMessageBridge;
+}
+function productionMessageDate(raw) {
+ var m=String(raw||'').trim().match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);
+ if(!m)throw Error('留言日期不完整');return m[1]+'/'+m[2].padStart(2,'0')+'/'+m[3].padStart(2,'0');
+}
+function renderProductionMessageStatus(host) {
+ if(!host)return;var button=document.createElement('button');button.type='button';button.textContent='查核留言同步';button.style.cssText='display:block;margin-top:8px;min-height:44px;max-width:100%;white-space:normal';
+ var label=document.createElement('span');label.setAttribute('role','status');label.textContent=host.textContent;host.textContent='';host.appendChild(label);host.appendChild(button);
+ button.addEventListener('click',async function(){button.disabled=true;try{var b=getProductionMessageBridge();await b.checkReceipts();var count=Object.keys(b.receipts()).length;label.textContent=count?'還有 '+count+' 則留言同步待確認，不必重送。':'留言同步已確認。';button.hidden=!count;button.style.display=count?'block':'none';}catch(_){label.textContent='尚未確認同步，已儲存的留言不必重送。';}finally{button.disabled=false;}});
+}
+function productionEbookMessageInput(payload) {
+ var cls=payload.sourceClassName||payload.className||(gData&&gData.className)||'',student=payload.storedStudentKey||payload.studentKey||'';
+ if(!student&&gData){var keys=getStudentKeysForClass(gData.studentKeysByClassKey,safeKey(cls),cls===gData.className?gData.foundUserKey:'');if(keys.length===1)student=keys[0];}
+ if(!student)throw Error('找不到這個班級的學生對應，請重新開啟學生畫面');
+ return{subject:BEAR_SUBJECT.replace(/^\//,''),className:cls,studentKey:student,targetDate:productionMessageDate(payload.targetDate),content:payload.replyContent===undefined?payload.content:payload.replyContent,requestId:payload.clientRequestId,replyTo:payload.feedbackKey||payload.replyToFeedbackKey||''};
+}
+function mergeProductionMessageFeedback(node,context) {
+ window.rememberProductionMessageNativeFeedback(node);
+ var b=getProductionMessageBridge();if(!b||!context)return node;var pairs=Object.assign({},context.studentKeysByClassKey||{}),cls=context.className;
+ if(cls&&context.foundUserKey&&!pairs[safeKey(cls)])pairs[safeKey(cls)]=[context.foundUserKey];
+ var result=node||{};Object.keys(pairs).forEach(function(classKey){var ids=Array.isArray(pairs[classKey])?pairs[classKey]:[pairs[classKey]];ids.forEach(function(id){result=b.merge(classKey,id,result);});});return result;
+}
+
+async function sendProductionStudentReport(action,payload,send) {
+ var types=['作業上傳','缺考回報','補考回報','補考結果回報'];
+ var homework=['submitHomeworkDone','reportHomeworkPaper','unlockHolidayPractice','reportHolidayPractice'].indexOf(action)>=0;
+ if(!homework&&(action!=='submitFeedback'||types.indexOf(payload.type)<0))return send(payload);
+ var bridge=getProductionMessageBridge(),subject=BEAR_SUBJECT.replace(/^\//,'');
+ if(!bridge||!bridge.accepts(subject,payload.sourceClassName||payload.className||(gData&&gData.className)))return send(payload);
+ var content=Object.assign({},payload);delete content.clientRequestId;
+ var stable=function(v){if(Array.isArray(v))return v.map(stable);if(v&&typeof v==='object')return Object.fromEntries(Object.keys(v).sort().map(function(k){return[k,stable(v[k])];}));return v;};
+ var identity=homework?[subject,action,gData&&(gData.foundUserKey||gData.studentName),stable(content)]:[subject,stable(content)];
+ var fingerprint=Array.from(new Uint8Array(await window.crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(identity))))).map(function(x){return x.toString(16).padStart(2,'0');}).join('');
+ var key='ebook-student-report-pending-v1:'+fingerprint,storage=window.localStorage,prior=storage.getItem(key);
+ if(prior){if(!/^[A-Za-z0-9_-]{12,128}$/.test(prior))throw Error('回報收據格式異常，請先聯絡老師查核');payload.clientRequestId=prior;}
+ else{
+  var count=0;for(var i=0;i<storage.length;i++)if(String(storage.key(i)).indexOf('ebook-student-report-pending-v1:')===0)count++;
+  if(count>=32)throw Error('尚有回報等待確認，請先重新整理確認原回報');
+  storage.setItem(key,payload.clientRequestId);
+  if(storage.getItem(key)!==payload.clientRequestId)throw Error('無法保存本次回報識別碼，請確認瀏覽器儲存空間');
+ }
+ var result;
+ try {result=await send(payload);} catch(error) {
+  if(error&&error.details&&error.details.businessStatus==='rejected'&&error.details.reason==='student-report-reset'&&error.details.requestId===payload.clientRequestId)storage.removeItem(key);
+  throw error;
+ }
+ if(result&&result.data&&result.data.result&&result.data.result.success===true)storage.removeItem(key);
+ return result;
+}
+
     function doPostAction(action, data, onSuccess, onErr) {
       if (isDashboardDraftPreviewMode) {
         if (onErr) onErr(new Error("Dashboard 草稿預覽不允許寫入正式資料。"));
@@ -5094,7 +5171,15 @@
          payload.clientRequestId = pendingEbookRequestIds[requestFingerprint] || createClientRequestId(action);
          pendingEbookRequestIds[requestFingerprint] = payload.clientRequestId;
       }
-      ebookFunctions.httpsCallable("runEbookStudentAction", { timeout: 180000 })({ action: action, data: payload })
+      function sendLegacyMessageAction(){return sendProductionStudentReport(action,payload,function(p){return ebookFunctions.httpsCallable("runEbookStudentAction", { timeout: 180000 })({action:action,data:p});});}
+      Promise.resolve().then(function(){
+       var sticker=window.handleProductionStudentSticker?.(action,payload);
+       if(sticker)return sticker.promise.then(function(r){return r.authority==='legacy'?sendLegacyMessageAction():{data:{result:r}};});
+       var b=action==='submitFeedback'&&payload.type==='學生留言'?getProductionMessageBridge():null;
+       if(b&&!b.accepts(BEAR_SUBJECT.replace(/^\//,''),payload.sourceClassName||payload.className||(gData&&gData.className)))b=null;
+       var fast=b?b.handle('student',productionEbookMessageInput(payload)):null;
+       return fast?fast.promise.then(function(r){if(r.authority==='legacy'){payload.replyToFeedbackKey=r.replyToFeedbackKey||'';return sendLegacyMessageAction();}return{data:{result:r}};}):sendLegacyMessageAction();
+      })
       .then(function(callResult) {
          var result = callResult && callResult.data ? callResult.data.result : null;
          if (result && result.success === true) delete pendingEbookRequestIds[requestFingerprint];
@@ -5767,12 +5852,14 @@
     }
 
     function getVerifiedStoredGradeExamId(grade, colKey, classKey, examIdByColKey, examCatalogEntriesByClassKey) {
-        var candidateId = (examIdByColKey || {})[colKey] || "";
+        var pinnedExamId = grade && grade.fastWriteExamId;
+        var candidateId = pinnedExamId || (examIdByColKey || {})[colKey] || "";
+        if(typeof candidateId!=="string" || candidateId.length>180)return "";
         if (!candidateId) return "";
         var classEntries = (examCatalogEntriesByClassKey || {})[classKey] || {};
-        var entry = classEntries[candidateId];
+        var entry = Object.prototype.hasOwnProperty.call(classEntries,candidateId) ? classEntries[candidateId] : null;
         if (!entry) return "";
-        if (entry.colKey && String(entry.colKey) !== String(colKey)) return "";
+        if (!pinnedExamId && entry.colKey && String(entry.colKey) !== String(colKey)) return "";
         var gradeDate = normalizeEbookExamLookupText(grade && grade.date || "");
         var entryDate = normalizeEbookExamLookupText(entry.date || "");
         if (gradeDate && entryDate && gradeDate !== entryDate) return "";
@@ -5946,13 +6033,15 @@
         var className = options.className || options.currentClassName || "";
         var fullGradeList = [];
         for (let col in (examsObj || {})) {
-            const rawData = examsObj[col] || {};
+            const nativeData = examsObj[col] || {};
+            var verifiedNativeExamId=getVerifiedStoredGradeExamId(nativeData,col,classKey,options.examIdByColKey||{},options.examCatalogEntriesByClassKey||{});
+            const rawData = window.overlayProductionGrade(nativeData,classKey,nativeData.sourceStudentKey,verifiedNativeExamId);
             if (!GiftedAssignmentVisibility.visible(rawData, options.dailyPosts || {}, classKey)) continue;
             const eData = Object.assign({}, rawData, {
                 dist: Array.isArray(rawData.dist) ? rawData.dist.slice() : rawData.dist,
                 labels: Array.isArray(rawData.labels) ? rawData.labels.slice() : rawData.labels
             });
-            var storedExamIdForAnchor = (options.examIdByColKey || {})[col] || "";
+            var storedExamIdForAnchor = verifiedNativeExamId;
             var stableDateAnchors = storedExamIdForAnchor && (options.dateAnchorKeysByExamId || {})[storedExamIdForAnchor] || [];
             var gradeDateAnchorKeys = stableDateAnchors.length ? stableDateAnchors : (options.dateAnchorKeys || []);
             if (!shouldIncludeTransferGrade(classKey, currentClassKey, eData, transferIndex, transferChain, options.promotionContext, gradeDateAnchorKeys)) continue;
@@ -6419,7 +6508,8 @@
             : '';
     }
 
-    function buildFeedbackHistoryList(fbsObj) {
+    function buildFeedbackHistoryList(fbsObj, fastWriteContext) {
+        fbsObj=mergeProductionMessageFeedback(fbsObj,fastWriteContext);
         var list = [];
         for (let fbid in (fbsObj || {})) {
             const fb = fbsObj[fbid];
@@ -6450,6 +6540,7 @@
                 isTransferFormerClass: fb.isTransferFormerClass === true
             });
         }
+        list=window.overlayProductionStickerHistory(list,fastWriteContext);
         return list.sort(function(a, b) {
             var tA = new Date(a.time).getTime() || 0;
             var tB = new Date(b.time).getTime() || 0;
@@ -6866,11 +6957,11 @@
             // Fetch Feedbacks
             if (result.trackedClassKeys.length > 1) {
                 result.cohortFeedbackRoot = await loadClassStudentNodeMapByKeys(`${BEAR_SUBJECT}/feedbacks`, result.trackedClassKeys, result.studentKeysByClassKey, foundUserKey);
-                result.feedbackHistory = buildFeedbackHistoryList(mergeStudentChildNodeByKeys(result.cohortFeedbackRoot, result.trackedClassKeys, foundUserKey, result.studentTransferIndex, result.className, safeC, result.studentTransferChain, result.classNameByKey, result.studentKeysByClassKey));
+                result.feedbackHistory = buildFeedbackHistoryList(mergeStudentChildNodeByKeys(result.cohortFeedbackRoot, result.trackedClassKeys, foundUserKey, result.studentTransferIndex, result.className, safeC, result.studentTransferChain, result.classNameByKey, result.studentKeysByClassKey), result);
             } else {
                 const snapF = await db.ref(`${BEAR_SUBJECT}/feedbacks/${safeC}/${foundUserKey}`).once('value');
                 result.cohortFeedbackRoot = null;
-                result.feedbackHistory = buildFeedbackHistoryList(snapF.val() || {});
+                result.feedbackHistory = buildFeedbackHistoryList(snapF.val() || {}, result);
             }
 
             try {
@@ -8470,6 +8561,10 @@
 
         // ★★★ 即時監聽生命週期管理 ★★★
         function clearRealtimeListeners() {
+            window.stopProductionStickerWatch();
+            window.stopProductionGradeWatches();
+            window.rebuildProductionGradeView=null;
+            window.stopProductionMessageWatches();
             activeRealtimeListeners.forEach(function(item) {
                 try {
                     item.ref.off('value', item.handler);
@@ -9101,7 +9196,7 @@
             document.getElementById('headClass').innerText = getEbookClassTitle(result.className);
             var initStickerCount = result.stickers || 0; // fallback if FB not ready
             document.getElementById('headStickers').style.display = 'inline-flex';
-            document.getElementById('headStickerCount').innerText = initStickerCount;
+            document.getElementById('headStickerCount').innerText = window.overlayProductionStickerBalance(initStickerCount,result);
             
             // ★即時監聽系統
             try {
@@ -9142,9 +9237,10 @@
 
                     // 1. 棒卡數監聽
                     watchRealtimeValue(BEAR_SUBJECT + '/students/' + safeC + '/' + studentKey + '/stickers', function(snap) {
-                        document.getElementById('headStickerCount').innerText = snap.val() || 0;
+                        document.getElementById('headStickerCount').innerText = window.overlayProductionStickerBalance(snap.val() || 0,gData);
                     });
 
+                    window.syncProductionStickerWatch();
                     // 2. 留言回報監聽 (包含審核狀態與老師回覆)
                     trackedClassKeys.forEach(function(classKey) {
                         getStudentKeysForClass(studentKeysByClassKey, classKey, studentKey).forEach(function(scopedStudentKey) {
@@ -9154,9 +9250,9 @@
                                     if (!gData.cohortFeedbackRoot) gData.cohortFeedbackRoot = {};
                                     if (!gData.cohortFeedbackRoot[classKey]) gData.cohortFeedbackRoot[classKey] = {};
                                     gData.cohortFeedbackRoot[classKey][scopedStudentKey] = fbsObj;
-                                    gData.feedbackHistory = buildFeedbackHistoryList(mergeStudentChildNodeByKeys(gData.cohortFeedbackRoot, trackedClassKeys, studentKey, gData.studentTransferIndex || {}, gData.className, safeC, gData.studentTransferChain, gData.classNameByKey, studentKeysByClassKey));
+                                    gData.feedbackHistory = buildFeedbackHistoryList(mergeStudentChildNodeByKeys(gData.cohortFeedbackRoot, trackedClassKeys, studentKey, gData.studentTransferIndex || {}, gData.className, safeC, gData.studentTransferChain, gData.classNameByKey, studentKeysByClassKey), gData);
                                 } else {
-                                    gData.feedbackHistory = buildFeedbackHistoryList(fbsObj);
+                                    gData.feedbackHistory = buildFeedbackHistoryList(fbsObj, gData);
                                 }
                                 // 重新渲染聯絡簿區塊，確保狀態即時更新
                                 renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
@@ -9224,7 +9320,7 @@
                     }
 
                     // 4. 成績資料監聽 (近期成績更新，含轉班前原班成績)
-                    function rebuildGradesFromScopedSources() {
+                    function rebuildGradesFromScopedSources(fastWriteGradesOnly) {
                         gData.gradeDateAnchorKeys = collectGradeDateAnchorKeys(
                             gData.dailyPostSourceRoot || gData.dailyPost || [],
                             gData.cohortGradeExamRoot || {},
@@ -9254,15 +9350,16 @@
                             gData.studentEnrollmentIndex || {},
                             trackedClassKeys
                         );
-                        renderOldGradeCards(gData.grades);
+                        renderOldGradeCards(gData.grades,fastWriteGradesOnly);
 
                         // 當成績更新時，也必須重新映射給聯絡簿，否則聯絡簿會顯示舊的或遺失的成績 ref
                         if (gData.dailyPost) {
                             remapDailyPostGrades();
-                            renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
+                            renderDailyPosts(gData.dailyPost, gData.feedbackHistory,fastWriteGradesOnly?'grades':false);
                         }
                         schedulePendingTasksRecompute();
                     }
+                    window.rebuildProductionGradeView=function(){rebuildGradesFromScopedSources(true);};
                     trackedGradeClassKeys.forEach(function(classKey) {
                         getStudentKeysForClass(studentKeysByClassKey, classKey, studentKey).forEach(function(scopedStudentKey) {
                             watchRealtimeValue(BEAR_SUBJECT + '/grades/' + classKey + '/' + scopedStudentKey + '/exams', function(snap) {
@@ -10619,7 +10716,7 @@
                 swalAlert('已送出', '留言與附件已一起送出。', 'success');
             } catch (err) {
                 if (status) status.innerText = feedbackSubmitStarted
-                    ? '留言送出失敗，附件仍保留，可直接重試。'
+                    ? '尚未確認送出結果，內容及附件仍保留；請用原內容重試查核。'
                     : '附件上傳失敗：' + getUploadErrorText(err);
                 if (!feedbackSubmitStarted) swalAlert('附件上傳失敗', getUploadErrorText(err), 'warning');
             } finally {
@@ -11511,7 +11608,7 @@
             }
             if (canUseAdminModeReview() && shouldShowGodMakeupReview(exam, logic)) {
                 var makeupContextKey = makeDomSafeId("makeup_" + safeDate + "_" + (exam.colIndex || 0));
-                window.adminModeMakeupContext[makeupContextKey] = { className: gData.className, studentName: gData.studentName, targetDate: post.date, sourceClassName: post.storedClassName || post.sourceClassName || gData.className, storedStudentKey: exam.sourceStudentKey || post.sourceStudentKey || "", gradeClassName: exam.storedClassName || gData.className, gradeClassKey: exam.storedClassKey || "", examColIndex: exam.colIndex, title: exam.exam || "", targetExamId: exam.storedExamId || exam.examId || exam.targetExamId || "", currentColor: exam.cellColor || "", scoreReview: getLatestMakeupReportInfo(exam, history), resultReview: getLatestMakeupResultReportInfo(exam, history) };
+                window.adminModeMakeupContext[makeupContextKey] = { className: gData.className, studentName: gData.studentName, targetDate: post.date, sourceClassName: post.storedClassName || post.sourceClassName || gData.className, storedStudentKey: exam.sourceStudentKey || post.sourceStudentKey || "", gradeClassName: exam.storedClassName || gData.className, gradeClassKey: exam.storedClassKey || "", examColIndex: exam.colIndex, title: exam.exam || "", targetExamId: exam.storedExamId || exam.examId || exam.targetExamId || "", currentScore: String(exam.score == null ? "" : exam.score).trim(), currentColor: exam.cellColor || "", scoreReview: getLatestMakeupReportInfo(exam, history), resultReview: getLatestMakeupResultReportInfo(exam, history) };
                 scoreReportHtml += buildGodMakeupReviewBox(makeupContextKey, exam, logic);
             }
             var chartHtml = "";
@@ -11581,15 +11678,16 @@
             return "<div class='grade-section'" + pendingExamAttrs + "><div class='main-exam-title'>" + examTitle + "</div><div class='main-exam-range'>" + buildAssessmentTitleHtml(exam.exam, exam.className || post.storedClassName || post.className || (gData && gData.className)) + "</div><div class='main-score'>" + scoreDisplay + "</div>" + logic.statusHtml + "<div class='score-sub'>班平均: " + exam.average + "</div>" + standardHtml + scoreReportHtml + chartHtml + refHwHtml + "</div>";
         }
 
-        function renderDailyPosts(posts, history) {
-            window.adminModeReplyContext = {};
-            window.adminModeStickerContext = {};
-            window.adminModeStickerAdjustmentContext = {};
-            window.adminModeMakeupContext = {};
+        function renderDailyPosts(posts, history, fastWriteHistoryOnly) {
+            var fastWritePreviousScoreContexts=Object.assign({},window.adminModeScoreEditContext||{});var fastWritePreviousMakeupContexts=Object.assign({},window.adminModeMakeupContext||{});
+            if(!fastWriteHistoryOnly) window.adminModeReplyContext = {};
+            if(!fastWriteHistoryOnly) window.adminModeStickerContext = {};
+            if(!fastWriteHistoryOnly) window.adminModeStickerAdjustmentContext = {};
+            if(!fastWriteHistoryOnly) window.adminModeMakeupContext = {};
             window.adminModeScoreEditContext = window.adminModeScoreEditContext || {};
-            window.adminModeDirectMessageContext = {};
-            studentFeedbackComposerContexts = {};
-            ebookFeedbackThreadDomContext = {};
+            if(!fastWriteHistoryOnly) window.adminModeDirectMessageContext = {};
+            if(!fastWriteHistoryOnly) studentFeedbackComposerContexts = {};
+            if(!fastWriteHistoryOnly) ebookFeedbackThreadDomContext = {};
             function getPostScopedHistory(postData) {
                 var postSourceClassKey = postData.sourceClassKey || "";
                 return (history || []).filter(function(h) {
@@ -11661,7 +11759,7 @@
                             var quotedStickerBadgeStyle = quotedStickerPenalty
                                 ? 'background:linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);'
                                 : 'background:linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);';
-                            var rendered = `<div style="font-weight:bold; font-size:1.1rem; color:#431407; margin-bottom:4px;">${quotedStickerIcon}${d.reason} <span style="${quotedStickerBadgeStyle} color:white; padding:2px 8px; border-radius:12px; font-size:0.9rem;">${formatStickerCountText(d.count)}</span></div><div style="font-weight:bold; color:${statusColor}; font-size:0.95rem; background:rgba(255,255,255,0.7); display:inline-block; padding:2px 8px; border-radius:4px; margin-top:4px;">${statusIcon} ${quotedStickerStatus}</div>`;
+                            var rendered = `<div style="font-weight:bold; font-size:1.1rem; color:#431407; margin-bottom:4px;">${quotedStickerIcon}${escapeHtml(d.reason)} <span style="${quotedStickerBadgeStyle} color:white; padding:2px 8px; border-radius:12px; font-size:0.9rem;">${formatStickerCountText(d.count)}</span></div><div style="font-weight:bold; color:${statusColor}; font-size:0.95rem; background:rgba(255,255,255,0.7); display:inline-block; padding:2px 8px; border-radius:4px; margin-top:4px;">${statusIcon} ${quotedStickerStatus}</div>`;
                             return `<div class="quote-box" style="background:#fef3c7; border-left:4px solid #f59e0b; border-radius:8px; padding:12px; margin:10px 0; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
                                       <div class="quote-content">${rendered}</div>
                                     </div>`;
@@ -12226,7 +12324,22 @@
                     : uploadHtml;
                 var feedbackHtml = "<div class='feedback-section'>" + learningReportHtml + "<div class='section-title'>" + SVG.chat + "留言內容</div><div id='history-" + safeDateId + "'>" + historyHtml + "</div>" + godStickerAdjustmentHtml + adminDirectHtml + studentInputHtml + "</div>"; var headerTitle = buildDailyPostHeaderTitle(post, SVG.calendar); var sessionBadge = buildDailyPostSessionBadge(post); var transferBadge = post.isTransferFormerClass ? "<span class='post-transfer-badge'>轉班前紀錄｜" + escapeHtml(post.sourceClassName || "原班") + "</span>" : ""; var pendingPostAttrs = " data-pending-post-anchor='1' data-post-id='" + escapeHtmlAttr(post.dailyPostId || post.id || '') + "' data-source-class-key='" + escapeHtmlAttr(post.sourceClassKey || post.storedClassKey || '') + "' data-stored-class-key='" + escapeHtmlAttr(post.storedClassKey || '') + "' data-post-date='" + escapeHtmlAttr(post.date || '') + "'"; html += "<div class='post-card-wrapper'" + pendingPostAttrs + "><div class='post-card'><div class='post-header'><span class='post-header-main'>" + headerTitle + sessionBadge + transferBadge + "</span></div>" + gradeHtml + "<div class='content-section'><div class='section-title'>" + SVG.megaphone + "聯絡事項</div>" + contentHtml + supplementalInfoHtml + "</div>" + feedbackHtml + "</div></div>";
 
-            }); container.innerHTML = html;
+            });
+            if(fastWriteHistoryOnly==='grades'){window.replaceProductionGradeCards(container,html,'.grade-section[data-pending-exam-anchor]',fastWritePreviousScoreContexts,fastWritePreviousMakeupContexts);window.syncProductionVisibleGradeWatches();return;}
+            if(fastWriteHistoryOnly){
+                var fragment=document.createElement('template');fragment.innerHTML=html;
+                var freshCards=fragment.content.querySelectorAll('.post-card-wrapper');
+                container.querySelectorAll('.post-card-wrapper').forEach(function(card){
+                    var fresh=Array.from(freshCards).find(function(n){return n.dataset.postDate===card.dataset.postDate&&n.dataset.sourceClassKey===card.dataset.sourceClassKey&&n.dataset.storedClassKey===card.dataset.storedClassKey;});
+                    var oldHistory=card.querySelector('[id^="history-"]'),newHistory=fresh&&fresh.querySelector('[id^="history-"]');if(!oldHistory||!newHistory)return;
+                    var editing=oldHistory.contains(document.activeElement)||Array.from(oldHistory.querySelectorAll('textarea,input:not([type="hidden"])')).some(function(n){return !!n.value;});
+                    if(editing){var note=card.querySelector('.fastwrite-new-message-note');if(!note){note=document.createElement('p');note.className='fastwrite-new-message-note';note.setAttribute('role','status');oldHistory.insertAdjacentElement('beforebegin',note);}note.textContent='有新留言，完成目前輸入後重新整理即可查看。';return;}
+                    oldHistory.innerHTML=newHistory.innerHTML;var previousNote=card.querySelector('.fastwrite-new-message-note');if(previousNote)previousNote.remove();
+                });return;
+            }
+            container.innerHTML = html;
+            window.syncProductionVisibleMessageWatches();
+            window.syncProductionVisibleGradeWatches();
 
             posts.forEach(function(post) {
                 if (isAdminMode || isDashboardDraftPreviewMode || post.isTransferFormerClass) return;
@@ -12257,7 +12370,8 @@
     
         }
 
-        function renderOldGradeCards(grades) {
+        function renderOldGradeCards(grades,fastWriteGradesOnly) {
+            var fastWritePreviousScoreContexts=Object.assign({},window.adminModeScoreEditContext||{});var fastWritePreviousMakeupContexts=Object.assign({},window.adminModeMakeupContext||{});
             window.adminModeScoreEditContext = window.adminModeScoreEditContext || {};
             var container = document.getElementById('tab-content-1'); if (!grades || grades.length === 0) { container.innerHTML = "<p style='color:#666; padding:10px;'>目前尚無成績紀錄。</p>"; return; } var html = ""; grades.forEach(function (item) {
                 var chartDistribution = EbookScoreDistribution.forDisplay(item);
@@ -12334,7 +12448,9 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             <div class='click-hint'>▼</div>
         </div>`;
             });
+            if(fastWriteGradesOnly){window.replaceProductionGradeCards(container,html,'.score-card[data-pending-exam-anchor]',fastWritePreviousScoreContexts,fastWritePreviousMakeupContexts);window.syncProductionVisibleGradeWatches();return;}
             container.innerHTML = html;
+            window.syncProductionVisibleGradeWatches();
 
             var observer = new IntersectionObserver(function(entries, obs) {
                 entries.forEach(function(entry) {
@@ -12714,7 +12830,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 if (customEl) { customEl.value = ''; customEl.style.display = 'none'; }
                 clearEbookSubmitLoading(submitBtn, "送出申請");
                 
-                alert("棒卡申請已送出！請等待老師審核。");
+                swalAlert("棒卡申請已儲存", "請等待老師審核。", "success");
             }).withFailureHandler(function(e) {
                 swalAlert('棒卡申請送出失敗', friendlySubmitError(e), 'warning');
                 clearEbookSubmitLoading(submitBtn, "送出申請");
@@ -12848,7 +12964,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }
             if (parseInt(count) > 0) count = "-" + count; // Ensure it's negative
             
-            if (!confirm("確定要送出此改進申報？送出後將於審核通過扣除棒數。")) return;
+            if (!(await swalConfirm("送出改進申報", "審核通過後才會扣除棒數。"))) return;
             
             setEbookSubmitLoading(submitBtn, "送出中");
 
@@ -12872,7 +12988,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 if (selEl) { selEl.selectedIndex = 0; }
                 if (customEl) { customEl.value = ''; customEl.style.display = 'none'; }
                 clearEbookSubmitLoading(submitBtn, "送出反省");
-                alert("改進申報已送出！勇敢面對是成長的開始。");
+                swalAlert("改進申報已儲存", "請等待老師審核。", "success");
             }).withFailureHandler(function(e) {
                 swalAlert('申報送出失敗', friendlySubmitError(e), 'warning');
                 clearEbookSubmitLoading(submitBtn, "送出反省");
@@ -12928,7 +13044,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 }
                 if (callback) callback();
             }).withFailureHandler(function (e) {
-                swalAlert("送出失敗", friendlySubmitError(e), 'warning');
+                swalAlert("留言結果待確認", "請保留原內容再重試查核。" + friendlySubmitError(e), 'warning');
                 clearEbookSubmitLoading(btn, submitLabel);
                 if (failureCallback) failureCallback(e);
             }).submitFeedback(form);
@@ -13611,7 +13727,9 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         }
 
         function getGodSessionCallable(name) {
-            return ebookFunctions.httpsCallable(name, name === 'runEbookGodAdminAction' ? { timeout: 180000 } : undefined);
+            var original=ebookFunctions.httpsCallable(name, name === 'runEbookGodAdminAction' ? { timeout: 180000 } : undefined);
+            if(name!=='sendEbookGodDirectMessage'&&name!=='sendEbookGodReply')return original;
+            return function(payload){return Promise.resolve().then(function(){var b=getProductionMessageBridge();if(b&&!b.accepts(BEAR_SUBJECT.replace(/^\//,''),payload.sourceClassName||payload.className||(gData&&gData.className)))b=null;var fast=b?b.handle('god',productionEbookMessageInput(payload)):null;return fast?fast.promise.then(function(r){if(r.authority==='legacy'){if(name==='sendEbookGodReply')payload.feedbackKey=r.replyToFeedbackKey||'';return original(payload);}return{data:r};}):original(payload);});};
         }
 
         function markEbookGodSessionActivity() {
@@ -13638,7 +13756,15 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             }
             if (ebookGodSessionInfo && ebookGodSessionInfo.firebaseCustomToken) {
                 await ebookAuth.setPersistence(firebase.auth.Auth.Persistence.NONE);
+                window.stopProductionMessageWatches?.();
+                window.stopProductionStickerWatch?.();
+                window.stopProductionGradeWatches?.();
                 await ebookAuth.signInWithCustomToken(ebookGodSessionInfo.firebaseCustomToken);
+                if (!document.hidden) {
+                    window.syncProductionVisibleMessageWatches?.();
+                    window.syncProductionStickerWatch?.();
+                    window.syncProductionVisibleGradeWatches?.();
+                }
             }
             ebookAuthSessionInfo = ebookGodSessionInfo;
             ebookGodSessionLastRenewAt = now;
@@ -13953,7 +14079,45 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 "</div>";
         }
 
+
+var productionGodScoreBridge;
+function getProductionGodScoreBridge(){
+ if(!Array.isArray(window.DASHBOARD_FASTWRITE_SCOPES))throw Error('極速設定未載入，請重新整理');if(!window.DASHBOARD_FASTWRITE_SCOPES.length||BEAR_SUBJECT.replace(/^\//,'')!=='science')return null;
+ if(!productionGodScoreBridge)productionGodScoreBridge=window.ProductionGodScoreBridge.create({scopes:window.DASHBOARD_FASTWRITE_SCOPES,storage:localStorage,
+  getIdentity:function(){return{uid:ebookFirebaseApp.auth().currentUser?.uid,sessionId:ebookGodSessionId};},
+  callable:function(input){return ebookFunctions.httpsCallable('runEbookGodAdminAction',{timeout:30000})(input);},
+  hash:async function(parts){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(parts))))).map(function(n){return n.toString(16).padStart(2,'0');}).join('');},
+  studentKeyFor:function(route,p){if(p.storedStudentKey&&(!p.feedbackId||route.className===p.sourceClassName))return p.storedStudentKey;var ids=getStudentKeysForClass(gData.studentKeysByClassKey,route.classKey,route.className===gData.className?gData.foundUserKey:'');return ids.length===1?ids[0]:'';}
+ });return productionGodScoreBridge;
+}
+function renderProductionGodScoreReceipt(status){
+ if(!status)return;var label=document.createElement('span');label.textContent=status.textContent;label.setAttribute('role','status');var button=document.createElement('button');button.type='button';button.textContent='查核試算表回填';button.style.cssText='display:block;min-height:44px;margin-top:6px';status.replaceChildren(label,button);
+ button.addEventListener('click',async function(){button.disabled=true;try{var remaining=await getProductionGodScoreBridge().checkReceipts();label.textContent=remaining?'還有 '+remaining+' 筆回填待確認，已儲存的分數不必重送。':'試算表回填已確認。';if(!remaining)button.remove();}catch(_){label.textContent='回填尚未確認，請稍後查核，分數不必重送。';}finally{button.disabled=false;}});
+}
+
+
+var productionGodStickerBridge;
+function productionGodStickerContext(){return{uid:ebookFirebaseApp.auth().currentUser?.uid,sessionId:ebookGodSessionId,className:gData.className,studentKey:gData.foundUserKey,studentName:gData.studentName};}
+function getProductionGodStickerBridge(){
+ if(!Array.isArray(window.DASHBOARD_FASTWRITE_SCOPES))throw Error('極速設定未載入，請重新整理');if(!window.DASHBOARD_FASTWRITE_SCOPES.length||BEAR_SUBJECT!=='/science')return null;
+ var identity=JSON.stringify(productionGodStickerContext());if(!productionGodStickerBridge||productionGodStickerBridge.identity!==identity)productionGodStickerBridge=window.ProductionGodStickerBridge.create({scopes:window.DASHBOARD_FASTWRITE_SCOPES,storage:localStorage,getContext:productionGodStickerContext,
+  callable:function(q){return getGodSessionCallable('runEbookGodAdminAction')(q);},
+  hash:async function(value){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(value))))).map(function(x){return x.toString(16).padStart(2,'0');}).join('');},
+  onBalance:function(route,key,balance,revision){window.confirmProductionStickerBalance(balance,revision);}
+ });return productionGodStickerBridge;
+}
+function renderProductionGodStickerReceipt(anchor){
+ if(!anchor)return;var b;try{b=getProductionGodStickerBridge();}catch(_){return;}if(!b)return;var panel=anchor.querySelector('.fastwrite-god-sticker-receipt');if(!panel){panel=document.createElement('div');panel.className='fastwrite-god-sticker-receipt';panel.style.cssText='overflow-wrap:anywhere;font-size:.9rem';var label=document.createElement('span');label.setAttribute('role','status');panel.append(label);var button=document.createElement('button');button.type='button';button.textContent='查核棒卡儲存';button.style.cssText='display:block;min-height:44px;margin-top:6px';button.addEventListener('click',async function(){button.disabled=true;try{await b.checkReceipts();renderProductionGodStickerReceipt(anchor);}catch(_){label.textContent='結果仍待確認，請保留原輸入，稍後再查核。';}finally{button.disabled=false;}});panel.append(button);anchor.append(panel);}
+ var pending=Object.keys(b.pendingIndex()).length,receipts=Object.keys(b.receipts()).length;panel.firstChild.textContent=pending?'儲存結果待確認，請先查核。':receipts?'棒卡已儲存，試算表背景同步中。':'本機追蹤的棒卡回填已確認。';panel.lastChild.hidden=!pending&&!receipts;
+}
+
         async function runGodAdminAction(action, data) {
+            if(action==='approveStickerGas'||action==='writeStickerAdjustmentGas'){
+                var stickerBridge=getProductionGodStickerBridge(),sticker=stickerBridge&&stickerBridge.handle(action,data||{},BEAR_SUBJECT.replace(/^\//,''));
+                if(sticker){var savedSticker=await sticker.promise;if(savedSticker.authority!=='legacy')return savedSticker;}
+            }
+            var fastBridge=getProductionGodScoreBridge(),fast=fastBridge&&fastBridge.handle(action,data||{});
+            if(fast){var answer=await fast.promise;if(answer.authority!=='legacy')return answer;}
             var fn = getGodSessionCallable('runEbookGodAdminAction');
             var result = await fn({
                 sessionId: ebookGodSessionId,
@@ -14001,7 +14165,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
 
             var confirmText = gData.studentName + '｜' + context.targetDate + '｜' + context.title +
                 '\n\n原分數：' + getGodScoreHumanLabel(context.currentScore) + '\n新分數：' + getGodScoreHumanLabel(nextScore) +
-                '\n\n確定要覆寫 Google Sheet 的這一格嗎？';
+                '\n\n確定要修改這筆成績嗎？';
             var ok = await swalConfirm('確認修改分數', confirmText);
             if (!ok) return;
 
@@ -14012,7 +14176,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             if (btn) btn.innerText = '修改中...';
             if (status) {
                 status.style.color = '#64748b';
-                status.innerText = '正在比對原分數並寫入單一儲存格...';
+                status.innerText = '正在核對原分數並儲存...';
             }
             try {
                 var requestId = createStableEbookRequestId('god-score-edit', [
@@ -14047,7 +14211,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 context.currentScore = nextScore;
                 context.currentNumericScore = nextNumericScore;
                 context.hasAbsenceMarker = keepAbsenceMarker;
-                if (input) input.value = nextNumericScore;
+                if (input) { input.value = nextNumericScore; input.defaultValue = nextNumericScore; } if(absenceInput)absenceInput.defaultChecked=keepAbsenceMarker;
                 var box = btn ? (btn.closest('.grade-section') || btn.closest('.score-card')) : null;
                 var scoreNode = box ? box.querySelector('.main-score > span:first-child') : null;
                 if (scoreNode) scoreNode.textContent = nextNumericScore;
@@ -14071,16 +14235,17 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     var isReplay = gasResult.idempotentReplay === true;
                     var firebaseSynced = gasResult.firebaseSynced === true;
                     status.style.color = (isReplay || firebaseSynced) ? '#16a34a' : '#b45309';
-                    status.innerText = isReplay
+                    status.innerText = gasResult.storage==='firebase' ? '成績已儲存，試算表背景同步中，不必重送。' : isReplay
                         ? '已確認先前的修改完成，分數為 ' + getGodScoreHumanLabel(nextScore) + '。'
                         : (firebaseSynced
                             ? '已修改為 ' + getGodScoreHumanLabel(nextScore) + '，並完成單欄雲端同步。'
                             : 'Google Sheet 已修改為 ' + getGodScoreHumanLabel(nextScore) + '；系統正在背景補上雲端顯示，可繼續處理其他學生。');
+                    if(gasResult.storage==='firebase'){renderProductionGodScoreReceipt(status);if(box){box.querySelectorAll('.avg-score,.score-sub').forEach(function(n){n.textContent='班平均：更新中';});box.querySelectorAll('.v2-bar-chart-container').forEach(function(n){n.hidden=true;});var updateNote=box.querySelector('.fastwrite-grade-update-note');if(updateNote)updateNote.remove();}}
                 }
             } catch (err) {
                 if (status) {
                     status.style.color = '#dc2626';
-                    status.innerText = '修改失敗：' + (err && err.message ? err.message : String(err));
+                    status.innerText = '修改結果待確認；請保留原輸入再重試查核：' + (err && err.message ? err.message : String(err));
                 }
             } finally {
                 controls.forEach(function(el) { el.disabled = false; });
@@ -14092,6 +14257,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
 
         function rememberAdminFeedbackJobForDashboard(callableResult) {
             var data = callableResult && callableResult.data ? callableResult.data : {};
+            if(data.businessStatus==='committed'&&data.storage==='firebase'&&data.fastWriteReceipt)return{data:data,browserIndexSaved:true};
             var jobId = (data.jobId || '').toString();
             if (!data.success || !/^ebook_feedback_[a-f0-9]{40}$/.test(jobId)) {
                 throw new Error('伺服器沒有建立留言背景工作');
@@ -14155,11 +14321,12 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 }
                 if (input) input.value = '';
                 clearAdminModeAttachmentDraft(contextKey, true);
-                if (status) status.innerText = queuedJobResult.browserIndexSaved
+                if(status&&queuedJob.storage==='firebase'){status.innerText='留言已儲存，背景同步中，不必重送。';renderProductionMessageStatus(status);}
+                else if (status) status.innerText = queuedJobResult.browserIndexSaved
                     ? '已排入後端佇列，可安全離開；回到 Dashboard 後可在工作中心查看進度。'
                     : '已排入後端佇列，工作會繼續；但此瀏覽器無法保存進度索引，返回 Dashboard 後可能無法自動顯示。';
                 if (btn) {
-                    btn.innerText = '已排入佇列';
+                    btn.innerText = queuedJob.storage==='firebase'?'已儲存':'已排入佇列';
                     btn.style.background = 'var(--primary)';
                 }
             } catch (err) {
@@ -14167,8 +14334,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     btn.disabled = false;
                     btn.innerText = '送出';
                 }
-                if (status) status.innerText = '送出失敗，附件仍保留，可直接重試。';
-                swalAlert('留言或附件送出失敗', '學生端尚未收到。' + (err && err.message ? ' ' + err.message : ''), 'error');
+                if (status) status.innerText = '尚未確認送出結果，內容及附件仍保留；請用原內容重試查核。';
+                swalAlert('留言結果待確認', '請保留原內容及附件，重試會先查核原收據。' + (err && err.message ? ' ' + err.message : ''), 'error');
             }
         }
 
@@ -14289,7 +14456,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             if (status) status.textContent = '寫入中...';
             try {
                 context.requestId = context.requestId || createClientRequestId('sticker_adjust');
-                await runGodAdminAction('writeStickerAdjustmentGas', {
+                var stickerResult = await runGodAdminAction('writeStickerAdjustmentGas', {
                     className: gData.className,
                     studentName: gData.studentName,
                     targetDate: context.targetDate,
@@ -14302,11 +14469,13 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 });
                 if (status) status.textContent = '已完成：' + adjustment.reason + ' ' + formatStickerCountText(adjustment.count);
                 if (btn) btn.innerText = '已完成';
+                if(stickerResult.storage==='firebase')renderProductionGodStickerReceipt(status);
             } catch (err) {
                 buttons.forEach(function(button) { button.disabled = false; });
                 if (btn) btn.innerText = originalText;
                 if (status) status.textContent = '';
-                swalAlert('棒卡調整失敗', 'Google Sheet 寫入或 Firebase 同步失敗。' + (err && err.message ? ' ' + err.message : ''), 'error');
+                renderProductionGodStickerReceipt(status);
+                swalAlert('棒卡結果待確認', '請保留原申請並先查核儲存結果。' + (err && err.message ? ' ' + err.message : ''), 'error');
             }
         }
 
@@ -14379,22 +14548,24 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var originalText = btn ? btn.innerText : '';
             if (btn) btn.innerText = '處理中';
             try {
-                await runGodAdminAction('approveStickerGas', {
+                var stickerResult = await runGodAdminAction('approveStickerGas', {
                     feedbackKey: context.fbKey,
                     timeStr: context.time,
                     className: gData.className,
                     studentName: gData.studentName,
-                    count: finalAction === '通過' ? context.count : 0,
+                    count: context.count,
                     actionStr: finalAction,
                     sourceClassName: context.sourceClassName || gData.className,
                     storedStudentKey: context.storedStudentKey || "",
                     balanceClassName: context.balanceClassName || gData.className
                 });
                 if (btn) btn.innerText = finalAction === '通過' ? '已通過' : '已退回';
+                if(stickerResult.storage==='firebase')renderProductionGodStickerReceipt(row);
             } catch (err) {
                 buttons.forEach(function(button) { button.disabled = false; });
                 if (btn) btn.innerText = originalText;
-                swalAlert('審核失敗', 'Google Sheet 寫入或 Firebase 同步失敗。' + (err && err.message ? ' ' + err.message : ''), 'error');
+                renderProductionGodStickerReceipt(row);
+                swalAlert('棒卡結果待確認', '請保留原申請並先查核儲存結果。' + (err && err.message ? ' ' + err.message : ''), 'error');
             }
         }
 
@@ -14472,7 +14643,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     sourceSurface: isColorCorrection ? "ebook_god_color_correction" : "ebook_god_review",
                     teacherDirectColorWriteback: !(colorReview && colorReview.feedbackKey),
                     teacherColorCorrection: isColorCorrection,
-                    expectedCurrentColor: isColorCorrection ? currentColorInfo.hex : '',
+                    expectedCurrentColor: String(context.currentColor || '#ffffff').toLowerCase(),
                     colorHex: nextColorInfo.hex
                 });
                 context.currentColor = nextColorInfo.hex;
@@ -14483,16 +14654,17 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     var isReplay = gasResult.idempotentReplay === true;
                     var firebaseSynced = gasResult.firebaseSynced === true;
                     status.style.color = (isReplay || firebaseSynced) ? '#16a34a' : '#b45309';
-                    status.innerText = isReplay
+                    status.innerText = gasResult.storage==='firebase' ? '補考結果已儲存，試算表背景同步中，不必重送。' : isReplay
                         ? '已確認先前的' + (isColorCorrection ? '更正' : '登記') + '完成。'
                         : (firebaseSynced
                             ? (isColorCorrection ? '已更正補考結果，並完成單格雲端同步。' : '已登記補考結果，並完成單格雲端同步。')
                             : (isColorCorrection ? '已更正 Google Sheet；雲端單格同步待補。' : '已登記 Google Sheet；雲端單格同步待補。'));
+                    if(gasResult.storage==='firebase')renderProductionGodScoreReceipt(status);
                 }
             } catch (err) {
                 if (status) {
                     status.style.color = '#dc2626';
-                    status.innerText = (isColorCorrection ? '更正失敗：' : '登記失敗：') + (err && err.message ? err.message : String(err));
+                    status.innerText = (err && err.fastWriteRejected ? '未寫入：' : '結果待確認；請保留原選擇再重試查核：') + (err && err.message ? err.message : String(err));
                 }
             } finally {
                 buttons.forEach(function(button) { button.disabled = false; });
@@ -14545,14 +14717,17 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     payload.examColIndex = context.examColIndex;
                     payload.targetExamTitle = context.scoreReview.targetExamTitle || context.title || "";
                 }
-                await runGodAdminAction('writeScoreGas', payload);
+                var reviewResult=await runGodAdminAction('writeScoreGas', payload);
+                var reviewReceipt=reviewResult&&reviewResult.result;
+                if(reviewReceipt&&reviewReceipt.storage==='firebase')context.currentScore=finalScore;
                 if (btn) {
                     btn.innerText = '已回填';
                     btn.style.background = '#64748b';
                 }
                 if (status) {
                     status.style.color = '#16a34a';
-                    status.innerText = '已回填 ' + finalScore + '，等待雲端同步顯示。';
+                    status.innerText = reviewReceipt&&reviewReceipt.storage==='firebase' ? '缺考分數 '+finalScore+' 已儲存，試算表背景同步中，不必重送。' : '已回填 ' + finalScore + '，等待雲端同步顯示。';
+                    if(reviewReceipt&&reviewReceipt.storage==='firebase')renderProductionGodScoreReceipt(status);
                 }
             } catch (err) {
                 if (btn) {
@@ -14561,7 +14736,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 }
                 if (status) {
                     status.style.color = '#dc2626';
-                    status.innerText = '回填失敗：' + (err && err.message ? err.message : String(err));
+                    status.innerText = (err && err.fastWriteRejected ? '未寫入：' : '回填結果待確認；可重試查核原收據：') + (err && err.message ? err.message : String(err));
                 }
             }
         }
@@ -14605,7 +14780,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 status.innerText = '正在回填缺考分數...';
             }
             try {
-                await runGodAdminAction('writeScoreGas', {
+                var directResult = await runGodAdminAction('writeScoreGas', {
                     className: gData.className,
                     studentName: gData.studentName,
                     targetDateStr: context.targetDate,
@@ -14613,6 +14788,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     sourceClassName: context.sourceClassName || gData.className,
                     storedStudentKey: context.storedStudentKey || "",
                     scoreValue: finalScore,
+                    expectedCurrentScore: context.currentScore,
                     examColIndex: context.examColIndex,
                     targetExamTitle: context.title || "",
                     targetExamId: context.targetExamId || "",
@@ -14623,20 +14799,26 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     clientRequestId: createClientRequestId('direct-makeup-score'),
                     sourceSurface: "ebook_god_review"
                 });
+                var directReceipt = directResult && directResult.result;
+                if (directReceipt && directReceipt.storage === 'firebase') {
+                    context.currentScore = finalScore;
+                    if (row) row.remove();
+                }
                 if (btn) {
                     btn.innerText = '已回填';
                     btn.style.background = '#64748b';
                 }
                 if (status) {
                     status.style.color = '#16a34a';
-                    status.innerText = '已回填 ' + finalScore + '，等待雲端同步顯示。';
+                    status.innerText = directReceipt && directReceipt.storage === 'firebase' ? '缺考分數 '+finalScore+' 已儲存，試算表背景同步中，不必重送。' : '已回填 ' + finalScore + '，等待雲端同步顯示。';
+                    if (directReceipt && directReceipt.storage === 'firebase') renderProductionGodScoreReceipt(status);
                 }
             } catch (err) {
                 controls.forEach(function(el) { el.disabled = false; });
                 if (btn) btn.innerText = originalText || '回填';
                 if (status) {
                     status.style.color = '#dc2626';
-                    status.innerText = '回填失敗：' + (err && err.message ? err.message : String(err));
+                    status.innerText = '回填結果待確認；原輸入已保留，可重試查核：' + (err && err.message ? err.message : String(err));
                 }
             }
         }
@@ -14687,11 +14869,12 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 }
                 if (input) input.value = '';
                 clearAdminModeAttachmentDraft(contextKey, false);
-                if (status) status.innerText = queuedJobResult.browserIndexSaved
+                if(status&&queuedJob.storage==='firebase'){status.innerText='留言已儲存，背景同步中，不必重送。';renderProductionMessageStatus(status);}
+                else if (status) status.innerText = queuedJobResult.browserIndexSaved
                     ? '已排入後端佇列，可安全離開；回到 Dashboard 後可在工作中心查看進度。'
                     : '已排入後端佇列，工作會繼續；但此瀏覽器無法保存進度索引，返回 Dashboard 後可能無法自動顯示。';
                 if (btn) {
-                    btn.innerText = '已排入佇列';
+                    btn.innerText = queuedJob.storage==='firebase'?'已儲存':'已排入佇列';
                     btn.style.background = 'var(--primary)';
                 }
             } catch (err) {
@@ -14699,8 +14882,8 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     btn.disabled = false;
                     btn.innerText = '回覆';
                 }
-                if (status) status.innerText = '回覆失敗，附件仍保留，可直接重試。';
-                swalAlert('回覆或附件送出失敗', '學生端尚未收到。' + (err && err.message ? ' ' + err.message : ''), 'error');
+                if (status) status.innerText = '尚未確認送出結果，內容及附件仍保留；請用原內容重試查核。';
+                swalAlert('留言結果待確認', '請保留原內容及附件，重試會先查核原收據。' + (err && err.message ? ' ' + err.message : ''), 'error');
             }
         }
 
