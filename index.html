@@ -2167,9 +2167,10 @@
             display: block;
         }
 
-        .assessment-chapter { display:block; overflow-wrap:anywhere; }
-        .assessment-detail { display:block; font-size:.95em; font-weight:400; line-height:1.55; color:#64748b; overflow-wrap:anywhere; }
-        .assessment-detail > span { display:block; }
+        .assessment-name { white-space:normal; overflow-wrap:anywhere; }
+        .assessment-chapter { display:inline-block; max-width:100%; overflow-wrap:anywhere; }
+        .assessment-detail { display:inline; font-size:.95em; font-weight:400; line-height:1.55; color:#64748b; overflow-wrap:anywhere; }
+        .assessment-detail > span { display:inline-block; max-width:100%; vertical-align:baseline; }
         .exam-info { min-width:0; flex:1; }
         .exam-name, .main-exam-title, .exam-date { overflow-wrap:anywhere; }
         .card-main { gap:12px; flex-wrap:wrap; }
@@ -11449,8 +11450,8 @@
 
         function buildAssessmentTitleHtml(value, className) {
             var parts = window.AssessmentLabels.describe(value, className);
-            return '<span class="assessment-chapter">' + escapeHtml(parts.heading) + '</span>' +
-                (parts.detail ? '<span class="assessment-detail">' + parts.detail.split('｜').map(function(part) { return '<span>' + escapeHtml(part) + '</span>'; }).join('') + '</span>' : '');
+            return '<span class="assessment-name"><span class="assessment-chapter">' + escapeHtml(parts.heading) + '</span>' +
+                (parts.detail ? ' <span class="assessment-detail">' + parts.detail.split('｜').map(function(part) { return '<span>' + escapeHtml(part) + '</span>'; }).join(' ') + '</span>' : '') + '</span>';
         }
 
         function buildDailyPostExamCard(post, exam, others, history) {
