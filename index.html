@@ -5000,6 +5000,7 @@
     <script src="fastwrite_grade_reader.js?v=20261018"></script>
     <script src="fastwrite_grade_dom.js?v=20261018"></script>
     <script src="fastwrite_ebook_grades.js?v=20261018"></script>
+    <script src="student_tool_drafts.js?v=20261027"></script>
     <script src="fastwrite_dashboard_score_bridge.js?v=20261018"></script>
     <script src="fastwrite_god_score_bridge.js?v=20261018"></script>
 <script src="fastwrite_sticker_reader.js?v=20261019"></script>
@@ -12337,6 +12338,8 @@ async function sendProductionStudentReport(action,payload,send) {
                     oldHistory.innerHTML=newHistory.innerHTML;var previousNote=card.querySelector('.fastwrite-new-message-note');if(previousNote)previousNote.remove();
                 });return;
             }
+            var toolDraftIdentity = JSON.stringify([ebookFirebaseApp.auth().currentUser?.uid || "", gData?.className || "", gData?.foundUserKey || "", !!isAdminMode]);
+            var toolDraftState = window.StudentToolDrafts.capture(container, toolDraftIdentity);
             container.innerHTML = html;
             window.syncProductionVisibleMessageWatches();
             window.syncProductionVisibleGradeWatches();
@@ -12354,6 +12357,8 @@ async function sendProductionStudentReport(action,payload,send) {
             Object.keys(window.adminModeDirectMessageContext || {}).forEach(function(contextKey) {
                 renderAdminModeAttachmentDraft(contextKey, true);
             });
+
+            window.StudentToolDrafts.restore(container, toolDraftState, toolDraftIdentity);
 
             var observer = new IntersectionObserver(function(entries, obs) {
                 entries.forEach(function(entry) {
