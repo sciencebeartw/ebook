@@ -63,6 +63,7 @@ let offlineCount = 0;
 let onlineCount = 0;
 let attachedCount = 0;
 let detachedCount = 0;
+const stoppedFastWrite = [];
 const context = {
   console: { info() {}, warn() {} },
   document: {
@@ -70,6 +71,9 @@ const context = {
     addEventListener(name, handler) { documentListeners[name] = handler; },
   },
   window: {
+    stopProductionStickerWatch() { stoppedFastWrite.push('stickers'); },
+    stopProductionGradeWatches() { stoppedFastWrite.push('grades'); },
+    stopProductionMessageWatches() { stoppedFastWrite.push('messages'); },
     addEventListener(name, handler) { windowListeners[name] = handler; },
   },
   db: {
@@ -127,6 +131,7 @@ windowListeners.pageshow();
 assert.equal(onlineCount, 2, 'pageshow must resume a page restored from browser cache');
 
 context.clearRealtimeListeners();
+assert.deepEqual(stoppedFastWrite, ['stickers','grades','messages'], 'logout must clear all scoped Fast Write watches');
 assert.equal(detachedCount, 1, 'normal logout or view changes must still detach listeners');
 assert.equal(timers.size, 0, 'clearing listeners must also clear background timers');
 

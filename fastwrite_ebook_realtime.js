@@ -62,5 +62,6 @@
   document.querySelectorAll('#tab-content-0 .post-card-wrapper').forEach(n=>observer.observe(n));
  };
  document.addEventListener('visibilitychange',()=>{if(document.hidden)root.stopProductionMessageWatches();else root.syncProductionVisibleMessageWatches();});
+ root.addEventListener('online',()=>{root.stopProductionMessageWatches();if(!document.hidden)root.syncProductionVisibleMessageWatches();});
  root.addEventListener('pagehide',()=>root.stopProductionMessageWatches());
 })(window);

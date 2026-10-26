@@ -27,5 +27,6 @@
   observer=new IntersectionObserver(entries=>{for(const e of entries)if(e.isIntersecting)visible.add(e.target);else visible.delete(e.target);reconcile();},{rootMargin:'80px 0px'});
   document.querySelectorAll('#tab-content-0 .grade-section[data-pending-exam-anchor],#tab-content-1 .score-card[data-pending-exam-anchor]').forEach(n=>observer.observe(n));
  };
+ root.addEventListener('online',()=>{root.stopProductionGradeWatches();if(!document.hidden)root.syncProductionVisibleGradeWatches();});
  document.addEventListener('visibilitychange',()=>{if(document.hidden)root.stopProductionGradeWatches();else root.syncProductionVisibleGradeWatches();});root.addEventListener('pagehide',()=>root.stopProductionGradeWatches());
 })(window);

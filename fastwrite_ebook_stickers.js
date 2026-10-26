@@ -34,5 +34,6 @@
     }});
   }catch(_){if(generation===version&&current===who())note('棒卡來源尚未確認，請重新登入後核對。');}
  };
+ root.addEventListener('online',()=>{root.stopProductionStickerWatch();if(!document.hidden)root.syncProductionStickerWatch();});
  document.addEventListener('visibilitychange',()=>document.hidden?root.stopProductionStickerWatch():root.syncProductionStickerWatch());root.addEventListener('pagehide',()=>root.stopProductionStickerWatch());
 })(window);
