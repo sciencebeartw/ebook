@@ -4994,7 +4994,7 @@
   <link rel="stylesheet" href="ebook_push.css?v=20261015-preview1">
     <script src="fastwrite_config.js?v=20261018"></script>
     <script src="fastwrite_production_transport.js?v=20261018"></script>
-    <script src="fastwrite_message_bridge.js?v=20261018"></script>
+    <script src="fastwrite_message_bridge.js?v=20261027_visible_preflight"></script>
     <script src="fastwrite_realtime.js?v=20261018"></script>
     <script src="fastwrite_ebook_realtime.js?v=20261027_online"></script>
     <script src="fastwrite_grade_reader.js?v=20261018"></script>
@@ -5111,6 +5111,15 @@ function getProductionMessageBridge() {
   hash:async function(parts){return Array.from(new Uint8Array(await window.crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(parts))))).map(function(x){return x.toString(16).padStart(2,'0');}).join('');}
  });return productionMessageBridge;
 }
+document.addEventListener('focusin',function(event){
+ var input=event.target,context=null,mode=isAdminMode?'god':'student';
+ if(!input||!input.id||!gData||!gData.foundUserKey)return;
+ if(input.id.indexOf('admin-reply-input-')===0)context=(window.adminModeReplyContext||{})[input.id.slice(18)];
+ else if(input.id.indexOf('admin-direct-input-')===0)context=(window.adminModeDirectMessageContext||{})[input.id.slice(19)];
+ else if(input.id.indexOf('input-')===0)context=studentFeedbackComposerContexts[input.id.slice(6)];
+ if(!context||!context.targetDate)return;
+ try{var b=getProductionMessageBridge();if(b)b.warm(mode,productionEbookMessageInput({sourceClassName:context.storedClassName||context.sourceClassName||context.className,storedStudentKey:context.storedStudentKey,targetDate:context.targetDate})).catch(function(){});}catch(_){}
+});
 function productionMessageDate(raw) {
  var m=String(raw||'').trim().match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);
  if(!m)throw Error('留言日期不完整');return m[1]+'/'+m[2].padStart(2,'0')+'/'+m[3].padStart(2,'0');

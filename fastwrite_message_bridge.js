@@ -1,10 +1,29 @@
 (function(root){"use strict";
  function create({scopes,callableFor,storage,getUid,hash,getSessionId=()=>"",transport=root.ProductionFastWriteTransport,onSaved=()=>{}}){
   if(!Array.isArray(scopes)||scopes.length>64||[callableFor,getUid,hash].some(f=>typeof f!=="function")||!storage||!transport?.create)throw Error("message-bridge-config-invalid");
-  const routes=new Map(),busy=new Map(),remote=new Map(),safe=x=>typeof x==="string"&&x.length>0&&x.length<=180&&!/[.#$[\]/\x00-\x1f\x7f]/.test(x)&&!["__proto__","constructor","prototype"].includes(x);
+  const routes=new Map(),busy=new Map(),remote=new Map(),prepared=new Map(),safe=x=>typeof x==="string"&&x.length>0&&x.length<=180&&!/[.#$[\]/\x00-\x1f\x7f]/.test(x)&&!["__proto__","constructor","prototype"].includes(x);
   for(const s of scopes.filter(route=>route.subject!=='math')){if(s.subject!=="science"||s.enabled!==true||!safe(s.className)||!safe(s.classKey)||!/^[-\w]{1,80}$/.test(s.scopeId)||!Number.isSafeInteger(s.epoch)||s.epoch<1||routes.has(s.className)||[...routes.values()].some(r=>r.classKey===s.classKey||r.scopeId===s.scopeId))throw Error("message-route-invalid");routes.set(s.className,{...s});}
   const account=()=>{const uid=getUid();if(!/^[-\w]{1,80}$/.test(uid||""))throw Error("請先登入再送出留言");return uid;};
   const receiptKey=uid=>"fastwrite-message-receipts-"+uid;
+  // 重用目前登入者與角色的可見／輸入中對話；提交仍由伺服器逐次核對權限、切換與交易。
+  const preparedKey=(mode,uid,route,entityId)=>[mode,uid,mode==='god'?getSessionId():'',route.scopeId,route.epoch,entityId].join('|');
+  function remember(k,promise){const row={at:Date.now(),promise};prepared.delete(k);prepared.set(k,row);while(prepared.size>4)prepared.delete(prepared.keys().next().value);return row;}
+  function readReady(mode,uid,route,entityId,c){
+   if(!['student','teacher','god'].includes(mode))return c.read();
+   const k=preparedKey(mode,uid,route,entityId),old=prepared.get(k);
+   if(old&&Date.now()-old.at<120000)return old.promise;
+   const row=remember(k,Promise.resolve().then(()=>c.read()).then(view=>{
+    if(account()!==uid)throw Error('登入帳號已變更，請重新整理');
+    if(view?.authority==='legacy'||!/^p\d{12}$/.test(view?.segment||'')||!Array.isArray(view.messages))if(prepared.get(k)===row)prepared.delete(k);
+    return view;
+   }).catch(error=>{if(prepared.get(k)===row)prepared.delete(k);throw error;}));return row.promise;
+  }
+  async function warm(mode,p){
+   if(!['student','teacher','god'].includes(mode))return false;
+   const route=p?.subject==='science'&&routes.get(p.className);if(!route)return false;
+   const uid=account(),target=await watchTarget(mode,p);if(!target||account()!==uid)return false;
+   const entityId=target.id.split('|').pop();await readReady(mode,uid,route,entityId,target.transport);return true;
+  }
   function receipts(uid=account()){let rows;try{rows=JSON.parse(storage.getItem(receiptKey(uid))||"{}");}catch(_){throw Error("留言收據無法讀取，請保留目前頁面");}if(!rows||typeof rows!=="object"||Array.isArray(rows)||Object.keys(rows).length>128)throw Error("留言收據需要查核");return rows;}
   function save(uid,id,row){const rows=receipts(uid);if(!rows[id]&&Object.keys(rows).length>=128)throw Error("待回填留言已達上限，請先查核同步狀態");rows[id]=row;storage.setItem(receiptKey(uid),JSON.stringify(rows));}
   function connection(route,entityId,mode,uid,payload){return transport.create({kind:"message",callable:callableFor(mode),storage,namespace:"message_"+mode+"_"+uid,scope:route.scopeId,entityId,epoch:route.epoch,sessionId:mode==="god"?getSessionId():undefined,
@@ -26,7 +45,7 @@
      if(pending&&(pending.text!==p.content||(pending.replyTo||"")!==(p.replyTo||"")||pending.requestId!==p.requestId))throw Error("上一則留言仍待確認，請先用原內容重試");
      if(!pending){
       if(Object.keys(receipts(uid)).length>=128)throw Error("待回填留言已達上限，請先查核同步狀態");
-      const view=await c.read();
+      const view=await readReady(mode,uid,route,entityId,c);
       if(view?.authority==="legacy"&&view.kind==="message"&&/^[a-f0-9]{64}$/.test(view.rollbackVerificationHash||"")){
        let replyToFeedbackKey=p.replyTo||"";
        if(/^p\d{12}_/.test(replyToFeedbackKey)){
@@ -40,7 +59,7 @@
       if(account()!==uid)throw Error("登入帳號已變更，請重新整理");
       c.prepare({requestId:p.requestId,text:p.content,replyTo:p.replyTo||"",epoch:route.epoch});
      }
-     const receipt=await c.send({recover:!!pending});if(account()!==uid)throw Error("登入帳號已變更；原留言收據已保留");
+     let receipt;try{receipt=await c.send({recover:!!pending});}catch(error){prepared.delete(preparedKey(mode,uid,route,entityId));throw error;}if(account()!==uid)throw Error("登入帳號已變更；原留言收據已保留");
      const result={success:true,storage:"firebase",businessStatus:"committed",sheetStatus:receipt.mirrorStatus||"pending",fastWriteReceipt:{scope:route.scopeId,entityId,eventId:receipt.eventId,requestId:p.requestId,revision:receipt.revision},time:new Date(receipt.committedAt).toLocaleString("sv-SE",{timeZone:"Asia/Taipei"}).replaceAll("-","/"),msg:"留言已儲存，背景同步中"};
      try{onSaved(result,p,mode);}catch(_){}return result;
     })();busy.set(key,{signature,promise});try{return await promise;}finally{if(busy.get(key)?.promise===promise)busy.delete(key);}
@@ -90,6 +109,7 @@
       if(changed)storage.setItem(receiptKey(uid),JSON.stringify(local));
      }
      remote.set(id,{loginUid:uid,classKey:route.classKey,studentKey:p.studentKey,head,selected,pages,revisions,withdrawn:{...old.withdrawn,...withdrawn},rows:Object.values(pages).flat()});
+     if(!isHistory)remember(preparedKey(mode,uid,route,entityId),Promise.resolve({segment:view.segment,messages:[]}));
    }
    const target={id,prefix:'ebook_fast_write_v1/segments/'+route.scopeId+'/'+entityId+'/',transport:c,
     accept(view){put(view,false);},
@@ -102,10 +122,10 @@
       const messages={};for(const row of [...result.references,...result.messages]){if(!row||!safe(row.id))throw Error('invalid-message-history');messages[row.id]=row;}
       put({segment,revision:result.revision??result.messages.length,messages,withdrawn:result.withdrawn||{}},true);return target.historyState();
      })();try{return await loading;}finally{loading=null;}
-    },clear(){closed=true;remote.delete(id);}};
+    },clear(){closed=true;remote.delete(id);prepared.delete(preparedKey(mode,uid,route,entityId));}};
    return target;
   }
-  function clearRemote(){remote.clear();}
+  function clearRemote(){remote.clear();prepared.clear();}
   async function dates(p){
    const route=p?.subject==='science'&&routes.get(p.className);if(!route||!safe(p.studentKey))throw Error('invalid-message-watch');const uid=account();
    const result=await callableFor('teacher')({action:'fastWriteMessageViewV1',data:{scope:route.scopeId,epoch:route.epoch,studentKey:p.studentKey,...(p.before?{before:p.before}:{})}}),r=result?.data;
@@ -115,7 +135,7 @@
    if(!/^p\d{12}_[a-f0-9]{64}$/.test(messageId||''))throw Error('invalid-message-reference');const uid=account(),t=await watchTarget('teacher',p),r=await t.transport.legacyReference(messageId);
    if(account()!==uid||r?.messageId!==messageId||!safe(r.feedbackKey)||/^p\d{12}_/.test(r.feedbackKey)||!(r.authority==='firebase'&&r.verified===true||r.authority==='legacy'&&/^[a-f0-9]{64}$/.test(r.rollbackVerificationHash||'')))throw Error('留言仍在同步，請稍後再查核已看狀態');return r.feedbackKey;
   }
-  return{handle,receipts,checkReceipts,merge,watchTarget,clearRemote,dates,nativeReference,accepts:(subject,className)=>subject==="science"&&routes.has(className)};
+  return{handle,warm,receipts,checkReceipts,merge,watchTarget,clearRemote,dates,nativeReference,accepts:(subject,className)=>subject==="science"&&routes.has(className)};
  }
  root.MessageFastWriteBridge={create};if(typeof module!=="undefined")module.exports={create};
 })(typeof window!=="undefined"?window:globalThis);
