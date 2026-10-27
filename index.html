@@ -13045,7 +13045,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                     var el = document.getElementById(inputId);
                     if (el) el.value = "";
                     clearEbookSubmitLoading(btn, submitLabel);
-                    alert("已送出！");
+                    swalAlert("已送出", "留言已儲存，不必等待試算表背景同步。", "success");
                 }
                 if (callback) callback();
             }).withFailureHandler(function (e) {
@@ -13835,12 +13835,14 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 isStudentPreviewMode = !!(session.viewMode === 'student_preview' || (session.permissions && session.permissions.studentPreview === true));
                 isAdminMode = !isStudentPreviewMode;
                 showEbookSessionBootstrapLoader(isStudentPreviewMode ? '學生視角' : '上帝視角');
-                session.pendingPolicy = await loadEbookPendingTaskPolicy();
+                // 驗證完成後，政策與同一學生資料並行讀取；兩者就緒才顯示畫面。
+                var pendingPolicyPromise = loadEbookPendingTaskPolicy();
                 ebookGodSessionInfo = session;
                 ebookAuthSessionInfo = session;
                 startEbookGodSessionHeartbeat();
-                google.script.run.withSuccessHandler(function(result) {
+                google.script.run.withSuccessHandler(async function(result) {
                     if (result && result.found) {
+                        session.pendingPolicy = await pendingPolicyPromise;
                         enterStudentView(result, isStudentPreviewMode ? 'student_preview' : 'god_session');
                     } else {
                         swalAlert('查無此學生資料', '請回行政中心重新開啟學生畫面。', 'warning');
