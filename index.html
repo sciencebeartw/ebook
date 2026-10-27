@@ -63,7 +63,10 @@
     })();
     </script>
     <meta name="theme-color" content="#f3faf6">
-    <style>html { background: #f3faf6; } #splash-status { margin: 22px 0 0; color: #315c44; font: 16px/1.6 system-ui, sans-serif; }</style>
+    <style>
+        /* 操作確認須在公告、圖片與既有 modal 上方，避免按鈕被浮層攔截。 */
+        .swal2-container { z-index: 2147483647 !important; }
+html { background: #f3faf6; } #splash-status { margin: 22px 0 0; color: #315c44; font: 16px/1.6 system-ui, sans-serif; }</style>
 
     <!-- External Resources -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
