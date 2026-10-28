@@ -6839,26 +6839,43 @@ async function sendProductionStudentReport(action,payload,send) {
             result.trackedGradeClassKeys = lifecycle.trackedGradeClassKeys;
             result.studentKeysByClassKey = lifecycle.studentKeysByClassKey;
 
-            // Fetch Grades. Transfer students read only their current class plus indexed source classes.
+            // 身分與歷程範圍驗證完成後，同時讀取互不相依的資料；沿用原路徑與讀取次數。
             result.examCatalogEntriesByClassKey = {};
             result.cohortGradeExamNodeMap = {};
-            var gradeSources = await Promise.all([
+            const globalBulletinKey = safeKey("全校");
+            const formerBulletinScopes = window.EbookPromotionApp.getFormerBulletinScopes(result.promotionContext, result.studentTransferChain);
+            const bulletinReadKeys = uniqueClassKeys([safeC, globalBulletinKey].concat(formerBulletinScopes.map(function(scope) {
+                return scope.classKey;
+            })));
+            const hasFormerClasses = result.trackedClassKeys.length > 1;
+            const initialSources = await Promise.all([
                 loadGradeExamMapByKeys(result.trackedGradeClassKeys, foundUserKey, result.studentKeysByClassKey, result.cohortGradeExamNodeMap, result.transferChain, safeC, result.promotionContext),
-                loadExamIdByClassColKey(result.trackedGradeClassKeys, result.examCatalogEntriesByClassKey)
+                loadExamIdByClassColKey(result.trackedGradeClassKeys, result.examCatalogEntriesByClassKey),
+                hasFormerClasses
+                    ? loadClassNodeMapByKeys(`${BEAR_SUBJECT}/dailyPosts`, result.trackedClassKeys)
+                    : db.ref(`${BEAR_SUBJECT}/dailyPosts/${safeC}`).once('value').then(function(snap) { return snap.val() || {}; }),
+                Promise.all(bulletinReadKeys.map(function(classKey) {
+                    return db.ref(`${BEAR_SUBJECT}/bulletins/${classKey}`).once('value').then(function(snap) {
+                        return { classKey: classKey, value: snap.val() || {} };
+                    });
+                })),
+                hasFormerClasses
+                    ? loadClassStudentNodeMapByKeys(`${BEAR_SUBJECT}/feedbacks`, result.trackedClassKeys, result.studentKeysByClassKey, foundUserKey)
+                    : db.ref(`${BEAR_SUBJECT}/feedbacks/${safeC}/${foundUserKey}`).once('value').then(function(snap) { return snap.val() || {}; }),
+                (hasFormerClasses
+                    ? loadClassStudentNodeMapByKeys(`${BEAR_SUBJECT}/homeworkDone`, result.trackedClassKeys, result.studentKeysByClassKey, foundUserKey)
+                    : db.ref(`${BEAR_SUBJECT}/homeworkDone/${safeC}/${foundUserKey}`).once('value').then(function(snap) { return snap.val() || {}; })
+                ).catch(function(homeworkDoneErr) {
+                    console.error("HomeworkDone read failed:", homeworkDoneErr);
+                    throw new Error("作業完成回報讀取失敗，為避免把已完成誤顯示為未完成，請重新整理後再試");
+                })
             ]);
-            result.cohortGradeExamRoot = gradeSources[0];
-            result.examIdByClassColKey = gradeSources[1];
-
-            // Fetch Posts
-            let postsObj = {};
-            if (result.trackedClassKeys.length > 1) {
-                result.cohortDailyPostRoot = await loadClassNodeMapByKeys(`${BEAR_SUBJECT}/dailyPosts`, result.trackedClassKeys);
-                postsObj = mergeDailyPostClassNodeByKeys(result.cohortDailyPostRoot, result.trackedClassKeys, safeC, result.studentTransferIndex, result.className, result.studentTransferChain, foundUserKey, result.promotionContext);
-            } else {
-                const snapP = await db.ref(`${BEAR_SUBJECT}/dailyPosts/${safeC}`).once('value');
-                result.cohortDailyPostRoot = null;
-                postsObj = snapP.val() || {};
-            }
+            result.cohortGradeExamRoot = initialSources[0];
+            result.examIdByClassColKey = initialSources[1];
+            result.cohortDailyPostRoot = hasFormerClasses ? initialSources[2] : null;
+            let postsObj = hasFormerClasses
+                ? mergeDailyPostClassNodeByKeys(result.cohortDailyPostRoot, result.trackedClassKeys, safeC, result.studentTransferIndex, result.className, result.studentTransferChain, foundUserKey, result.promotionContext)
+                : initialSources[2];
             result.dailyPostSourceRoot = postsObj;
             result.gradeDateAnchorKeys = collectGradeDateAnchorKeys(
                 postsObj,
@@ -6927,17 +6944,8 @@ async function sendProductionStudentReport(action,payload,send) {
             pendingSessionPosts.sort((a,b) => new Date(b.date) - new Date(a.date));
             result.pendingSessionPosts = filterItemsByStudentEnrollmentDate(pendingSessionPosts, result.studentEnrollmentIndex, result.trackedClassKeys);
 
-            // Fetch Bulletins
-            const globalBulletinKey = safeKey("全校");
-            const formerBulletinScopes = window.EbookPromotionApp.getFormerBulletinScopes(result.promotionContext, result.studentTransferChain);
-            const bulletinReadKeys = uniqueClassKeys([safeC, globalBulletinKey].concat(formerBulletinScopes.map(function(scope) {
-                return scope.classKey;
-            })));
-            const bulletinSnaps = await Promise.all(bulletinReadKeys.map(function(classKey) {
-                return db.ref(`${BEAR_SUBJECT}/bulletins/${classKey}`).once('value').then(function(snap) {
-                    return { classKey: classKey, value: snap.val() || {} };
-                });
-            }));
+            // 公告仍依原升班／調班日期邊界組合。
+            const bulletinSnaps = initialSources[3];
             const bulletinNodeByClassKey = {};
             bulletinSnaps.forEach(function(item) {
                 bulletinNodeByClassKey[item.classKey] = item.value || {};
@@ -6967,29 +6975,14 @@ async function sendProductionStudentReport(action,payload,send) {
             })));
             result.bulletins = result.currentBulletins;
 
-            // Fetch Feedbacks
-            if (result.trackedClassKeys.length > 1) {
-                result.cohortFeedbackRoot = await loadClassStudentNodeMapByKeys(`${BEAR_SUBJECT}/feedbacks`, result.trackedClassKeys, result.studentKeysByClassKey, foundUserKey);
-                result.feedbackHistory = buildFeedbackHistoryList(mergeStudentChildNodeByKeys(result.cohortFeedbackRoot, result.trackedClassKeys, foundUserKey, result.studentTransferIndex, result.className, safeC, result.studentTransferChain, result.classNameByKey, result.studentKeysByClassKey), result);
-            } else {
-                const snapF = await db.ref(`${BEAR_SUBJECT}/feedbacks/${safeC}/${foundUserKey}`).once('value');
-                result.cohortFeedbackRoot = null;
-                result.feedbackHistory = buildFeedbackHistoryList(snapF.val() || {}, result);
-            }
-
-            try {
-                if (result.trackedClassKeys.length > 1) {
-                    result.cohortHomeworkDoneRoot = await loadClassStudentNodeMapByKeys(`${BEAR_SUBJECT}/homeworkDone`, result.trackedClassKeys, result.studentKeysByClassKey, foundUserKey);
-                    result.homeworkDone = mergeHomeworkDoneForStudentByKeys(result.cohortHomeworkDoneRoot, result.trackedClassKeys, foundUserKey, result.studentKeysByClassKey);
-                } else {
-                    const snapHD = await db.ref(`${BEAR_SUBJECT}/homeworkDone/${safeC}/${foundUserKey}`).once('value');
-                    result.cohortHomeworkDoneRoot = null;
-                    result.homeworkDone = snapHD.val() || {};
-                }
-            } catch (homeworkDoneErr) {
-                console.error("HomeworkDone read failed:", homeworkDoneErr);
-                throw new Error("作業完成回報讀取失敗，為避免把已完成誤顯示為未完成，請重新整理後再試");
-            }
+            result.cohortFeedbackRoot = hasFormerClasses ? initialSources[4] : null;
+            result.feedbackHistory = buildFeedbackHistoryList(hasFormerClasses
+                ? mergeStudentChildNodeByKeys(result.cohortFeedbackRoot, result.trackedClassKeys, foundUserKey, result.studentTransferIndex, result.className, safeC, result.studentTransferChain, result.classNameByKey, result.studentKeysByClassKey)
+                : initialSources[4], result);
+            result.cohortHomeworkDoneRoot = hasFormerClasses ? initialSources[5] : null;
+            result.homeworkDone = hasFormerClasses
+                ? mergeHomeworkDoneForStudentByKeys(result.cohortHomeworkDoneRoot, result.trackedClassKeys, foundUserKey, result.studentKeysByClassKey)
+                : initialSources[5];
 
             return result;
         } catch(e) {

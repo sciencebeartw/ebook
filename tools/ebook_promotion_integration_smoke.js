@@ -63,7 +63,7 @@ assert.match(
   'grade view models must preserve logical source and physical storage class separately'
 );
 assert.match(
-  between('// Fetch Bulletins', '// Fetch Feedbacks'),
+  between('async function executeFirebaseRead', 'function createApiMethods'),
   /getFormerBulletinScopes[\s\S]*\.once\('value'\)[\s\S]*currentBulletins[\s\S]*historicalBulletins/,
   'former bulletins must use bounded one-time class reads and remain separate from current bulletins'
 );
@@ -79,6 +79,8 @@ const calls = { tabs: null, sticky: null, emergency: null };
 const container = { innerHTML: '' };
 const sandbox = {
   isDashboardDraftPreviewMode: false,
+  gData: { className: '測試班' },
+  safeKey(value) { return String(value || '').replace(/[.#$[\]]/g, '-'); },
   isBulletinEffective: () => true,
   getBulletinDisplayChannels(bulletin) {
     const options = bulletin && bulletin.displayOptions ? bulletin.displayOptions : {};
@@ -92,6 +94,7 @@ const sandbox = {
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
   },
+  escapeHtmlAttr(value) { return sandbox.escapeHtml(value); },
   parseBtn(value) { return sandbox.escapeHtml(value || ''); },
   renderParsedLink(label) { return `<a>${label}</a>`; },
   updateBulletinTabs(list) { calls.tabs = list.slice(); },
