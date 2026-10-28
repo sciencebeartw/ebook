@@ -61,16 +61,17 @@
     }else{
      // 尚未提交前就先確認追蹤容量；同時提交仍由 saveReceipt 再核對，失敗時命令不會被清掉。
      if(Object.keys(receipts(uid)).length>=128)throw Error("待回填收據已達上限，請先查核同步狀態");
-     const view=await c.read();
+     const requestId=review&&!p.teacherColorCorrection?'review_'+(await hash([p.feedbackId,commandAction,data])).slice(0,48):p.requestId||p.clientRequestId;
+     // 現值與原請求收據互不相依；兩者完成後才準備命令，減少一次等待且保留防重送。
+     const [view,receiptRead]=await Promise.all([c.read(),(review?c.receipt(requestId):Promise.resolve(null)).then(value=>({value}),error=>({error}))]);
      // 僅提交前、沒有未確認命令且伺服器已完成整班回退時，才允許原入口受理。
      if(legacyView(view))return{authority:"legacy",rollbackVerificationHash:view.rollbackVerificationHash,clientItemId:p.clientItemId||p.studentKey};
      if(view?.kind!=='grade'||(!review||p.teacherColorCorrection===true)&&(color?view.business?.color!==p.expectedCurrentColor:view.business?.score!==p.expectedCurrentScore))throw Error(color?'目前補考顏色已變更，請重新整理後再修改':'目前分數已變更，請重新整理後再修改');
      if(account()!==uid)throw Error("登入帳號已變更，請重新整理");
-     const requestId=review&&!p.teacherColorCorrection?'review_'+(await hash([p.feedbackId,commandAction,data])).slice(0,48):p.requestId||p.clientRequestId;
+     if(receiptRead.error)throw receiptRead.error;const prior=receiptRead.value;
      const command={requestId,epoch:route.epoch,expectedRevision:view.revision,action:commandAction,
       data:review?{...data,...(color?{expectedColor:view.business.color}:{expectedScore:view.business.score})}:data};
      // 同一回報重新開頁仍先取原收據；不以新的 revision 重送已完成的審核。
-     const prior=review?await c.receipt(requestId):null;
      if(prior){saveReceipt(uid,route,entityId,prior,command);result=prior;}
      else{c.prepare(command);result=await c.send();}
     }
