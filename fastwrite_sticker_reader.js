@@ -5,7 +5,7 @@
  function create({scopes,callableFor,getUid,getSessionId=()=>'',storage,hash,transport=root.ProductionFastWriteTransport}){
   if(!Array.isArray(scopes)||scopes.length>64||[callableFor,getUid,getSessionId,hash].some(f=>typeof f!=='function')||!transport?.create)throw Error('invalid-sticker-reader');
   const routes=new Map(),cache=new Map();let identity='';
-  for(const r of scopes.filter(route=>route.subject!=='math')){if(r.subject!=='science'||r.scoreAuthority!=='dashboard'||r.enabled!==true||!safe(r.classKey)||!label(r.className)||!/^[-\w]{1,80}$/.test(r.scopeId)||!int(r.epoch)||r.epoch<1||routes.has(r.classKey)||[...routes.values()].some(s=>s.scopeId===r.scopeId))throw Error('invalid-sticker-route');routes.set(r.classKey,{...r});}
+  for(const r of scopes){if(!(r.subject==='science'&&r.scoreAuthority==='dashboard'||r.subject==='math'&&r.gradeAuthority==='bidirectional')||r.enabled!==true||!safe(r.classKey)||!label(r.className)||!/^[-\w]{1,80}$/.test(r.scopeId)||!int(r.epoch)||r.epoch<1||routes.has(r.classKey)||[...routes.values()].some(s=>s.scopeId===r.scopeId))throw Error('invalid-sticker-route');routes.set(r.classKey,{...r});}
   function account(mode){const uid=getUid(),session=mode==='god'?getSessionId():'';if(!/^[-\w]{1,80}$/.test(uid||'')||mode==='god'&&!/^[a-f0-9]{48,64}$/i.test(session))throw Error('sticker-login-required');const next=[uid,mode,session].join('|');if(identity!==next){cache.clear();identity=next;}return{uid,session,key:next};}
   const token=(c,s)=>JSON.stringify([c,s]);
   function current(){const [uid,mode,session]=identity.split('|');if(!identity||getUid()!==uid||mode==='god'&&getSessionId()!==session){cache.clear();identity='';return false;}return true;}

@@ -11,8 +11,8 @@
    getStudentKey:(cls,name,key)=>{current();if(cls!==c.className||name&&name!==c.studentName||key&&key!==c.studentKey)throw Error('棒卡入帳學生已變更，請重新載入');return c.studentKey;},
    onBalance:(route,key,balance,revision)=>{current();onBalance?.(route,key,balance,revision);}});
   function handle(action,p,subject){
-   if(!['approveStickerGas','writeStickerAdjustmentGas'].includes(action)||subject!=='science')return null;
-   if(!scopes.some(s=>s.enabled===true&&s.subject==='science'&&s.scoreAuthority==='dashboard'&&s.className===(p.balanceClassName||p.className)))return null;
+   if(!['approveStickerGas','writeStickerAdjustmentGas'].includes(action)||!['science','math'].includes(subject))return null;
+   if(!scopes.some(s=>s.enabled===true&&s.subject===subject&&(s.subject==='science'&&s.scoreAuthority==='dashboard'||s.subject==='math'&&s.gradeAuthority==='bidirectional')&&s.className===(p.balanceClassName||p.className)))return null;
    try{current();if(p.className!==c.className||p.studentName!==c.studentName)throw Error('棒卡學生對應已變更');
     return core.handle(action,{...p,studentKey:c.studentKey,...(action==='writeStickerAdjustmentGas'?{clientRequestId:p.requestId}:{})},subject);
    }catch(e){return{promise:Promise.reject(e)};}

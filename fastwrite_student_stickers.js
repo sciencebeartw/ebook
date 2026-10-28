@@ -2,10 +2,10 @@
  function create({scopes,callable,storage,getContext,hash,transport=root.ProductionFastWriteTransport}){
   if(!Array.isArray(scopes)||scopes.length>64||[callable,getContext,hash].some(f=>typeof f!=='function')||!transport?.create)throw Error('invalid-student-sticker-bridge');
   const routes=new Map(),busy=new Map();
-  for(const s of scopes.filter(route=>route.subject!=='math')){if(s.enabled!==true||s.subject!=='science'||s.scoreAuthority!=='dashboard'||!s.className||!/^[\w-]{1,80}$/.test(s.scopeId)||!Number.isSafeInteger(s.epoch)||s.epoch<1||routes.has(s.className))throw Error('invalid-student-sticker-route');routes.set(s.className,s);}
+  for(const s of scopes){if(s.enabled!==true||!(s.subject==='science'&&s.scoreAuthority==='dashboard'||s.subject==='math'&&s.gradeAuthority==='bidirectional')||!s.className||!/^[\w-]{1,80}$/.test(s.scopeId)||!Number.isSafeInteger(s.epoch)||s.epoch<1||routes.has(s.className))throw Error('invalid-student-sticker-route');routes.set(s.className,s);}
   function handle(action,p,subject){
-   if(action!=='submitFeedback'||p?.type!=='棒卡申請'||subject!=='science')return null;
-   const route=routes.get(p.className);if(!route)return null;
+   if(action!=='submitFeedback'||p?.type!=='棒卡申請'||!['science','math'].includes(subject))return null;
+   const route=routes.get(p.className);if(!route||route.subject!==subject)return null;
    return{promise:(async()=>{
     const ctx=getContext(),identity=JSON.stringify(ctx),current=()=>{if(JSON.stringify(getContext())!==identity)throw Error('學生或登入狀態已變更，請回原學生畫面查核');};
     if(!ctx||ctx.isAdmin===true||!/^[\w-]{1,80}$/.test(ctx.uid||'')||ctx.className!==p.className||ctx.studentName!==p.studentName||typeof ctx.studentKey!=='string'||!ctx.studentKey||/[.#$[\]/\x00-\x1f]/.test(ctx.studentKey)||p.sourceClassName&&p.sourceClassName!==ctx.className)throw Error('棒卡申請的班級學生對應已變更');

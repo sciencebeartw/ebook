@@ -4997,7 +4997,7 @@ html { background: #f3faf6; } #splash-status { margin: 22px 0 0; color: #315c44;
   <link rel="stylesheet" href="ebook_push.css?v=20261015-preview1">
     <script src="fastwrite_config.js?v=20261018"></script>
     <script src="fastwrite_production_transport.js?v=20261018"></script>
-    <script src="fastwrite_message_bridge.js?v=20261027_visible_preflight"></script>
+    <script src="fastwrite_message_bridge.js?v=20261029_math_feedback_v1"></script>
     <script src="fastwrite_realtime.js?v=20261018"></script>
     <script src="fastwrite_ebook_realtime.js?v=20261027_online"></script>
     <script src="fastwrite_grade_reader.js?v=20261018"></script>
@@ -5006,11 +5006,11 @@ html { background: #f3faf6; } #splash-status { margin: 22px 0 0; color: #315c44;
     <script src="student_tool_drafts.js?v=20261027"></script>
     <script src="fastwrite_dashboard_score_bridge.js?v=20261028_review_parallel_v1"></script>
     <script src="fastwrite_god_score_bridge.js?v=20261018"></script>
-<script src="fastwrite_sticker_reader.js?v=20261019"></script>
-<script src="fastwrite_student_stickers.js?v=20261020"></script>
-<script src="fastwrite_ebook_stickers.js?v=20261027_online"></script>
-<script src="fastwrite_dashboard_stickers.js?v=20261019"></script>
-<script src="fastwrite_god_stickers.js?v=20261019"></script>
+<script src="fastwrite_sticker_reader.js?v=20261029_math_feedback_v1"></script>
+<script src="fastwrite_student_stickers.js?v=20261029_math_feedback_v1"></script>
+<script src="fastwrite_ebook_stickers.js?v=20261029_math_feedback_v1"></script>
+<script src="fastwrite_dashboard_stickers.js?v=20261029_math_feedback_v1"></script>
+<script src="fastwrite_god_stickers.js?v=20261029_math_feedback_v1"></script>
 </head>
 
 <body>
@@ -14111,8 +14111,8 @@ function renderProductionGodScoreReceipt(status){
 var productionGodStickerBridge;
 function productionGodStickerContext(){return{uid:ebookFirebaseApp.auth().currentUser?.uid,sessionId:ebookGodSessionId,className:gData.className,studentKey:gData.foundUserKey,studentName:gData.studentName};}
 function getProductionGodStickerBridge(){
- if(!Array.isArray(window.DASHBOARD_FASTWRITE_SCOPES))throw Error('極速設定未載入，請重新整理');if(!window.DASHBOARD_FASTWRITE_SCOPES.length||BEAR_SUBJECT!=='/science')return null;
- var identity=JSON.stringify(productionGodStickerContext());if(!productionGodStickerBridge||productionGodStickerBridge.identity!==identity)productionGodStickerBridge=window.ProductionGodStickerBridge.create({scopes:window.DASHBOARD_FASTWRITE_SCOPES,storage:localStorage,getContext:productionGodStickerContext,
+ if(!Array.isArray(window.MESSAGE_FASTWRITE_SCOPES))throw Error('極速設定未載入，請重新整理');if(!window.MESSAGE_FASTWRITE_SCOPES.length||!window.MESSAGE_FASTWRITE_SCOPES.some(s=>s.subject===BEAR_SUBJECT.replace(/^\//,'')&&s.className===gData.className))return null;
+ var identity=JSON.stringify(productionGodStickerContext());if(!productionGodStickerBridge||productionGodStickerBridge.identity!==identity)productionGodStickerBridge=window.ProductionGodStickerBridge.create({scopes:window.MESSAGE_FASTWRITE_SCOPES,storage:localStorage,getContext:productionGodStickerContext,
   callable:function(q){return getGodSessionCallable('runEbookGodAdminAction')(q);},
   hash:async function(value){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(value))))).map(function(x){return x.toString(16).padStart(2,'0');}).join('');},
   onBalance:function(route,key,balance,revision){window.confirmProductionStickerBalance(balance,revision);}

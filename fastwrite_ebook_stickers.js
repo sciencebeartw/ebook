@@ -1,16 +1,16 @@
 (function(root){'use strict';
  let reader,manager,target,version=0,identity='',nativeBalance=0,committed,acceptedRevision=-1;
- function ready(){return typeof ebookFirebaseApp!=='undefined'&&typeof gData!=='undefined'&&gData&&typeof isAdminMode!=='undefined'&&typeof BEAR_SUBJECT!=='undefined'&&BEAR_SUBJECT==='/science'&&!isDashboardDraftPreviewMode;}
+ function ready(){return typeof ebookFirebaseApp!=='undefined'&&typeof gData!=='undefined'&&gData&&typeof isAdminMode!=='undefined'&&typeof BEAR_SUBJECT!=='undefined'&&Array.isArray(root.MESSAGE_FASTWRITE_SCOPES)&&root.MESSAGE_FASTWRITE_SCOPES.some(s=>s.enabled===true&&s.subject===BEAR_SUBJECT.replace(/^\//,'')&&s.className===gData.className)&&!isDashboardDraftPreviewMode;}
  function who(){return ready()?[ebookFirebaseApp.auth().currentUser?.uid||'',typeof ebookGodSessionId==='undefined'?'':ebookGodSessionId,gData.className||'',gData.foundUserKey||''].join('|'):'';}
  let submitter;
  root.handleProductionStudentSticker=function(action,payload){
-  if(!ready()||isAdminMode||!Array.isArray(root.DASHBOARD_FASTWRITE_SCOPES)||!root.DASHBOARD_FASTWRITE_SCOPES.length)return null;
-  if(!submitter)submitter=root.ProductionStudentStickerBridge.create({scopes:root.DASHBOARD_FASTWRITE_SCOPES,storage:root.localStorage,
+  if(!ready()||isAdminMode||!Array.isArray(root.MESSAGE_FASTWRITE_SCOPES)||!root.MESSAGE_FASTWRITE_SCOPES.length)return null;
+  if(!submitter)submitter=root.ProductionStudentStickerBridge.create({scopes:root.MESSAGE_FASTWRITE_SCOPES,storage:root.localStorage,
    getContext:()=>({uid:ebookFirebaseApp.auth().currentUser?.uid,className:gData?.className,studentName:gData?.studentName,studentKey:gData?.foundUserKey,isAdmin:isAdminMode}),
    callable:ebookFunctions.httpsCallable('runEbookStudentAction',{timeout:30000}),hash:async v=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(v))))).map(x=>x.toString(16).padStart(2,'0')).join('')});
   return submitter.handle(action,payload,BEAR_SUBJECT.replace(/^\//,''));
  };
- function getReader(){const scopes=root.DASHBOARD_FASTWRITE_SCOPES;if(!Array.isArray(scopes)||!scopes.length||!ready())return null;
+ function getReader(){const scopes=root.MESSAGE_FASTWRITE_SCOPES;if(!Array.isArray(scopes)||!scopes.length||!ready())return null;
   if(!reader)reader=root.ProductionStickerReader.create({scopes,storage:root.localStorage,getUid:()=>ebookFirebaseApp.auth().currentUser?.uid,getSessionId:()=>ebookGodSessionId,
    callableFor:mode=>ebookFunctions.httpsCallable(mode==='god'?'runEbookGodAdminAction':'runEbookStudentAction',{timeout:30000}),hash:async v=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(v))))).map(x=>x.toString(16).padStart(2,'0')).join('')});return reader;}
  function note(text){const anchor=document.getElementById('headStickers');if(!anchor)return;let el=document.getElementById('fastWriteStickerReadStatus');if(!el){el=document.createElement('span');el.id='fastWriteStickerReadStatus';el.setAttribute('role','status');el.style.cssText='display:block;font-size:.85rem;overflow-wrap:anywhere';anchor.insertAdjacentElement('afterend',el);}el.textContent=text;}

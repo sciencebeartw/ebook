@@ -2,7 +2,7 @@
  function create({scopes,callable,storage,getUid,getStudentKey,onBalance,hash,transport=root.ProductionFastWriteTransport}){
   if(!Array.isArray(scopes)||scopes.length>64||[callable,getUid,getStudentKey,hash].some(f=>typeof f!=='function')||!transport?.create)throw Error('invalid-sticker-bridge');
   const routes=new Map(),busy=new Map();
-  for(const s of scopes.filter(route=>route.subject!=='math')){if(s.enabled!==true||s.subject!=='science'||s.scoreAuthority!=='dashboard'||!s.className||!/^[\w-]{1,80}$/.test(s.scopeId)||!Number.isSafeInteger(s.epoch)||s.epoch<1||routes.has(s.className))throw Error('invalid-sticker-route');routes.set(s.className,s);}
+  for(const s of scopes){if(s.enabled!==true||!(s.subject==='science'&&s.scoreAuthority==='dashboard'||s.subject==='math'&&s.gradeAuthority==='bidirectional')||!s.className||!/^[\w-]{1,80}$/.test(s.scopeId)||!Number.isSafeInteger(s.epoch)||s.epoch<1||routes.has(s.className))throw Error('invalid-sticker-route');routes.set(s.className,s);}
   const uid=()=>{const v=getUid();if(!/^[\w-]{1,80}$/.test(v||''))throw Error('請先登入老師帳號');return v;};
   const receiptKey=u=>'fastwrite-sticker-receipts-'+u;
   const pendingKey=u=>'fastwrite-sticker-pending-'+u;
@@ -55,8 +55,9 @@
    })();busy.set(busyKey,{signature,promise});try{return await promise;}finally{if(busy.get(busyKey)?.promise===promise)busy.delete(busyKey);}
   }
   function handle(action,p,subject){
-   if(!['approveStickerGas','approveAllStickersGas','writeStickerAdjustmentGas','fastWriteStickerCheckin'].includes(action)||subject!=='science')return null;
-   const route=routes.get(p?.balanceClassName||p?.className);if(!route){if(routes.has(p?.className))return{promise:Promise.reject(Error('棒卡入帳班級尚未完成對應'))};return null;}
+   if(!['approveStickerGas','approveAllStickersGas','writeStickerAdjustmentGas','fastWriteStickerCheckin'].includes(action)||!['science','math'].includes(subject))return null;
+   const route=routes.get(p?.balanceClassName||p?.className);if(route&&route.subject!==subject)return null;
+   if(!route){if(routes.has(p?.className))return{promise:Promise.reject(Error('棒卡入帳班級尚未完成對應'))};return null;}
    const promise=(async()=>{
     const u=uid();if(action!=='approveAllStickersGas')return one(route,p,action,u);
     let rows=p.pendingList;try{if(typeof rows==='string')rows=JSON.parse(rows);}catch(_){throw Error('待審名單不正確');}
