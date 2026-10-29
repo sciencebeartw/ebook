@@ -5261,6 +5261,14 @@ async function sendProductionStudentReport(action,payload,send) {
       }
     }
 
+    function loadEbookLoginPendingPolicy(session) {
+      // 新版登入回傳同一次驗證的規則；舊後端仍使用原 Callable，不取本機舊快取。
+      if (session && session.pendingPolicy !== undefined) {
+        return Promise.resolve(normalizeEbookPendingPolicyPayload(session.pendingPolicy));
+      }
+      return loadEbookPendingTaskPolicy();
+    }
+
     function ebookAdminFeatureRetired(onSuccess) {
       if (onSuccess) onSuccess({ success: false, msg: "eBook 內建管理功能已退場，請回行政中心操作。" });
     }
@@ -7001,7 +7009,8 @@ async function sendProductionStudentReport(action,payload,send) {
                    subjectKey: BEAR_SUBJECT.replace('/', ''),
                    studentName: u,
                    password: p,
-                   rememberDevice: shouldRemember
+                   rememberDevice: shouldRemember,
+                   includePendingPolicy: true
                });
                const session = loginResult && loginResult.data ? loginResult.data : null;
                if (!session || !session.firebaseCustomToken || !session.className || !session.studentKey) {
@@ -7014,7 +7023,7 @@ async function sendProductionStudentReport(action,payload,send) {
                ebookAuthSessionInfo = session;
                const loaded = await Promise.all([
                    executeFirebaseRead(u, '', true, session.className, session.studentKey),
-                   loadEbookPendingTaskPolicy()
+                   loadEbookLoginPendingPolicy(session)
                ]);
                const res = loaded[0];
                res.pendingPolicy = loaded[1];
@@ -9114,7 +9123,7 @@ async function sendProductionStudentReport(action,payload,send) {
                 if (!currentUser) return false;
                 showEbookParentLoginLoader('自動登入中');
                 var resumeFn = ebookFunctions.httpsCallable('resumeEbookStudentSession');
-                var resumeResult = await resumeFn({ subjectKey: BEAR_SUBJECT.replace('/', '') });
+                var resumeResult = await resumeFn({ subjectKey: BEAR_SUBJECT.replace('/', ''), includePendingPolicy: true });
                 var session = resumeResult && resumeResult.data ? resumeResult.data : null;
                 if (!session || !session.firebaseCustomToken || !session.className || !session.studentKey) {
                     throw new Error('自動登入服務沒有回傳完整的學生身分');
@@ -9124,7 +9133,7 @@ async function sendProductionStudentReport(action,payload,send) {
                 ebookAuthSessionInfo = session;
                 var loaded = await Promise.all([
                     executeFirebaseRead(session.studentName, '', true, session.className, session.studentKey),
-                    loadEbookPendingTaskPolicy()
+                    loadEbookLoginPendingPolicy(session)
                 ]);
                 loaded[0].pendingPolicy = loaded[1];
                 ebookAuthSessionInfo.pendingPolicy = loaded[1];
@@ -13754,9 +13763,9 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             var previousAllowedClassKeys = ebookGodSessionInfo && ebookGodSessionInfo.allowedClassKeys;
             var fn = getGodSessionCallable('getEbookGodSession');
             var needsFirebaseToken = !!force;
-            var result = await fn({ sessionId: ebookGodSessionId, includeFirebaseToken: needsFirebaseToken });
+            var result = await fn({ sessionId: ebookGodSessionId, includeFirebaseToken: needsFirebaseToken, includePendingPolicy: needsFirebaseToken });
             ebookGodSessionInfo = result && result.data ? result.data : null;
-            if (ebookGodSessionInfo && ebookGodSessionInfo.pendingPolicy === undefined && previousPendingPolicy) {
+            if (!needsFirebaseToken && ebookGodSessionInfo && ebookGodSessionInfo.pendingPolicy === undefined && previousPendingPolicy) {
                 ebookGodSessionInfo.pendingPolicy = previousPendingPolicy;
             }
             // 一般 heartbeat 不一定重新簽 Firebase token；保留首次 Functions 回傳的
@@ -13841,7 +13850,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 isAdminMode = !isStudentPreviewMode;
                 showEbookSessionBootstrapLoader(isStudentPreviewMode ? '學生視角' : '上帝視角');
                 // 驗證完成後，政策與同一學生資料並行讀取；兩者就緒才顯示畫面。
-                var pendingPolicyPromise = loadEbookPendingTaskPolicy();
+                var pendingPolicyPromise = loadEbookLoginPendingPolicy(session);
                 ebookGodSessionInfo = session;
                 ebookAuthSessionInfo = session;
                 startEbookGodSessionHeartbeat();
