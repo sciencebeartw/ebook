@@ -25,7 +25,7 @@ const context = {
 context.normalizeEbookExamLookupText = value => String(value == null ? '' : value).replace(/\s+/g, '');
 vm.createContext(context);
 vm.runInContext(
-  extract('function getVerifiedStoredGradeExamId', 'function collectGradeDateAnchorKeys') +
+  extract('function isFastWriteInitialGrade', 'function collectGradeDateAnchorKeys') +
   extract('function normalizeExamCatalogClassSnapshot', 'async function loadExamIdByClassColKey'),
   context,
 );

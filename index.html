@@ -5872,7 +5872,18 @@ async function sendProductionStudentReport(action,payload,send) {
             .replace(/\d{1,2}[\/.-]\d{1,2}/g, "");
     }
 
+    // 僅接受伺服器同一新增考卷工作發布的永久 ID；不等待 Sheet 欄號。
+    function isFastWriteInitialGrade(grade, colKey) {
+        var m = grade && grade.fastWriteInitial;
+        return !!(m && m.schema === 1 && /^exam_[a-f0-9-]{36}$/.test(grade.fastWriteExamId || '') &&
+            colKey === 'pending_' + grade.fastWriteExamId && m.examId === grade.fastWriteExamId &&
+            /^[-\w]{1,180}$/.test(m.scope || '') && /^[-\w]{1,180}$/.test(m.requestId || '') &&
+            /^[a-f0-9]{64}$/.test(m.requestHash || '') && /^[a-f0-9]{64}$/.test(m.scoreHash || '') &&
+            typeof grade.score === 'string' && grade.score !== '' && typeof grade.date === 'string' && typeof grade.examName === 'string');
+    }
+
     function getVerifiedStoredGradeExamId(grade, colKey, classKey, examIdByColKey, examCatalogEntriesByClassKey) {
+        if (isFastWriteInitialGrade(grade, colKey)) return grade.fastWriteExamId;
         var pinnedExamId = grade && grade.fastWriteExamId;
         var candidateId = pinnedExamId || (examIdByColKey || {})[colKey] || "";
         if(typeof candidateId!=="string" || candidateId.length>180)return "";
@@ -6053,10 +6064,18 @@ async function sendProductionStudentReport(action,payload,send) {
         var transferChain = options.transferChain || EbookLifecycleApp.buildTransferChain(transferIndex, currentClassKey, { maxDepth: 8 });
         var className = options.className || options.currentClassName || "";
         var fullGradeList = [];
+        var initialByExamId = {};
+        Object.keys(examsObj || {}).forEach(function(key) {
+            if (isFastWriteInitialGrade(examsObj[key], key)) initialByExamId[examsObj[key].fastWriteExamId] = key;
+        });
         for (let col in (examsObj || {})) {
             const nativeData = examsObj[col] || {};
+            var initialGrade = isFastWriteInitialGrade(nativeData, col);
+            // 欄位建立途中可能先有空白實體欄；同卷只顯示一次，待原工作完成原子替換。
+            if (!initialGrade && initialByExamId[nativeData.fastWriteExamId]) continue;
+            if (String(col).indexOf('pending_') === 0 && !initialGrade) continue;
             var verifiedNativeExamId=getVerifiedStoredGradeExamId(nativeData,col,classKey,options.examIdByColKey||{},options.examCatalogEntriesByClassKey||{});
-            const rawData = window.overlayProductionGrade(nativeData,classKey,nativeData.sourceStudentKey,verifiedNativeExamId);
+            const rawData = initialGrade ? nativeData : window.overlayProductionGrade(nativeData,classKey,nativeData.sourceStudentKey,verifiedNativeExamId);
             if (!GiftedAssignmentVisibility.visible(rawData, options.dailyPosts || {}, classKey)) continue;
             const eData = Object.assign({}, rawData, {
                 dist: Array.isArray(rawData.dist) ? rawData.dist.slice() : rawData.dist,
@@ -6182,7 +6201,7 @@ async function sendProductionStudentReport(action,payload,send) {
                 myBucket: myBucketIndex,
                 total: eData.total,
                 isMissing: isMissing,
-                colIndex: parseInt(col.replace('col_','')),
+                colIndex: initialGrade ? 0 : parseInt(col.replace('col_','')),
                 cellColor: eData.cellColor,
                 sourceStudentKey: eData.sourceStudentKey || ""
             });
