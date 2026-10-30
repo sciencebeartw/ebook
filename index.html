@@ -10197,6 +10197,15 @@ async function sendProductionStudentReport(action,payload,send) {
                 }
                 return result;
             }
+            var nativeStatus = window.GiftedHomeworkStatus?.display(exam);
+            if (nativeStatus) {
+                result.mainScore = nativeStatus.label;
+                result.effectiveNum = nativeStatus.score;
+                result.mainClass = nativeStatus.score === null ? ' text-grey-status' : '';
+                result.statusHtml = "<div class='home-exam-tag' data-native-homework-key='" + escapeHtmlAttr(nativeStatus.key) + "'>" + escapeHtml(nativeStatus.note) + "</div>";
+                if(nativeStatus.retry) result.statusHtml += "<button type='button' style='min-height:44px' data-native-homework-retry='" + escapeHtmlAttr(nativeStatus.key) + "'>重新確認繳交狀態</button>";
+                return result;
+            }
             var overrideNum = getFeedbackOverrideNum(exam, feedbackHistory);
             
             if (sheetNum !== null && !isNaN(sheetNum)) {
@@ -10240,6 +10249,14 @@ async function sendProductionStudentReport(action,payload,send) {
                 if (result.effectiveNum < exam.makeupThreshold) result.statusHtml += "<div class='makeup-status-tag status-warning'>" + SVG.alert + "未達標需補考</div>";
             }
             return result;
+        }
+
+        function refreshNativeHomeworkDisplays() {
+            if (!gData) return;
+            window.GiftedHomeworkStatus?.observe(gData.dailyPost || [], gData.grades || [], gData.className);
+            if (Array.isArray(gData.dailyPost)) renderDailyPosts(gData.dailyPost, gData.feedbackHistory || [], 'grades');
+            if (Array.isArray(gData.grades)) renderOldGradeCards(gData.grades, true);
+            queueMicrotask(function(){window.GiftedHomeworkStatus?.scan();});
         }
 
         function refreshHolidayGradeDisplays() {
@@ -11691,7 +11708,9 @@ async function sendProductionStudentReport(action,payload,send) {
                 others.forEach(function (o) {
                     var sDisplay = o.score;
                     var hwColorClass = "";
-                    if (isHomeworkMissingScore(sDisplay)) sDisplay = "<span class='text-red' style='font-size:1rem'>未繳</span>";
+                    var nativeReference = window.GiftedHomeworkStatus?.display(o);
+                    if(nativeReference) sDisplay = "<span data-native-homework-key='" + escapeHtmlAttr(nativeReference.key) + "'>" + escapeHtml(nativeReference.label) + "</span><small>" + escapeHtml(nativeReference.note) + "</small>";
+                    else if (isHomeworkMissingScore(sDisplay)) sDisplay = "<span class='text-red' style='font-size:1rem'>未繳</span>";
                     else {
                         var m = sDisplay.match(/(\d+(\.\d+)?)/);
                         if (m) {
@@ -11713,6 +11732,8 @@ async function sendProductionStudentReport(action,payload,send) {
         }
 
         function renderDailyPosts(posts, history, fastWriteHistoryOnly) {
+            window.GiftedHomeworkStatus?.observe(posts || [], gData?.grades || [], gData?.className || '');
+            queueMicrotask(function(){window.GiftedHomeworkStatus?.scan();});
             var fastWritePreviousScoreContexts=Object.assign({},window.adminModeScoreEditContext||{});var fastWritePreviousMakeupContexts=Object.assign({},window.adminModeMakeupContext||{});
             if(!fastWriteHistoryOnly) window.adminModeReplyContext = {};
             if(!fastWriteHistoryOnly) window.adminModeStickerContext = {};
@@ -16298,7 +16319,7 @@ function renderProductionGodStickerReceipt(anchor){
         });
     </script>
 </div><script src="gifted_release_config.js?v=20261009-v25"></script>
-<script src="gifted_entry.js?v=20261025-ipad-timeout"></script>
+<script src="gifted_homework_status.js?v=20261031-firebase-receipt"></script><script src="gifted_entry.js?v=20261031-firebase-receipt"></script>
 </body>
 
 </html>

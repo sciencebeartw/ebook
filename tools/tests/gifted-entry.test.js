@@ -95,3 +95,15 @@ test('standalone homework transport also supports browsers without AbortSignal.t
  ctx.fetch=(url,input)=>new Promise((resolve,reject)=>input.signal.addEventListener('abort',()=>reject(new DOMException('Aborted','AbortError'))));
  const pending=ctx.api('/api/student',{action:'task'},'synthetic-token');expire();await assert.rejects(pending,{name:'AbortError'});assert.equal(cleared,2);
 });
+
+test('summary read is authenticated, scoped, and does not need to open homework',async()=>{
+ const f=setup(true,false),seen=[];f.context.fetch=async(url,input)=>{seen.push({url,input});return {ok:true,json:async()=>({planId:plan})};};f.ready();
+ assert.equal((await f.ui.readSummary({planId:plan,segmentId:'week-1'})).planId,plan);assert.equal(f.elements.length,0);
+ assert.deepEqual(JSON.parse(seen[0].input.body),{action:'summary',planId:plan,segmentId:'week-1'});assert.equal(seen[0].input.headers.Authorization,'Bearer opaque');
+ assert.equal(f.values.size,0);
+});
+test('summary read rejects an old identity after logout or a different login',async()=>{
+ for(const switchUser of [false,true]){const f=setup(true,false);f.ready();const pending=f.ui.readSummary({planId:plan,segmentId:'week-1'});await new Promise(setImmediate);
+ if(switchUser){f.auth.currentUser={uid:'student-b',getIdToken:async()=> 'new'};f.ready();}else f.ui.close(true);
+ f.resolveFetch();await assert.rejects(pending,/LOGIN_REQUIRED/);}
+});

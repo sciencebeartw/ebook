@@ -3,7 +3,7 @@
  let frame,overlay,owner,lastOwner,auth,unsubscribe,studentSession,activeAssignment,studentName='',generation=0;
  const config=root.GIFTED_HOMEWORK_RELEASE,query=new URLSearchParams(location.search);
  function erase(uid){if(!uid)return;const prefix='gifted-answer-outbox-v1:'+encodeURIComponent(uid)+'|',correctionPrefix='gifted-correction-request:'+uid+':';try{for(let i=localStorage.length-1;i>=0;i--){const key=localStorage.key(i);if(key?.startsWith(prefix)||key?.startsWith(correctionPrefix))localStorage.removeItem(key);}}catch{}}
- function close(clear=false){generation++;if(clear){erase(owner||lastOwner);lastOwner=null;studentSession=null;}frame?.remove();overlay?.remove();frame=overlay=null;activeAssignment=null;unsubscribe?.();unsubscribe=null;owner=null;auth=null;document.body.classList.remove('gifted-entry-open');}
+ function close(clear=false){generation++;if(clear){erase(owner||lastOwner);lastOwner=null;studentSession=null;root.GiftedHomeworkStatus?.clear();}frame?.remove();overlay?.remove();frame=overlay=null;activeAssignment=null;unsubscribe?.();unsubscribe=null;owner=null;auth=null;document.body.classList.remove('gifted-entry-open');}
  function assignmentFromHref(href){
   try{
    const here=new URL(location.href),url=new URL(href,here),path=p=>p.replace(/\/index\.html$/,'/').replace(/\/$/,'');
@@ -20,6 +20,8 @@
   const teacherView=context.teacherView===true&&['god_session','student_preview'].includes(context.mode);
   if(!user||context.preview||(!teacherView&&(context.result?.isAdmin||['admin_view','god_session','student_preview','dashboard_draft_preview'].includes(context.mode)))){close(true);return;}
   studentSession={auth:context.auth,uid:user.uid,readOnly:teacherView&&context.mode==='god_session',studentPreview:teacherView&&context.mode==='student_preview',studentName:String(context.result.studentName||'')};
+  root.GiftedHomeworkStatus?.activate(JSON.stringify([user.uid,context.mode,context.result.className,context.result.foundUserKey,context.result.studentName]));
+  root.refreshNativeHomeworkDisplays?.();
   if(query.get('gifted')){const assignment=assignmentFromHref(location.href);if(assignment)openAssignment(assignment);}
  }
  function openAssignment(assignment){
@@ -61,9 +63,20 @@
    try{
     const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify(body),signal:controller.signal});
     const value=await response.json();valid();
-    if(!response.ok)throw Error(value.error||'連線失敗');return value;
+    if(!response.ok)throw Error(value.error||'連線失敗');
+    if(body.action==='submit'&&value.status==='submitted')root.GiftedHomeworkStatus?.submitted(activeAssignment,value);
+    return value;
    }finally{clearTimeout(timeout);}
   }});
  }
- root.GiftedEbook={ready,close,getTransport};
+ async function readSummary(assignment){
+  const session=studentSession;
+  function valid(){if(!session||studentSession!==session||session.auth.currentUser?.uid!==session.uid)throw Error('LOGIN_REQUIRED');}
+  valid();const token=await session.auth.currentUser.getIdToken();valid();
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),30000);
+  try{const response=await fetch(config.studentApi,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({action:'summary',planId:assignment.planId,segmentId:assignment.segmentId}),signal:controller.signal});
+   const value=await response.json();valid();if(!response.ok)throw Error(value.error||'連線失敗');return value;
+  }finally{clearTimeout(timer);}
+ }
+ root.GiftedEbook={ready,close,getTransport,readSummary,assignmentFromHref};
 })(window);
