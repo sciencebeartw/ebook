@@ -26,7 +26,7 @@
   }
   function receipts(uid=account()){let rows;try{rows=JSON.parse(storage.getItem(receiptKey(uid))||"{}");}catch(_){throw Error("留言收據無法讀取，請保留目前頁面");}if(!rows||typeof rows!=="object"||Array.isArray(rows)||Object.keys(rows).length>128)throw Error("留言收據需要查核");return rows;}
   function save(uid,id,row){const rows=receipts(uid);if(!rows[id]&&Object.keys(rows).length>=128)throw Error("待回填留言已達上限，請先查核同步狀態");rows[id]=row;storage.setItem(receiptKey(uid),JSON.stringify(rows));}
-  function connection(route,entityId,mode,uid,payload){return transport.create({kind:"message",callable:callableFor(mode),storage,namespace:"message_"+mode+"_"+uid,scope:route.scopeId,entityId,epoch:route.epoch,sessionId:mode==="god"?getSessionId():undefined,
+  function connection(route,entityId,mode,uid,payload){return transport.create({kind:"message",callable:callableFor(mode),storage,namespace:"message_"+mode+"_"+uid,scope:route.scopeId,entityId,epoch:route.epoch,sessionId:mode==="god"?getSessionId():undefined,messageSource:{studentKey:payload.studentKey,targetDate:payload.targetDate},
    onConfirmed:(result,command)=>{
     if(!/^p\d{12}_[a-f0-9]{64}$/.test(result.eventId||"")||!Number.isSafeInteger(result.revision)||result.revision<1||result.revision>32||!Number.isSafeInteger(result.committedAt))throw Error("留言收據對應不一致");
     const id=route.scopeId+"|"+entityId+"|"+command.requestId;

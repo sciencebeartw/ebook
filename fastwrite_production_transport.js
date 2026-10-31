@@ -1,10 +1,10 @@
 (function(root){"use strict";
  // 同一候選的 callable transport。結果不明保留原命令，從 receipt 恢復，不改送 GAS。
- function create({callable,storage,namespace,scope,entityId,epoch,sessionId,onConfirmed,kind="business"}){
+ function create({callable,storage,namespace,scope,entityId,epoch,sessionId,onConfirmed,kind="business",messageSource}){
   if(typeof callable!=="function"||!storage||!/^[-\w]{1,100}$/.test(namespace)||!/^[-\w]{1,80}$/.test(scope)||!/^[-\w]{1,80}$/.test(entityId)||!Number.isSafeInteger(epoch)||epoch<1)throw Error("invalid-production-transport");
   const key="fastwrite-production-"+namespace+"-"+scope+"-"+entityId;
   function pending(){try{return JSON.parse(storage.getItem(key)||"null");}catch(_){throw Error("saved-command-unreadable");}}
-  async function request(operation,extra={}){const response=await callable({action:"fastWriteV1",data:{operation,scope,entityId,epoch,...extra},...(sessionId?{sessionId}:{})});return response.data;}
+  async function request(operation,extra={}){const response=await callable({action:"fastWriteV1",data:{operation,scope,entityId,epoch,...(kind==="message"&&messageSource&&["read","watch"].includes(operation)?{messageSource}:{}),...extra},...(sessionId?{sessionId}:{})});return response.data;}
   function prepare(command){if(pending())throw Error("previous-command-unconfirmed");
    if(!["business","message"].includes(kind)||!command||command.epoch!==epoch||!/^[-\w]{1,80}$/.test(command.requestId||"")||(kind!=="message"||command.expectedRevision!==undefined)&&!Number.isSafeInteger(command.expectedRevision))throw Error("invalid-command");
    storage.setItem(key,JSON.stringify(command));return pending();}
