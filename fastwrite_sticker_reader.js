@@ -1,6 +1,9 @@
 (function(root){'use strict';
  const safe=s=>typeof s==='string'&&s.length>0&&s.length<=180&&!/[.#$[\]/\x00-\x1f\x7f]/.test(s)&&!['__proto__','prototype','constructor'].includes(s),label=s=>typeof s==='string'&&s.length>0&&s.length<=100&&!/[\x00-\x1f\x7f]/.test(s),int=Number.isSafeInteger;
  function day(s){return typeof s==='string'&&/^(?:20\d{2}|2100)-\d{2}-\d{2}$/.test(s)&&!isNaN(Date.parse(s))&&new Date(s+'T00:00:00Z').toISOString().slice(0,10)===s;}
+ // Sheet 餘額校正可能超過單次申請的 100 棒；讀取時依帳本前後餘額核對。
+ // 僅放寬唯讀帳本，申請及寫入指令仍沿用原本的 100 棒限制。
+ const balancedEntry=a=>int(a.before)&&int(a.after)&&Number.isSafeInteger(a.after-a.before)&&a.after-a.before===a.delta;
  const date=s=>s.replace(/-/g,'/'),time=ms=>new Date(ms+28800000).toISOString().slice(0,19).replace(/-/g,'/').replace('T',' ');
  function create({scopes,callableFor,getUid,getSessionId=()=>'',storage,hash,transport=root.ProductionFastWriteTransport}){
   if(!Array.isArray(scopes)||scopes.length>64||[callableFor,getUid,getSessionId,hash].some(f=>typeof f!=='function')||!transport?.create)throw Error('invalid-sticker-reader');
@@ -18,7 +21,7 @@
     if(view?.kind!=='stickers'||view.entityId!==entityId||!int(view.revision)||view.revision<0||!b||!int(b.balance)||new TextEncoder().encode(JSON.stringify(view)).length>256*1024)throw Error('invalid-sticker-projection');
     for(const field of ['applications','entries','checkins']){const rows=b[field]||{};if(typeof rows!=='object'||Array.isArray(rows)||Object.keys(rows).length>512)throw Error('invalid-sticker-projection');}
     for(const [id,a]of Object.entries(b.applications||{}))if(!a||typeof a!=='object'||!safe(id)||a.id!==id||!int(a.delta)||!a.delta||Math.abs(a.delta)>100||!day(a.date)||typeof a.reason!=='string'||a.reason.length>2000||!['pending','approved','rejected'].includes(a.status)||!int(a.submittedAt)||a.submittedAt<0||a.submittedAt>4102444800000||a.reviewReason!==undefined&&(typeof a.reviewReason!=='string'||a.reviewReason.length>2000)||a.sourceFeedbackKey!==undefined&&(!safe(a.sourceFeedbackKey)||!label(a.sourceClassName)||!safe(a.sourceStudentKey)))throw Error('invalid-sticker-projection');
-    for(const [id,a]of Object.entries(b.entries||{}))if(!a||typeof a!=='object'||!safe(id)||a.id!==id||!int(a.delta)||!a.delta||Math.abs(a.delta)>100||!day(a.date)||typeof a.reason!=='string'||a.reason.length>2000||!int(a.at)||a.at<0||a.at>4102444800000||a.applicationId!==undefined&&!safe(a.applicationId))throw Error('invalid-sticker-projection');
+    for(const [id,a]of Object.entries(b.entries||{}))if(!a||typeof a!=='object'||!safe(id)||a.id!==id||!int(a.delta)||((!a.delta||Math.abs(a.delta)>100)&&!balancedEntry(a))||!day(a.date)||typeof a.reason!=='string'||a.reason.length>2000||!int(a.at)||a.at<0||a.at>4102444800000||a.applicationId!==undefined&&!safe(a.applicationId))throw Error('invalid-sticker-projection');
     for(const [d,c]of Object.entries(b.checkins||{}))if(!c||typeof c!=='object'||!day(d)||typeof c.checked!=='boolean'||!int(c.checkedAt))throw Error('invalid-sticker-projection');
     const old=cache.get(key);if(old&&old.revision>view.revision)return false;const next={revision:view.revision,business:JSON.parse(JSON.stringify(b)),route,studentKey};if(JSON.stringify(old)===JSON.stringify(next))return false;
     if(cache.size>=4&&!cache.has(key))cache.delete(cache.keys().next().value);cache.set(key,next);return true;
