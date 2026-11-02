@@ -6172,6 +6172,7 @@ async function sendProductionStudentReport(action,payload,send) {
 
             fullGradeList.push({
                 giftedPostId:eData.giftedPostId, giftedPlanId:eData.giftedPlanId, giftedSegmentId:eData.giftedSegmentId,
+                nativeScopeSheetStatus: eData.nativeScopeMigration?.schema === 1 && eData.nativeScopeMigration?.policy === 2 && eData.nativeScopeMigration?.status === 'sheet_pending' ? 'pending' : '',
                 assessmentKind: eData.assessmentKind || '', scoreMax: eData.scoreMax, scoreUnit: eData.scoreUnit, reportEnabled: eData.reportEnabled, sourceAssignmentId: eData.sourceAssignmentId || '', dueAt: eData.dueAt || 0, originClassName: eData.originClassName || '',
                 className: presentation.className,
                 sourceClassKey: presentation.sourceClassKey,
@@ -10209,6 +10210,9 @@ async function sendProductionStudentReport(action,payload,send) {
                 return result;
             }
             var overrideNum = getFeedbackOverrideNum(exam, feedbackHistory);
+            if (exam.nativeScopeSheetStatus === 'pending' && sheetNum !== null && !isNaN(sheetNum)) {
+                result.statusHtml += "<div class='home-exam-tag'>試算表待同步</div>";
+            }
             
             if (sheetNum !== null && !isNaN(sheetNum)) {
                 if (rawScore.indexOf("假") > -1) {
