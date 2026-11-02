@@ -1,9 +1,22 @@
 /* 沿用聯絡簿登入。預設關閉；不儲存／轉送登入 token 至 URL、iframe 或 localStorage。 */
 (function(root){'use strict';
- let frame,overlay,owner,lastOwner,auth,unsubscribe,studentSession,activeAssignment,studentName='',generation=0;
+ let frame,overlay,owner,lastOwner,auth,unsubscribe,studentSession,activeAssignment,pageState,studentName='',generation=0;
  const config=root.GIFTED_HOMEWORK_RELEASE,query=new URLSearchParams(location.search);
  function erase(uid){if(!uid)return;const prefix='gifted-answer-outbox-v1:'+encodeURIComponent(uid)+'|',correctionPrefix='gifted-correction-request:'+uid+':';try{for(let i=localStorage.length-1;i>=0;i--){const key=localStorage.key(i);if(key?.startsWith(prefix)||key?.startsWith(correctionPrefix))localStorage.removeItem(key);}}catch{}}
- function close(clear=false){generation++;if(clear){erase(owner||lastOwner);lastOwner=null;studentSession=null;root.GiftedHomeworkStatus?.clear();}frame?.remove();overlay?.remove();frame=overlay=null;activeAssignment=null;unsubscribe?.();unsubscribe=null;owner=null;auth=null;document.body.classList.remove('gifted-entry-open');}
+ function lockPage(opener){
+  pageState={x:root.scrollX||0,y:root.scrollY||0,focus:opener||document.activeElement};
+  document.body.style.setProperty('--gifted-entry-page-top',-pageState.y+'px');
+  document.documentElement.classList.add('gifted-entry-open');document.body.classList.add('gifted-entry-open');
+ }
+ function unlockPage(){
+  if(!pageState)return;
+  const saved=pageState;pageState=null;
+  document.body.classList.remove('gifted-entry-open');document.body.style.removeProperty('--gifted-entry-page-top');
+  root.scrollTo(saved.x,saved.y);
+  document.documentElement.classList.remove('gifted-entry-open');
+  if(saved.focus?.isConnected)saved.focus.focus({preventScroll:true});
+ }
+ function close(clear=false){generation++;if(clear){erase(owner||lastOwner);lastOwner=null;studentSession=null;root.GiftedHomeworkStatus?.clear();}frame?.remove();overlay?.remove();frame=overlay=null;activeAssignment=null;unsubscribe?.();unsubscribe=null;owner=null;auth=null;unlockPage();}
  function assignmentFromHref(href){
   try{
    const here=new URL(location.href),url=new URL(href,here),path=p=>p.replace(/\/index\.html$/,'/').replace(/\/$/,'');
@@ -24,7 +37,7 @@
   root.refreshNativeHomeworkDisplays?.();
   if(query.get('gifted')){const assignment=assignmentFromHref(location.href);if(assignment)openAssignment(assignment);}
  }
- function openAssignment(assignment){
+ function openAssignment(assignment,opener){
   const session=studentSession,user=session?.auth.currentUser;
   if(!session||!user||user.uid!==session.uid)return false;
   const endpoint=new URL(config.studentApi);
@@ -36,7 +49,7 @@
   back.onclick=async()=>{if(session.readOnly){close(false);return;}const ok=await root.swalConfirm('返回聯絡簿','尚未送出的答案會保留在此裝置，下次可繼續填寫。');if(ok)close(false);};
   frame=document.createElement('iframe');frame.title='資優自然課本作業';
   const url=new URL('gifted/index.html',location.href);url.searchParams.set('v','20261025-ipad-timeout');url.searchParams.set('plan',assignment.planId);url.searchParams.set('segment',assignment.segmentId);
-  overlay.append(back,frame);document.body.append(overlay);document.body.classList.add('gifted-entry-open');frame.src=url.href;back.focus();
+  overlay.append(back,frame);lockPage(opener);document.body.append(overlay);frame.src=url.href;back.focus({preventScroll:true});
   unsubscribe=auth.onAuthStateChanged(next=>{if(next?.uid!==owner)close(true);});
   return true;
  }
@@ -45,7 +58,7 @@
   if(event.defaultPrevented||event.button!==0||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
   const link=event.target.closest?.('a[href]');if(!link||link.hasAttribute('download'))return;
   const assignment=assignmentFromHref(link.href);
-  if(assignment&&openAssignment(assignment))event.preventDefault();
+  if(assignment&&openAssignment(assignment,link))event.preventDefault();
  });
  function getTransport(caller){
   if(!frame||frame.contentWindow!==caller||!owner||auth.currentUser?.uid!==owner)throw Error('LOGIN_REQUIRED');
