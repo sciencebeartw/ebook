@@ -14,8 +14,9 @@
    try{result=receipt||await request("commit",{command:saved});}
    catch(error){
     const d=error?.details;
-    if(error?.code==='functions/failed-precondition'&&d?.businessStatus==='rejected'&&
-      d.requestId===saved.requestId&&['feedback-review-already-scored','feedback-review-already-colored'].includes(d.reason)&&
+    if(['functions/failed-precondition','failed-precondition'].includes(error?.code)&&d?.businessStatus==='rejected'&&
+      d.requestId===saved.requestId&&(['feedback-review-already-scored','feedback-review-already-colored'].includes(d.reason)||
+       saved.action==='apply_stickers'&&d.reason==='sticker-latest-date-required')&&
       JSON.stringify(pending())===JSON.stringify(saved)){
      storage.removeItem(key);error.fastWriteRejected=true;
     }

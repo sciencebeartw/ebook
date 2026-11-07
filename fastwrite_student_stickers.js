@@ -18,9 +18,18 @@
     const promise=(async()=>{
      const c=transport.create({callable:async q=>{current();const r=await callable(q);current();return r;},storage,namespace:'student_stickers_'+ctx.uid,scope:route.scopeId,entityId,epoch:route.epoch,
       onConfirmed:r=>{current();if(!/^[a-f0-9]{64}$/.test(r.eventId||'')||!Number.isSafeInteger(r.revision)||r.revision<1||!Number.isSafeInteger(r.result?.balance))throw Error('棒卡申請收據尚未確認');}});
-     const pending=c.pending();
-     if(pending){if(pending.action!=='apply_stickers'||JSON.stringify(pending.data)!==signature)throw Error('上一筆棒卡申請結果待確認，請使用原內容重試');}
-     else{
+     let pending=c.pending();
+     if(pending&&(pending.action!=='apply_stickers'||JSON.stringify(pending.data)!==signature)){
+      if(pending.action!=='apply_stickers'||!/^\d{4}-\d{2}-\d{2}$/.test(pending.data?.date||'')||pending.data.date>=date)throw Error('上一筆棒卡申請結果待確認，請使用原內容重試');
+      let priorReceipt,retired=false;
+      try{priorReceipt=await c.send({recover:true});}
+      catch(error){if(error?.fastWriteRejected!==true||error.details?.reason!=='sticker-latest-date-required'||c.pending())throw error;retired=true;}
+      current();
+      if(priorReceipt)throw Error('上一筆棒卡申請已確認儲存，請先查看申請紀錄，再確認是否送出這次申請');
+      if(!retired)throw Error('上一筆棒卡申請結果尚未確認，請稍後再試');
+      pending=c.pending();
+     }
+     if(!pending){
       const view=await c.read();current();
       if(view?.authority==='legacy'&&view.kind==='stickers'&&/^[a-f0-9]{64}$/.test(view.rollbackVerificationHash||''))return{authority:'legacy',rollbackVerificationHash:view.rollbackVerificationHash};
       if(view?.kind!=='stickers'||!Number.isSafeInteger(view.revision)||!Number.isSafeInteger(view.business?.balance))throw Error('棒卡來源尚未確認');
