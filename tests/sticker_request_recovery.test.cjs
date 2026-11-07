@@ -2,9 +2,10 @@
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const source=process.env.STICKER_FRONTEND_SOURCE||path.resolve(__dirname,'..');
 const {create}=require(path.join(source,'fastwrite_student_stickers.js')),transport=require(path.join(source,'fastwrite_production_transport.js'));
-function fixture({committed=false,code='failed-precondition',unknown=false}={}){
+function fixture({committed=false,code='failed-precondition',unknown=false,vanishAtSend=false}={}){
  const saved=new Map(),calls=[],receipts={},old={requestId:'original_request',epoch:1,expectedRevision:0,action:'apply_stickers',data:{delta:5,reason:'上週申請',date:'2026-10-31'}};
- const storage={getItem:k=>saved.get(k)||null,setItem:(k,v)=>saved.set(k,v),removeItem:k=>saved.delete(k)};
+ let reads=0;
+ const storage={getItem:k=>{if(vanishAtSend&&++reads===4)saved.delete(k);return saved.get(k)||null;},setItem:(k,v)=>saved.set(k,v),removeItem:k=>saved.delete(k)};
  const receipt={businessStatus:'committed',eventId:'a'.repeat(64),revision:1,result:{balance:4}};if(committed)receipts[old.requestId]=receipt;
  const callable=async q=>{const p=q.data;calls.push(p);
   if(unknown)throw Object.assign(Error('unavailable'),{code:'unavailable'});
@@ -33,7 +34,5 @@ test('同週改內容不偷偷重送原內容；仍保留原請求',async()=>{
  const f=fixture();await assert.rejects(f.send({targetDate:'2026/10/31'}),/原內容重試/);assert.equal(f.calls.length,0);assert.deepEqual(f.t.pending(),f.old);
 });
 test('另一分頁已移除未確認資料但未取得終態時不自動送出',async()=>{
- let reads=0;const values=new Map(),storage={getItem:k=>{if(++reads===2)values.delete(k);return values.get(k)||null;},setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)},calls=[];
- const t=transport.create({callable:async q=>{calls.push(q);return{data:null};},storage,namespace:'student_stickers_test',scope:'scope',entityId:'entity',epoch:1});
- t.prepare({requestId:'old',epoch:1,expectedRevision:0,action:'apply_stickers',data:{}});assert.equal(await t.send({recover:true}),null);assert.equal(calls.length,0);
+ const f=fixture({vanishAtSend:true});await assert.rejects(f.send(),/結果尚未確認/);assert.equal(f.calls.length,0);assert.equal(f.t.pending(),null);
 });
