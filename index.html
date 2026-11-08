@@ -5028,7 +5028,7 @@ html { background: #f3faf6; } #splash-status { margin: 22px 0 0; color: #315c44;
 
     <script src="assessment_labels.js?v=20261012-full-scope"></script>
     <script src="assessment_naming.js?v=20261013-editable-2"></script>
-    <script src="class_session_plan.js?v=20261011-library1"></script>
+    <script src="class_session_plan.js?v=extra-lessons-20261108"></script>
     <script src="homework_report_status.js?v=20261011-pending1"></script>
     <script src="homework_answers_contract.js?v=20261011-report1"></script>
     <script src="homework_answers_app.js?v=20261017-responsive-1"></script>
@@ -5047,7 +5047,7 @@ html { background: #f3faf6; } #splash-status { margin: 22px 0 0; color: #315c44;
   <script src="ebook_promotion_app.js?v=20260812_legacy_transfer_student_key"></script>
   <script src="gifted_assignment_visibility.js?v=20261011-library1"></script>
   <script src="gifted_homework_full_scores.js?v=20260720_geo3_question_count_v2"></script>
-  <script src="ebook_pending_tasks_app.js?v=20261011-contactbook1-20261011-homework-score"></script>
+  <script src="ebook_pending_tasks_app.js?v=extra-lessons-20261108"></script>
   <script src="ebook_feedback_threads_app.js?v=20261018-correction-reply"></script>
   <script src="ebook_score_distribution.js?v=equal-high-score-chart-20260922"></script>
 
@@ -10892,7 +10892,7 @@ async function sendProductionStudentReport(action,payload,send) {
             var session = getDailyPostDisplayOptions(post).session;
             if (!session || typeof session !== "object") return null;
             var status = (session.status || "").toString().trim().toLowerCase();
-            if (status !== "rescheduled" && status !== "cancelled") return null;
+            if (status !== "rescheduled" && status !== "added" && status !== "cancelled") return null;
             var rawDate = (post && post.date || "").toString().trim();
             var match = rawDate.match(/(\d{4})[\/.-](\d{1,2})[\/.-](\d{1,2})/);
             if (!match) return null;
@@ -10937,7 +10937,7 @@ async function sendProductionStudentReport(action,payload,send) {
                 !start || !end || end.total <= start.total) return null;
             return {
                 status: status,
-                label: "本次調課｜" + dateLabel + start.label + "–" + end.label
+                label: (session.kind === "additional" || status === "added" ? "本次加課｜" : "本次調課｜") + dateLabel + start.label + "–" + end.label
             };
         }
 

@@ -262,7 +262,7 @@
     if (policy.suppressEntryReminder || policy.status !== 'ready' || !policy.loginReminder || !policy.reminderDue) return [];
     var overdue = getReminderDueItems(result);
     return (result.items || []).filter(function(item) { return overdue.indexOf(item) >= 0 ||
-      Number(item.dueAt) > 0 && Number(policy.loadedAt) >= Number(item.dueAt) - Number(policy.reminderLeadMs || 0); });
+      Number(item.dueAt) > 0 && Number(policy.loadedAt) >= (Number(item.reminderAt) || Number(item.dueAt) - Number(policy.reminderLeadMs || 0)); });
   }
 
   function isReminderDueState(result) {
@@ -808,7 +808,7 @@
       return { status: status, valid: true };
     }
     if (!status || status === "scheduled") return { status: "standard", valid: true };
-    if (status !== "rescheduled") return { status: "invalid", valid: false };
+    if (status !== "rescheduled" && status !== "added") return { status: "invalid", valid: false };
     var actualDate = fullDateParts(session.actualDate);
     var originalStart = parseSessionClock(session.originalStartTime);
     var originalEnd = parseSessionClock(session.originalEndTime);
@@ -1402,13 +1402,14 @@
         var scopedGrades = grades.filter(function(g) { return (g.storedClassKey || g.sourceClassKey || context.classKey) === sourceClassKey; });
         var receipts = ((options.homeworkReportReceipts || {})[sourceClassKey] || {});
         Reports.pending(post, { feedbacks: scopedFeedback, grades: scopedGrades, receipts: receipts,
-          dueAt: Number((((policy.homeworkDueByClass || {})[sourceClassKey] || {})[post.id] || holidayPostOptions(post).homeworkDue || {}).dueAt || 0)
+          dueAt: Number((((policy.homeworkDueByClass || {})[sourceClassKey] || {})[post.id] || holidayPostOptions(post).homeworkDue || {}).dueAt || 0),
+          reminderAt: Number((((policy.homeworkDueByClass || {})[sourceClassKey] || {})[post.id] || holidayPostOptions(post).homeworkDue || {}).reminderAt || 0)
         }).forEach(function(a) {
           pushIfActive(tasks, createTask({ kind: "homework_paper_report", itemType: "homework_report",
             neutralLabel: "作業待回報分數", title: a.title, date: text(post.date),
             sourceClassKey: sourceClassKey, sourceClassName: getPostSourceClassName(post, context),
             sourceItemId: a.sourceItemId, assignmentId: a.assignmentId, answerId: a.answerId,
-            dueAt: a.dueAt, reminderSourceDate: text(post.date),
+            dueAt: a.dueAt, reminderAt: Number((((policy.homeworkDueByClass || {})[sourceClassKey] || {})[post.id] || holidayPostOptions(post).homeworkDue || {}).reminderAt || 0), reminderSourceDate: text(post.date),
             displayTarget: { tab: "contact", dailyPostId: postRowKey, sourceClassKey: sourceClassKey,
               postDate: text(post.date), section: "homework-paper-report", focus: "homework-paper-report", answerId: a.answerId }
           }, context), policy);
@@ -1427,6 +1428,7 @@
         legacySourceItemIds: legacySourceItemIds,
         reminderSourceDate: text(post.date),
         dueAt: Number((((policy.homeworkDueByClass || {})[sourceClassKey] || {})[post.id] || holidayPostOptions(post).homeworkDue || {}).dueAt || 0),
+          reminderAt: Number((((policy.homeworkDueByClass || {})[sourceClassKey] || {})[post.id] || holidayPostOptions(post).homeworkDue || {}).reminderAt || 0),
         displayTarget: {
           tab: "contact",
           dailyPostId: postRowKey,
@@ -1475,7 +1477,7 @@
       pushIfActive(tasks, createTask({ kind: "holiday_practice", itemType: "homework_report",
         neutralLabel: progress && progress.unlockedAt ? "假期卷待回報分數" : "假期卷待完成",
         title: a.title, date: text(post.date), sourceClassKey: sourceClassKey, sourceClassName: sourceClassName,
-        sourceItemId: a.assignmentId, assignmentId: a.assignmentId, dueAt: a.dueAt,
+        sourceItemId: a.assignmentId, assignmentId: a.assignmentId, dueAt: a.dueAt, reminderAt: a.reminderAt || 0,
         reminderSourceDate: text(post.date), displayTarget: awaitingScoreReport ? scoreTarget : paperTarget,
         reportTarget: awaitingScoreReport ? scoreTarget : null, paperTarget: paperTarget
       }, context), policy);

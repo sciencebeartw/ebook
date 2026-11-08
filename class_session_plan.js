@@ -50,36 +50,44 @@
         return p && HOLIDAY_PRACTICE_POLICY_IDS.indexOf(p.id) >= 0 ? p : null;
     }
     function supportsHolidayPractice(subject, className) { return !!holidayPracticePolicy(subject, className); }
-    function occurrenceId(p, originalDate) {
+    function occurrenceId(p, originalDate, kind) {
         var key = dateKey(originalDate);
-        if (!p || !key || weekday(key) !== p.weekday) fail('原訂課次日期與固定班次不符');
-        return p.id + '__' + key;
+        if (!p || !key || (kind !== 'additional' && weekday(key) !== p.weekday)) fail('原訂課次日期與固定班次不符');
+        if (kind === 'additional' && weekday(key) === p.weekday) fail('固定上課日請使用原課次；加課需選其他日期');
+        return p.id + (kind === 'additional' ? '__extra__' : '__') + key;
     }
     function normalizeException(p, raw) {
         if (!raw || typeof raw !== 'object') fail('缺少上課安排');
-        var originalDate = dateKey(raw.originalDate), id = occurrenceId(p, originalDate);
+        var kind = raw.kind === 'additional' || raw.status === 'added' ? 'additional' : 'regular';
+        var originalDate = dateKey(raw.originalDate), id = occurrenceId(p, originalDate, kind);
         if (raw.occurrenceId && raw.occurrenceId !== id || raw.policyId && raw.policyId !== p.id) fail('課次識別不符');
         var status = raw.status;
-        if (['scheduled', 'cancelled', 'rescheduled'].indexOf(status) < 0) fail('無效的上課安排');
-        var actualDate = status === 'rescheduled' ? dateKey(raw.actualDate) : originalDate;
-        var startTime = status === 'rescheduled' ? raw.startTime : p.startTime;
-        var endTime = status === 'rescheduled' ? raw.endTime : p.endTime;
-        var endDate = status === 'rescheduled' && raw.endDate ? dateKey(raw.endDate) : actualDate;
+        if (['scheduled', 'cancelled', 'rescheduled', 'added'].indexOf(status) < 0 || kind === 'additional' && status === 'scheduled') fail('無效的上課安排');
+        var custom = status === 'rescheduled' || kind === 'additional';
+        var actualDate = custom ? dateKey(raw.actualDate || (kind === 'additional' ? originalDate : '')) : originalDate;
+        var startTime = custom ? raw.startTime : p.startTime;
+        var endTime = custom ? raw.endTime : p.endTime;
+        var endDate = custom && raw.endDate ? dateKey(raw.endDate) : actualDate;
         var startAt = at(actualDate, startTime), endAt = at(endDate, endTime);
         if (!Number.isFinite(startAt) || !Number.isFinite(endAt) || endAt <= startAt || endAt - startAt > DAY) fail('實際上下課日期或時間不完整');
         if (Math.abs(dayMs(actualDate) - dayMs(originalDate)) > 8 * WEEK) fail('改期超過八週，請確認課務安排');
         var revision = Number(raw.revision || 0);
         if (!Number.isInteger(revision) || revision < 0) fail('無效的安排版本');
-        return { schemaVersion: 1, occurrenceId: id, policyId: p.id, originalDate: originalDate, status: status,
+        return Object.assign({ schemaVersion: 1, occurrenceId: id, policyId: p.id, originalDate: originalDate, status: status,
             actualDate: actualDate, startTime: startTime, endDate: endDate, endTime: endTime,
-            startAt: startAt, endAt: endAt, revision: revision };
+            startAt: startAt, endAt: endAt, revision: revision }, kind === 'additional' ? { kind: kind, reminderPolicy: 'previous_day_2100' } : {});
     }
     function resolve(p, originalDate, exceptions) {
-        var id = occurrenceId(p, originalDate), ex = (exceptions || {})[id];
+        var extra = weekday(originalDate) !== p.weekday;
+        var id = occurrenceId(p, originalDate, extra ? 'additional' : 'regular'), ex = (exceptions || {})[id];
+        if (extra && !ex) fail('找不到已登記的加課');
         if (ex && ex.pending === true) fail('上課安排同步中');
         return normalizeException(p, ex || { originalDate: originalDate, status: 'scheduled' });
     }
-    function nextOriginal(p, originalDate) { occurrenceId(p, originalDate); return addDays(originalDate, 7); }
+    function nextOriginal(p, originalDate) {
+        if (!p || !dateKey(originalDate)) fail('課次日期不完整');
+        return addDays(originalDate, (p.weekday - weekday(originalDate) + 7) % 7 || 7);
+    }
     function candidates(p, anchor, exceptions, bounds) {
         bounds = bounds || {};
         var start = addDays(anchor, -56), list = [], seen = {};
@@ -143,8 +151,9 @@
         if (prior && prior.dueAt <= now && prior.dueOccurrenceId) return prior;
         var next = adjacent(p, source, exceptions, 1, bounds);
         if (!next) fail('找不到下一次實際上課，請確認課程結束日期');
-        return { sourceOccurrenceId: source.occurrenceId, dueOccurrenceId: next.occurrenceId, dueAt: next.startAt,
-            dueDate: next.actualDate, dueTime: next.startTime, scheduleRevision: next.revision, duePolicy: 'next_actual_class_start' };
+        return Object.assign({ sourceOccurrenceId: source.occurrenceId, dueOccurrenceId: next.occurrenceId, dueAt: next.startAt,
+            dueDate: next.actualDate, dueTime: next.startTime, scheduleRevision: next.revision, duePolicy: 'next_actual_class_start' },
+            next.kind === 'additional' ? { reminderAt: at(addDays(next.actualDate, -1), '21:00'), reminderPolicy: 'previous_day_2100' } : { reminderAt: 0, reminderPolicy: '' });
     }
     function reminderLead(p, schedule) {
         var mins = timeMinutes(schedule.time);
@@ -154,8 +163,8 @@
     function event(p, originalDate, exceptions, purpose, schedule) {
         var o = resolve(p, originalDate, exceptions), lead = purpose === 'teacher' ? 0 : reminderLead(p, schedule);
         return { occurrenceId: o.occurrenceId, originalDate: o.originalDate, eventId: o.occurrenceId + '__' + purpose,
-            status: o.status, revision: o.revision, at: o.startAt - lead,
-            originalAt: at(o.originalDate, p.startTime) - lead, occurrence: o };
+            status: o.status, revision: o.revision, at: purpose !== 'teacher' && o.kind === 'additional' ? at(addDays(o.actualDate, -1), '21:00') : o.startAt - lead,
+            originalAt: o.kind === 'additional' ? (purpose === 'teacher' ? o.startAt : at(addDays(o.originalDate, -1), '21:00')) : at(o.originalDate, p.startTime) - lead, occurrence: o };
     }
     function isSelfMarked(exam) { return !!exam && (exam.assessmentKind === 'holiday_self_marked' || (!!exam.sourceAssignmentId && !/^gifted_library_/.test(exam.assessmentKind || ''))); }
     function holidayState(assignment, progress, now) {
