@@ -7053,7 +7053,8 @@ async function sendProductionStudentReport(action,payload,send) {
                    ? firebase.auth.Auth.Persistence.LOCAL
                    : firebase.auth.Auth.Persistence.NONE);
                await ebookAuth.signInWithCustomToken(session.firebaseCustomToken);
-               ebookAuthSessionInfo = session;
+               // 學生登入 API 的舊回傳契約未附 role；僅在這兩個已驗證學生入口補齊。
+               ebookAuthSessionInfo = Object.assign({ role: 'student' }, session);
                const loaded = await Promise.all([
                    executeFirebaseRead(u, '', true, session.className, session.studentKey),
                    loadEbookLoginPendingPolicy(session)
@@ -9165,7 +9166,8 @@ async function sendProductionStudentReport(action,payload,send) {
                 }
                 await ebookAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
                 await ebookAuth.signInWithCustomToken(session.firebaseCustomToken);
-                ebookAuthSessionInfo = session;
+                // 學生登入 API 的舊回傳契約未附 role；僅在這兩個已驗證學生入口補齊。
+                ebookAuthSessionInfo = Object.assign({ role: 'student' }, session);
                 var loaded = await Promise.all([
                     executeFirebaseRead(session.studentName, '', true, session.className, session.studentKey),
                     loadEbookLoginPendingPolicy(session)
