@@ -7,9 +7,9 @@
  }
  function create({scopes,callableFor,getUid,getSessionId=()=>'',storage,hash,transport=root.ProductionFastWriteTransport}){
   if(!Array.isArray(scopes)||scopes.length>64||[callableFor,getUid,getSessionId,hash].some(f=>typeof f!=='function')||!transport?.create)throw Error('invalid-grade-reader');
-  const routes=new Map(),cache=new Map(),safe=x=>typeof x==='string'&&x.length>0&&x.length<=180&&!/[.#$[\]/\x00-\x1f\x7f]/.test(x)&&!['__proto__','constructor','prototype'].includes(x);
+  const routes=new Map(),cache=new Map(),complete=new Map(),safe=x=>typeof x==='string'&&x.length>0&&x.length<=180&&!/[.#$[\]/\x00-\x1f\x7f]/.test(x)&&!['__proto__','constructor','prototype'].includes(x);
   for(const s of scopes){if(!['science','math'].includes(s.subject)||!['dashboard','bidirectional'].includes(s.gradeAuthority||s.scoreAuthority)||s.enabled!==true||!safe(s.classKey)||!s.className||!/^[-\w]{1,80}$/.test(s.scopeId)||!Number.isSafeInteger(s.epoch)||s.epoch<1||routes.has(s.classKey)||[...routes.values()].some(r=>r.scopeId===s.scopeId))throw Error('invalid-grade-route');routes.set(s.classKey,{...s});}
-  let identity='';function account(mode){const uid=getUid(),session=mode==='god'?getSessionId():'';if(!/^[-\w]{1,80}$/.test(uid||'')||mode==='god'&&!/^[a-f0-9]{48,64}$/i.test(session))throw Error('grade-login-required');const next=uid+'|'+session+'|'+mode;if(identity!==next){cache.clear();identity=next;}return{uid,session,identity};}
+  let identity='';function account(mode){const uid=getUid(),session=mode==='god'?getSessionId():'';if(!/^[-\w]{1,80}$/.test(uid||'')||mode==='god'&&!/^[a-f0-9]{48,64}$/i.test(session))throw Error('grade-login-required');const next=uid+'|'+session+'|'+mode;if(identity!==next){cache.clear();complete.clear();identity=next;}return{uid,session,identity};}
   const token=(c,s,e)=>JSON.stringify([c,s,e]);
   async function target(mode,{classKey,studentKey,examId}){
    const route=routes.get(classKey);if(!['student','god','teacher'].includes(mode)||!route||!safe(studentKey)||!safe(examId))throw Error('grade-source-invalid');
@@ -20,10 +20,20 @@
      const old=cache.get(key);if(old&&old.revision>view.revision)return false;const next={revision:view.revision,score:view.business.score,color:view.business.color};if(JSON.stringify(old)===JSON.stringify(next))return false;
      if(cache.size>=64&&!cache.has(key))cache.delete(cache.keys().next().value);cache.delete(key);cache.set(key,next);return true;},clear:()=>cache.delete(key)};
   }
-  function overlay(raw,classKey,studentKey,examId){if(nativeAuthority(raw))return raw;const v=cache.get(token(classKey,studentKey,examId));if(!v)return raw;
-   const pending=String(raw.score??'')!==v.score;return{...raw,score:v.score,cellColor:v.color,fastWriteRevision:v.revision,
-    ...(pending?{average:'更新中',dist:[],labels:[],myBucket:-1,total:0,fastWriteStatisticsPending:true}:{})};}
-  return{target,overlay,clear:()=>{cache.clear();identity='';},accepts:classKey=>routes.has(classKey),size:()=>cache.size};
+  // 分數與統計只能由同一份完整原生快照發布；即時 business 通知不搶先覆蓋分數。
+  function copy(raw){const next={...raw};for(const key of ['dist','labels'])if(Array.isArray(raw[key]))next[key]=raw[key].slice();return next;}
+  function overlay(raw,classKey,studentKey,examId,mode='student'){
+   raw=raw||{};account(mode);if(nativeAuthority(raw))return raw;
+   const key=token(classKey,studentKey,examId);let old=complete.get(key);
+   if(old&&raw.fastWriteBindingHash&&old.fastWriteBindingHash&&raw.fastWriteBindingHash!==old.fastWriteBindingHash){complete.delete(key);old=null;}
+   const pending=raw.fastWriteStatisticsPending===true||String(raw.average||'').trim()==='更新中';
+   const older=old&&((raw.fastWriteRevision||0)<(old.fastWriteRevision||0)||(raw.fastWriteStatisticsVersion||0)<(old.fastWriteStatisticsVersion||0));
+   if(pending||older)return old?copy(old):{...raw,score:'',average:'',dist:[],labels:[],myBucket:-1,total:0,gradeDisplayPending:true};
+   const next=copy(raw);
+   if(studentKey&&examId){if(complete.size>=64&&!complete.has(key))complete.delete(complete.keys().next().value);complete.delete(key);complete.set(key,next);}
+   return copy(next);
+  }
+  return{target,overlay,clearLive:()=>cache.clear(),clear:()=>{cache.clear();complete.clear();identity='';},accepts:classKey=>routes.has(classKey),size:()=>cache.size};
  }
  root.ProductionGradeReader={create,nativeAuthority};if(typeof module!=='undefined')module.exports={create,nativeAuthority};
 })(typeof window!=='undefined'?window:globalThis);

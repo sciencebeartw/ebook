@@ -7,8 +7,15 @@
    callableFor:mode=>ebookFunctions.httpsCallable(mode==='god'?'runEbookGodAdminAction':'runEbookStudentAction',{timeout:30000}),hash:async parts=>Array.from(new Uint8Array(await root.crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(parts))))).map(n=>n.toString(16).padStart(2,'0')).join('')});return bridge;}
  function redraw(){if(queued)return;queued=true;Promise.resolve().then(()=>{queued=false;if(ready()&&!document.hidden&&typeof root.rebuildProductionGradeView==='function')root.rebuildProductionGradeView();});}
  function note(card,text){if(!card?.isConnected)return;let el=card.querySelector('.fastwrite-grade-read-status');if(!el){el=document.createElement('p');el.className='fastwrite-grade-read-status';el.setAttribute('role','status');card.append(el);}el.textContent=text;}
- root.overlayProductionGrade=function(raw,classKey,studentKey,examId){if(identity!==who())return raw;return reader()?.overlay(raw,classKey,studentKey,examId)||raw;};
- root.stopProductionGradeWatches=function(){generation++;observer?.disconnect();observer=null;visible.clear();manager?.clear();targets.clear();blocked.clear();bridge?.clear();identity='';};
+ root.overlayProductionGrade=function(raw,classKey,studentKey,examId){
+  const b=reader();if(!b)return raw;const current=who();
+  if(identity!==current){generation++;manager?.clear();targets.clear();blocked.clear();b.clear();identity=current;}
+  try{return b.overlay(raw,classKey,studentKey,examId,isAdminMode?'god':'student');}catch(_){return raw.fastWriteStatisticsPending===true||raw.average==='更新中'?{...raw,score:'',average:'',dist:[],labels:[],gradeDisplayPending:true}:raw;}
+ };
+ // 只重算已在本機的原生快照，不另發讀取。
+ root.refreshProductionGradeDisplay=redraw;
+ document.addEventListener('focusout',event=>{if(event.target.closest?.('.grade-section,.score-card'))redraw();});
+ root.stopProductionGradeWatches=function(){generation++;observer?.disconnect();observer=null;visible.clear();manager?.clear();targets.clear();blocked.clear();bridge?.clearLive();};
  async function reconcile(){
   if(!ready()||document.hidden){root.stopProductionGradeWatches();return;}const b=reader();if(!b)return;
   const current=who();if(identity!==current){manager?.clear();targets.clear();blocked.clear();b.clear();identity=current;}

@@ -5002,9 +5002,10 @@ html { background: #f3faf6; } #splash-status { margin: 22px 0 0; color: #315c44;
     <script src="fastwrite_message_bridge.js?v=20261031_message_admission_v1"></script>
     <script src="fastwrite_realtime.js?v=20261018"></script>
     <script src="fastwrite_ebook_realtime.js?v=20261027_online"></script>
-    <script src="fastwrite_grade_reader.js?v=20261018"></script>
-    <script src="fastwrite_grade_dom.js?v=20261018"></script>
-    <script src="fastwrite_ebook_grades.js?v=20261027_online"></script>
+    <style>.grade-preparing{min-height:180px;display:flex;align-items:center;justify-content:center;padding:24px 16px;box-sizing:border-box;color:#64748b;font-size:1rem;line-height:1.6;text-align:center;}</style>
+    <script src="fastwrite_grade_reader.js?v=20261108_complete"></script>
+    <script src="fastwrite_grade_dom.js?v=20261108_complete"></script>
+    <script src="fastwrite_ebook_grades.js?v=20261108_complete"></script>
     <script src="student_tool_drafts.js?v=20261027"></script>
     <script src="fastwrite_dashboard_score_bridge.js?v=20261028_review_parallel_v1"></script>
     <script src="fastwrite_god_score_bridge.js?v=20261018"></script>
@@ -6194,6 +6195,8 @@ async function sendProductionStudentReport(action,payload,send) {
                 guidanceThreshold: mathGuidanceStandard ? mathGuidanceStandard.guidanceThreshold : 0,
                 fullScore: mathGuidanceStandard ? mathGuidanceStandard.fullScore : null,
                 score: eData.score,
+                gradeDisplayPending: eData.gradeDisplayPending === true,
+                fastWriteRevision: eData.fastWriteRevision || 0,
                 scoreNum: isNaN(studentScoreNum) ? null : studentScoreNum,
                 unit: currentUnit,
                 average: eData.average,
@@ -9412,7 +9415,7 @@ async function sendProductionStudentReport(action,payload,send) {
                                     safeC,
                                     gData.promotionContext
                                 );
-                                rebuildGradesFromScopedSources();
+                                rebuildGradesFromScopedSources(true);
                             });
                         });
                     });
@@ -11610,6 +11613,9 @@ async function sendProductionStudentReport(action,payload,send) {
 
         function buildDailyPostExamCard(post, exam, others, history) {
             if (!exam) return "";
+            var examTitle = getDailyPostExamTimePrefix(exam) + getDailyPostExamLabel(exam) + "成績";
+            var pendingExamAttrs = " data-grade-revision='" + escapeHtmlAttr(exam.fastWriteRevision || 0) + "' data-grade-score='" + escapeHtmlAttr(exam.score == null ? "" : exam.score) + "' data-pending-exam-anchor='1' data-exam-id='" + escapeHtmlAttr(exam.examId || '') + "' data-stored-exam-id='" + escapeHtmlAttr(exam.storedExamId || '') + "' data-exam-col-index='" + escapeHtmlAttr(exam.colIndex === undefined || exam.colIndex === null ? '' : exam.colIndex) + "' data-assignment-id='" + escapeHtmlAttr(exam.sourceAssignmentId || '') + "'";
+            if (exam.gradeDisplayPending) return "<div class='grade-section'" + pendingExamAttrs + " aria-busy='true'><div class='main-exam-title'>" + examTitle + "</div><div class='main-exam-range'>" + buildAssessmentTitleHtml(exam.exam, exam.className || post.storedClassName || post.className || (gData && gData.className)) + "</div><div class='grade-preparing' role='status'>成績準備中，分數與班平均將一起顯示。</div></div>";
             var scoreReportHtml = "";
             var chartDistribution = EbookScoreDistribution.forDisplay(exam);
             var displayExam = chartDistribution.normalized ? Object.assign({}, exam, { myBucket: chartDistribution.myBucket }) : exam;
@@ -11730,9 +11736,6 @@ async function sendProductionStudentReport(action,payload,send) {
                 });
                 refHwHtml += "</div>";
             }
-
-            var examTitle = getDailyPostExamTimePrefix(exam) + getDailyPostExamLabel(exam) + "成績";
-            var pendingExamAttrs = " data-pending-exam-anchor='1' data-exam-id='" + escapeHtmlAttr(exam.examId || '') + "' data-stored-exam-id='" + escapeHtmlAttr(exam.storedExamId || '') + "' data-exam-col-index='" + escapeHtmlAttr(exam.colIndex === undefined || exam.colIndex === null ? '' : exam.colIndex) + "' data-assignment-id='" + escapeHtmlAttr(exam.sourceAssignmentId || '') + "'";
 
             return "<div class='grade-section'" + pendingExamAttrs + "><div class='main-exam-title'>" + examTitle + "</div><div class='main-exam-range'>" + buildAssessmentTitleHtml(exam.exam, exam.className || post.storedClassName || post.className || (gData && gData.className)) + "</div><div class='main-score'>" + scoreDisplay + "</div>" + logic.statusHtml + "<div class='score-sub'>班平均: " + exam.average + "</div>" + standardHtml + scoreReportHtml + chartHtml + refHwHtml + "</div>";
         }
@@ -12386,7 +12389,7 @@ async function sendProductionStudentReport(action,payload,send) {
                 var feedbackHtml = "<div class='feedback-section'>" + learningReportHtml + "<div class='section-title'>" + SVG.chat + "留言內容</div><div id='history-" + safeDateId + "'>" + historyHtml + "</div>" + godStickerAdjustmentHtml + adminDirectHtml + studentInputHtml + "</div>"; var headerTitle = buildDailyPostHeaderTitle(post, SVG.calendar); var sessionBadge = buildDailyPostSessionBadge(post); var transferBadge = post.isTransferFormerClass ? "<span class='post-transfer-badge'>轉班前紀錄｜" + escapeHtml(post.sourceClassName || "原班") + "</span>" : ""; var pendingPostAttrs = " data-pending-post-anchor='1' data-post-id='" + escapeHtmlAttr(post.dailyPostId || post.id || '') + "' data-source-class-key='" + escapeHtmlAttr(post.sourceClassKey || post.storedClassKey || '') + "' data-stored-class-key='" + escapeHtmlAttr(post.storedClassKey || '') + "' data-post-date='" + escapeHtmlAttr(post.date || '') + "'"; html += "<div class='post-card-wrapper'" + pendingPostAttrs + "><div class='post-card'><div class='post-header'><span class='post-header-main'>" + headerTitle + sessionBadge + transferBadge + "</span></div>" + gradeHtml + "<div class='content-section'><div class='section-title'>" + SVG.megaphone + "聯絡事項</div>" + contentHtml + supplementalInfoHtml + "</div>" + feedbackHtml + "</div></div>";
 
             });
-            if(fastWriteHistoryOnly==='grades'){window.replaceProductionGradeCards(container,html,'.grade-section[data-pending-exam-anchor]',fastWritePreviousScoreContexts,fastWritePreviousMakeupContexts);window.syncProductionVisibleGradeWatches();return;}
+            if(fastWriteHistoryOnly==='grades'){if(window.replaceProductionGradeCards(container,html,'.grade-section[data-pending-exam-anchor]',fastWritePreviousScoreContexts,fastWritePreviousMakeupContexts)){window.syncProductionVisibleGradeWatches();return;}fastWriteHistoryOnly=false;}
             if(fastWriteHistoryOnly){
                 var fragment=document.createElement('template');fragment.innerHTML=html;
                 var freshCards=fragment.content.querySelectorAll('.post-card-wrapper');
@@ -12439,6 +12442,8 @@ async function sendProductionStudentReport(action,payload,send) {
             var fastWritePreviousScoreContexts=Object.assign({},window.adminModeScoreEditContext||{});var fastWritePreviousMakeupContexts=Object.assign({},window.adminModeMakeupContext||{});
             window.adminModeScoreEditContext = window.adminModeScoreEditContext || {};
             var container = document.getElementById('tab-content-1'); if (!grades || grades.length === 0) { container.innerHTML = "<p style='color:#666; padding:10px;'>目前尚無成績紀錄。</p>"; return; } var html = ""; grades.forEach(function (item) {
+                var pendingOldExamAttrs = " data-grade-revision='" + escapeHtmlAttr(item.fastWriteRevision || 0) + "' data-grade-score='" + escapeHtmlAttr(item.score == null ? "" : item.score) + "' data-source-class-key='" + escapeHtmlAttr(safeKey(item.storedClassKey || item.sourceClassKey || item.className || gData.className)) + "' data-pending-exam-anchor='1' data-exam-id='" + escapeHtmlAttr(item.examId || '') + "' data-stored-exam-id='" + escapeHtmlAttr(item.storedExamId || '') + "' data-exam-col-index='" + escapeHtmlAttr(item.colIndex === undefined || item.colIndex === null ? '' : item.colIndex) + "'";
+                if(item.gradeDisplayPending){html += "<div class='score-card'" + pendingOldExamAttrs + " aria-busy='true'><div class='class-badge'>" + escapeHtml(item.className || '') + "</div><div class='exam-info'><span class='exam-date'>" + escapeHtml(item.date) + "</span><span class='exam-name'>" + buildAssessmentTitleHtml(item.exam, item.className || (gData && gData.className)) + "</span></div><div class='grade-preparing' role='status'>成績準備中，分數與班平均將一起顯示。</div></div>";return;}
                 var chartDistribution = EbookScoreDistribution.forDisplay(item);
                 var displayItem = chartDistribution.normalized ? Object.assign({}, item, { myBucket: chartDistribution.myBucket }) : item;
                 var logic = getDisplayLogic(displayItem, gData ? gData.feedbackHistory : []); var unitDisplay = ""; if (!isNaN(parseFloat(logic.mainScore))) unitDisplay = "<span class='score-unit'>" + escapeHtml(getGradeScoreUnitText(item, item.unit)) + "</span>"; var displayScore = "<div class='score-val" + logic.mainClass + "'>" + escapeHtml(logic.mainScore) + unitDisplay + "</div>"; var chartHtml = "";
@@ -12497,7 +12502,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 var oldStandardHtml = isMathAdvancedGuidance
                     ? ((mathGuidanceStandard && mathGuidanceStandard.guidanceThreshold > 0) ? "<div class='detail-box'>" + SVG.target + " 輔導標準：" + escapeHtml(mathGuidanceStandard.guidanceThreshold) + "分</div>" : "")
                     : ((item.note && !isHomeworkColumnTitle((item.date || "") + (item.exam || ""))) ? "<div class='detail-box'>" + SVG.target + " 補考標準：" + escapeHtml(item.note) + "</div>" : "");
-                var pendingOldExamAttrs = " data-source-class-key='" + escapeHtmlAttr(safeKey(item.storedClassKey || item.sourceClassKey || item.className || gData.className)) + "' data-pending-exam-anchor='1' data-exam-id='" + escapeHtmlAttr(item.examId || '') + "' data-stored-exam-id='" + escapeHtmlAttr(item.storedExamId || '') + "' data-exam-col-index='" + escapeHtmlAttr(item.colIndex === undefined || item.colIndex === null ? '' : item.colIndex) + "'";
+
                 html += `
         <div class='score-card'${pendingOldExamAttrs} onclick='toggleCard(this)'>
             <div class='class-badge'>${escapeHtml(classBadgeText)}</div>
@@ -12513,7 +12518,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             <div class='click-hint'>▼</div>
         </div>`;
             });
-            if(fastWriteGradesOnly){window.replaceProductionGradeCards(container,html,'.score-card[data-pending-exam-anchor]',fastWritePreviousScoreContexts,fastWritePreviousMakeupContexts);window.syncProductionVisibleGradeWatches();return;}
+            if(fastWriteGradesOnly&&window.replaceProductionGradeCards(container,html,'.score-card[data-pending-exam-anchor]',fastWritePreviousScoreContexts,fastWritePreviousMakeupContexts)){window.syncProductionVisibleGradeWatches();return;}
             container.innerHTML = html;
             window.syncProductionVisibleGradeWatches();
 
@@ -14280,23 +14285,11 @@ function renderProductionGodStickerReceipt(anchor){
                 context.hasAbsenceMarker = keepAbsenceMarker;
                 if (input) { input.value = nextNumericScore; input.defaultValue = nextNumericScore; } if(absenceInput)absenceInput.defaultChecked=keepAbsenceMarker;
                 var box = btn ? (btn.closest('.grade-section') || btn.closest('.score-card')) : null;
-                var scoreNode = box ? box.querySelector('.main-score > span:first-child') : null;
-                if (scoreNode) scoreNode.textContent = nextNumericScore;
-                var oldScoreNode = box ? box.querySelector('.score-val') : null;
-                if (oldScoreNode && oldScoreNode.firstChild) oldScoreNode.firstChild.nodeValue = nextNumericScore;
-                var absenceTag = box ? box.querySelector('[data-absence-score-tag="1"]') : null;
-                if (keepAbsenceMarker && !absenceTag && box) {
-                    absenceTag = document.createElement('div');
-                    absenceTag.className = 'home-exam-tag';
-                    absenceTag.setAttribute('data-absence-score-tag', '1');
-                    absenceTag.textContent = '(請假回報)';
-                    var scoreContainer = box.querySelector('.main-score') || box.querySelector('.score-val');
-                    if (scoreContainer && scoreContainer.parentNode) scoreContainer.parentNode.insertBefore(absenceTag, scoreContainer.nextSibling);
-                } else if (!keepAbsenceMarker && absenceTag) {
-                    absenceTag.remove();
+                if (box) {
+                    box.dataset.gradeWritePending = nextScore;
+                    var committedRevision = actionResult && actionResult.result && actionResult.result.receipt && actionResult.result.receipt.revision;
+                    if (Number.isSafeInteger(committedRevision) && committedRevision > 0) box.dataset.gradeWriteRevision = committedRevision;
                 }
-                var title = btn && btn.closest('.god-score-edit-box') ? btn.closest('.god-score-edit-box').querySelector('.god-score-edit-title') : null;
-                if (title) title.textContent = '老師修改分數｜目前 ' + getGodScoreHumanLabel(nextScore);
                 if (status) {
                     var gasResult = actionResult && actionResult.result ? actionResult.result : {};
                     var isReplay = gasResult.idempotentReplay === true;
@@ -14307,7 +14300,7 @@ function renderProductionGodStickerReceipt(anchor){
                         : (firebaseSynced
                             ? '已修改為 ' + getGodScoreHumanLabel(nextScore) + '，並完成單欄雲端同步。'
                             : 'Google Sheet 已修改為 ' + getGodScoreHumanLabel(nextScore) + '；系統正在背景補上雲端顯示，可繼續處理其他學生。');
-                    if(gasResult.storage==='firebase'){renderProductionGodScoreReceipt(status);if(box){box.querySelectorAll('.avg-score,.score-sub').forEach(function(n){n.textContent='班平均：更新中';});box.querySelectorAll('.v2-bar-chart-container').forEach(function(n){n.hidden=true;});var updateNote=box.querySelector('.fastwrite-grade-update-note');if(updateNote)updateNote.remove();}}
+                    if(gasResult.storage==='firebase')renderProductionGodScoreReceipt(status);
                 }
             } catch (err) {
                 if (status) {
@@ -14317,6 +14310,7 @@ function renderProductionGodStickerReceipt(anchor){
             } finally {
                 controls.forEach(function(el) { el.disabled = false; });
                 if (btn) btn.innerText = originalText || '修改分數';
+                if (window.refreshProductionGradeDisplay) window.refreshProductionGradeDisplay();
             }
         }
 
