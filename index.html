@@ -5053,6 +5053,12 @@ html { background: #f3faf6; } #splash-status { margin: 22px 0 0; color: #315c44;
 
   <script src="resource_catalog_view.js?v=20261002_resources_time_v1"></script>
   <script src="ebook_resources_app.js?v=20261003_resources_outline_v5"></script>
+    <link rel="stylesheet" href="ebook_surveys.css?v=20261109-survey-library1">
+    <script>window.EBOOK_SURVEYS_ENABLED = true;</script>
+    <script src="survey_contract.js?v=20261109-survey-library1"></script>
+    <script src="ebook_surveys_view.js?v=20261109-survey-library1"></script>
+    <script src="ebook_surveys_parent.js?v=20261109-survey-library1"></script>
+
 
   <script src="ebook_push_navigation.js?v=20261014-all1"></script>
   <script src="ebook_push_app.js?v=20261015-preview1"></script>
@@ -7651,6 +7657,7 @@ async function sendProductionStudentReport(action,payload,send) {
                 </div>
             </div>
             <div id="ebookResourceEntry" class="er-root" hidden></div>
+            <div id="ebookSurveyEntry" hidden></div>
             <div id="tab-content-0"></div>
             <div id="tab-content-1" style="display:none; padding:15px;"></div>
             <div id="tab-content-2" style="display:none; padding:15px;"></div>
@@ -8598,6 +8605,7 @@ async function sendProductionStudentReport(action,payload,send) {
                 }
             ).then(function(result) {
                 if (result.isConfirmed) switchTab(3);
+                if (window.EBOOK_SURVEYS_ENABLED) document.dispatchEvent(new Event("ebook:popup-idle"));
             });
         }
 
@@ -9219,7 +9227,7 @@ async function sendProductionStudentReport(action,payload,send) {
             queueMicrotask(function() { window.EbookPush?.ready({ session: ebookAuthSessionInfo || {}, uid: ebookAuth.currentUser && ebookAuth.currentUser.uid,
                 subject: ebookSubjectParam, preview: isStudentPreviewMode || isDashboardDraftPreviewMode || !!ebookGodSessionInfo,
                 firebaseConfig: firebaseConfig, navigate: openEbookPushTarget, findTarget: function(target) { return window.EbookPushNavigation.find(target, getEbookPushNavigationContext()); }, isReadable: function(node) { return window.EbookPushNavigation.readable(node); }, call: async function(data) { return (await ebookFunctions.httpsCallable('runEbookPushAction', { timeout: 15000 })(data)).data; } }); });
-            queueMicrotask(function() { window.GiftedEbook?.ready({ auth: ebookAuth, result: result, mode: pass, preview: isDashboardDraftPreviewMode, teacherView: !!ebookGodSessionInfo }); });
+            queueMicrotask(function() { window.GiftedEbook?.ready({ auth: ebookAuth, result: result, mode: pass, preview: isDashboardDraftPreviewMode, teacherView: !!ebookGodSessionInfo }); window.GiftedLibraryEbook?.ready({ auth: ebookAuth, result: result, mode: pass, preview: isDashboardDraftPreviewMode, teacherView: !!ebookGodSessionInfo }); });
             activeEbookPromotionContext = result.promotionContext || null;
             resetPopupQueueForEntry();
             pendingTasksState = { status: 'unavailable', items: [] };
@@ -9571,6 +9579,13 @@ async function sendProductionStudentReport(action,payload,send) {
                     }});
                 } else window.EbookResources.reset();
             }
+            if (window.EBOOK_SURVEYS_ENABLED && window.EbookSurveyParent && !isDashboardDraftPreviewMode && !isAdminMode && (ebookAuthSessionInfo || {}).role === 'student') {
+                window.EbookSurveyParent.mount({
+                    identity: [ebookAuthSessionInfo.subjectKey, ebookAuthSessionInfo.className, ebookAuthSessionInfo.studentKey].join('|'),
+                    request: async function(payload) { return (await ebookFunctions.httpsCallable('runEbookSurveyStudentAction')(payload)).data; },
+                    canRemind: function() { return !activeEmergencyAnnouncement && !popupAnnouncementQueue.length && !document.querySelector('dialog[open], .swal2-container') && !/^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || ''); }
+                });
+            }
             renderDailyPosts(result.dailyPost, result.feedbackHistory);
             renderOldGradeCards(result.grades);
             renderBulletins(result.currentBulletins || result.bulletins || [], result.historicalBulletins || []);
@@ -9628,6 +9643,7 @@ async function sendProductionStudentReport(action,payload,send) {
         }
         function exitGodMode() {
             if (window.EbookResources) window.EbookResources.reset();
+            if (window.EbookSurveyParent) window.EbookSurveyParent.reset();
             clearRealtimeListeners();
             ebookAuth.signOut().catch(function() {});
             document.getElementById('full-loader').style.display = 'none';
@@ -9996,7 +10012,9 @@ async function sendProductionStudentReport(action,payload,send) {
         async function doLogout() {
             if (window.EbookPush && !await window.EbookPush.beforeLogout()) return;
             window.GiftedEbook?.close(true);
+            window.GiftedLibraryEbook?.close(true);
             if (window.EbookResources) window.EbookResources.reset();
+            if (window.EbookSurveyParent) window.EbookSurveyParent.reset();
             clearRealtimeListeners();
             if (isAdminMode) exitGodMode();
             ebookAuth.signOut().catch(function() {});
@@ -11886,7 +11904,7 @@ async function sendProductionStudentReport(action,payload,send) {
                 var homeworkItems = getPostHomeworkItems(post);
                 var holidayHtml = HolidayPracticeApp.render(post);
                 var hasRegularHomeworkTwo = homeworkItems.some(function(item) { return item.key === "hw2"; });
-                if (holidayHtml && !hasRegularHomeworkTwo) {
+                if ((holidayHtml || libraryButtons) && !hasRegularHomeworkTwo) {
                     homeworkItems.forEach(function(item) { if (item.key === "hw1") item.label = "今日作業一"; });
                 }
                 function getPostExamTypes(text) {
@@ -12102,22 +12120,23 @@ async function sendProductionStudentReport(action,payload,send) {
                     var examLabel = types.length === 1 ? types[0] : "本次考卷";
                     return "<div class='quiz-answer-note'>" + examLabel + "會於課堂直接訂正與對答；缺席同學請依影片連結自行補看，不另提供答案。</div>";
                 }
+                var libraryButtons = window.GiftedLibraryEbook?.buttons(post, getStudentActionPostSourceClassName(post, gData && gData.className), isDashboardDraftPreviewMode) || "";
                 var fields = [{ label: "今日課程進度", val: post.progress }].concat(buildPostQuizFields(post));
                 homeworkItems.forEach(function(item, hwIdx) {
                     var homeworkNoteMode = getDailyPostHomeworkNoteMode(post);
                     var extra = homeworkNoteMode === "show" && hwIdx !== homeworkItems.length - 1 ? "" : buildHomeworkUploadNote(post, item.val);
                     if (item.key === "hw1") extra = renderGiftedHomeworkDraftPreview(post) + extra;
-                    if (item.key === "hw2") extra += holidayHtml;
+                    if (item.key === "hw2") extra += libraryButtons + holidayHtml;
                     if (hwIdx === homeworkItems.length - 1) extra += buildHomeworkDoneButton(post);
                     fields.push({ label: item.label, val: item.val, extra: extra, linkMode: getDailyPostHomeworkLinkMode(post, item.key), customLabel: getDailyPostHomeworkCustomLabel(post, item.key), color: getDailyPostLinkColor(post, item.key) });
                 });
                 // 假期練習卷有自己的完成／開答案流程，不能依賴一般作業二存在。
                 // 沒有一般作業二時，將它獨立成一個作業欄位；兩者皆空時就是唯一的「今日作業」。
-                if (holidayHtml && !hasRegularHomeworkTwo) {
+                if ((holidayHtml || libraryButtons) && !hasRegularHomeworkTwo) {
                     fields.push({
                         label: homeworkItems.length ? "今日作業二" : "今日作業",
                         val: "",
-                        extra: holidayHtml,
+                        extra: libraryButtons + holidayHtml,
                         linkMode: "auto",
                         customLabel: "",
                         color: ""
@@ -13653,6 +13672,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             if (!emergency) {
                 hideEmergencyModal();
                 if (pendingEntryNoticeReady) maybeShowPendingEntryReminder();
+                if (window.EBOOK_SURVEYS_ENABLED) document.dispatchEvent(new Event("ebook:popup-idle"));
                 return false;
             }
             var popupTone = getBulletinDisplayChannels(emergency).popupTone;
@@ -16321,7 +16341,7 @@ function renderProductionGodStickerReceipt(anchor){
             restoreRememberedStudentLogin();
         });
     </script>
-</div><script src="gifted_release_config.js?v=20261009-v25"></script>
+</div><link rel="stylesheet" href="gifted_library_entry.css?v=20261109"><script src="gifted_library_policy.js?v=20261109"></script><script src="gifted_library_entry.js?v=20261109"></script><script src="gifted_release_config.js?v=20261009-v25"></script>
 <script src="gifted_homework_status.js?v=20261031-firebase-receipt"></script><script src="gifted_entry.js?v=20261103-per-assignment"></script>
 </body>
 
