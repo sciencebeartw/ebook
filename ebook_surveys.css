@@ -2,3 +2,30 @@
 @media(max-width:760px){.es .es-editor{grid-template-columns:1fr}.es .es-editor .es-side{position:static}.es .es-top,.es .es-list-card{flex-direction:column;align-items:stretch}.es .es-panel{padding:17px}.es .es-stats{gap:8px}.es .es-stat{padding:12px}.es .es-stat strong{font-size:27px}.es .es-grid{grid-template-columns:1fr;gap:0}.es .es-footer{flex-direction:column;align-items:stretch}.es h2{font-size:21px}.es .es-entry-button{padding:14px}.es .es-entry-button strong{font-size:17px}.es-dialog{max-height:calc(100dvh - 20px);width:calc(100% - 20px);border-radius:12px}.es .es-dialog-body{padding:17px}.es .es-dialog-head,.es .es-dialog-footer{padding:13px 17px}.es .es-dialog-head h2{font-size:18px}.es .es-dialog-footer button{flex:1}.es .es-book img{width:63px;height:88px}.es .es-book{gap:12px;padding:12px}.es .es-book strong{font-size:14px}.es .es-toolbar>*{flex:1;min-width:140px}.es .es-answer-option{font-size:14px}.es .es-stats .es-stat span{font-size:12px}}
 
 .es-survey-page{position:fixed;inset:0;z-index:20000;overflow-y:auto;overscroll-behavior:contain;background:#f3f7f4;padding:24px 16px;padding-bottom:max(24px,env(safe-area-inset-bottom));}.es-page-wrap{max-width:660px;margin:0 auto}.es-page-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px}.es-page-card{background:white;border:1px solid var(--es-line);border-radius:14px;overflow:hidden}.es-survey-page .es-dialog-head{position:static;padding:23px 24px 14px;border:0}.es-survey-page .es-dialog-head h2{font-size:24px}.es-survey-page .es-dialog-body{padding:0 24px 14px}.es-survey-page .es-dialog-footer{position:static;padding:16px 24px}.es-survey-page .es-description{line-height:1.8}.es-survey-page .es-book{align-items:flex-start}.es-survey-page .es-book img{width:64px;height:92px}.es-survey-page .es-form-question{margin:23px 0 12px}@media(max-width:760px){.es-survey-page{padding:14px 12px}.es-page-head{margin-bottom:14px}.es-page-head small{font-size:11px}.es-page-head button{padding:8px 11px;font-size:14px}.es-survey-page .es-dialog-head{padding:20px 17px 10px}.es-survey-page .es-dialog-head h2{font-size:22px}.es-survey-page .es-dialog-body{padding:0 17px 12px}.es-survey-page .es-dialog-footer{padding:14px 17px}.es-survey-page .es-answer-option{padding:11px 12px}}
+
+/* 家長手機調查：主要文字與聯絡簿內文接近，輔助資訊保留清楚層級。 */
+@media (max-width:760px) {
+    .es.es-survey-page, .es.es-dialog { font-size:17px; }
+    .es-survey-page .es-description,
+    .es-survey-page .es-answer-option,
+    .es-survey-page .es-answer-review strong,
+    .es-survey-page .es-book strong { font-size:17px; }
+    .es-survey-page .es-form-question legend { font-size:18px; }
+    .es-survey-page .es-dialog-head h2,
+    .es-survey-page .es-success h3 { font-size:24px; }
+    .es-dialog .es-dialog-head h2 { font-size:20px; }
+    .es-survey-page .es-student-line,
+    .es-survey-page .es-pill,
+    .es-survey-page .es-book p,
+    .es-survey-page .es-book a,
+    .es-survey-page small,
+    .es-survey-page .es-muted,
+    .es-survey-page .es-help,
+    .es-survey-page .es-status,
+    .es-dialog .es-muted { font-size:15px; }
+    .es-survey-page .es-required { font-size:14px; }
+    .es-survey-page .es-page-head button { font-size:16px; }
+    .es-survey-page .es-page-head small { font-size:13px; }
+    .es-survey-page .es-book > div { min-width:0; overflow-wrap:anywhere; }
+    .es-survey-page .es-help { line-height:1.7; }
+}
