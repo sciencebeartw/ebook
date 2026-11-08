@@ -8,8 +8,16 @@
         host.querySelectorAll('[data-survey]').forEach(b=>b.onclick=()=>open(b.dataset.survey));
     }
     async function load(){if(!deps)return;const token=generation,request=deps.request;try{const r=await request({action:'list'});if(token!==generation)return;rows=r.surveys||[];hasMore=!!r.hasMore;render();maybeRemind();}catch(e){if(token!==generation)return;const h=document.getElementById('ebookSurveyEntry');if(h){h.hidden=false;h.classList.add('es');h.innerHTML='<button class="es-entry-button" type="button">調查暫時無法載入，點此重試</button>';h.firstChild.onclick=load;}}}
-    function reminderKey(){return 'ebook-survey-snooze:'+String(deps&&deps.identity||'')+':'+new Date(Date.now()+28800000).toISOString().slice(0,10);}
-    function maybeRemind(){if(!deps||reminded||document.querySelector('.es-survey-page')||!rows.some(r=>!r.answered&&!r.closed&&r.remind)||!deps.canRemind||!deps.canRemind())return;let skip=false;try{skip=localStorage.getItem(reminderKey())==='1';}catch(_){}if(skip)return;reminded=true;const list=rows.filter(r=>!r.answered&&!r.closed&&r.remind);const d=V.modal(list.length===1?'有一份調查待填寫':'有 '+list.length+' 份調查待填寫','<p>'+E(list[0].title)+(list.length>1?'等 '+list.length+' 份調查':'')+'</p><p class="es-muted" style="margin-top:8px">點下方按鈕前往填寫。</p>','<button type="button" data-snooze>稍後再填</button><button type="button" class="es-primary" data-open>前往調查</button>');dialog=d;d.querySelector('[data-snooze]').onclick=()=>{try{localStorage.setItem(reminderKey(),'1');}catch(_){}d.close();};d.querySelector('[data-open]').onclick=()=>{d.close();open(list[0].id);};}
+    function maybeRemind(){
+        if(!deps||reminded||document.querySelector('.es-survey-page')||!rows.some(r=>!r.answered&&!r.closed&&r.remind)||!deps.canRemind||!deps.canRemind())return;
+        // 每次進入只提醒一次；稍後再填不再保存當日暫停，下次進入仍提醒未填調查。
+        reminded=true;
+        const list=rows.filter(r=>!r.answered&&!r.closed&&r.remind);
+        const d=V.modal(list.length===1?'有一份調查待填寫':'有 '+list.length+' 份調查待填寫','<p>'+E(list[0].title)+(list.length>1?'等 '+list.length+' 份調查':'')+'</p><p class="es-muted" style="margin-top:8px">點下方按鈕前往填寫。</p>','<button type="button" data-snooze>稍後再填</button><button type="button" class="es-primary" data-open>前往調查</button>');
+        dialog=d;
+        d.querySelector('[data-snooze]').onclick=()=>d.close();
+        d.querySelector('[data-open]').onclick=()=>{d.close();open(list[0].id);};
+    }
     async function open(id){if(!deps)return;if(dialog&&dialog.isConnected)dialog.close(true);const token=generation,request=deps.request;const d=V.page('調查','<p role="status">正在載入…</p>');dialog=d;try{const result=await request({action:'get',id});if(token!==generation||!d.isConnected)return;draw(d,result,!!result.response,false,request,token);}catch(e){if(d.isConnected)d.querySelector('.es-dialog-body').textContent=e.message;}}
     function draw(d,r,showReview,preview,request,token){
         const f=r.survey.form,response=r.response;d.querySelector('h2').textContent=f.title;

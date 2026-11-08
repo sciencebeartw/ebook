@@ -6,9 +6,9 @@ const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
 const start=html.indexOf('        function maybeShowPendingEntryReminder()');
 const pending=html.slice(start,html.indexOf('        // ★★★ 即時監聽生命週期管理',start));
 const parent=fs.readFileSync(path.join(__dirname,'../ebook_surveys_parent.js'),'utf8');
-async function fixture({answered=false,snoozed=false,lateList=false}={}){
+async function fixture({answered=false,closed=false,remind=true,snoozed=false,lateList=false}={}){
     let container=false,options,resolveAlert,resolveList,modalCount=0,requestCount=0;
-    const listeners={},storage=new Map(),tabs=[];
+    const listeners={},storage=new Map(),tabs=[],buttons={};
     const c={console,Date,Event,
         pendingEntryNoticeReady:true,pendingEntryReminderHandled:false,
         pendingTasksState:{policy:{},items:[{}]},activeEmergencyAnnouncement:null,
@@ -24,17 +24,17 @@ async function fixture({answered=false,snoozed=false,lateList=false}={}){
         },
         window:{EBOOK_SURVEYS_ENABLED:true,EbookPendingTasks:{getEntryReminderItems:()=>[{}]},
             EbookSurveyContract:{esc:String},EbookSurveyView:{modal(){
-                modalCount++;return {querySelector:()=>({}),close(){}};
+                modalCount++;return {querySelector:selector=>buttons[selector]||(buttons[selector]={}),close(){}};
             }}}
     };
     vm.createContext(c);vm.runInContext(parent+'\n'+pending,c);
-    const list={surveys:[{id:'qa',title:'調查',answered,closed:false,remind:true}]};
+    const list={surveys:[{id:'qa',title:'調查',answered,closed,remind}]};
     const config={identity:'qa',canRemind:()=>!container,request:async()=>{
         requestCount++;return lateList?new Promise(resolve=>resolveList=()=>resolve(list)):list;
     }};
     c.window.EbookSurveyParent.mount(config);c.maybeShowPendingEntryReminder();
     await Promise.resolve();
-    return {c,tabs,config,get modals(){return modalCount;},get requests(){return requestCount;},
+    return {c,tabs,config,list,buttons,storage,get modals(){return modalCount;},get requests(){return requestCount;},
         click:async confirmed=>{resolveAlert({isConfirmed:confirmed});await Promise.resolve();},
         finishClose(){container=false;options.didClose?.();},
         finishList:async()=>{resolveList();await Promise.resolve();await Promise.resolve();}};
@@ -50,13 +50,22 @@ test('清單較晚載入仍可顯示調查',async()=>{
     const f=await fixture({lateList:true});await f.click(true);f.finishClose();
     assert.equal(f.modals,0);await f.finishList();assert.equal(f.modals,1);assert.equal(f.requests,1);
 });
-for(const reason of ['answered','snoozed'])test(reason+' 不因關閉其他彈窗而強制再提醒',async()=>{
+for(const reason of ['answered','closed'])test(reason+' 不因關閉其他彈窗而強制再提醒',async()=>{
     const f=await fixture({[reason]:true});await f.click(true);f.finishClose();assert.equal(f.modals,0);
 });
-test('同頁僅提醒一次；重新登入掛載後可再次提醒未填調查',async()=>{
+test('稍後再填只略過本次；同日重新登入仍提醒，直到回答送出',async()=>{
     const f=await fixture();await f.click(true);f.finishClose();assert.equal(f.modals,1);
+    f.buttons['[data-snooze]'].onclick();assert.equal(f.storage.size,0,'不保存當日暫停');
     f.c.window.EbookSurveyParent.maybeRemind();assert.equal(f.modals,1);
     f.c.window.EbookSurveyParent.mount(f.config);await new Promise(setImmediate);assert.equal(f.modals,2);
+    f.list.surveys[0].answered=true;
+    f.c.window.EbookSurveyParent.mount(f.config);await new Promise(setImmediate);assert.equal(f.modals,2,'填完後下次進入不再提醒');
+});
+test('舊版留下的當日暫停紀錄不再阻擋提醒',async()=>{
+    const f=await fixture({snoozed:true});await f.click(true);f.finishClose();assert.equal(f.modals,1);
+});
+test('老師關閉提醒的調查不彈窗',async()=>{
+    const f=await fixture({remind:false});await f.click(true);f.finishClose();assert.equal(f.modals,0);
 });
 test('等關閉期間登出，不再彈出上一位學生的調查',async()=>{
     const f=await fixture();await f.click(true);f.c.window.EbookSurveyParent.reset();
