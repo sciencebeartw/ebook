@@ -1,0 +1,14 @@
+'use strict';
+const{test}=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
+const reader=require('../fastwrite_grade_reader');
+function fixture(){let clock=1000,next=1,redraws=0,network=0;const timers=new Map(),events={},docEvents={};
+ const window={localStorage:{},DASHBOARD_FASTWRITE_SCOPES:[{subject:'science',gradeAuthority:'dashboard',enabled:true,classKey:'class',className:'班',scopeId:'scope',epoch:1}],ProductionGradeReader:{create:options=>reader.create({...options,now:()=>clock,transport:{create(){network++;return{};}}})},addEventListener:(event,cb)=>events[event]=cb};
+ const document={hidden:false,addEventListener:(event,cb)=>docEvents[event]=cb};
+ vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../fastwrite_ebook_grades.js'),'utf8'),{window,document,ebookFirebaseApp:{auth:()=>({currentUser:{uid:'uid'}})},ebookGodSessionId:'a'.repeat(64),gData:{className:'class',foundUserKey:'student'},isAdminMode:false,isDashboardDraftPreviewMode:false,Date:{now:()=>clock},setTimeout:(fn,ms)=>{const id=next++;timers.set(id,{fn,ms});return id;},clearTimeout:id=>timers.delete(id)});
+ let raw={score:'94',average:'更新中',fastWriteStatisticsPending:true};const read=()=>window.overlayProductionGrade(raw,'class','student','exam');
+ window.rebuildProductionGradeView=()=>{redraws++;read();};window.syncProductionVisibleGradeWatches=()=>{};
+ return{window,document,read,timers,events,docEvents,setRaw:value=>raw=value,advance:ms=>clock+=ms,get redraws(){return redraws;},get network(){return network;},async fire(){const [id,t]=timers.entries().next().value;timers.delete(id);t.fn();await Promise.resolve();}};
+}
+test('eight-second wait is one local timer, repeated renders do not poll or move deadline',async()=>{const f=fixture();for(let i=0;i<10;i++)assert(f.read().gradeDisplayPending);assert.equal(f.timers.size,1);assert.equal([...f.timers.values()][0].ms,8000);f.advance(8000);await f.fire();assert.equal(f.read().score,'94');assert.equal(f.read().average,'暫無資料');assert.equal(f.timers.size,0);assert.equal(f.redraws,1);assert.equal(f.network,0);});
+test('hidden page cancels timer; returning redraws current local result even without a visible watch',async()=>{const f=fixture();f.read();f.document.hidden=true;f.docEvents.visibilitychange();assert.equal(f.timers.size,0);f.advance(9000);f.document.hidden=false;f.docEvents.visibilitychange();await Promise.resolve();assert.equal(f.redraws,1);assert.equal(f.read().average,'暫無資料');assert.equal(f.timers.size,0);assert.equal(f.network,0);});
+test('pagehide clears waiting work and reconnect never creates repeated requests',async()=>{const f=fixture();f.read();f.events.pagehide();assert.equal(f.timers.size,0);f.advance(9000);f.events.online();await Promise.resolve();assert.equal(f.read().score,'94');assert.equal(f.timers.size,0);assert.equal(f.network,0);});

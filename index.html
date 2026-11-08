@@ -5003,9 +5003,9 @@ html { background: #f3faf6; } #splash-status { margin: 22px 0 0; color: #315c44;
     <script src="fastwrite_realtime.js?v=20261018"></script>
     <script src="fastwrite_ebook_realtime.js?v=20261027_online"></script>
     <style>.grade-preparing{min-height:180px;display:flex;align-items:center;justify-content:center;padding:24px 16px;box-sizing:border-box;color:#64748b;font-size:1rem;line-height:1.6;text-align:center;}</style>
-    <script src="fastwrite_grade_reader.js?v=20261108_complete"></script>
-    <script src="fastwrite_grade_dom.js?v=20261108_complete"></script>
-    <script src="fastwrite_ebook_grades.js?v=20261108_complete"></script>
+    <script src="fastwrite_grade_reader.js?v=20261108_resilient"></script>
+    <script src="fastwrite_grade_dom.js?v=20261108_resilient"></script>
+    <script src="fastwrite_ebook_grades.js?v=20261108_resilient"></script>
     <script src="student_tool_drafts.js?v=20261027"></script>
     <script src="fastwrite_dashboard_score_bridge.js?v=20261028_review_parallel_v1"></script>
     <script src="fastwrite_god_score_bridge.js?v=20261018"></script>
@@ -6196,6 +6196,8 @@ async function sendProductionStudentReport(action,payload,send) {
                 fullScore: mathGuidanceStandard ? mathGuidanceStandard.fullScore : null,
                 score: eData.score,
                 gradeDisplayPending: eData.gradeDisplayPending === true,
+                gradeDisplayDelayed: eData.gradeDisplayDelayed === true,
+                gradeDisplayError: eData.gradeDisplayError === true,
                 fastWriteRevision: eData.fastWriteRevision || 0,
                 scoreNum: isNaN(studentScoreNum) ? null : studentScoreNum,
                 unit: currentUnit,
@@ -11615,7 +11617,7 @@ async function sendProductionStudentReport(action,payload,send) {
             if (!exam) return "";
             var examTitle = getDailyPostExamTimePrefix(exam) + getDailyPostExamLabel(exam) + "成績";
             var pendingExamAttrs = " data-grade-revision='" + escapeHtmlAttr(exam.fastWriteRevision || 0) + "' data-grade-score='" + escapeHtmlAttr(exam.score == null ? "" : exam.score) + "' data-pending-exam-anchor='1' data-exam-id='" + escapeHtmlAttr(exam.examId || '') + "' data-stored-exam-id='" + escapeHtmlAttr(exam.storedExamId || '') + "' data-exam-col-index='" + escapeHtmlAttr(exam.colIndex === undefined || exam.colIndex === null ? '' : exam.colIndex) + "' data-assignment-id='" + escapeHtmlAttr(exam.sourceAssignmentId || '') + "'";
-            if (exam.gradeDisplayPending) return "<div class='grade-section'" + pendingExamAttrs + " aria-busy='true'><div class='main-exam-title'>" + examTitle + "</div><div class='main-exam-range'>" + buildAssessmentTitleHtml(exam.exam, exam.className || post.storedClassName || post.className || (gData && gData.className)) + "</div><div class='grade-preparing' role='status'>成績準備中，分數與班平均將一起顯示。</div></div>";
+            if (exam.gradeDisplayPending) return "<div class='grade-section'" + pendingExamAttrs + " aria-busy='true'><div class='main-exam-title'>" + examTitle + "</div><div class='main-exam-range'>" + buildAssessmentTitleHtml(exam.exam, exam.className || post.storedClassName || post.className || (gData && gData.className)) + "</div><div class='grade-preparing' role='status'>" + (exam.gradeDisplayError ? "成績暫時無法載入，請重新登入。" : "成績準備中，分數與班平均將一起顯示。") + "</div></div>";
             var scoreReportHtml = "";
             var chartDistribution = EbookScoreDistribution.forDisplay(exam);
             var displayExam = chartDistribution.normalized ? Object.assign({}, exam, { myBucket: chartDistribution.myBucket }) : exam;
@@ -11675,7 +11677,7 @@ async function sendProductionStudentReport(action,payload,send) {
                 scoreReportHtml += buildGodMakeupReviewBox(makeupContextKey, exam, logic);
             }
             var chartHtml = "";
-            if (exam.dist) {
+            if (exam.dist && !exam.gradeDisplayDelayed) {
                 var dist = chartDistribution.dist;
                 var labels = chartDistribution.labels;
                 var maxVal = Math.max(...dist);
@@ -12443,7 +12445,7 @@ async function sendProductionStudentReport(action,payload,send) {
             window.adminModeScoreEditContext = window.adminModeScoreEditContext || {};
             var container = document.getElementById('tab-content-1'); if (!grades || grades.length === 0) { container.innerHTML = "<p style='color:#666; padding:10px;'>目前尚無成績紀錄。</p>"; return; } var html = ""; grades.forEach(function (item) {
                 var pendingOldExamAttrs = " data-grade-revision='" + escapeHtmlAttr(item.fastWriteRevision || 0) + "' data-grade-score='" + escapeHtmlAttr(item.score == null ? "" : item.score) + "' data-source-class-key='" + escapeHtmlAttr(safeKey(item.storedClassKey || item.sourceClassKey || item.className || gData.className)) + "' data-pending-exam-anchor='1' data-exam-id='" + escapeHtmlAttr(item.examId || '') + "' data-stored-exam-id='" + escapeHtmlAttr(item.storedExamId || '') + "' data-exam-col-index='" + escapeHtmlAttr(item.colIndex === undefined || item.colIndex === null ? '' : item.colIndex) + "'";
-                if(item.gradeDisplayPending){html += "<div class='score-card'" + pendingOldExamAttrs + " aria-busy='true'><div class='class-badge'>" + escapeHtml(item.className || '') + "</div><div class='exam-info'><span class='exam-date'>" + escapeHtml(item.date) + "</span><span class='exam-name'>" + buildAssessmentTitleHtml(item.exam, item.className || (gData && gData.className)) + "</span></div><div class='grade-preparing' role='status'>成績準備中，分數與班平均將一起顯示。</div></div>";return;}
+                if(item.gradeDisplayPending){html += "<div class='score-card'" + pendingOldExamAttrs + " aria-busy='true'><div class='class-badge'>" + escapeHtml(item.className || '') + "</div><div class='exam-info'><span class='exam-date'>" + escapeHtml(item.date) + "</span><span class='exam-name'>" + buildAssessmentTitleHtml(item.exam, item.className || (gData && gData.className)) + "</span></div><div class='grade-preparing' role='status'>" + (item.gradeDisplayError ? "成績暫時無法載入，請重新登入。" : "成績準備中，分數與班平均將一起顯示。") + "</div></div>";return;}
                 var chartDistribution = EbookScoreDistribution.forDisplay(item);
                 var displayItem = chartDistribution.normalized ? Object.assign({}, item, { myBucket: chartDistribution.myBucket }) : item;
                 var logic = getDisplayLogic(displayItem, gData ? gData.feedbackHistory : []); var unitDisplay = ""; if (!isNaN(parseFloat(logic.mainScore))) unitDisplay = "<span class='score-unit'>" + escapeHtml(getGradeScoreUnitText(item, item.unit)) + "</span>"; var displayScore = "<div class='score-val" + logic.mainClass + "'>" + escapeHtml(logic.mainScore) + unitDisplay + "</div>"; var chartHtml = "";
@@ -12474,6 +12476,7 @@ dist.forEach((val, idx) => {
 });
 chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
 
+                if (item.gradeDisplayDelayed) chartHtml = "";
                 var oldScoreEditHtml = "";
                 var editableOldScore = getGodEditableScore(item);
                 var editableOldScoreInfo = getGodEditableScoreInfo(editableOldScore);

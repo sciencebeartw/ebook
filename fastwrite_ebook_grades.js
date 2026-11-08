@@ -1,24 +1,26 @@
 (function(root){'use strict';
- let bridge,manager,observer,generation=0,identity='',visible=new Set(),targets=new Map(),blocked=new Set(),queued=false;
+ let bridge,manager,observer,generation=0,identity='',visible=new Set(),targets=new Map(),blocked=new Set(),queued=false,waitingTimer,waitingAt=0;
  function ready(){return typeof ebookFirebaseApp!=='undefined'&&typeof gData!=='undefined'&&gData&&typeof isAdminMode!=='undefined';}
  function who(){return ready()?[ebookFirebaseApp.auth().currentUser?.uid||'',typeof ebookGodSessionId==='undefined'?'':ebookGodSessionId,gData.className||'',gData.foundUserKey||''].join('|'):'';}
  function reader(){if(!ready()||!Array.isArray(root.DASHBOARD_FASTWRITE_SCOPES)||!root.DASHBOARD_FASTWRITE_SCOPES.length)return null;
   if(!bridge)bridge=root.ProductionGradeReader.create({scopes:root.DASHBOARD_FASTWRITE_SCOPES,getUid:()=>ebookFirebaseApp.auth().currentUser?.uid,getSessionId:()=>ebookGodSessionId,storage:root.localStorage,
    callableFor:mode=>ebookFunctions.httpsCallable(mode==='god'?'runEbookGodAdminAction':'runEbookStudentAction',{timeout:30000}),hash:async parts=>Array.from(new Uint8Array(await root.crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(parts))))).map(n=>n.toString(16).padStart(2,'0')).join('')});return bridge;}
  function redraw(){if(queued)return;queued=true;Promise.resolve().then(()=>{queued=false;if(ready()&&!document.hidden&&typeof root.rebuildProductionGradeView==='function')root.rebuildProductionGradeView();});}
+ function cancelWaiting(){clearTimeout(waitingTimer);waitingTimer=undefined;waitingAt=0;}
+ function waitForDisplay(b){const until=b.waitingUntil();if(!until||document.hidden){cancelWaiting();return;}if(waitingTimer&&waitingAt===until)return;cancelWaiting();waitingAt=until;waitingTimer=setTimeout(()=>{waitingTimer=undefined;waitingAt=0;redraw();},Math.max(0,until-Date.now()));}
  function note(card,text){if(!card?.isConnected)return;let el=card.querySelector('.fastwrite-grade-read-status');if(!el){el=document.createElement('p');el.className='fastwrite-grade-read-status';el.setAttribute('role','status');card.append(el);}el.textContent=text;}
  root.overlayProductionGrade=function(raw,classKey,studentKey,examId){
   const b=reader();if(!b)return raw;const current=who();
-  if(identity!==current){generation++;manager?.clear();targets.clear();blocked.clear();b.clear();identity=current;}
-  try{return b.overlay(raw,classKey,studentKey,examId,isAdminMode?'god':'student');}catch(_){return raw.fastWriteStatisticsPending===true||raw.average==='更新中'?{...raw,score:'',average:'',dist:[],labels:[],gradeDisplayPending:true}:raw;}
+  if(identity!==current){generation++;manager?.clear();targets.clear();blocked.clear();cancelWaiting();b.clear();identity=current;}
+  try{const display=b.overlay(raw,classKey,studentKey,examId,isAdminMode?'god':'student');waitForDisplay(b);return display;}catch(_){return raw.fastWriteStatisticsPending===true||raw.average==='更新中'?{...raw,score:'',average:'',dist:[],labels:[],gradeDisplayPending:true,gradeDisplayError:true}:raw;}
  };
  // 只重算已在本機的原生快照，不另發讀取。
  root.refreshProductionGradeDisplay=redraw;
  document.addEventListener('focusout',event=>{if(event.target.closest?.('.grade-section,.score-card'))redraw();});
- root.stopProductionGradeWatches=function(){generation++;observer?.disconnect();observer=null;visible.clear();manager?.clear();targets.clear();blocked.clear();bridge?.clearLive();};
+ root.stopProductionGradeWatches=function(){cancelWaiting();generation++;observer?.disconnect();observer=null;visible.clear();manager?.clear();targets.clear();blocked.clear();bridge?.clearLive();};
  async function reconcile(){
   if(!ready()||document.hidden){root.stopProductionGradeWatches();return;}const b=reader();if(!b)return;
-  const current=who();if(identity!==current){manager?.clear();targets.clear();blocked.clear();b.clear();identity=current;}
+  const current=who();if(identity!==current){manager?.clear();targets.clear();blocked.clear();cancelWaiting();b.clear();identity=current;}
   const version=++generation;manager=manager||root.ProductionFastWriteRealtime.create({database:db,getIdentity:who});const wanted=new Map();
   for(const card of [...visible].filter(n=>n.isConnected)){
    if(wanted.size>=4)break;const post=card.closest('.post-card-wrapper'),classKey=card.dataset.sourceClassKey||post?.dataset.storedClassKey||post?.dataset.sourceClassKey,examId=card.dataset.storedExamId||card.dataset.examId;
@@ -34,6 +36,6 @@
   observer=new IntersectionObserver(entries=>{for(const e of entries)if(e.isIntersecting)visible.add(e.target);else visible.delete(e.target);reconcile();},{rootMargin:'80px 0px'});
   document.querySelectorAll('#tab-content-0 .grade-section[data-pending-exam-anchor],#tab-content-1 .score-card[data-pending-exam-anchor]').forEach(n=>observer.observe(n));
  };
- root.addEventListener('online',()=>{root.stopProductionGradeWatches();if(!document.hidden)root.syncProductionVisibleGradeWatches();});
- document.addEventListener('visibilitychange',()=>{if(document.hidden)root.stopProductionGradeWatches();else root.syncProductionVisibleGradeWatches();});root.addEventListener('pagehide',()=>root.stopProductionGradeWatches());
+ root.addEventListener('online',()=>{root.stopProductionGradeWatches();if(!document.hidden){root.syncProductionVisibleGradeWatches();redraw();}});
+ document.addEventListener('visibilitychange',()=>{if(document.hidden)root.stopProductionGradeWatches();else{root.syncProductionVisibleGradeWatches();redraw();}});root.addEventListener('pagehide',()=>root.stopProductionGradeWatches());
 })(window);
