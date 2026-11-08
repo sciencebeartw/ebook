@@ -8602,11 +8602,14 @@ async function sendProductionStudentReport(action,payload,send) {
                         popup: 'pending-reminder-swal',
                         title: 'pending-reminder-swal-title',
                         htmlContainer: 'pending-reminder-swal-copy'
+                    },
+                    didClose: function() {
+                        // 等關閉動畫及容器移除完成，再接續調查提醒。
+                        if (window.EBOOK_SURVEYS_ENABLED) document.dispatchEvent(new Event('ebook:popup-idle'));
                     }
                 }
             ).then(function(result) {
                 if (result.isConfirmed) switchTab(3);
-                if (window.EBOOK_SURVEYS_ENABLED) document.dispatchEvent(new Event("ebook:popup-idle"));
             });
         }
 
