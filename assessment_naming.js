@@ -1,7 +1,7 @@
 /* Dashboard / eBook 共用：可編輯預填及呈現名稱，不作成績識別。 */
 (function(root) {
     'use strict';
-    function clean(value) { return String(value || '').replace(/[\r\n]+/g, ' ').replace(/\[/g, '［').replace(/\]/g, '］').trim().slice(0, 300); }
+    function clean(value) { return String(value || '').replace(/\s*[（(]自行對答案[）)]/g, '').replace(/自行對答案/g, '').replace(/[\r\n]+/g, ' ').replace(/\[/g, '［').replace(/\]/g, '］').trim().slice(0, 300); }
     function esc(value) { return String(value || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
     function validDate(y, m, d) {
         const n = new Date(Date.UTC(+y, +m - 1, +d));
@@ -46,7 +46,7 @@
     function reportTitle(value, className) {
         const full = root.AssessmentLabels ? root.AssessmentLabels.fullTitle(value, className) : clean(value);
         if (Array.from(full).length <= 46) return full;
-        const qualifier = full.match(/(?:概念[一二三四五六七八九十\d、]+|前半|後半|全章|自行對答案)/g) || [];
+        const qualifier = full.match(/(?:概念[一二三四五六七八九十\d、]+|前半|後半|全章)/g) || [];
         const tail = Array.from(new Set(qualifier)).join('・');
         const short = Array.from(full).slice(0, tail ? 34 : 44).join('').replace(/[、，；：｜\s]+$/, '');
         return short + '…' + (tail && !short.includes(tail) ? '（' + tail + '）' : '');

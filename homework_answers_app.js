@@ -59,7 +59,7 @@
             var named = root.AssessmentNaming && root.AssessmentNaming.find(getDailyPostDisplayOptions(post), '', '', 'homeworkAnswer:' + a.id);
             var titleHtml = named && named.label ? root.AssessmentNaming.labelHtml(named.label) : typeof buildAssessmentLinkHtml === 'function' ? buildAssessmentLinkHtml(title, getStudentActionPostSourceClassName(post, gData.className)) : esc(title);
             return '<a class="btn-important-tag homework-answer-link" href="' + esc(answer.answerUrl) + '" target="_blank" rel="noopener noreferrer">' + SVG.document + titleHtml + '</a>' + reportForm(post, a, answer);
-        }).join('') + '<div class="homework-done-hint">請自行對答案，並用紅筆訂正。</div>';
+        }).join('') + '<div class="homework-done-hint">請用紅筆完成訂正。</div>';
         if (errors[k]) return waitingForms(post, list, '解答載入尚未完成，請按下方重新載入；已填分數會保留。') + '<div class="homework-done-hint" role="status">' + esc(errors[k]) + '</div><button type="button" class="homework-answer-retry" data-homework-answer-retry="' + esc(getHomeworkDoneDomKey(post)) + '">重新載入解答</button>';
         if (!pending[k]) Promise.resolve().then(function() { load(post); });
         return waitingForms(post, list, '完成紀錄已確認，正在載入解答與回報紀錄，請稍候。');

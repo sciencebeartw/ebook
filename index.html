@@ -5026,13 +5026,13 @@ html { background: #f3faf6; } #splash-status { margin: 22px 0 0; color: #315c44;
         </div>
     </div>
 
-    <script src="assessment_labels.js?v=20261012-full-scope"></script>
-    <script src="assessment_naming.js?v=20261013-editable-2"></script>
+    <script src="assessment_labels.js?v=20261109_practice_label"></script>
+    <script src="assessment_naming.js?v=20261109_practice_label"></script>
     <script src="class_session_plan.js?v=extra-lessons-20261108"></script>
     <script src="homework_report_status.js?v=20261011-pending1"></script>
     <script src="homework_answers_contract.js?v=20261011-report1"></script>
-    <script src="homework_answers_app.js?v=20261017-responsive-1"></script>
-    <script src="holiday_practice_app.js?v=20261013-editable-1"></script>
+    <script src="homework_answers_app.js?v=20261109_practice_label"></script>
+    <script src="holiday_practice_app.js?v=20261109_practice_label"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
   <!-- Firebase SDK -->
@@ -10202,7 +10202,7 @@ async function sendProductionStudentReport(action,payload,send) {
                 var holidayProgressScore = ClassSessionPlan.validScore(holidayProgress && (holidayProgress.reportedScore != null ? holidayProgress.reportedScore : holidayProgress.score));
                 var holidayReportedScore = holidayReport ? holidayReport.reportedScoreNum : holidayProgressScore;
                 var holidayAssignment = window.HolidayPracticeApp ? HolidayPracticeApp.assignmentForExam(exam) : exam;
-                result.statusHtml = "<div class='home-exam-tag'>自行對答案</div>";
+                result.statusHtml = "<div class='home-exam-tag'>回家練習卷</div>";
                 if (holidayScore !== null) {
                     result.effectiveNum = holidayScore;
                     result.mainScore = holidayScore;

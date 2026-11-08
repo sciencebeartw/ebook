@@ -77,7 +77,7 @@ test('named student preview loads the real holiday control and asks before unloc
 test('holiday practice has an independent homework field when regular homework is empty',()=>{
  const main=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
  assert.match(main,/var hasRegularHomeworkTwo = homeworkItems\.some/);
- assert.match(main,/if \(holidayHtml && !hasRegularHomeworkTwo\)[\s\S]{0,500}label: homeworkItems\.length \? "今日作業二" : "今日作業"/);
+ assert.match(main,/if \(\(holidayHtml \|\| libraryButtons\) && !hasRegularHomeworkTwo\)[\s\S]{0,500}label: homeworkItems\.length \? "今日作業二" : "今日作業"/);
  assert.doesNotMatch(main,/homeworkItems\.push\(\{ key: "hw2", label: "今日作業二", val: "" \}\)/);
 });
 

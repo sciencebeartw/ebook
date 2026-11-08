@@ -50,7 +50,7 @@
         var a = assignment(post), c = context(post), p = progress(post), now = Date.now();
         if (!a || a.draft) return '';
         var state = P.holidayState(a, p, now), id = a.assignmentId;
-        var label = state === 'reported' ? '已登記 ' + p.score + ' 分' : state === 'awaiting_review' ? '已回報分數，等待老師登記' : state === 'missing' ? '缺繳：請回報分數' : state === 'awaiting_score' ? '答案已開啟，請自行對答案後回報分數。' : '';
+        var label = state === 'reported' ? '已登記 ' + p.score + ' 分' : state === 'awaiting_review' ? '已回報分數，等待老師登記' : state === 'missing' ? '缺繳：請回報分數' : state === 'awaiting_score' ? '答案已開啟，請完成訂正並回報分數。' : '';
         var preview = isAdminMode || isDashboardDraftPreviewMode;
         var color = (P.options(post).links || {}).holidayColor;
         var colorClass = ' post-button-' + (['blue', 'purple', 'slate', 'orange', 'gray'].indexOf(color) > -1 ? color : 'orange');
@@ -79,7 +79,7 @@
         if (!(p && p.unlockedAt) || p.reportedAt) return '';
         return '<div class="score-report-section holiday-score-report" data-holiday-score-report="' + esc(id) + '">' +
             '<div style="font-weight:bold; color:#c0392b; margin-bottom:10px; font-size:1.35rem;">' + SVG.edit + '回報假期練習卷分數</div>' +
-            '<div class="input-box"><input type="number" min="0" max="' + (P.SCORE_MAX || 200) + '" step="0.01" inputmode="decimal" class="score-input" aria-label="自行對答案後的分數" id="holiday-score-' + esc(id) + '" placeholder="輸入分數" value="' + esc(scoreDrafts[id] || '') + '">' +
+            '<div class="input-box"><input type="number" min="0" max="' + (P.SCORE_MAX || 200) + '" step="0.01" inputmode="decimal" class="score-input" aria-label="回報分數" id="holiday-score-' + esc(id) + '" placeholder="輸入分數" value="' + esc(scoreDrafts[id] || '') + '">' +
             '<button type="button" class="score-btn" data-holiday-action="report" data-assignment="' + esc(id) + '"' + (busy[id] ? ' disabled aria-busy="true"' : '') + '>' + (busy[id] ? '送出中…' : '送出') + '</button></div></div>';
     }
     function redraw(id) {

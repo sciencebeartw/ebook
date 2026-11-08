@@ -14,7 +14,7 @@
         return value.length === 1 ? units.indexOf(value) : 0;
     }
     function describe(value, className) {
-        const raw = String(value || '').trim();
+        const raw = String(value || '').replace(/\s*[（(]自行對答案[）)]/g, '').replace(/自行對答案/g, '').trim();
         // 舊假期卷常以「日期 班名 回家複習卷 章節.pdf」作為欄名。
         // 僅在移除已知前綴後能辨識章節時採用，其他自訂文字不裁切。
         const scope = raw.replace(/^\d{8}(?:[-～~、]\d{2,8})*\s+/, '')
@@ -31,13 +31,12 @@
         // 跨章只顯示章節範圍，不逐章列出內容；保留複習考用途。
         if (/[、,\-–—～~至]/.test(match[3])) {
             const compact = heading + (/複習考/.test(detail) ? '複習考' : '');
-            const note = /（自行對答案）/.test(detail) ? '（自行對答案）' : '';
-            return { heading: compact, detail: note, full: compact + note };
+            return { heading: compact, detail: '', full: compact };
         }
         const catalog = /^115小六資優自然/.test(String(className || '')) ? chapters[match[2]] : null;
         const chapter = catalog && catalog[chapterNumber(match[3]) - 1];
         // 只補有目錄依據、且尚未填章名的簡稱。自訂內容不覆寫。
-        if (chapter && (!detail || /^(?:概念[一二三四五六七八九十\d、及與到至\-～]+|前半(?:範圍)?|後半(?:範圍)?|全章?|剩餘(?:作業|範圍)?|複習考)?(?:（自行對答案）)?$/.test(detail))) {
+        if (chapter && (!detail || /^(?:概念[一二三四五六七八九十\d、及與到至\-～]+|前半(?:範圍)?|後半(?:範圍)?|全章?|剩餘(?:作業|範圍)?|複習考)?$/.test(detail))) {
             detail = chapter + (detail ? '｜' + detail : '');
         }
         return { heading, detail, full: heading + (detail ? ' ' + detail : '') };
@@ -45,11 +44,11 @@
     function fullTitle(value, className) { return describe(value, className).full; }
     // 新上傳的簡章名可補內容；日期、班名及未知檔名不猜測，原樣保留。
     function paperTitle(value, className) {
-        const raw = String(value || '').trim();
+        const raw = String(value || '').replace(/\s*[（(]自行對答案[）)]/g, '').replace(/自行對答案/g, '').trim();
         return /^115小六資優自然/.test(String(className || '')) ? fullTitle(raw, className) : raw;
     }
     function dateParts(value) {
-        const raw = String(value || '').trim();
+        const raw = String(value || '').replace(/\s*[（(]自行對答案[）)]/g, '').replace(/自行對答案/g, '').trim();
         const match = raw.match(/(?:(\d{4})[\/-])?(\d{1,2})[\/-](\d{1,2})/);
         if (!match) return { date: raw, shortDate: raw, type: '' };
         return {
