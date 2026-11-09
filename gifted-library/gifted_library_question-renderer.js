@@ -2,7 +2,7 @@
   'use strict';
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const text=v=>esc(v).replace(/\n/g,'<br>');
-  function media(items,label){return (items||[]).map(a=>BearStudentMedia.html(a,'',label)).join('');}
+  function media(items,label,kind='question'){return (items||[]).map(a=>BearStudentMedia.html(a,'',label,kind)).join('');}
   function blocks(items){return (items||[]).map(b=>{
     if(b.kind==='text')return `<p class="typed-context-text">${text(b.text)}</p>`;
     if(b.kind==='media')return `<div class="typed-figures">${media(b.media,'題目附圖')}</div>`;
@@ -16,7 +16,7 @@
     const tf=q.options.length===2&&q.options[0].text.startsWith('○');
     return `<p class="typed-question-label">${esc(q.sourceTitle||q.label)}</p>`+(q.contextBlocks?.length?`<aside class="typed-context" aria-label="共用題文">${blocks(q.contextBlocks)}</aside>`:'')+
       `<p class="typed-prompt">${text(q.prompt)}</p>`+blocks(q.bodyBlocks)+
-      (q.options.length?'<div class="typed-choices">'+q.options.map((o,i)=>`<label class="typed-choice"><input type="${q.type==='multiple'?'checkbox':'radio'}" name="${esc(name)}" value="${esc(o.id)}"><span class="typed-choice-label">${tf?'':esc(choiceLabel(q,o,i))}</span><span class="typed-choice-content">${text(o.text)}${media(o.media,'選項 '+choiceLabel(q,o,i))}</span></label>`).join('')+'</div>':'');
+      (q.options.length?'<div class="typed-choices">'+q.options.map((o,i)=>`<label class="typed-choice"><input type="${q.type==='multiple'?'checkbox':'radio'}" name="${esc(name)}" value="${esc(o.id)}"><span class="typed-choice-label">${tf?'':esc(choiceLabel(q,o,i))}</span><span class="typed-choice-content">${text(o.text)}${media(o.media,'選項 '+choiceLabel(q,o,i),'option')}</span></label>`).join('')+'</div>':'');
   }
   global.GiftedTypedQuestion={question,blocks,choiceLabel,answerText};
 })(window);

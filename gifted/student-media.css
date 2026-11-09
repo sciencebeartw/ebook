@@ -3,14 +3,15 @@
 .student-question,#studentQuestionPanel{min-width:0}
 .student-question .student-assets{display:flex;flex-direction:column;align-items:flex-start;gap:12px;max-width:100%;min-width:0}
 .student-media{display:block;max-width:100%;min-width:0;margin:0;border:1px solid #d7e0da;border-radius:8px;background:#fff;overflow:hidden}
+.student-media[data-media-kind=option] .student-media-preview>img{max-height:220px}
 .student-media-preview{max-width:100%;overflow:auto;cursor:zoom-in;padding:12px}
-.student-question .student-media img{display:block;width:100%;max-width:none;height:auto;max-height:480px;object-fit:contain;border:0;border-radius:0;padding:0}
+.student-media-preview>img{display:block;width:auto;max-width:100%;height:auto;max-height:300px;object-fit:contain;border:0;border-radius:0;padding:0}
 .student-question .student-media .asset-table{width:100%;min-width:280px;max-width:none;font-size:17px;line-height:1.55;table-layout:auto;margin:0}
 .student-media .asset-table th,.student-media .asset-table td{padding:8px 10px;word-break:normal;overflow-wrap:normal}
 .asset-table{border-collapse:collapse}.asset-table th,.asset-table td{border:1px solid #bfcfc3;text-align:center}.asset-table th{background:#edf5ef}
 .student-question .student-media .asset-table-compact,.student-media-content .asset-table-compact{table-layout:fixed;min-width:0;width:100%}
 .student-media .asset-table-compact th,.student-media .asset-table-compact td{padding:6px 4px;overflow-wrap:anywhere}
-.student-question .student-media-open{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:44px;padding:8px 12px;border:0;border-radius:0;border-top:1px solid #e4eae3;background:#f4f7f2;color:#285645;font-size:14px;font-weight:600;cursor:zoom-in}
+.student-media .student-media-open{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:44px;padding:8px 12px;border:0;border-radius:0;border-top:1px solid #e4eae3;background:#f4f7f2;color:#285645;font-size:14px;font-weight:600;cursor:zoom-in}
 .student-options label>span{min-width:0;flex:1}.student-options .student-assets{width:100%}
 .student-media-open:focus-visible,.student-media-dialog button:focus-visible{outline:3px solid #b47a23;outline-offset:-3px}
 body.student-media-opened{overflow:hidden}

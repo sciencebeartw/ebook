@@ -2,7 +2,7 @@
   'use strict';
   const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
   const positive = v => Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : 0;
-  function presentation(asset = {}) {
+  function presentation(asset = {}, kind = 'question') {
     const percent = positive(asset.displayWidthPercent);
     if (percent) return { width: `clamp(240px, ${clamp(percent, 1, 100)}%, 720px)`, manual: true };
     if (asset.renderAs === 'table') return { width: 'min(100%, 720px)', manual: false };
@@ -10,19 +10,20 @@
     const pt = positive(asset.wordDisplayWidthPt) || positive(asset.wordDisplayWidthTwip) / 20;
     const hp = positive(asset.wordDisplayHeightPt) || positive(asset.wordDisplayHeightTwip) / 20;
     const ratio = w && h ? w / h : pt && hp ? pt / hp : 1.5;
-    const compact = pt && pt < 70 && hp && hp < 30;
-    const target = pt ? pt * 96 / 72 * 2 : w || 480;
-    const width = compact ? clamp(target, 100, 220) : Math.min(clamp(target, 420, 720), Math.max(160, ratio * 480));
-    return { width: `${Math.round(width)}px`, manual: false };
+    const option = kind === 'option', maxWidth = option ? 320 : 520, maxHeight = option ? 220 : 300;
+    // 紙本點數換算螢幕像素即可；小圖不再強制放大，高清裁圖也不按原始像素撐滿版面。
+    const target = pt ? pt * 96 / 72 : w || (option ? 240 : 360);
+    const width = Math.max(96, Math.min(target, maxWidth, ratio * maxHeight));
+    return { width: `${Math.round(width + 26)}px`, manual: false };
   }
   const escape = value => String(value ?? '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
   let entries = [], dialog, previousFocus, zoom = 1, baseWidth = 0;
   function reset() { if (dialog?.open) dialog.close(); entries = []; }
-  function html(asset, tableHtml, label) {
+  function html(asset, tableHtml, label, kind = 'question') {
     const key = entries.push({asset, label}) - 1;
-    const display = presentation(asset);
+    const display = presentation(asset, kind);
     const body = asset.renderAs === 'table' ? tableHtml : `<img src="${escape(asset.url)}" alt="${escape(label)}" loading="lazy">`;
-    return `<figure class="student-media" data-student-media="${key}" style="width:${display.width}"><div class="student-media-preview">${body}</div><button type="button" class="student-media-open" aria-label="放大${escape(label)}">放大圖表 <span aria-hidden="true">↗</span></button></figure>`;
+    return `<figure class="student-media" data-media-kind="${kind === 'option' ? 'option' : 'question'}" data-student-media="${key}" style="width:${display.width}"><div class="student-media-preview">${body}</div><button type="button" class="student-media-open" aria-label="放大${escape(label)}">放大圖表 <span aria-hidden="true">↗</span></button></figure>`;
   }
   function ensureDialog() {
     if (dialog) return;
