@@ -25,10 +25,11 @@
         const deadline='<span class="es-pill">'+(f.endsAt?C.date(f.endsAt)+' 截止':'截止時間待設定')+'</span>';
         if(showReview&&response){d.querySelector('.es-dialog-body').innerHTML='<div class="es-success"><div class="es-success-icon">✓</div><h3>已收到你的回答</h3><p class="es-muted">'+E(r.student.name)+'，謝謝你的協助！</p></div>'+V.review(f,response)+'<p class="es-muted">最後回覆：'+C.date(response.updatedAt)+(response.actor.role==='admin'?' · 老師代填':'')+'</p><div class="es-help" style="margin-top:15px">'+(r.canEdit?'截止前都可以修改，以最後一次成功送出的回答為準。':'調查已結束；如需更正，請聯絡老師。')+'</div><div class="es-status" role="status"></div>';
             d.querySelector('.es-dialog-footer').innerHTML=(r.canEdit?'<button type="button" data-edit>修改回答</button>':'')+'<button type="button" class="es-primary" data-close>完成</button>';
-            const edit=d.querySelector('[data-edit]');if(edit)edit.onclick=()=>draw(d,r,false,preview,request,token);return;
+            const edit=d.querySelector('[data-edit]');if(edit)edit.onclick=()=>draw(d,r,false,preview,request,token);root.EbookSurveyAttachments.bind(d,f,response.answers,{request,scope:{id:r.survey.id},readOnly:true});return;
         }
         d.querySelector('.es-dialog-body').innerHTML=identity+deadline+(preview?'<div class="es-warning" style="margin-top:12px">家長端預覽，這裡的操作不會送出回答。</div>':'')+'<p class="es-description">'+E(f.description)+'</p>'+V.book(f)+'<form>'+V.fields(f,response?response.answers:{})+'</form><div class="es-status" role="status" aria-live="polite"></div>';
         d.querySelector('.es-dialog-footer').innerHTML='<button type="button" data-close>'+(response?'取消修改':'稍後填寫')+'</button><button type="button" class="es-primary" data-submit '+(preview||!r.canEdit?'disabled':'')+'>'+(response?'儲存修改':'送出回答')+'</button>';
+        root.EbookSurveyAttachments.bind(d,f,response?response.answers:{},{request,scope:{id:r.survey.id,formRevision:r.survey.formRevision},preview,readOnly:!r.canEdit});
         let pending=null,busy=false;
         d.querySelector('[data-submit]').onclick=async()=>{
             if(busy||preview)return;
