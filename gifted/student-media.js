@@ -49,14 +49,16 @@
       return html({renderAs:'table',table:b},table,'題目資料表');
     }).join('');
   }
-  let entries = [], dialog, previousFocus, zoom = 1, baseWidth = 0;
-  function reset() { if (dialog?.open) dialog.close(); entries = []; }
+  let dialog, previousFocus, zoom = 1, baseWidth = 0;
+  function reset() { if (dialog?.open) dialog.close(); }
   function html(asset, tableHtml, label, kind = 'question') {
-    const key = entries.push({asset, label}) - 1;
     const display = presentation(asset, kind);
-    const body = asset.renderAs === 'table' ? tableHtml : `<img src="${escape(asset.url)}" alt="${escape(label)}" loading="lazy">`;
+    const isTable = asset.renderAs === 'table';
+    const cols = asset.table?.rows?.[0]?.length || 4;
+    const zoomWidth = isTable ? clamp(cols * 140, 560, 1000) : clamp(positive(asset.width) || 900, 560, 1200);
+    const body = isTable ? tableHtml : `<img src="${escape(asset.url)}" alt="${escape(label)}" loading="lazy">`;
     const size = display.imageWidth ? `;--student-media-image-width:${display.imageWidth};--student-media-image-height:${display.imageHeight}` : '';
-    return `<figure class="student-media" data-media-kind="${kind === 'option' ? 'option' : 'question'}" data-student-media="${key}" style="width:${display.width}${size}"><div class="student-media-preview">${body}</div><button type="button" class="student-media-open" aria-label="放大${escape(label)}">放大圖表 <span aria-hidden="true">↗</span></button></figure>`;
+    return `<figure class="student-media" data-media-kind="${kind === 'option' ? 'option' : 'question'}" data-student-media="${zoomWidth}" data-media-label="${escape(label)}" style="width:${display.width}${size}"><div class="student-media-preview">${body}</div><button type="button" class="student-media-open" aria-label="放大${escape(label)}">放大圖表 <span aria-hidden="true">↗</span></button></figure>`;
   }
   function ensureDialog() {
     if (dialog) return;
@@ -85,17 +87,14 @@
     dialog.querySelector('[data-media-action="plus"]').disabled = zoom >= 3;
   }
   function open(figure) {
-    const entry = entries[Number(figure.dataset.studentMedia)];
-    if (!entry) return;
     ensureDialog(); previousFocus = figure.querySelector('button'); zoom = 1;
     const source = figure.querySelector('.student-media-preview');
     const content = dialog.querySelector('.student-media-content');
     content.replaceChildren(...[...source.childNodes].map(node => node.cloneNode(true)));
     const image = content.querySelector('img');
     if (image) image.loading = 'eager';
-    const cols = entry.asset.table?.rows?.[0]?.length || 4;
-    baseWidth = entry.asset.renderAs === 'table' ? clamp(cols * 140, 560, 1000) : clamp(positive(entry.asset.width) || 900, 560, 1200);
-    dialog.querySelector('h2').textContent = entry.label;
+    baseWidth = Number(figure.dataset.studentMedia);
+    dialog.querySelector('h2').textContent = figure.dataset.mediaLabel;
     document.body.classList.add('student-media-opened'); dialog.showModal(); paintZoom();
     dialog.querySelector('.student-media-viewport').scrollTo(0, 0);
   }
