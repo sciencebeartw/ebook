@@ -3932,7 +3932,7 @@ html { background: #f3faf6; } #splash-status { margin: 22px 0 0; color: #315c44;
         }
 
         .sticker-reason-select {
-            flex: 1;
+            flex: 1 1 12em;
             min-width: 0;
             padding: 8px 12px;
             border: 1.5px solid #fed7aa;
@@ -12315,6 +12315,7 @@ async function sendProductionStudentReport(action,payload,send) {
                 <select class="sticker-reason-select" id="sticker-reason-${safeDateId}" onchange="onStickerReasonChange('${safeDateId}')">
                     <option value="__placeholder__" disabled selected>請選擇得棒名目</option>
                     <option value="小考高分">小考高分</option>
+                    <option value="期中/期末考高分">期中/期末考高分</option>
                     <option value="即時練習">即時練習</option>
                     <option value="__custom__">自行填寫...</option>
                 </select>
@@ -12329,6 +12330,10 @@ async function sendProductionStudentReport(action,payload,send) {
                 <button class="sticker-submit-btn" onclick="submitStickerApply('${safeDateId}', '${post.date}')">送出申請</button>
             </div>
             <input type="text" class="sticker-reason-custom" id="sticker-custom-${safeDateId}" placeholder="請輸入得棒名目...">
+            <div id="sticker-school-exam-${safeDateId}" hidden>
+                <input type="text" class="sticker-reason-custom" id="sticker-school-exam-detail-${safeDateId}" style="display:block;" maxlength="80" aria-label="期中或期末考的科目與分數" aria-describedby="sticker-school-exam-hint-${safeDateId}" placeholder="科目與分數，例如：自然 98 分">
+                <div class="sticker-hint" id="sticker-school-exam-hint-${safeDateId}">請先在這份聯絡簿的留言區上傳考卷照片，讓老師看得到姓名、科目和分數，再依獎勵公告選擇或自訂棒數，送出申請。</div>
+            </div>
             <div class="sticker-hint">申請後由老師審核，通過後計入總棒數 ${SVG.star}</div>
             </div></div>
         </details>
@@ -12868,8 +12873,12 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         function onStickerReasonChange(safeId) {
             var sel = document.getElementById('sticker-reason-' + safeId);
             var custom = document.getElementById('sticker-custom-' + safeId);
+            var schoolExam = document.getElementById('sticker-school-exam-' + safeId);
             if (sel && custom) {
                 custom.style.display = (sel.value === '__custom__') ? 'block' : 'none';
+            }
+            if (sel && schoolExam) {
+                schoolExam.hidden = sel.value !== '期中/期末考高分';
             }
         }
         function onStickerCountChange(safeId) {
@@ -12893,11 +12902,20 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
 
             var selEl = document.getElementById('sticker-reason-' + safeId);
             var customEl = document.getElementById('sticker-custom-' + safeId);
+            var schoolExamDetailEl = document.getElementById('sticker-school-exam-detail-' + safeId);
             var countSelEl = document.getElementById('sticker-count-' + safeId);
             var countCustomEl = document.getElementById('sticker-count-custom-' + safeId);
             
             var reason = selEl ? selEl.value : '';
             if (reason === '__custom__') reason = customEl ? customEl.value.trim() : '';
+            if (reason === '期中/期末考高分') {
+                var schoolExamDetail = schoolExamDetailEl ? schoolExamDetailEl.value.trim() : '';
+                if (!schoolExamDetail) {
+                    swalAlert('請填寫科目與分數', '例如：自然 98 分。', 'warning');
+                    return;
+                }
+                reason += '：' + schoolExamDetail;
+            }
             
             var countStr = countSelEl ? countSelEl.value : '';
             if (countStr === '__custom__') countStr = countCustomEl ? countCustomEl.value.trim() : '';
@@ -12926,7 +12944,9 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 // 不需要手動寫入 Firebase，因為 GAS 的 submitFeedback 內部會觸發單筆 feedback 同步
                 // 且 Firebase .on('value') 監聽器會處理即時更新
                 if (selEl) { selEl.selectedIndex = 0; }
-                if (customEl) { customEl.value = ''; customEl.style.display = 'none'; }
+                if (customEl) customEl.value = '';
+                if (schoolExamDetailEl) schoolExamDetailEl.value = '';
+                onStickerReasonChange(safeId);
                 clearEbookSubmitLoading(submitBtn, "送出申請");
                 
                 swalAlert("棒卡申請已儲存", "請等待老師審核。", "success");
