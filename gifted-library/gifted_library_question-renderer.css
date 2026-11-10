@@ -2,7 +2,7 @@
 .typed-prompt,.typed-context-text{font-size:20px;line-height:1.75;white-space:normal;overflow-wrap:anywhere;margin:12px 0}
 .typed-context{border-left:3px solid #a5b9aa;background:#f4f7f3;padding:8px 14px;margin:12px 0}
 .typed-choices{display:grid;grid-template-columns:minmax(0,1fr);gap:9px;margin-top:18px}
-.typed-choice{display:flex!important;align-items:flex-start!important;gap:10px;padding:12px;border:1px solid #c8d4cd;border-radius:8px;min-height:44px;box-sizing:border-box;width:100%;min-width:0;max-width:100%;margin:0!important;font-size:19px;line-height:1.65}
+.typed-choice{display:flex;align-items:flex-start;gap:10px;padding:12px;border:1px solid #c8d4cd;border-radius:8px;min-height:44px;box-sizing:border-box;width:100%;min-width:0;max-width:100%;margin:0!important;font-size:19px;line-height:1.65}
 .typed-choice:has(input:checked){background:#edf6ee;border-color:#407b53}
 .typed-choice input{flex:0 0 auto;margin-top:8px;width:18px;height:18px}
 .typed-choice-label{flex:0 0 22px}
@@ -24,5 +24,3 @@
 
 
 .typed-figures figure,.typed-choice figure,.typed-table figure{box-sizing:border-box}
-
-.typed-choices .student-media-preview img{display:block;max-width:100%;height:auto}

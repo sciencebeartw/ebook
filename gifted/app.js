@@ -63,8 +63,16 @@ function paintAnswerGrid(){
  $('answerGrid').querySelectorAll('button').forEach(el=>el.onclick=()=>{questionIndex=Number(el.dataset.index);paint();});
  $('answerGridHelp').hidden=!needsCorrection;
 }
-function paint(){BearStudentMedia.bind($('questionCard'));BearStudentMedia.reset();const q=task.questions[questionIndex];$('count').textContent='已填 '+valuesCount()+' / '+task.questions.length+' 題';$('question').value=q.id;
- $('questionCard').innerHTML=(q.groupContext?'<p>'+esc(q.groupContext)+'</p>':'')+'<p><strong>'+esc(questionLabel(q))+'</strong></p><p>'+esc(q.prompt)+'</p>'+BearStudentMedia.blocks(q.bodyBlocks)+q.media.map(m=>BearStudentMedia.html(m,'',questionLabel(q)+'圖表')).join('')+q.options.map(o=>`<label class="option"><input type="radio" name="answer" value="${esc(o.id)}" ${one(answers[q.id])===o.id?'checked':''} ${task.submission?'disabled':''}><span>${esc(o.text)}${(o.media||[]).map(m=>BearStudentMedia.html(m,'','選項圖表','option')).join('')}</span></label>`).join('');
+function paint(){
+ BearStudentMedia.bind($('questionCard'));BearStudentMedia.reset();
+ const q=task.questions[questionIndex];$('count').textContent='已填 '+valuesCount()+' / '+task.questions.length+' 題';$('question').value=q.id;
+ const promptMedia=BearStudentMedia.blocks(q.bodyBlocks)+q.media.map(m=>BearStudentMedia.html(m,'',questionLabel(q)+'圖表')).join('');
+ const options=BearStudentMedia.homeworkOptions(q.options,o=>
+  `<input type="radio" name="answer" value="${esc(o.id)}" ${one(answers[q.id])===o.id?'checked':''} ${task.submission?'disabled':''}>`
+ );
+ $('questionCard').innerHTML=(q.groupContext?'<p>'+esc(q.groupContext)+'</p>':'')+
+  '<p><strong>'+esc(questionLabel(q))+'</strong></p><p>'+esc(q.prompt)+'</p>'+
+  promptMedia+options;
  window.GiftedProperNames?.decorate($('questionCard'),q.prompt);
  $('questionCard').querySelectorAll('input[name=answer]').forEach(el=>el.onchange=()=>{if(isReadOnly())return;try{answers[q.id]=el.value;box.saveLocalDraft(answers,task.revision);$('studentStatus').textContent='已暫存本機；送出後才正式登記。';paint();}catch(e){error(e);}});
  paintAnswerGrid();

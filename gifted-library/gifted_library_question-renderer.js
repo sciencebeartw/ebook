@@ -14,9 +14,17 @@
   function answerText(q,ids){return ids.map(id=>{const i=q.options.findIndex(o=>o.id===id),o=q.options[i];return o?(isMock(q)?choiceLabel(q,o,i)+' ':'')+o.text:id;}).join('、');}
   function question(q,name=q.id){
     const tf=q.options.length===2&&q.options[0].text.startsWith('○');
-    return `<p class="typed-question-label">${esc(q.sourceTitle||q.label)}</p>`+(q.contextBlocks?.length?`<aside class="typed-context" aria-label="共用題文">${blocks(q.contextBlocks)}</aside>`:'')+
-      `<p class="typed-prompt">${text(q.prompt)}</p>`+blocks(q.bodyBlocks)+
-      (q.options.length?'<div class="typed-choices">'+q.options.map((o,i)=>`<label class="typed-choice"><input type="${q.type==='multiple'?'checkbox':'radio'}" name="${esc(name)}" value="${esc(o.id)}"><span class="typed-choice-label">${tf?'':esc(choiceLabel(q,o,i))}</span><span class="typed-choice-content">${text(o.text)}${media(o.media,'選項 '+choiceLabel(q,o,i),'option')}</span></label>`).join('')+'</div>':'');
+    const prompt=`<p class="typed-question-label">${esc(q.sourceTitle||q.label)}</p>`+(q.contextBlocks?.length?`<aside class="typed-context" aria-label="共用題文">${blocks(q.contextBlocks)}</aside>`:'')+
+      `<p class="typed-prompt">${text(q.prompt)}</p>`+blocks(q.bodyBlocks);
+    const columns=BearStudentMedia.optionColumns(q.options);
+    const choices=q.options.map((o,i)=>{
+      const label=tf?'':esc(choiceLabel(q,o,i));
+      const caption=o.text?`<span class="typed-choice-text">${text(o.text)}</span>`:'';
+      return `<label class="typed-choice"><input type="${q.type==='multiple'?'checkbox':'radio'}" name="${esc(name)}" value="${esc(o.id)}"><span class="typed-choice-label">${label}</span><span class="typed-choice-content">${caption}${media(o.media,'選項 '+choiceLabel(q,o,i),'option')}</span></label>`;
+    }).join('');
+    const gridClass=columns>1?' image-options':'';
+    const gridStyle=columns>1?` style="--image-option-columns:${columns}"`:'';
+    return prompt+(choices?`<div class="typed-choices${gridClass}"${gridStyle}>${choices}</div>`:'');
   }
   global.GiftedTypedQuestion={question,blocks,choiceLabel,answerText};
 })(window);

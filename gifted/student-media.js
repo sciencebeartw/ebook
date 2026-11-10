@@ -10,13 +10,35 @@
     const pt = positive(asset.wordDisplayWidthPt) || positive(asset.wordDisplayWidthTwip) / 20;
     const hp = positive(asset.wordDisplayHeightPt) || positive(asset.wordDisplayHeightTwip) / 20;
     const ratio = w && h ? w / h : pt && hp ? pt / hp : 1.5;
-    const option = kind === 'option', maxWidth = option ? 320 : 520, maxHeight = option ? 220 : 300;
-    // 紙本點數換算螢幕像素即可；小圖不再強制放大，高清裁圖也不按原始像素撐滿版面。
-    const target = pt ? pt * 96 / 72 : w || (option ? 240 : 360);
-    const width = Math.max(96, Math.min(target, maxWidth, ratio * maxHeight));
-    return { width: `${Math.round(width + 26)}px`, manual: false };
+    // 以 12pt 紙本題文字為比例基準；像素是圖檔解析度，只用來避免放大低解析度圖。
+    const option = kind === 'option', maxWidth = option ? 9 : 12.25, maxHeight = option ? 4.25 : 8;
+    const em = n => `${Math.round(n * 1000) / 1000}em`;
+    const widths = [em(Math.min(maxWidth, ratio * maxHeight))];
+    if (pt) widths.push(em(pt / 12));
+    if (w) widths.push(`${w}px`);
+    const imageWidth = widths.length > 1 ? `min(${widths.join(', ')})` : widths[0];
+    // 圖可以比放大按鈕窄；按鈕保留可讀文字與觸控空間。
+    return { width: `max(104px, calc(${imageWidth} + 26px))`, imageWidth, imageHeight: em(maxHeight), manual: false };
   }
   const escape = value => String(value ?? '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+  function optionColumns(options) {
+    if (options.length < 2) return 1;
+    const assets = options.flatMap(o => o.media || []);
+    if (!assets.length || assets.some(a => a.renderAs === 'table')) return 1;
+    const allCompact = options.length <= 4 && options.every(o =>
+      o.media?.length === 1 && !positive(o.media[0].displayWidthPercent) &&
+      /^(?:[（(][A-DＡ-Ｄ][）)])?$/i.test((o.text || '').trim())
+    );
+    return allCompact ? options.length : 2;
+  }
+  function homeworkOptions(options, inputHtml) {
+    const columns = optionColumns(options);
+    const choices = options.map(o => {
+      const images = (o.media || []).map(m => html(m, '', '選項圖表', 'option')).join('');
+      return `<label class="option">${inputHtml(o)}<span><span>${escape(o.text)}</span>${images}</span></label>`;
+    }).join('');
+    return columns > 1 ? `<div class="image-options" style="--image-option-columns:${columns}">${choices}</div>` : choices;
+  }
   function blocks(items){
     return (items||[]).map(b=>{
       if(b.kind==='text')return '<p>'+escape(b.text)+'</p>';
@@ -33,7 +55,8 @@
     const key = entries.push({asset, label}) - 1;
     const display = presentation(asset, kind);
     const body = asset.renderAs === 'table' ? tableHtml : `<img src="${escape(asset.url)}" alt="${escape(label)}" loading="lazy">`;
-    return `<figure class="student-media" data-media-kind="${kind === 'option' ? 'option' : 'question'}" data-student-media="${key}" style="width:${display.width}"><div class="student-media-preview">${body}</div><button type="button" class="student-media-open" aria-label="放大${escape(label)}">放大圖表 <span aria-hidden="true">↗</span></button></figure>`;
+    const size = display.imageWidth ? `;--student-media-image-width:${display.imageWidth};--student-media-image-height:${display.imageHeight}` : '';
+    return `<figure class="student-media" data-media-kind="${kind === 'option' ? 'option' : 'question'}" data-student-media="${key}" style="width:${display.width}${size}"><div class="student-media-preview">${body}</div><button type="button" class="student-media-open" aria-label="放大${escape(label)}">放大圖表 <span aria-hidden="true">↗</span></button></figure>`;
   }
   function ensureDialog() {
     if (dialog) return;
@@ -87,7 +110,7 @@
     });
     window.addEventListener('resize', () => { if (dialog?.open) paintZoom(); });
   }
-  const api = {presentation, html, blocks, reset, bind};
+  const api = {presentation, optionColumns, homeworkOptions, html, blocks, reset, bind};
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.BearStudentMedia = api;
 })(typeof window !== 'undefined' ? window : globalThis);
