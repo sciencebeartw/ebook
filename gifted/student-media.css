@@ -44,3 +44,18 @@ body.student-media-opened{overflow:hidden}
 .student-media-dialog>p{font-size:13px;line-height:1.6;padding:10px 16px;margin:0;color:#57695c;flex:none}
 #studentResult[role=status]{scroll-margin-top:90px}
 @media(max-width:600px){.student-media-dialog{width:calc(100vw - 12px);height:calc(100dvh - 12px);border-radius:8px}.student-media-dialog header{padding:10px 12px}.student-media-dialog h2{font-size:18px}.student-media-preview{padding:8px}.student-question .student-media .asset-table{font-size:16px}.student-media-content{margin:0}.student-media-viewport{padding:8px}}
+
+/* Keep the calibrated glyph height when a wide diagram needs its own scroll area. */
+.student-media[data-reading-size] .student-media-preview > img {
+  width: var(--student-media-image-width);
+  max-width: none;
+  height: auto;
+  max-height: none;
+  margin-inline: 0;
+}
+[data-gifted-library] .student-media[data-reading-size] { font-size: 20px }
+.correction-answers .student-media[data-reading-size] { font-size: 19px }
+@media(max-width:600px) {
+  [data-gifted-library] .student-media[data-reading-size] { font-size: 19px }
+  .correction-answers .student-media[data-reading-size] { font-size: 18px }
+}

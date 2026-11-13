@@ -2,7 +2,16 @@
   'use strict';
   const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
   const positive = v => Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : 0;
+  function readingWidth(asset) {
+    const fingerprint = String(asset.url || '').match(/(?:\/|%2f)([0-9a-f]{64})\.(?:png|svg)(?=[?#]|$)/i)?.[1];
+    return fingerprint ? positive(root.BearStudentMediaReadingSizes?.[fingerprint.toLowerCase()]) : 0;
+  }
   function presentation(asset = {}, kind = 'question') {
+    const widthInEm = readingWidth(asset);
+    if (widthInEm) {
+      const imageWidth = `${widthInEm}em`;
+      return { width: `max(104px, calc(${imageWidth} + 26px))`, imageWidth, imageHeight: 'none', calibrated: true };
+    }
     const percent = positive(asset.displayWidthPercent);
     if (percent) return { width: `clamp(240px, ${clamp(percent, 1, 100)}%, 720px)`, manual: true };
     if (asset.renderAs === 'table') return { width: 'min(100%, 720px)', manual: false };
@@ -29,7 +38,7 @@
       o.media?.length === 1 && !positive(o.media[0].displayWidthPercent) &&
       /^(?:[（(][A-DＡ-Ｄ][）)])?$/i.test((o.text || '').trim())
     );
-    return allCompact ? options.length : 2;
+    return allCompact && assets.every(asset => readingWidth(asset) <= 7.7) ? options.length : 2;
   }
   function homeworkOptions(options, inputHtml) {
     const columns = optionColumns(options);
@@ -58,7 +67,8 @@
     const zoomWidth = isTable ? clamp(cols * 140, 560, 1000) : clamp(positive(asset.width) || 900, 560, 1200);
     const body = isTable ? tableHtml : `<img src="${escape(asset.url)}" alt="${escape(label)}" loading="lazy">`;
     const size = display.imageWidth ? `;--student-media-image-width:${display.imageWidth};--student-media-image-height:${display.imageHeight}` : '';
-    return `<figure class="student-media" data-media-kind="${kind === 'option' ? 'option' : 'question'}" data-student-media="${zoomWidth}" data-media-label="${escape(label)}" style="width:${display.width}${size}"><div class="student-media-preview">${body}</div><button type="button" class="student-media-open" aria-label="放大${escape(label)}">放大圖表 <span aria-hidden="true">↗</span></button></figure>`;
+    const calibrated = display.calibrated ? ' data-reading-size' : '';
+    return `<figure class="student-media"${calibrated} data-media-kind="${kind === 'option' ? 'option' : 'question'}" data-student-media="${zoomWidth}" data-media-label="${escape(label)}" style="width:${display.width}${size}"><div class="student-media-preview">${body}</div><button type="button" class="student-media-open" aria-label="放大${escape(label)}">放大圖表 <span aria-hidden="true">↗</span></button></figure>`;
   }
   function ensureDialog() {
     if (dialog) return;
