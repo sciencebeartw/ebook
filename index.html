@@ -5058,7 +5058,7 @@ html { background: #f3faf6; } #splash-status { margin: 22px 0 0; color: #315c44;
     <script src="survey_contract.js?v=20261109-survey-photos1"></script>
     <script src="ebook_surveys_view.js?v=20261109-survey-photos1"></script>
     <script src="ebook_surveys_attachments.js?v=20261109-survey-photos1"></script>
-    <script src="ebook_surveys_parent.js?v=20261109-survey-photos1"></script>
+    <script src="ebook_surveys_parent.js?v=20261114-survey-student-preview"></script>
 
 
   <script src="ebook_push_navigation.js?v=20261014-all1"></script>
@@ -9588,8 +9588,11 @@ async function sendProductionStudentReport(action,payload,send) {
                     }});
                 } else window.EbookResources.reset();
             }
-            if (window.EBOOK_SURVEYS_ENABLED && window.EbookSurveyParent && !isDashboardDraftPreviewMode && !isAdminMode && (ebookAuthSessionInfo || {}).role === 'student') {
+            if (window.EBOOK_SURVEYS_ENABLED && window.EbookSurveyParent && ebookAuthSessionInfo &&
+                !isDashboardDraftPreviewMode && !isAdminMode &&
+                (isStudentPreviewMode || ebookAuthSessionInfo.role === 'student')) {
                 window.EbookSurveyParent.mount({
+                    preview: isStudentPreviewMode,
                     identity: [ebookAuthSessionInfo.subjectKey, ebookAuthSessionInfo.className, ebookAuthSessionInfo.studentKey].join('|'),
                     request: async function(payload) { return (await ebookFunctions.httpsCallable('runEbookSurveyStudentAction')(payload)).data; },
                     canRemind: function() { return !activeEmergencyAnnouncement && !popupAnnouncementQueue.length && !document.querySelector('dialog[open], .swal2-container') && !/^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || ''); }

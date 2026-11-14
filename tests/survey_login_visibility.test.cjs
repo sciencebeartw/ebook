@@ -10,7 +10,7 @@ const mount=source('            if (window.EBOOK_SURVEYS_ENABLED && window.Ebook
 function fixture(overrides={}){
  const requests=[],mounted=[],errors=[];
  const session={success:true,firebaseCustomToken:'synthetic-token',firebaseAuthUid:'qa',subjectKey:'science',className:'QA班',studentKey:'qa',studentName:'測試學生',...overrides};
- const c={console:{warn(){}},ebookAuthSessionInfo:null,gData:null,ebookRememberedRestoreInProgress:false,ebookGodSessionId:'',isDashboardDraftPreviewMode:false,isAdminMode:false,
+ const c={console:{warn(){}},ebookAuthSessionInfo:null,gData:null,ebookRememberedRestoreInProgress:false,ebookGodSessionId:'',isDashboardDraftPreviewMode:false,isAdminMode:false,isStudentPreviewMode:false,
   BEAR_SUBJECT:'science/',firebase:{auth:{Auth:{Persistence:{LOCAL:'local',NONE:'none'}}}},
   ebookFunctions:{httpsCallable:name=>async data=>{requests.push({name,data});return {data:name==='runEbookSurveyStudentAction'?{surveys:[{id:'qa-survey'}]}:session};}},
   ebookAuth:{setPersistence:async()=>{},signInWithCustomToken:async()=>{},signOut:async()=>{}},
@@ -28,3 +28,14 @@ for(const mode of ['manual','remembered'])test(mode+' 登入正式回傳沒有 r
 test('登入缺少必要身分不掛載調查',async()=>{const f=fixture({studentKey:''});await f.login();assert.equal(f.errors.length,1);assert.equal(f.mounted.length,0);});
 test('明確非學生角色不被前端預設值蓋成學生',async()=>{for(const role of ['teacher','student_preview']){const f=fixture({role});await f.login();assert.equal(f.c.ebookAuthSessionInfo.role,role);assert.equal(f.mounted.length,0);}});
 test('上帝模式與編輯草稿預覽不掛載家長調查',async()=>{for(const flag of ['isAdminMode','isDashboardDraftPreviewMode']){const f=fixture();f.c[flag]=true;await f.login();assert.equal(f.mounted.length,0);}});
+
+test('後台學生視角沿用同一調查 API，明確標記為預覽',async()=>{
+ const f=fixture();f.c.isStudentPreviewMode=true;
+ f.c.ebookAuthSessionInfo={subjectKey:'science',className:'QA班',studentKey:'qa'};
+ f.c.enterStudentView();
+ assert.equal(f.mounted.length,1);
+ assert.equal(f.mounted[0].preview,true);
+ assert.equal(f.mounted[0].identity,'science|QA班|qa');
+ assert.equal((await f.mounted[0].request({action:'list'})).surveys[0].id,'qa-survey');
+ assert.deepEqual(f.requests.map(request=>request.name),['runEbookSurveyStudentAction']);
+});
