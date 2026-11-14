@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><title>資優自然｜線上作答</title><link rel="icon" href="data:,">
+<link rel="stylesheet" href="app.css"><link rel="stylesheet" href="../gifted/student-media.css?v=20261113-reading-text">
+<link rel="stylesheet" href="exam.css"><script defer src="../gifted/student-media-reading-sizes.js?v=20261113-reading-text"></script><script defer src="../gifted/student-media.js?v=20261113-reading-text"></script><script defer src="exam.js"></script></head>
+<body><div class="environment">測試學生專用</div>
+<header><div class="brand">山熊科學 <span>資優自然</span></div></header>
+<main><p class="eyebrow">電子聯絡簿 ／ 線上作答</p><h1 id="examTitle">讀取考卷中</h1><p class="lead" id="examLead"></p><div class="actions"><button id="questionPdf" hidden type="button">下載題目卷 PDF</button></div>
+<section id="examResult" hidden><h2 id="examScore"></h2><p id="examStatus"></p><div class="actions"><button id="answerPdf" type="button" hidden>下載解答卷 PDF</button><button id="checkReceipt" type="button" hidden>更新批改／回報狀態</button></div></section>
+<section id="answerSection" hidden><div class="section-heading"><h2 id="answerHeading">本次作答</h2><span id="count"></span></div>
+<div class="question-nav"><button id="previous">上一題</button><label>題號<select id="question"></select></label><button id="next">下一題</button></div>
+<div id="questionCard" class="student-question"></div><div id="answerGrid"></div></section>
+<section id="submitSection" hidden><h2>確認後交卷</h2><label class="check"><input type="checkbox" id="blanks">確認未答題以留白送出</label>
+<div class="actions"><button id="submit" class="primary">交卷並看結果</button></div></section>
+<p id="examError" role="alert"></p></main>
+<dialog id="confirmSubmission" aria-labelledby="confirmHeading"><form method="dialog">
+<h2 id="confirmHeading">確定交卷？</h2><p>這份考卷只能交卷一次。送出後若需要更正，請從聯絡簿聯絡老師。</p>
+<div class="actions"><button value="cancel" autofocus>取消</button><button value="submit" class="primary">確定交卷</button></div>
+</form></dialog></body></html>

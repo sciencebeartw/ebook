@@ -1,0 +1,35 @@
+:root {font:17px/1.55 system-ui,sans-serif;color:#21382b;background:#f2f7f2;accent-color:#246144;}
+* {box-sizing:border-box;}
+body {margin:0;}
+[hidden] {display:none !important;}
+.environment {padding:6px 16px;text-align:center;background:#e3eee5;color:#305842;font-size:.84rem;font-weight:750;}
+body>header {padding:10px max(16px,calc((100vw - 820px)/2));background:white;border-bottom:1px solid #d5e2d6;}
+.brand {font-size:1.23rem;font-weight:800;white-space:nowrap;}
+.brand span {color:#39694f;font-weight:650;margin-left:.45em;}
+main {width:min(100%,850px);margin:0 auto;padding:14px 16px 32px;}
+h1,h2,h3,p {margin:0 0 10px;overflow-wrap:anywhere;}
+h1 {line-height:1.2;font-size:clamp(1.55rem,5vw,2.4rem);}
+h2 {font-size:1.17rem;}
+h3 {font-size:1.06rem;}
+.eyebrow,.lead {color:#41644e;}
+.eyebrow {font-size:.85rem;font-weight:700;}
+section {margin-top:14px;padding:16px;background:white;border:1px solid #d4e2d4;border-radius:12px;min-width:0;}
+button,select,input[type=text] {font:inherit;border:1px solid #73947e;border-radius:8px;padding:7px 12px;min-height:44px;}
+button,select {background:white;color:#214b35;}
+button:disabled {opacity:.58;cursor:default;}
+button:not(:disabled) {cursor:pointer;}
+.primary {background:#226143;color:white;font-weight:750;}
+.actions,.section-heading,.question-nav {display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.section-heading {justify-content:space-between;}
+.section-heading h2 {margin:0;}
+.question-nav {margin:10px 0;}
+.question-nav label {display:flex;align-items:center;gap:6px;}
+#answerGrid {display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;}
+#answerGrid .answered {background:#e5f0e6;}
+#answerGrid [aria-current=true] {outline:2px solid #226143;outline-offset:-2px;}
+.check,.option {display:flex;gap:8px;align-items:center;padding:8px 10px;min-height:44px;}
+.option {border:1px solid #d5e2d6;border-radius:8px;margin:6px 0;}
+.check input,.option input {width:20px;height:20px;}
+input[type=text] {display:block;margin-top:5px;width:min(100%,390px);}
+td {padding:5px;border:1px solid #b3c5b5;}
+table {border-collapse:collapse;}

@@ -7662,6 +7662,7 @@ async function sendProductionStudentReport(action,payload,send) {
             <div id="ebookResourceEntry" class="er-root" hidden></div>
             <div id="ebookSurveyEntry" hidden></div>
             <section id="giftedLibraryPilotEntry" aria-label="測試學生題本入口" hidden></section>
+            <section id="giftedFormalExamEntry" aria-label="第 28 堂線上考卷" hidden></section>
             <div id="tab-content-0"></div>
             <div id="tab-content-1" style="display:none; padding:15px;"></div>
             <div id="tab-content-2" style="display:none; padding:15px;"></div>
@@ -9235,7 +9236,7 @@ async function sendProductionStudentReport(action,payload,send) {
             queueMicrotask(function() { window.EbookPush?.ready({ session: ebookAuthSessionInfo || {}, uid: ebookAuth.currentUser && ebookAuth.currentUser.uid,
                 subject: ebookSubjectParam, preview: isStudentPreviewMode || isDashboardDraftPreviewMode || !!ebookGodSessionInfo,
                 firebaseConfig: firebaseConfig, navigate: openEbookPushTarget, findTarget: function(target) { return window.EbookPushNavigation.find(target, getEbookPushNavigationContext()); }, isReadable: function(node) { return window.EbookPushNavigation.readable(node); }, call: async function(data) { return (await ebookFunctions.httpsCallable('runEbookPushAction', { timeout: 15000 })(data)).data; } }); });
-            queueMicrotask(function() { window.GiftedEbook?.ready({ auth: ebookAuth, result: result, mode: pass, preview: isDashboardDraftPreviewMode, teacherView: !!ebookGodSessionInfo }); window.GiftedLibraryEbook?.ready({ auth: ebookAuth, result: result, mode: pass, preview: isDashboardDraftPreviewMode, teacherView: !!ebookGodSessionInfo }); });
+            queueMicrotask(function() { window.GiftedEbook?.ready({ auth: ebookAuth, result: result, mode: pass, preview: isDashboardDraftPreviewMode, teacherView: !!ebookGodSessionInfo }); window.GiftedLibraryEbook?.ready({ auth: ebookAuth, result: result, mode: pass, preview: isDashboardDraftPreviewMode, teacherView: !!ebookGodSessionInfo }); window.GiftedFormalExam?.ready({ auth: ebookAuth, functions: ebookFunctions, result: result, preview: isDashboardDraftPreviewMode, teacherView: !!ebookGodSessionInfo }); });
             activeEbookPromotionContext = result.promotionContext || null;
             resetPopupQueueForEntry();
             pendingTasksState = { status: 'unavailable', items: [] };
@@ -10021,6 +10022,7 @@ async function sendProductionStudentReport(action,payload,send) {
             if (window.EbookPush && !await window.EbookPush.beforeLogout()) return;
             window.GiftedEbook?.close(true);
             window.GiftedLibraryEbook?.close(true);
+            window.GiftedFormalExam?.close(true);
             if (window.EbookResources) window.EbookResources.reset();
             if (window.EbookSurveyParent) window.EbookSurveyParent.reset();
             clearRealtimeListeners();
@@ -16369,7 +16371,7 @@ function renderProductionGodStickerReceipt(anchor){
             restoreRememberedStudentLogin();
         });
     </script>
-</div><link rel="stylesheet" href="gifted_library_entry.css?v=20261114-pilot"><script src="gifted_library_policy.js?v=20261109"></script><script src="gifted_library_entry.js?v=20261114-pilot"></script><script src="gifted_release_config.js?v=20261009-v25"></script>
+</div><link rel="stylesheet" href="gifted_library_entry.css?v=20261114-pilot"><script src="gifted_library_policy.js?v=20261109"></script><script src="gifted_library_entry.js?v=20261114-pilot"></script><link rel="stylesheet" href="gifted_formal_exam_entry.css?v=20261114"><script src="gifted_formal_exam_entry.js?v=20261114"></script><script src="gifted_release_config.js?v=20261009-v25"></script>
 <script src="gifted_homework_status.js?v=20261031-firebase-receipt"></script><script src="gifted_entry.js?v=20261103-per-assignment"></script>
 </body>
 

@@ -1,0 +1,14 @@
+.exam-result-note {margin:12px 0;padding:12px 14px;border-radius:8px;background:#edf6ed;}
+#examError:empty {display:none;}
+#examError {color:#922d20;}
+#examOptions legend {margin-bottom:4px;font-size:1rem;color:#516345;}
+#examOptions {border:0;padding:0;margin:0;min-width:0;}
+#examOptions .option {display:grid;grid-template-columns:auto auto minmax(0,1fr);align-items:start;gap:10px;min-height:48px;}
+#examOptions .option input {margin-top:.28em;}
+#examOptions .exam-option-copy > p {margin:0;}
+#answerGrid button {min-height:44px;}
+.exam-table {overflow:auto;}
+.exam-table td {min-width:0;}
+#confirmSubmission {max-width:min(420px,90vw);border:1px solid #c8d9cb;border-radius:14px;padding:18px 22px;color:#1c3d2c;}
+#confirmSubmission::backdrop {background:#172d22a6;}
+#confirmSubmission .actions {justify-content:flex-end;}

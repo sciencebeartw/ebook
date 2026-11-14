@@ -1,0 +1,12 @@
+#giftedFormalExamEntry:not([hidden]) {display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:12px 14px;margin:10px 0;border:1px solid #c8d9cb;border-radius:12px;background:#f2f7f2;color:#1c3d2c;}
+#giftedFormalExamEntry strong {flex-basis:100%;}
+#giftedFormalExamEntry button,.gfe-dialog>button {min-height:44px;padding:8px 14px;border:1px solid #226143;border-radius:8px;background:#226143;color:#fff;font:700 1rem system-ui;cursor:pointer;}
+.gfe-dialog {padding:0;border:0;margin:0;max-width:none;max-height:none;width:100vw;height:100dvh;background:#f2f7f2;color:#1c3d2c;}
+.gfe-dialog[open] {display:grid;grid-template-rows:auto minmax(0,1fr);}
+.gfe-dialog>button {justify-self:start;margin:8px 12px;}
+.gfe-dialog>iframe {width:100%;height:100%;border:0;}
+#giftedFormalExamEntry details {flex-basis:100%;}
+#giftedFormalExamEntry summary {display:list-item;min-height:44px;align-content:center;cursor:pointer;font-weight:650;}
+#giftedFormalExamEntry form {display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 6px;}
+#giftedFormalExamEntry input {width:85px;min-height:44px;padding:5px 8px;font:inherit;}
+#giftedFormalExamEntry form [role=status] {flex-basis:100%;}
