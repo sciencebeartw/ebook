@@ -9236,7 +9236,7 @@ async function sendProductionStudentReport(action,payload,send) {
             queueMicrotask(function() { window.EbookPush?.ready({ session: ebookAuthSessionInfo || {}, uid: ebookAuth.currentUser && ebookAuth.currentUser.uid,
                 subject: ebookSubjectParam, preview: isStudentPreviewMode || isDashboardDraftPreviewMode || !!ebookGodSessionInfo,
                 firebaseConfig: firebaseConfig, navigate: openEbookPushTarget, findTarget: function(target) { return window.EbookPushNavigation.find(target, getEbookPushNavigationContext()); }, isReadable: function(node) { return window.EbookPushNavigation.readable(node); }, call: async function(data) { return (await ebookFunctions.httpsCallable('runEbookPushAction', { timeout: 15000 })(data)).data; } }); });
-            queueMicrotask(function() { window.GiftedEbook?.ready({ auth: ebookAuth, result: result, mode: pass, preview: isDashboardDraftPreviewMode, teacherView: !!ebookGodSessionInfo }); window.GiftedLibraryEbook?.ready({ auth: ebookAuth, result: result, mode: pass, preview: isDashboardDraftPreviewMode, teacherView: !!ebookGodSessionInfo }); window.GiftedFormalExam?.ready({ auth: ebookAuth, functions: ebookFunctions, result: result, preview: isDashboardDraftPreviewMode, teacherView: !!ebookGodSessionInfo }); });
+            queueMicrotask(function() { window.GiftedEbook?.ready({ auth: ebookAuth, result: result, mode: pass, preview: isDashboardDraftPreviewMode, teacherView: !!ebookGodSessionInfo }); window.GiftedLibraryEbook?.ready({ auth: ebookAuth, result: result, mode: pass, preview: isDashboardDraftPreviewMode, teacherView: !!ebookGodSessionInfo }); window.GiftedFormalExam?.ready({ auth: ebookAuth, functions: ebookFunctions, result: result, preview: isStudentPreviewMode || isDashboardDraftPreviewMode, teacherView: !!ebookGodSessionInfo }); });
             activeEbookPromotionContext = result.promotionContext || null;
             resetPopupQueueForEntry();
             pendingTasksState = { status: 'unavailable', items: [] };
@@ -12443,6 +12443,7 @@ async function sendProductionStudentReport(action,payload,send) {
             var toolDraftIdentity = JSON.stringify([ebookFirebaseApp.auth().currentUser?.uid || "", gData?.className || "", gData?.foundUserKey || "", !!isAdminMode]);
             var toolDraftState = window.StudentToolDrafts.capture(container, toolDraftIdentity);
             container.innerHTML = html;
+            window.GiftedFormalExam?.mount();
             window.syncProductionVisibleMessageWatches();
             window.syncProductionVisibleGradeWatches();
 
@@ -16374,7 +16375,7 @@ function renderProductionGodStickerReceipt(anchor){
             restoreRememberedStudentLogin();
         });
     </script>
-</div><link rel="stylesheet" href="gifted_library_entry.css?v=20261114-pilot"><script src="gifted_library_policy.js?v=20261109"></script><script src="gifted_library_entry.js?v=20261114-pilot"></script><link rel="stylesheet" href="gifted_formal_exam_entry.css?v=20261114"><script src="gifted_formal_exam_entry.js?v=20261114"></script><script src="gifted_release_config.js?v=20261009-v25"></script>
+</div><link rel="stylesheet" href="gifted_library_entry.css?v=20261114-pilot"><script src="gifted_library_policy.js?v=20261109"></script><script src="gifted_library_entry.js?v=20261114-pilot"></script><link rel="stylesheet" href="gifted_formal_exam_entry.css?v=20261115"><script src="gifted_formal_exam_entry.js?v=20261115"></script><script src="gifted_release_config.js?v=20261009-v25"></script>
 <script src="gifted_homework_status.js?v=20261031-firebase-receipt"></script><script src="gifted_entry.js?v=20261103-per-assignment"></script>
 </body>
 

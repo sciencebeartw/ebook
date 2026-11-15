@@ -1,8 +1,34 @@
 (function(root) {
   'use strict';
   let session, dialog, frame, opener, unsubscribe;
+  const pilotClass = '115小六資優自然週六上午班';
+  const postId = 'post_171442cbd9b18f73df6871dcdf4ba96ee4f96bc0_0';
+  const postDate = '2026/11/14';
+  const paperAnchors = {quiz:'[data-pending-exam-paper-anchor]',makeup:'[data-pending-paper-anchor]'};
   const entry = () => document.getElementById('giftedFormalExamEntry');
-  const current = own => session === own && own.auth.currentUser?.uid === own.uid;
+  const current = own => !!own && session === own && own.auth.currentUser?.uid === own.uid;
+
+  function mount() {
+    const own = session;
+    if (!current(own) || !own.controls.size) return;
+    const host = entry();
+    const post = Array.from(document.querySelectorAll('#tab-content-0 [data-pending-post-anchor]')).find(card =>
+      card.dataset.postId === postId && card.dataset.postDate === postDate && card.dataset.sourceClassKey === pilotClass);
+    let hasFallback = false;
+    for (const [kind, controls] of own.controls) {
+      const examId = own.exam[kind].examId;
+      const anchor = post && Array.from(post.querySelectorAll(paperAnchors[kind])).find(node =>
+        !!examId && (node.dataset.examId === examId || node.dataset.storedExamId === examId));
+      const paper = anchor?.querySelector('a.btn-link[href]');
+      if (paper) {
+        if (paper.nextElementSibling !== controls) paper.after(controls);
+      } else {
+        hasFallback = true;
+        if (controls.parentElement !== host) host.append(controls);
+      }
+    }
+    host.hidden = !hasFallback;
+  }
   function close(clear) {
     dialog?.close();
     dialog?.remove();
@@ -12,37 +38,43 @@
     if (clear) {
       unsubscribe?.();
       unsubscribe = null;
+      session?.controls.forEach(controls => controls.remove());
       session = null;
       const host = entry();
       if (host) {host.hidden = true;host.replaceChildren();}
     }
   }
   async function ready(context) {
-    close(true);
     const user = context.auth?.currentUser;
     if (!user || context.preview || context.teacherView || context.result?.isAdmin ||
-        context.result?.className !== '115小六資優自然週六上午班' || context.result?.studentName !== '測試學生') return;
-    const own = {auth:context.auth, uid:user.uid, callable:context.functions.httpsCallable('runEbookStudentAction',{timeout:180000})};
+        context.result?.className !== pilotClass || context.result?.studentName !== '測試學生') {
+      close(true);
+      return;
+    }
+    if (current(session)) {mount();return;}
+    close(true);
+    const own = {auth:context.auth, uid:user.uid, callable:context.functions.httpsCallable('runEbookStudentAction',{timeout:180000}), controls:new Map()};
     session = own;
     unsubscribe = own.auth.onAuthStateChanged(user => {if (session === own && user?.uid !== own.uid) close(true);});
     try {
       const details = await request(own, 'access');
       if (!current(own)) return;
       own.exam = details;
-      if (!Object.keys(details).length) return;
-      const title = document.createElement('strong');
-      title.textContent = '第 28 堂線上考卷｜測試學生專用';
-      entry().append(title);
-      for (const kind of ['quiz','makeup']) {
-        if (!details[kind]) continue;
+      for (const [kind, exam] of Object.entries(details)) {
+        if (!Object.hasOwn(paperAnchors, kind)) continue;
+        const controls = document.createElement('div');
+        controls.className = 'gfe-exam-controls';
+        controls.dataset.formalExamKind = kind;
         const button = document.createElement('button');
         button.type = 'button';
-        button.textContent = details[kind].label;
+        const title = kind === 'quiz' ? '小考' : '補考';
+        button.textContent = (exam.accepting ? '線上作答' : '查看線上結果') + '｜' + title;
         button.onclick = () => open(kind,button);
-        entry().append(button);
-        if (details[kind].accepting) entry().append(paperForm(kind, own));
+        controls.append(button);
+        if (exam.accepting) controls.append(paperForm(kind, own));
+        own.controls.set(kind, controls);
       }
-      entry().hidden = false;
+      mount();
     } catch (error) {
       if (current(own) && !['functions/failed-precondition','functions/permission-denied'].includes(error.code)) {
         entry().textContent = '暫時無法載入第 28 堂線上考卷，請重新整理聯絡簿。';
@@ -73,7 +105,7 @@
         if (!await root.swalConfirm('送出紙本回報？','送出後這份考卷就會以紙本回報送老師審查。')) return;
         const exam = own.exam[kind];
         const content = quiz ? String(input.valueAsNumber) : '錯 '+input.valueAsNumber+' 題';
-        const payload = {className:'115小六資優自然週六上午班',targetDate:exam.date,targetExamColIndex:exam.colIndex,
+        const payload = {className:pilotClass,targetDate:exam.date,targetExamColIndex:exam.colIndex,
           targetExamTitle:exam.title,targetExamId:exam.examId,type:quiz?'缺考回報':'補考結果回報',content,
           clientRequestId:'formal_paper_'+crypto.randomUUID().replace(/-/g,'')};
         const reply = await own.callable({action:'submitFeedback',data:payload});
@@ -123,5 +155,5 @@
       },
     };
   }
-  root.GiftedFormalExam={ready,close,transport};
+  root.GiftedFormalExam={ready,mount,close,transport};
 })(window);
