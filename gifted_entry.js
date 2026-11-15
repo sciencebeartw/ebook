@@ -77,7 +77,12 @@
     const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify(body),signal:controller.signal});
     const value=await response.json();valid();
     if(!response.ok)throw Error(value.error||'連線失敗');
-    if(body.action==='submit'&&value.status==='submitted')root.GiftedHomeworkStatus?.submitted(activeAssignment,value);
+    if(activeAssignment&&body.planId===activeAssignment.planId&&body.segmentId===activeAssignment.segmentId){
+     const receipt=body.action==='task'?value.submission:value;
+     if(['submit','receipt','task'].includes(body.action)&&receipt?.status==='submitted'){
+      root.GiftedHomeworkStatus?.submitted(activeAssignment,receipt);
+     }
+    }
     return value;
    }finally{clearTimeout(timeout);}
   }});

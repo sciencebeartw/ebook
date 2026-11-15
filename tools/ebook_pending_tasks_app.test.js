@@ -808,6 +808,27 @@ const giftedResult = Pending.buildPendingTasks(baseOptions({ grades: giftedGrade
 assert.strictEqual(giftedResult.items.length, 4, 'gifted blank/#N/A/string zero/numeric zero are all pending');
 assert.ok(giftedResult.items.every(item => item.kind === 'homework_score'));
 
+// The native receipt closes only its own row before the Sheet has a score.
+const nativePlan = 'hw_' + 'a'.repeat(64);
+const nativeAssignment = {planId:nativePlan,segmentId:'week-1'};
+const nativePost = {id:'native_post',date:'2026/08/08',className:CURRENT_CLASS,hw1:'https://school.example/ebook/?gifted=' + nativePlan};
+const nativeGrade = Object.assign({}, giftedGrades[0], {giftedPlanId:nativePlan,giftedSegmentId:'week-1',giftedPostId:nativePost.id});
+const gradeBesideNative = giftedGrades[1];
+const fixtures = baseOptions({posts:[nativePost],grades:[nativeGrade,gradeBesideNative],pendingPolicy:VALID_REMINDER_POLICY});
+const nativeStatus = require('../gifted_homework_status').create({
+  parseAssignment:() => nativeAssignment, readSummary:async () => { throw Error('Sheet is still pending'); },
+});
+nativeStatus.activate('native-receipt-test');
+nativeStatus.observe(fixtures.posts,fixtures.grades,CURRENT_CLASS);
+fixtures.helpers.getNativeHomeworkReceiptState = nativeStatus.pendingForExam;
+const beforeReceipt = Pending.buildPendingTasks(fixtures);
+assert.deepStrictEqual(beforeReceipt.items.map(item => item.nativeHomeworkCheck?.status || null),['unconfirmed',null]);
+assert.ok(Pending.getReminderDueItems(beforeReceipt).every(item => item.sourceItemId !== 'col_10'));
+assert.ok(Pending.getEntryReminderItems(beforeReceipt).every(item => item.sourceItemId !== 'col_10'));
+nativeStatus.submitted(nativeAssignment,{status:'submitted',receiptId:'original',submittedAt:1000});
+const afterReceipt = Pending.buildPendingTasks(fixtures);
+assert.deepStrictEqual(afterReceipt.items.map(item => item.sourceItemId),['col_11']);
+
 const stableHomeworkGrade = {
   date: '2026/8/8 作業',
   exam: '穩定作業身分',

@@ -232,6 +232,7 @@
     result = result || {};
     var items = result.status === "ready" && Array.isArray(result.items) ? result.items : [];
     var policy = result.policy || {};
+    items = items.filter(function(item) { return !item.nativeHomeworkCheck; });
     if (!items.length || policy.status !== "ready" || policy.loginReminder !== true || policy.reminderDue !== true) return [];
 
     // This flag is constructed only by the local Dashboard draft-preview path;
@@ -261,8 +262,8 @@
     var policy = result && result.policy || {};
     if (policy.suppressEntryReminder || policy.status !== 'ready' || !policy.loginReminder || !policy.reminderDue) return [];
     var overdue = getReminderDueItems(result);
-    return (result.items || []).filter(function(item) { return overdue.indexOf(item) >= 0 ||
-      Number(item.dueAt) > 0 && Number(policy.loadedAt) >= (Number(item.reminderAt) || Number(item.dueAt) - Number(policy.reminderLeadMs || 0)); });
+    return (result.items || []).filter(function(item) { return !item.nativeHomeworkCheck && (overdue.indexOf(item) >= 0 ||
+      Number(item.dueAt) > 0 && Number(policy.loadedAt) >= (Number(item.reminderAt) || Number(item.dueAt) - Number(policy.reminderLeadMs || 0))); });
   }
 
   function isReminderDueState(result) {
@@ -1512,12 +1513,16 @@
           return !donePost.independentHolidayHomework && sourceMatches(sourceClassKey, donePost.sourceClassKey, helpers);
         })) return;
         if (isCompletedHomeworkScore(exam && exam.score, exam)) return;
+        var nativeReceipt = typeof helpers.getNativeHomeworkReceiptState === "function"
+          ? helpers.getNativeHomeworkReceiptState(exam) : null;
+        if (nativeReceipt && nativeReceipt.status === "submitted") return;
         var homeworkEligibility = resolveGradeHomeworkTaskEligibility(options, policy, exam, context, helpers);
         if (!homeworkEligibility.allowed) return;
         pushIfActive(tasks, createTask({
           kind: "homework_score",
           itemType: "homework",
           neutralLabel: "作業待完成",
+          nativeHomeworkCheck: nativeReceipt && nativeReceipt.status === "unconfirmed" ? nativeReceipt : null,
           title: titleText.trim() || "作業",
           date: text(exam && exam.date),
           sourceClassKey: sourceClassKey,

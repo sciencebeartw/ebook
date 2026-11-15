@@ -13,7 +13,7 @@ test('offline / invalid identity never turns an unknown status into 未繳',asyn
 test('real not-submitted result returns to the ordinary missing display; draft is not promoted',async()=>{const api=setup(async()=>response('not_submitted'));await api.load(key);assert.equal(api.display(exam),null);});
 test('logout and switching users discard outstanding private results',async()=>{let finish;const api=setup(()=>new Promise(r=>finish=r));const task=api.load(key);api.activate('student-b');finish(response());await task;assert.equal(api.display(exam),null);});
 test('changed title and duplicate homework columns fail closed',async()=>{const api=setup(async()=>{const r=response();r.grades[0].title='另一份';return r;});await api.load(key);assert.equal(api.display(exam).score,null);api.observe([post],[exam,{...exam,examId:'other'}],'測試班');assert.equal(api.display(exam),null);});
-test('a confirmed submission immediately survives a later summary network failure',async()=>{const api=setup(async()=>{throw Error('offline');});api.submitted(assignment,{status:'submitted',receiptId:'receipt',submittedAt:1000});await new Promise(setImmediate);assert.equal(api.display(exam).label,'已繳交');assert.match(api.display(exam).note,/已繳交/);});
+test('a confirmed submission immediately survives a later summary network failure',async()=>{const api=setup(async()=>{throw Error('offline');});const tagged={...exam,giftedPlanId:planId,giftedSegmentId:'week-1'};api.observe([post],[tagged],'測試班');api.submitted(assignment,{status:'submitted',receiptId:'receipt',submittedAt:1000});await new Promise(setImmediate);assert.equal(api.display(tagged).label,'已繳交');assert.match(api.display(tagged).note,/已繳交/);});
 test('duplicate renders share one lookup and do not poll completed reads',async()=>{let count=0,finish;const api=setup(()=>{count++;return new Promise(r=>finish=r);});const p=api.load(key);await api.load(key);finish(response());await p;await api.load(key);assert.equal(count,1);});
 
 test('a stale pre-submit summary cannot erase the newly confirmed receipt',async()=>{
@@ -28,4 +28,42 @@ test('returning after another device submitted rechecks the scoped receipt witho
  api.activate('student');api.observe([post],[exam],'測試班');await api.load(key);assert.equal(api.display(exam),null);
  api.refresh();await api.load(key);assert.equal(count,1);
  time=31000;result=response();api.refresh();await api.load(key);assert.equal(api.display(exam).score,9);assert.equal(count,2);
+});
+
+test('published homework recognizes an accepted receipt before a grade row exists',async()=>{
+ const api=setup(async()=>{throw Error('offline');});
+ api.observe([post],[],'測試班');
+ assert.equal(api.postAssignmentKey(post,'hw1'),key);
+ api.submitted(assignment,{status:'submitted',receiptId:'receipt',submittedAt:1000});
+ await new Promise(setImmediate);
+ assert.equal(api.postDisplay(key).label,'已繳交');
+});
+
+test('exact grade binding recognizes the receipt immediately and keeps a second same-day task independent',async()=>{
+ const tagged={...exam,giftedPlanId:planId,giftedSegmentId:'week-1',giftedPostId:'post-one'};
+ const other={...exam,examId:'other',exam:'另一份作業'};
+ const authoredPost={...post,id:'post-one'};
+ const api=setup(async()=>{throw Error('offline');});
+ api.observe([authoredPost],[other,tagged],'測試班');
+ assert.equal(api.pendingForExam(tagged).status,'unconfirmed');
+ assert.equal(api.pendingForExam(other),null);
+ api.submitted({...assignment,segmentId:'week-2'},{status:'submitted',receiptId:'attempt',submittedAt:1000});
+ assert.equal(api.pendingForExam(tagged).status,'unconfirmed');
+ api.submitted(assignment,{status:'submitted',receiptId:'receipt',submittedAt:1000});
+ assert.equal(api.pendingForExam(tagged).status,'submitted');
+ await new Promise(setImmediate);
+ assert.equal(api.pendingForExam(tagged).status,'submitted');
+ assert.equal(api.pendingForExam(other),null);
+});
+
+test('legacy same-day binding cannot clear an unrelated title without scoped confirmation',async()=>{
+ const api=setup(async()=>{const value=response();value.grades[0].title='另一張卷';return value;});
+ api.submitted(assignment,{status:'submitted',receiptId:'receipt',submittedAt:1000});
+ await new Promise(setImmediate);
+ assert.equal(api.postDisplay(key).label,'已繳交');
+ assert.equal(api.pendingForExam(exam).status,'unconfirmed');
+ assert.equal(api.display(exam).label,'暫時無法確認');
+ const matching=setup(async()=>response());
+ await matching.load(key);
+ assert.equal(matching.pendingForExam(exam).status,'submitted');
 });

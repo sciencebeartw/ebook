@@ -78,13 +78,15 @@ const loadPolicy = extractFunction('loadEbookPendingTaskPolicy');
 check(loadPolicy.includes("httpsCallable('getEbookPendingTaskPolicy')"), 'student policy must come from the authenticated callable');
 check(loadPolicy.includes("status: 'unavailable'"), 'policy errors must fail closed');
 const apiFactory = extractFunction('createApiMethods');
-check((apiFactory.match(/loadEbookPendingTaskPolicy\(\)/g) || []).length >= 2, 'login and manual refresh must each request a fresh policy');
+const loginPolicy = extractFunction('loadEbookLoginPendingPolicy');
+check(loginPolicy.includes('normalizeEbookPendingPolicyPayload(session.pendingPolicy)') && loginPolicy.includes('return loadEbookPendingTaskPolicy()'), 'login must use the authenticated session policy or the scoped callable');
+check(apiFactory.includes('loadEbookLoginPendingPolicy(session)') && apiFactory.includes('shouldReloadPendingPolicy ? loadEbookPendingTaskPolicy()'), 'login and manual refresh must each use the authenticated policy path');
 check(apiFactory.includes('res.pendingPolicy = loaded[1]'), 'fresh policy must overwrite the view policy');
 check(!apiFactory.includes('!ebookGodSessionId || isStudentPreviewMode'), 'manual refresh must not exclude teacher god sessions from the scoped pending policy');
 check(apiFactory.includes('const shouldReloadPendingPolicy = !!ebookAuthSessionInfo'), 'student, student preview, and teacher god sessions must refresh the same scoped pending policy');
 check(!apiFactory.includes('getTeacherGodHiddenPendingPolicy()'), 'teacher god mode must not replace the student pending tab with a hidden policy');
 const enterGodSession = extractFunction('enterEbookGodSession');
-check(enterGodSession.includes('session.pendingPolicy = await loadEbookPendingTaskPolicy()'), 'student preview and teacher god mode must load the same scoped policy after custom-token sign-in');
+check(enterGodSession.includes('pendingPolicyPromise = loadEbookLoginPendingPolicy(session)') && enterGodSession.includes('session.pendingPolicy = await pendingPolicyPromise'), 'student preview and teacher god mode must load the same scoped policy after session verification');
 check(extractFunction('renewEbookGodSession').includes('ebookGodSessionInfo.pendingPolicy = previousPendingPolicy'), 'heartbeat renewals must preserve the already loaded preview policy');
 
 const scheduler = extractFunction('schedulePendingTasksRecompute');
@@ -123,7 +125,7 @@ check(!directLoginBlock.includes('clearPendingReminderBrowserSessionMarks()'), '
 check(pendingRender.includes('gData.pendingPolicy.showPending !== false'), 'showPending=false must hide the pending tab and count');
 check(pendingRender.includes('getReminderDueItems(pendingTasksState)'), 'red rendering must use the same due-item classifier as the popup');
 check(pendingRender.includes("classList.toggle('is-reminder-due', reminderDue)"), 'render must add and remove red state as due items change');
-check(pendingRender.includes("badge.textContent = isReady && items.length ? String(items.length) : ''"), 'pending badge must always count every visible pending item');
+check(pendingRender.includes('!item.nativeHomeworkCheck') && pendingRender.includes("badge.textContent = isReady && pendingCount ? String(pendingCount) : ''"), 'the pending badge must exclude items whose native receipt is unconfirmed');
 check(pendingRender.includes('逾期未完成 " + reminderDueItems.length + " 項') && pendingRender.includes('待完成 " + openPendingCount + " 項'), 'mixed page summary must separate overdue and neutral pending counts');
 check(pendingRender.includes('if (left.isDue !== right.isDue) return left.isDue ? -1 : 1'), 'overdue cards must sort before neutral pending cards');
 check(html.includes('#tab-pending.is-reminder-due') && html.includes('.pending-card.is-reminder-due'), 'due-only red tab and card styles are missing');
@@ -133,7 +135,7 @@ check(html.includes('#tab-pending.active:not(.is-reminder-due)') && html.include
 check(html.includes('background: linear-gradient(135deg, var(--pending-accent-light) 0%, var(--pending-accent) 100%);'), 'pre-due pending actions must use the accessible shared amber palette');
 check(html.includes('color: var(--pending-ink);'), 'amber actions and headings must use readable warm-brown text');
 check(html.includes('.pending-action-btn.secondary') && html.includes('background: #fff7e0;'), 'secondary paper actions must use a quieter pale-amber hierarchy');
-check(html.includes("<div class='pending-card-status'>\" + (taskReminderDue ? \"逾期未完成\" : \"待完成\") + \"</div>"), 'every card must expose its overdue or pending status in text');
+check(pendingRender.includes('nativeCheck ? nativeCheck.label : (taskReminderDue ? "逾期未完成" : "待完成")') && pendingRender.includes('escapeHtml(statusLabel)'), 'every card must show the overdue, pending, or unconfirmed status in text');
 check(!html.includes("<div class='pending-card-status'>提醒時間已到</div>"), 'due cards must not expose the mechanical reminder-time status');
 check(html.includes('.pending-card.is-reminder-due .pending-action-btn'), 'due-card actions must use the same reminder color family as the card state');
 check(html.includes('background: linear-gradient(135deg, #e11d48 0%, #be123c 100%);'), 'due actions must keep white text on the accessible deep-red gradient');

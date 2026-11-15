@@ -1,34 +1,90 @@
 /* 原生作業以正式 Firebase 收據判斷已繳；Sheet 狀態不決定是否繳交。 */
 (function(root){'use strict';
  function create({parseAssignment,readSummary,onChange=()=>{},now=Date.now}){
-  const records=new Map();let bindings=new Map(),generation=0,identity='',active=false,inflight=0;
+  const records=new Map();let bindings=new Map(),postBindings=new Map(),generation=0,identity='',active=false,inflight=0;
   const text=v=>String(v==null?'':v).normalize('NFKC').replace(/\s+/g,'');
   const date=v=>{const m=/(20\d\d)[/-](\d{1,2})[/-](\d{1,2})/.exec(String(v||''));return m?`${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`:'';};
   const missing=v=>!String(v==null?'':v).trim()||/^(?:#N\/A|尚未繳交|未繳|未交|缺交|缺繳)$/.test(String(v).trim());
-  const examKey=e=>JSON.stringify([e.examId||e.storedExamId||'',date(e.date),text(e.exam||e.examName)]);
-  function activate(owner){if(identity!==owner){generation++;records.clear();bindings.clear();}identity=owner;active=!!owner;}
+  const examKey=e=>JSON.stringify([e.examId||e.storedExamId||'',date(e.date),text(e.exam||e.examName),e.colIndex??null]);
+  function activate(owner){if(identity!==owner){generation++;records.clear();bindings.clear();postBindings.clear();}identity=owner;active=!!owner;}
   function clear(){activate('');}
+  const assignmentKey=a=>a.planId+'|'+a.segmentId;
+  const postId=p=>String(p.id||p.dailyPostId||'');
+  const postKey=(post,slot)=>JSON.stringify([postId(post),date(post.date),slot]);
+
   function observe(posts,grades,className){
-   const next=new Map();
+   const next=new Map(), nextPosts=new Map(), candidates=[];
    for(const post of posts||[]){
     if(post.isTransferFormerClass||String(post.storedClassName||post.className||className)!==className)continue;
     const day=date(post.date);if(!day)continue;
-    const assignments=String(post.hw1||'').match(/https:\/\/[^\s<>"']+/g)||[];
-    const parsed=assignments.map(parseAssignment).filter(Boolean);
-    const unique=[...new Map(parsed.map(a=>[a.planId+'|'+a.segmentId,a])).values()];
-    if(unique.length!==1)continue;
-    const matching=(grades||[]).filter(e=>date(e.date)===day&&/作業/.test(String(e.date)+' '+String(e.exam||e.examName))&&
+    const slots=['hw1','hw2'].flatMap(slot=>(String(post[slot]||'').match(/https:\/\/[^\s<>"']+/g)||[])
+      .map(parseAssignment).filter(Boolean).map(assignment=>({slot,assignment})));
+    const byAssignment=new Map();
+    for(const entry of slots){
+     const key=assignmentKey(entry.assignment);
+     if(!byAssignment.has(key))byAssignment.set(key,[]);
+     byAssignment.get(key).push(entry);
+    }
+    for(const [key,entries] of byAssignment)candidates.push({post,day,slots:entries,key});
+   }
+   for(const {post,day,slots,key} of candidates){
+    const {assignment}=slots[0];
+    const matching=(grades||[]).filter(e=>!e.isTransferFormerClass&&date(e.date)===day&&
+      /作業/.test(String(e.date)+' '+String(e.exam||e.examName))&&
       String(e.storedClassName||e.className||className)===className);
-    if(matching.length!==1)continue; // 同日多欄不能猜配對。
-    const exam=matching[0],assignment=unique[0],key=assignment.planId+'|'+assignment.segmentId;
+    const exact=matching.filter(e=>e.giftedPlanId===assignment.planId&&e.giftedSegmentId===assignment.segmentId&&
+      (!e.giftedPostId||e.giftedPostId===postId(post)||e.giftedPostId===post.dailyPostId));
+    const legacy=matching.length===1&&candidates.filter(entry=>entry.day===day).length===1&&
+      !matching[0].giftedPlanId&&!matching[0].giftedSegmentId&&!matching[0].giftedPostId;
+    const exam=exact.length===1?exact[0]:legacy?matching[0]:null;
+    const title=text(exam?.exam||exam?.examName);
     let record=records.get(key);
-    if(!record){record={key,assignment,className,day,title:text(exam.exam||exam.examName),state:'checking',attemptAt:null,revision:0};records.set(key,record);}
-    if(record.className!==className||record.day!==day||record.title!==text(exam.exam||exam.examName))continue;
-    next.set(examKey(exam),record);
+    if(!record){
+     record={key,assignment,className,day,title,state:'checking',attemptAt:null,revision:0};
+     records.set(key,record);
+    }
+    if(record.className!==className||record.day!==day||record.title&&title&&record.title!==title)continue;
+    if(title&&!record.title){
+     record.title=title;
+     if(record.state==='loaded'&&record.summaryTitle!==title){
+      record.state='checking';record.attemptAt=null;
+     }
+    }
+    record.materialized=exact.length===1&&/^\d+(?:\.\d+)?$/.test(String(exact[0].score??'').trim());
+    for(const {slot} of slots)nextPosts.set(postKey(post,slot),record);
+    if(exam)next.set(examKey(exam),record);
    }
    bindings=next;
+   postBindings=nextPosts;
   }
   function get(exam){if(!active||!missing(exam.score))return null;return bindings.get(examKey(exam))||null;}
+
+  function receiptState(record, unverifiedLegacy=false){
+   if(!record||!active)return null;
+   if(record.submission?.status==='submitted'&&!unverifiedLegacy)return {status:'submitted'};
+   if(record.materialized)return {status:'submitted'};
+   if(record.state==='loaded'&&!unverifiedLegacy)return {status:'not_submitted'};
+   const unavailable=record.state==='unavailable';
+   return {status:'unconfirmed',key:record.key,label:unavailable?'暫時無法確認繳交狀態':'確認繳交狀態中',retry:unavailable};
+  }
+
+  const needsLegacyTitleCheck=(record,exam)=>record?.submission?.status==='submitted'&&!exam.giftedPlanId&&
+   record.summaryTitle!==text(exam.exam||exam.examName);
+  function pendingForExam(exam){
+   const record=get(exam);
+   return receiptState(record,needsLegacyTitleCheck(record,exam));
+  }
+
+  function postAssignmentKey(post,slot){return postBindings.get(postKey(post,slot))?.key||'';}
+
+  function postDisplay(key){
+   const result=receiptState(records.get(key));
+   if(!result)return null;
+   if(result.status==='submitted')return {label:'已繳交'};
+   if(result.status==='not_submitted')return {label:'尚未繳交',key};
+   return result;
+  }
+
   async function load(key,{force=false}={}){
    const r=records.get(key);if(!active||!r||r.loading||inflight>=2)return false;
    if(!force&&r.attemptAt!==null&&(r.state==='loaded'||now()-r.attemptAt<30000))return false;
@@ -37,12 +93,16 @@
     const value=await readSummary(r.assignment);
     if(epoch!==generation||!active||revision!==r.revision)return false;
     const g=value?.grades?.find(g=>g.targetId===r.assignment.segmentId);
-    if(value?.planId!==r.assignment.planId||value?.classId!==r.className||!g||date(g.lessonDate)!==r.day||text(g.title)!==r.title||
+    if(value?.planId!==r.assignment.planId||value?.classId!==r.className||!g||date(g.lessonDate)!==r.day||(r.title&&text(g.title)!==r.title)||
       !['submitted','not_submitted'].includes(g.submission?.status))throw Error('HOMEWORK_STATUS_MISMATCH');
     const s=g.submission;
     if(s.status==='submitted'&&(!Number.isSafeInteger(s.submittedAt)||s.submittedAt<=0||
       s.score!==null&&(!Number.isFinite(s.score)||s.score<0||s.score>s.maxScore)))throw Error('HOMEWORK_STATUS_MISMATCH');
-    r.state='loaded';r.submission=s;r.sheetStatus=g.status;
+    if(r.submission?.status!=='submitted'||s.status==='submitted'&&s.submittedAt>=r.submission.submittedAt){
+     r.submission=s;
+     r.sheetStatus=g.status;
+    }
+    r.summaryTitle=text(g.title);r.state='loaded';
    }catch(_){if(epoch===generation&&revision===r.revision){r.state='unavailable';}}finally{
     r.loading=false;inflight--;
     if(active)onChange();
@@ -51,14 +111,15 @@
    return true;
   }
   function submitted(assignment,receipt){
-   if(!active||receipt?.status!=='submitted'||!receipt.receiptId)return;
-   const r=records.get(assignment.planId+'|'+assignment.segmentId);if(!r)return;
+   if(!active||receipt?.status!=='submitted'||!receipt.receiptId||!Number.isSafeInteger(receipt.submittedAt)||receipt.submittedAt<=0)return;
+   const r=records.get(assignmentKey(assignment));
+   if(!r||r.submission?.status==='submitted'&&r.submission.submittedAt>=receipt.submittedAt)return;
    r.revision++;r.submission={status:'submitted',submittedAt:receipt.submittedAt,score:null};r.state='checking';r.sheetStatus='pending';r.attemptAt=null;onChange();
    load(r.key,{force:true});
   }
   function display(exam){
    const r=get(exam);if(!r)return null;
-   const s=r.submission,submitted=s?.status==='submitted';
+   const s=r.submission,submitted=s?.status==='submitted'&&!needsLegacyTitleCheck(r,exam);
    if(r.state==='loaded'&&!submitted)return null;
    return {key:r.key,score:submitted&&Number.isFinite(s.score)?s.score:null,
     label:submitted?(Number.isFinite(s.score)?String(s.score):'已繳交'):r.state==='unavailable'?'暫時無法確認':'確認繳交狀態中',
@@ -69,7 +130,7 @@
    for(const r of records.values())if(!r.loading&&r.attemptAt!==null&&now()-r.attemptAt>=30000){r.state='checking';r.attemptAt=null;changed=true;}
    if(changed)onChange();
   }
-  return {activate,clear,observe,get,load,submitted,display,refresh};
+  return {activate,clear,observe,get,load,submitted,display,refresh,pendingForExam,postAssignmentKey,postDisplay};
  }
  if(typeof module==='object'&&module.exports){module.exports={create};return;}
  const api=create({parseAssignment:href=>root.GiftedEbook?.assignmentFromHref(href),
@@ -78,7 +139,7 @@
  function scan(){
   observer?.disconnect();
   if(!('IntersectionObserver'in root)){
-   document.querySelectorAll('[data-native-homework-key]').forEach(node=>{const b=node.getBoundingClientRect();if(b.bottom>=-100&&b.top<=root.innerHeight+100)api.load(node.dataset.nativeHomeworkKey);});return;
+   document.querySelectorAll('[data-native-homework-key]').forEach(node=>{if(!node.getClientRects().length)return;const b=node.getBoundingClientRect();if(b.bottom>=-100&&b.top<=root.innerHeight+100)api.load(node.dataset.nativeHomeworkKey);});return;
   }
   observer=new IntersectionObserver(entries=>{for(const e of entries)if(e.isIntersecting)api.load(e.target.dataset.nativeHomeworkKey);},{rootMargin:'100px'});
   document.querySelectorAll('[data-native-homework-key]').forEach(node=>observer.observe(node));

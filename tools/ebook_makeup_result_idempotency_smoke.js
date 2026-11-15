@@ -74,7 +74,7 @@ assert(reportLookup.includes("!sameStoredCol && !isUniqueEbookFeedbackExamMatch(
 
 const colorCorrection = extractFunction(html, "setGodMakeupResultColor");
 assert(colorCorrection.includes("teacherColorCorrection: isColorCorrection"), "changing an existing makeup color must create a separate correction action");
-assert(colorCorrection.includes("expectedCurrentColor: isColorCorrection ? currentColorInfo.hex"), "color correction must reject a stale overwrite");
+assert(colorCorrection.includes("expectedCurrentColor: String(context.currentColor || '#ffffff').toLowerCase()"), "color correction must send the color originally shown in the editor for the stale-write check");
 assert(colorCorrection.includes("createStableEbookRequestId('god-makeup-color-correction'"), "color correction retries must reuse a stable request ID");
 assert(colorCorrection.includes("原稽核紀錄會保留"), "the confirmation must explain that the original audit record remains");
 

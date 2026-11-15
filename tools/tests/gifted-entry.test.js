@@ -107,3 +107,23 @@ test('summary read rejects an old identity after logout or a different login',as
  if(switchUser){f.auth.currentUser={uid:'student-b',getIdToken:async()=> 'new'};f.ready();}else f.ui.close(true);
  f.resolveFetch();await assert.rejects(pending,/LOGIN_REQUIRED/);}
 });
+
+test('only an accepted receipt for the active assignment updates the contact book',async()=>{
+ const accepted={status:'submitted',receiptId:'receipt',submittedAt:1000};
+ const received=[];
+ const f=setup(true,true,{GiftedHomeworkStatus:{activate(){},submitted:(assignment,receipt)=>received.push([assignment,receipt])},
+  fetch:async(_url,input)=>{
+   const request=JSON.parse(input.body);
+   const value=request.action==='task'?{submission:accepted}:request.action==='draft'?{status:'saved'}:accepted;
+   return {ok:true,json:async()=>value};
+  }});
+ f.ready();
+ const transport=f.ui.getTransport(f.elements[0].children[1].contentWindow);
+ for(const [action,segmentId] of [['draft','week-1'],['submit','week-2'],['task','week-1'],['submit','week-1'],['receipt','week-1']]){
+  await transport.request({action,planId:plan,segmentId});
+ }
+ assert.equal(received.length,3);
+ for(const [assignment,receipt] of received){
+  assert.equal(assignment.segmentId,'week-1');assert.equal(receipt,accepted);
+ }
+});
