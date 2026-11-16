@@ -6,7 +6,7 @@
 .answer-inputs label[hidden]{display:none}
 .answer-inputs input[type=text]{box-sizing:border-box;width:100%;min-block-size:44px;border:1px solid #8ba797;border-radius:.4rem;padding:.35rem .55rem;font:inherit;color:inherit;background:#fff}
 .answer-inputs.check-options{display:flex;flex-wrap:wrap;gap:.45rem}
-.answer-inputs.check-options label{display:flex;min-block-size:44px;cursor:pointer}
-.answer-inputs.check-options input{inline-size:1.2rem;block-size:1.2rem;margin:0;accent-color:#205c44}
+.answer-inputs .answer-option{display:flex;min-block-size:44px;cursor:pointer}
+.answer-inputs .answer-option input{inline-size:1.2rem;block-size:1.2rem;margin:0;accent-color:#205c44}
 .answer-inputs label.earlier-answer{display:block;width:100%}
 .answer-inputs label.earlier-answer[hidden]{display:none}

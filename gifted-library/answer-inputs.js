@@ -2,36 +2,37 @@
   'use strict';
   const prefix='slots-v1:';
   const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const validShape=shape=>shape&&(shape.mode==='blanks'||shape.mode==='checks')&&Array.isArray(shape.labels)&&shape.labels.length>0;
+  const validShape=shape=>shape&&['blanks','checks','mixed'].includes(shape.mode)&&Array.isArray(shape.labels)&&shape.labels.length>0&&(shape.mode!=='mixed'||shape.kinds?.length===shape.labels.length);
+  const isCheck=(shape,i)=>shape.mode==='checks'||shape.kinds?.[i]==='check';
   function fields(q){
     if(!validShape(q.answerInputs))return '<textarea maxlength="2000" aria-label="本題答案" placeholder="填寫答案，送出後自行核對解答"></textarea>';
-    const {mode,labels}=q.answerInputs;
-    const legend=mode==='checks'?'勾選符合的項目':'依照紙本格位填答';
+    const shape=q.answerInputs,{mode,labels}=shape;
+    const legend=mode==='checks'?'勾選符合的項目':mode==='mixed'?'依照紙本逐格填答與勾選':'依照紙本格位填答';
     return '<fieldset class="answer-inputs'+(mode==='checks'?' check-options':'')+'"><legend>'+legend+'</legend>'+
-      labels.map((label,i)=>mode==='checks'
-        ? '<label><input type="checkbox" data-slot="'+i+'"><span>'+escape(label)+'</span></label>'
+      labels.map((label,i)=>isCheck(shape,i)
+        ? '<label class="answer-option"><input type="checkbox" data-slot="'+i+'"><span>'+escape(label)+'</span></label>'
         : '<label><span>'+escape(label)+'</span><input type="text" maxlength="'+Math.min(100,Math.floor(1700/labels.length))+'" data-slot="'+i+'" autocomplete="off" spellcheck="false"></label>').join('')+
+      (shape.paperHint?'<p class="paper-answer-hint">'+escape(shape.paperHint)+'</p>':'')+
       '<label class="earlier-answer" hidden><span>原本填寫的答案</span><textarea maxlength="2000" aria-label="原本填寫的答案"></textarea></label></fieldset>';
   }
   function controls(element){return Array.from(element.querySelectorAll('[data-slot]'));}
-  function encode(mode,values){
-    if(mode==='checks'?!values.some(Boolean):!values.some(x=>x.trim())) return '';
+  function encode(values){
+    if(!values.some(value=>typeof value==='boolean'?value:Boolean(value.trim()))) return '';
     return prefix+JSON.stringify(values);
   }
-  function decode(mode,count,answer){
+  function decode(shape,count,answer){
     if(typeof answer!=='string'||!answer.startsWith(prefix))return null;
     try{
       const values=JSON.parse(answer.slice(prefix.length));
-      const expectedType=mode==='checks'?'boolean':'string';
-      if(Array.isArray(values)&&values.length===count&&values.every(value=>typeof value===expectedType))return values;
+      if(Array.isArray(values)&&values.length===count&&values.every((value,i)=>typeof value===(isCheck(shape,i)?'boolean':'string')))return values;
     }catch{}
     return null;
   }
   function read(q,element){
     if(!validShape(q.answerInputs))return element.querySelector('textarea').value;
-    const {mode}=q.answerInputs, fields=controls(element);
-    const values=fields.map(field=>mode==='checks'?field.checked:field.value);
-    return encode(mode,values)||element.querySelector('.earlier-answer textarea').value;
+    const fields=controls(element);
+    const values=fields.map((field,i)=>isCheck(q.answerInputs,i)?field.checked:field.value);
+    return encode(values)||element.querySelector('.earlier-answer textarea').value;
   }
   function restore(q,element,answer){
     if(!validShape(q.answerInputs)){element.querySelector('textarea').value=answer||'';return;}
@@ -39,20 +40,27 @@
     const previous=element.querySelector('.earlier-answer');
     previous.hidden=true;
     previous.querySelector('textarea').value='';
-    let values=decode(mode,fields.length,answer);
+    let values=decode(q.answerInputs,fields.length,answer);
     if(!values&&answer&&mode==='blanks'){
       // Legacy free text can be restored when its delimiters match the original number of blanks.
       const parts=labels.length===1?[answer]:answer.split(/[；;\r\n]+/).map(value=>value.trim());
       if(parts.length===fields.length)values=parts;
     }
     if(!values&&answer){previous.hidden=false;previous.querySelector('textarea').value=answer;}
-    fields.forEach((field,i)=>{if(mode==='checks')field.checked=values?.[i]===true;else field.value=values?.[i]||'';});
+    fields.forEach((field,i)=>{if(isCheck(q.answerInputs,i))field.checked=values?.[i]===true;else field.value=values?.[i]||'';});
   }
   function reference(q,result){
     if(!validShape(q.answerInputs)||!Array.isArray(result.referencePositions))return '';
     const {mode,labels}=q.answerInputs;
-    if(mode==='checks')return '應勾選 '+result.referencePositions.map(i=>labels[i]).join('、');
-    return '\n'+result.referencePositions.map((a,i)=>labels[i]+'　'+a).join('\n');
+    const positions=result.referencePositions;
+    if(mode==='checks')return positions.length?'應勾選 '+positions.map(i=>labels[i]).join('、'):'各項均不勾選';
+    const lines=positions.flatMap((a,i)=>typeof a==='string'?[labels[i]+'　'+a]:[]);
+    if(mode==='mixed'){
+      const checked=labels.filter((_,i)=>positions[i]===true);
+      lines.push(checked.length?'應勾選 '+checked.join('、'):'各項均不勾選');
+    }
+    if(result.paperReference)lines.push(result.paperReference);
+    return '\n'+lines.join('\n');
   }
   window.GiftedLibraryAnswerInputs={fields,read,restore,reference};
 })();
