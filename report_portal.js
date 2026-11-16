@@ -17,7 +17,7 @@
         let next = Infinity;
         document.querySelectorAll('.rp-score').forEach(form => {
             const a = items[Number(form.dataset.index)], late = isOverdue(a);
-            if (form.dataset.correction) return;
+            if (form.dataset.correction || form.dataset.reReport) return;
             const warning = form.previousElementSibling;
             if (warning?.classList.contains('rp-overdue')) warning.hidden = !late;
             const button = form.querySelector('button');
@@ -37,14 +37,33 @@
     teacherSelect.onchange();
     function message(text) { $('rp-message').textContent = text; }
     function draftKey(item) { return `report-draft:${identityKey}:${item.teacherKey}:${item.className}:${item.examId}:${item.submissionRevision || 0}`; }
-    function draft(item, value) {
-        try { const k = draftKey(item); if (value === null) localStorage.removeItem(k); else if (value !== undefined) localStorage.setItem(k, value); else return localStorage.getItem(k) || ''; } catch (_) { /* 私密瀏覽模式仍可回報 */ }
+    function draft(item, value, reReport = false) {
+        try { const k = draftKey(item) + (reReport ? ':after-clear' : ''); if (value === null) localStorage.removeItem(k); else if (value !== undefined) localStorage.setItem(k, value); else return localStorage.getItem(k) || ''; } catch (_) { /* 私密瀏覽模式仍可回報 */ }
         return '';
     }
     async function call(action, value = {}) { return (await functions.httpsCallable('runReportPortalStudentAction')({ action, ...value })).data; }
     function safeLink(url, label, variant = 'paper') {
         if (!url || !/^https:\/\/(?:firebasestorage\.googleapis\.com\/|drive\.google\.com\/file\/d\/[a-zA-Z0-9_-]+\/view(?:[?]|$))/.test(url)) return '';
         return `<a class="rp-link rp-link-${variant}" href="${escape(url)}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+    }
+    function scoreForm(a, index, { mode = '', label, button, value }) {
+        const attribute = mode === 'correction' ? 'data-correction="true"' : mode === 'after-clear' ? 'data-re-report="true"' : '';
+        return `<form class="rp-score" data-index="${index}" ${attribute}><label>${label}（滿分 ${escape(a.maxScore)}）<input name="score" type="number" inputmode="decimal" min="0" max="${escape(a.maxScore)}" step="any" required value="${escape(value)}"></label><button type="submit">${button}</button></form>`;
+    }
+    function correctionForm(a, index) {
+        if (!a.canCorrect) return '';
+        const value = draft(a);
+        const baseline = a.correctionBaseline ?? a.official?.score;
+        return `<details class="rp-correction" ${value ? 'open' : ''}><summary>更正分數</summary>${scoreForm(a, index, {
+            mode: 'correction', label: '更正後分數', button: '儲存更正', value: value || baseline,
+        })}<p class="rp-muted">上次登記的回報為 ${escape(baseline)} 分。更正會保留原回報時間與準時／遲交狀態。</p></details>`;
+    }
+    function reportAfterClearForm(a, index) {
+        if (!a.canReportAfterClear) return '';
+        const value = draft(a, undefined, true);
+        return `<details class="rp-correction" ${value ? 'open' : ''}><summary>老師已清空成績，重新回報</summary><p class="rp-muted">請在老師確認已清空後使用。系統會先收件，再核對正式成績。</p>${scoreForm(a, index, {
+            mode: 'after-clear', label: '我的分數', button: '送出回報', value,
+        })}</details>`;
     }
     function render() {
         $('rp-papers').innerHTML = items.length ? items.map((a, i) => {
@@ -53,13 +72,20 @@
             const expired = isOverdue(a);
             const official = a.official || { state: 'unavailable' };
             const recorded = !pending && ['score', 'text'].includes(official.state);
-            const retainedReceipt = needsAttention ? `<div class="rp-result rp-wait"><div>已收到回報 <strong>${escape(r.score)}</strong> 分</div><div>登記需要老師處理，你不用重新回報。</div>${timing(r) || `<small>${formatDate(r.receivedAt)}</small>`}</div>` : '';
-            const status = retainedReceipt + (recorded ? `<div class="rp-result"><div>目前成績 <strong>${escape(official.state === 'score' ? official.score : official.text)}</strong>${official.state === 'score' ? ' 分' : ''}</div><div>${r && official.state === 'score' && official.score !== r.score ? '老師已更新成績，以目前登記為準。' : needsAttention ? '目前已登記的成績' : '成績登記完成'}</div>${needsAttention ? '' : timing(r)}</div>` :
-                r && pending ? `<div class="rp-result rp-wait"><div>${r.isLate === true ? '已補交' : '已回報'} <strong>${escape(r.score)}</strong> 分</div><div>已收到，正在背景登記。可以離開本頁。</div>${timing(r) || `<small>${formatDate(r.receivedAt)}</small>`}</div>` :
+            const differentOfficial = recorded && r && (official.state !== 'score' || official.score !== r.score);
+            const received = r?.correction ? '已收到更正' : r?.isLate === true ? '已收到補交' : '已收到回報';
+            const retainedReceipt = needsAttention ? `<div class="rp-result rp-wait"><div>${received} <strong>${escape(r.score)}</strong> 分</div><div>登記需要老師處理，你不用重新回報。</div>${timing(r) || `<small>${formatDate(r.receivedAt)}</small>`}</div>` : '';
+            const status = retainedReceipt + (recorded ? `<div class="rp-result"><div>目前成績 <strong>${escape(official.state === 'score' ? official.score : official.text)}</strong>${official.state === 'score' ? ' 分' : ''}</div><div>${differentOfficial ? '老師已更新成績，以目前登記為準。' : needsAttention ? '目前已登記的成績' : '成績登記完成'}</div>${differentOfficial && !needsAttention ? `<div>上次回報 ${escape(r.score)} 分</div>` : ''}${needsAttention ? '' : timing(r)}</div>` :
+                r && pending ? `<div class="rp-result rp-wait"><div>${received} <strong>${escape(r.score)}</strong> 分</div><div>正在背景登記，可以離開本頁。</div>${timing(r) || `<small>${formatDate(r.receivedAt)}</small>`}</div>` :
                 needsAttention ? '' :
+                r?.sheetPersisted ? `<div class="rp-result"><div>上次回報登記 <strong>${escape(r.score)}</strong> 分</div>${timing(r)}</div>` :
                 !a.canSubmit ? `<div class="rp-result rp-wait">目前尚無法確認正式成績，請重新整理或聯絡老師。${timing(r)}</div>` :
-                `<p class="rp-result rp-late rp-overdue" role="status" ${expired ? '' : 'hidden'}>已超過回報期限，請儘速完成並回報。本次將記錄為遲交。</p><form class="rp-score" data-index="${i}"><label>我的分數（滿分 ${escape(a.maxScore)}）<input name="score" type="number" inputmode="decimal" min="0" max="${escape(a.maxScore)}" step="any" required value="${escape(draft(a))}"></label><button type="submit">${expired ? '補交分數' : '送出分數'}</button></form><p class="rp-muted">送出後，看到「已收到」即可離開。${draft(a) ? '有尚未確認送達的分數，請確認後送出。' : ''}</p>`);
-            return `<article class="rp-card" data-paper="${escape(a.assignmentId)}"><div class="rp-meta">${escape(a.className)} · ${escape(a.date)}</div><h2>${escape(a.title)}</h2>${a.dueAt ? `<div class="rp-meta">回報期限：${formatDate(a.dueAt)}</div>` : ''}<div class="rp-actions">${safeLink(a.questionUrl, '開啟考卷')}</div>${a.answerReady ? (a.answerText || a.answerUrl ? `<details><summary>查看答案</summary>${a.answerText ? `<div class="rp-answer">${escape(a.answerText)}</div>` : ''}${safeLink(a.answerUrl, '開啟答案檔案', 'answer')}</details>` : '') : `<p class="rp-muted">答案將於 ${formatDate(a.answerOpenAt)} 開放</p>`}<hr style="border:0;border-top:1px solid #e4ebe6;margin:18px 0">${a.reset ? '<p class="rp-muted">目前成績已清空，請重新回報。</p>' : ''}${status}${a.canCorrect ? `<details class="rp-correction" ${draft(a) ? 'open' : ''}><summary>更正分數</summary><form class="rp-score" data-index="${i}" data-correction="true"><label>更正後分數（滿分 ${escape(a.maxScore)}）<input name="score" type="number" inputmode="decimal" min="0" max="${escape(a.maxScore)}" step="any" required value="${escape(draft(a) || String(official.score))}"></label><button type="submit">儲存更正</button></form><p class="rp-muted">填錯可再次更正，原回報時間與準時／遲交狀態會保留。</p></details>` : r || recorded ? `<p class="rp-muted">${pending ? '登記完成後即可自行更正分數。' : '需要更正分數時，請聯絡老師。'}</p>` : ''}${pending ? '<span class="rp-meta">重新開啟本頁可查詢登記結果。</span>' : ''}</article>`;
+                `<p class="rp-result rp-late rp-overdue" role="status" ${expired ? '' : 'hidden'}>已超過回報期限，請儘速完成並回報。本次將記錄為遲交。</p>${scoreForm(a, i, {
+                    label: '我的分數', button: expired ? '補交分數' : '送出分數', value: draft(a),
+                })}<p class="rp-muted">送出後，看到「已收到」即可離開。${draft(a) ? '有尚未確認送達的分數，請確認後送出。' : ''}</p>`);
+            const edit = a.canCorrect ? correctionForm(a, i) : r || recorded ?
+                `<p class="rp-muted">${pending ? '登記完成後即可自行更正分數。' : '需要更正分數時，請聯絡老師。'}</p>` : '';
+            return `<article class="rp-card" data-paper="${escape(a.assignmentId)}"><div class="rp-meta">${escape(a.className)} · ${escape(a.date)}</div><h2>${escape(a.title)}</h2>${a.dueAt ? `<div class="rp-meta">回報期限：${formatDate(a.dueAt)}</div>` : ''}<div class="rp-actions">${safeLink(a.questionUrl, '開啟考卷')}</div>${a.answerReady ? (a.answerText || a.answerUrl ? `<details><summary>查看答案</summary>${a.answerText ? `<div class="rp-answer">${escape(a.answerText)}</div>` : ''}${safeLink(a.answerUrl, '開啟答案檔案', 'answer')}</details>` : '') : `<p class="rp-muted">答案將於 ${formatDate(a.answerOpenAt)} 開放</p>`}<hr style="border:0;border-top:1px solid #e4ebe6;margin:18px 0">${a.reset ? '<p class="rp-muted">目前成績已清空，請重新回報。</p>' : ''}${status}${edit}${reportAfterClearForm(a, i)}${pending ? '<span class="rp-meta">重新開啟本頁可查詢登記結果。</span>' : ''}</article>`;
         }).join('') : '<div class="rp-card">目前沒有開放的考卷或作業。</div>';
         updateDeadlines();
     }
@@ -79,7 +105,12 @@
             serverClock = Number.isFinite(result.serverNow) ? { time: result.serverNow, anchor: performance.now() } : null;
             if (result.teacherKey) teacherSelect.value = result.teacherKey;
             updateBrand(result.teacherLabel || teacherSelect.selectedOptions[0].textContent);
-            items.forEach(a => { if (a.report && a.report.revision === a.submissionRevision && String(a.report.score) === draft(a)) draft(a, null); });
+            items.forEach(a => {
+                if (!a.report || a.report.revision !== a.submissionRevision) return;
+                for (const reReport of [false, true]) {
+                    if (String(a.report.score) === draft(a, undefined, reReport)) draft(a, null, reReport);
+                }
+            });
             $('rp-name').textContent = `${result.name}，你好`;
             render(); message('');
         } catch (e) {
@@ -98,15 +129,18 @@
         } catch (error) { message(error.message || '登入失敗，請稍後再試。'); }
         finally { button.disabled = false; }
     });
-    $('rp-papers').addEventListener('input', e => { const form = e.target.closest('form[data-index]'); if (form) draft(items[Number(form.dataset.index)], e.target.value); });
+    $('rp-papers').addEventListener('input', e => { const form = e.target.closest('form[data-index]'); if (form) draft(items[Number(form.dataset.index)], e.target.value, !!form.dataset.reReport); });
     $('rp-papers').addEventListener('submit', async e => {
         e.preventDefault(); if (submitting) return;
         const form = e.target, a = items[Number(form.dataset.index)], score = form.elements.score.value, button = form.querySelector('button');
         if (!form.reportValidity()) return;
-        draft(a, score); submitting = true; button.disabled = true; button.textContent = '正在送出…'; message('正在傳送，請等候「已收到」。');
+        const correction = !!form.dataset.correction, reReport = !!form.dataset.reReport;
+        const options = correction ? { correction: true, expectedScore: a.correctionBaseline ?? a.official?.score } : reReport || a.reset ? { reReport: true } : {};
+        draft(a, score, reReport); submitting = true; button.disabled = true; button.textContent = '正在送出…'; message('正在傳送，請等候「已收到」。');
         try {
-            const result = await call('submit', { teacherKey: a.teacherKey, className: a.className, assignmentId: a.assignmentId, score, submissionRevision: a.submissionRevision || 0, ...(form.dataset.correction ? { correction: true, expectedScore: a.official.score } : {}) });
-            a.report = result.report; a.reset = false; a.canSubmit = false; a.canCorrect = false; draft(a, null); render(); message(form.dataset.correction ? '已收到更正，正在更新成績，可以離開本頁。' : result.report?.isLate === true ? '已收到補交分數，本次記錄為遲交，可以離開本頁。' : '已收到回報，可以離開本頁。');
+            const result = await call('submit', { teacherKey: a.teacherKey, className: a.className, assignmentId: a.assignmentId, score, submissionRevision: a.submissionRevision || 0, ...options });
+            a.report = result.report; a.reset = false; a.canSubmit = false; a.canCorrect = false; a.canReportAfterClear = false;
+            draft(a, null, reReport); render(); message(correction ? '已收到更正，正在背景核對，可以離開本頁。' : result.report?.isLate === true ? '已收到補交分數，本次記錄為遲交，可以離開本頁。' : '已收到回報，可以離開本頁。');
         } catch (error) {
             button.disabled = false;
             if (['functions/failed-precondition', 'functions/permission-denied', 'functions/unauthenticated', 'functions/invalid-argument'].includes(error.code)) {
