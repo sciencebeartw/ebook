@@ -54,11 +54,20 @@
     const {mode,labels}=q.answerInputs;
     const positions=result.referencePositions;
     if(mode==='checks')return positions.length?'應勾選 '+positions.map(i=>labels[i]).join('、'):'各項均不勾選';
-    const lines=positions.flatMap((a,i)=>typeof a==='string'?[labels[i]+'　'+a]:[]);
-    if(mode==='mixed'){
-      const checked=labels.filter((_,i)=>positions[i]===true);
-      lines.push(checked.length?'應勾選 '+checked.join('、'):'各項均不勾選');
-    }
+    const lines=[];
+    let checked=[];
+    const flushChecks=()=>{
+      if(checked.length)lines.push('應勾選 '+checked.join('、'));
+      checked=[];
+    };
+    positions.forEach((value,i)=>{
+      if(value===true)checked.push(labels[i]);
+      if(typeof value==='string'){
+        flushChecks();
+        lines.push(labels[i]+'　'+value);
+      }
+    });
+    flushChecks();
     if(result.paperReference)lines.push(result.paperReference);
     return '\n'+lines.join('\n');
   }
