@@ -4,6 +4,15 @@
   const pilotClass = '115小六資優自然週六上午班';
   const postId = 'post_171442cbd9b18f73df6871dcdf4ba96ee4f96bc0_0';
   const postDate = '2026/11/14';
+  const studentActionUrl = 'https://us-central1-sciencebear-admin.cloudfunctions.net/runEbookStudentAction';
+  const retryTransportCodes = new Set(['functions/internal', 'functions/unavailable', 'functions/deadline-exceeded', 'functions/unauthenticated']);
+  const accessMessages = {
+    'functions/unauthenticated':'登入狀態已失效。請在聯絡簿登出，再登入測試學生。',
+    'functions/unavailable':'此裝置目前連不到考卷服務。',
+    'functions/deadline-exceeded':'考卷服務連線逾時。',
+    'functions/internal':'考卷服務沒有傳回可讀取的結果。',
+    'exam/access-response':'考卷資料不完整，請重試。'
+  };
   const paperAnchors = {quiz:'[data-pending-exam-paper-anchor]',makeup:'[data-pending-paper-anchor]'};
   const entry = () => document.getElementById('giftedFormalExamEntry');
   const current = own => !!own && session === own && own.auth.currentUser?.uid === own.uid;
@@ -53,7 +62,9 @@
     }
     if (current(session)) {mount();return;}
     close(true);
-    const own = {auth:context.auth, uid:user.uid, callable:context.functions.httpsCallable('runEbookStudentAction',{timeout:180000}), controls:new Map()};
+    const own = {auth:context.auth, uid:user.uid, functions:context.functions,
+      callable:context.functions.httpsCallable('runEbookStudentAction',{timeout:180000}), controls:new Map()};
+    own.standalone = navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
     session = own;
     unsubscribe = own.auth.onAuthStateChanged(user => {if (session === own && user?.uid !== own.uid) close(true);});
     await load(own);
@@ -66,9 +77,13 @@
     try {
       const details = await request(own, 'access');
       if (!current(own)) return;
+      if (!details || typeof details !== 'object' || Array.isArray(details) ||
+          Object.entries(details).some(([kind, exam]) =>
+            !Object.prototype.hasOwnProperty.call(paperAnchors,kind) || !exam?.examId || typeof exam.accepting !== 'boolean')) {
+        throw formalError('exam/access-response');
+      }
       own.exam = details;
       for (const [kind, exam] of Object.entries(details)) {
-        if (!Object.prototype.hasOwnProperty.call(paperAnchors, kind)) continue;
         const controls = document.createElement('div');
         controls.className = 'gfe-exam-controls';
         controls.dataset.formalExamKind = kind;
@@ -93,7 +108,9 @@
       if (['functions/failed-precondition','functions/permission-denied'].includes(error.code)) return;
       const status = document.createElement('span');
       status.setAttribute('role', 'status');
-      status.textContent = '暫時無法載入第 28 堂線上考卷。';
+      const message = Object.prototype.hasOwnProperty.call(accessMessages, error.code) ?
+        accessMessages[error.code] : '考卷入口顯示失敗。';
+      status.textContent = '暫時無法載入第 28 堂線上考卷。' + message;
       const retry = document.createElement('button');
       retry.type = 'button';
       retry.textContent = '重試載入考卷';
@@ -145,11 +162,69 @@
     return details;
   }
 
+  function formalError(code) {
+    const error = Error('暫時無法完成考卷操作，請確認連線或重新開啟考卷。');
+    error.code = code;
+    return error;
+  }
+  async function callStudentActionDirect(own, payload, refreshToken = false) {
+    const user = own.auth.currentUser;
+    let token;
+    try {token = await user.getIdToken(refreshToken);}
+    catch (error) {
+      throw formalError(error.code === 'auth/network-request-failed' ? 'functions/unavailable' : 'functions/unauthenticated');
+    }
+    if (!current(own)) throw formalError('functions/unauthenticated');
+    // The same authenticated callable endpoint, using XHR if standalone WebKit's SDK transport fails.
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', studentActionUrl);
+      xhr.timeout = payload.data.operation === 'access' ? 15000 : 180000;
+      xhr.setRequestHeader('Content-Type','application/json');
+      xhr.setRequestHeader('Authorization','Bearer ' + token);
+      xhr.onerror = xhr.onabort = () => reject(formalError('functions/unavailable'));
+      xhr.ontimeout = () => reject(formalError('functions/deadline-exceeded'));
+      xhr.onload = () => {
+        let reply;
+        try {reply = JSON.parse(xhr.responseText);}
+        catch {reject(formalError('functions/internal'));return;}
+        if (reply?.error) {
+          const status = reply.error.status;
+          const code = typeof status === 'string' && /^[A-Z_]+$/.test(status) ?
+            'functions/' + status.toLowerCase().replace(/_/g,'-') : 'functions/internal';
+          const error = formalError(code);
+          const reason = reply.error.details?.reason;
+          if (typeof reason === 'string' && /^[a-z-]+$/.test(reason)) {
+            error.details = {reason};
+            if (typeof reply.error.message === 'string') error.message = reply.error.message;
+          }
+          reject(error);
+          return;
+        }
+        if (xhr.status === 200 && reply?.result) {resolve(reply.result);return;}
+        reject(formalError('functions/internal'));
+      };
+      xhr.send(JSON.stringify({data:payload}));
+    });
+  }
   async function request(own, operation, data = {}) {
-    if (!current(own)) throw Error('請重新登入聯絡簿。');
-    const reply = await own.callable({action:'giftedFormalExamL28',data:{...data,operation}});
-    if (!current(own)) throw Error('請重新登入聯絡簿。');
-    return reply.data.result;
+    if (!current(own)) throw formalError('functions/unauthenticated');
+    const payload = {action:'giftedFormalExamL28',data:{...data,operation}};
+    let reply;
+    if (own.direct) {
+      reply = await callStudentActionDirect(own, payload);
+    } else {
+      const call = operation === 'access' ? own.functions.httpsCallable('runEbookStudentAction',{timeout:15000}) : own.callable;
+      try {reply = (await call(payload))?.data;}
+      catch (error) {
+        // Only access is replayed. A paper submission always uses a single request path.
+        if (operation !== 'access' || !own.standalone || !retryTransportCodes.has(error.code) || !current(own)) throw error;
+        reply = await callStudentActionDirect(own, payload, error.code === 'functions/unauthenticated');
+        own.direct = true;
+      }
+    }
+    if (!current(own)) throw formalError('functions/unauthenticated');
+    return reply?.result;
   }
   function open(kind, button) {
     close(false);
