@@ -9,7 +9,7 @@ function check(condition, message) {
 }
 
 check(
-  html.includes('ebook_feedback_threads_app.js?v=20260822_feedback_threads_v1') &&
+  /<script src="ebook_feedback_threads_app\.js\?v=[^"]+"><\/script>/.test(html) &&
     html.includes('feedbackThreadApi.buildFeedbackThreads(myHistory)'),
   'the pure feedback-thread helper must be loaded before the eBook renderer uses it'
 );
@@ -59,7 +59,7 @@ check(
   'student and god-view thread replies must support text, files, photos, and attachment-only submission'
 );
 check(
-  html.includes('"feedback_thread_" + safeDateId + "_" + thread.id') &&
+  html.includes('"feedback_thread_" + safeDateId + "_" + (fastWriteRootId ? fastWriteRootId[1] : thread.id)') &&
     !html.includes('thread.id + "_" + blockIndex') &&
     html.includes('submitLabel: "回覆"') &&
     html.includes('submitLabel: "新增留言"') &&

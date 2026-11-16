@@ -37,7 +37,7 @@ check(
   'new attachment flows must reuse binary Firebase Storage uploads'
 );
 check(
-  html.includes("附件仍保留，可直接重試") && html.includes('draft.uploaded = uploaded;'),
+  html.includes("內容及附件仍保留；請用原內容重試查核。") && html.includes('draft.uploaded = uploaded;'),
   'teacher/student attachment drafts should remain retryable after message failure'
 );
 check(

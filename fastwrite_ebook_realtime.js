@@ -27,6 +27,43 @@
   });
  }
  root.refreshProductionFeedbackView=refreshHistory;
+ // 沿用同一個留言串的輸入元件，包含附件、焦點和正在送出的請求。
+ root.refreshGodFeedbackHistory=function(history, incoming, hasDraft){
+  const active=history.ownerDocument.activeElement;
+  const current=new Map([...history.children].flatMap(node=>{
+   const key=node.dataset.feedbackThreadViewKey || node.dataset.feedbackKey;
+   return key ? [[key,node]] : [];
+  }));
+  const ordered=[...incoming.children].map(next=>{
+   const old=current.get(next.dataset.feedbackThreadViewKey || next.dataset.feedbackKey);
+   if(!old)return next;
+   if(!next.dataset.feedbackThreadViewKey)return old.isEqualNode(next)?old:next;
+   old.dataset.feedbackThreadId=next.dataset.feedbackThreadId;
+   const composer=old.querySelector(':scope > .feedback-thread-composer');
+   let anchor=composer;
+   for(const selector of ['.feedback-thread-replies','.feedback-thread-toggle','.history-msg']){
+    const before=old.querySelector(':scope > '+selector);
+    const after=next.querySelector(':scope > '+selector);
+    if(before&&after&&before.isEqualNode(after)){anchor=before;continue;}
+    if(before)before.remove();
+    if(after){old.insertBefore(after,anchor);anchor=after;}
+   }
+   const newComposer=next.querySelector(':scope > .feedback-thread-composer');
+   if(!composer&&newComposer)old.append(newComposer);
+   else if(composer&&!newComposer&&!hasDraft(old))composer.remove();
+   return old;
+  });
+  const live=new Set(ordered);
+  for(const child of [...history.children])if(!live.has(child)&&!hasDraft(child))child.remove();
+  let cursor=history.firstElementChild;
+  for(const node of ordered){
+   if(node===cursor)cursor=cursor.nextElementSibling;
+   else history.insertBefore(node,cursor);
+  }
+  if(active?.isConnected&&history.contains(active)&&history.ownerDocument.activeElement!==active){
+   active.focus({preventScroll:true});
+  }
+ };
  root.rememberProductionMessageNativeFeedback=function(node){nativeFeedback=node||{};};
  root.stopProductionMessageWatches=function(){version++;observer?.disconnect();observer=null;visible.clear();manager?.clear();for(const t of targets.values())t.clear();targets.clear();};
  async function reconcile(){

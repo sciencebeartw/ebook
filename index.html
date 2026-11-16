@@ -5003,7 +5003,7 @@ html { background: #f3faf6; } #splash-status { margin: 22px 0 0; color: #315c44;
     <script src="fastwrite_production_transport.js?v=20261107_sticker_expired_recovery_v1"></script>
     <script src="fastwrite_message_bridge.js?v=20261031_message_admission_v1"></script>
     <script src="fastwrite_realtime.js?v=20261018"></script>
-    <script src="fastwrite_ebook_realtime.js?v=20261027_online"></script>
+    <script src="fastwrite_ebook_realtime.js?v=20261116_confirmed_reply"></script>
     <style>.grade-preparing{min-height:180px;display:flex;align-items:center;justify-content:center;padding:24px 16px;box-sizing:border-box;color:#64748b;font-size:1rem;line-height:1.6;text-align:center;}</style>
     <script src="fastwrite_grade_reader.js?v=20261108_resilient"></script>
     <script src="fastwrite_grade_dom.js?v=20261108_resilient"></script>
@@ -6580,6 +6580,7 @@ async function sendProductionStudentReport(action,payload,send) {
                 type: fb.type,
                 content: fb.content,
                 fbKey: fb.originalFeedbackKey || fbid,
+                clientRequestId: fb.clientRequestId || "",
                 targetExamColIndex: fb.targetExamColIndex || "",
                 targetExamTitle: fb.targetExamTitle || "",
                 targetExamId: typeof normalizeEbookFeedbackExamId === 'function' ? normalizeEbookFeedbackExamId(fb.targetExamId) : '',
@@ -9332,7 +9333,7 @@ async function sendProductionStudentReport(action,payload,send) {
                                     gData.feedbackHistory = buildFeedbackHistoryList(fbsObj, gData);
                                 }
                                 // 重新渲染聯絡簿區塊，確保狀態即時更新
-                                renderDailyPosts(gData.dailyPost, gData.feedbackHistory);
+                                renderDailyPosts(gData.dailyPost, gData.feedbackHistory, isAdminMode ? 'god-native-feedback' : false);
                                 // 同步重新渲染近期分數區塊，讓待審核狀態即時顯示在成績卡片上
                                 if (gData.grades) {
                                     renderOldGradeCards(gData.grades);
@@ -11817,6 +11818,8 @@ async function sendProductionStudentReport(action,payload,send) {
         }
 
         function renderDailyPosts(posts, history, fastWriteHistoryOnly) {
+            var container = document.getElementById('tab-content-0');
+            if (fastWriteHistoryOnly === 'god-native-feedback' && !container.querySelector('.post-card-wrapper')) fastWriteHistoryOnly = false;
             window.GiftedHomeworkStatus?.observe(posts || [], gData?.grades || [], gData?.className || '');
             queueMicrotask(function() {
                 updateNativeHomeworkPostBadges();
@@ -11850,7 +11853,7 @@ async function sendProductionStudentReport(action,payload,send) {
                     return isRecordFromPostSource(h.sourceClassKey, postSourceClassKey);
                 }).sort(function(a, b) { return new Date(a.time) - new Date(b.time); });
             }
-            var container = document.getElementById('tab-content-0'); if (!posts || posts.length === 0) { container.innerHTML = "<div style='text-align:center; padding:30px; color:#999;'>目前沒有聯絡簿資料</div>"; return; } var stickerPosts = posts.filter(function(p) {
+            if (!posts || posts.length === 0) { container.innerHTML = "<div style='text-align:center; padding:30px; color:#999;'>目前沒有聯絡簿資料</div>"; return; } var stickerPosts = posts.filter(function(p) {
                 var name = p.storedClassName || p.className || gData.className, policy = ClassSessionPlan.policy(ebookSubjectParam, name);
                 var plan = ((gData.pendingPolicy || {}).sessionPlansByClass || {})[safeKey(name)] || {};
                 return ClassSessionPlan.isActualPost(policy, p, plan, Date.now());
@@ -11861,7 +11864,7 @@ async function sendProductionStudentReport(action,payload,send) {
                 var examCards = (post.examData && post.examData.exams && post.examData.exams.length)
                     ? post.examData.exams
                     : ((post.examData && post.examData.main) ? [{ main: post.examData.main, others: post.examData.others || [] }] : []);
-                var gradeHtml = examCards.map(function(item) {
+                var gradeHtml = fastWriteHistoryOnly === true ? "" : examCards.map(function(item) {
                     return buildDailyPostExamCard(post, item.main, item.others || [], myHistory);
                 }).join("");
                 var contentHtml = "";
@@ -12289,8 +12292,10 @@ async function sendProductionStudentReport(action,payload,send) {
                     var thread = block.thread;
                     if (!thread || !thread.root) return;
                     var rootItem = thread.root.item || {};
+                    // Firebase 的即時留言回填後可能換成原生留言鍵，輸入框仍跟同一個串。
+                    var fastWriteRootId = isAdminMode && /^fw_(p\d{12}_[a-f0-9]{64})$/.exec(rootItem.clientRequestId || "");
                     var threadDomKey = makeDomSafeId(
-                        "feedback_thread_" + safeDateId + "_" + thread.id + "_" +
+                        "feedback_thread_" + safeDateId + "_" + (fastWriteRootId ? fastWriteRootId[1] : thread.id) + "_" +
                         (rootItem.storedClassKey || rootItem.sourceClassKey || "") + "_" +
                         (rootItem.storedStudentKey || "")
                     );
@@ -12333,8 +12338,11 @@ async function sendProductionStudentReport(action,payload,send) {
                             var teacherContextKey = makeDomSafeId("thread_god_" + threadDomKey);
                             var targetItem = teacherTarget.item || {};
                             var displayType = (targetItem.type === FEEDBACK_TYPE_LABELS.parent || targetItem.type === FEEDBACK_TYPE_LABELS.parentStudent || targetItem.type === FEEDBACK_TYPE_LABELS.student) ? "學生留言" : targetItem.type;
-                            window.adminModeReplyContext[teacherContextKey] = {
+                            var previousReplyContext = window.adminModeReplyContext[teacherContextKey];
+                            var replyButton = document.getElementById('admin-reply-send-' + teacherContextKey);
+                            if (!previousReplyContext?.clientRequestId && !replyButton?.disabled) window.adminModeReplyContext[teacherContextKey] = {
                                 fbKey: teacherTarget.key,
+                                threadDomKey: threadDomKey,
                                 targetDate: post.date,
                                 type: displayType,
                                 content: targetItem.content || "",
@@ -12352,7 +12360,8 @@ async function sendProductionStudentReport(action,payload,send) {
                         }
                     }
 
-                    historyHtml += "<section class='feedback-thread' data-feedback-thread-id='" + escapeHtmlAttr(thread.id) + "'>" +
+                    historyHtml += "<section class='feedback-thread' data-feedback-thread-id='" + escapeHtmlAttr(thread.id) +
+                        "' data-feedback-thread-view-key='" + escapeHtmlAttr(threadDomKey) + "'>" +
                         buildConversationMessageHtml(thread.root, false) + toggleHtml + repliesContainer + composerHtml + "</section>";
                 });
 
@@ -12476,12 +12485,20 @@ async function sendProductionStudentReport(action,payload,send) {
 
             });
             if(fastWriteHistoryOnly==='grades'){if(window.replaceProductionGradeCards(container,html,'.grade-section[data-pending-exam-anchor]',fastWritePreviousScoreContexts,fastWritePreviousMakeupContexts)){window.syncProductionVisibleGradeWatches();return;}fastWriteHistoryOnly=false;}
+            if (fastWriteHistoryOnly === 'god-native-feedback') {
+                window.replaceProductionGradeCards(container, html, '.grade-section[data-pending-exam-anchor]', fastWritePreviousScoreContexts, fastWritePreviousMakeupContexts);
+            }
             if(fastWriteHistoryOnly){
                 var fragment=document.createElement('template');fragment.innerHTML=html;
                 var freshCards=fragment.content.querySelectorAll('.post-card-wrapper');
                 container.querySelectorAll('.post-card-wrapper').forEach(function(card){
                     var fresh=Array.from(freshCards).find(function(n){return n.dataset.postDate===card.dataset.postDate&&n.dataset.sourceClassKey===card.dataset.sourceClassKey&&n.dataset.storedClassKey===card.dataset.storedClassKey;});
                     var oldHistory=card.querySelector('[id^="history-"]'),newHistory=fresh&&fresh.querySelector('[id^="history-"]');if(!oldHistory||!newHistory)return;
+                    if (isAdminMode) {
+                        window.refreshGodFeedbackHistory(oldHistory, newHistory, hasGodReplyDraft);
+                        card.querySelector('.fastwrite-new-message-note')?.remove();
+                        return;
+                    }
                     var editing=oldHistory.contains(document.activeElement)||Array.from(oldHistory.querySelectorAll('textarea,input:not([type="hidden"])')).some(function(n){return !!n.value;});
                     if(editing){var note=card.querySelector('.fastwrite-new-message-note');if(!note){note=document.createElement('p');note.className='fastwrite-new-message-note';note.setAttribute('role','status');oldHistory.insertAdjacentElement('beforebegin',note);}note.textContent='有新留言，完成目前輸入後重新整理即可查看。';return;}
                     oldHistory.innerHTML=newHistory.innerHTML;var previousNote=card.querySelector('.fastwrite-new-message-note');if(previousNote)previousNote.remove();
@@ -14079,7 +14096,16 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             return isAdminMode && !!ebookGodSessionId && !!(ebookGodSessionInfo && ebookGodSessionInfo.permissions && ebookGodSessionInfo.permissions.review);
         }
 
+        function hasGodReplyDraft(thread) {
+            var field = thread.querySelector('[id^="admin-reply-input-"]');
+            if (!field) return false;
+            var key = field.id.slice('admin-reply-input-'.length);
+            return Boolean(field.value || field.disabled || thread.contains(document.activeElement) ||
+                adminReplyAttachmentDrafts[key]?.files?.length || window.adminModeReplyContext?.[key]?.clientRequestId);
+        }
+
         function stageAdminModeAttachmentFiles(input, contextKey, isDirect) {
+            if (document.getElementById((isDirect ? 'admin-direct-send-' : 'admin-reply-send-') + contextKey)?.disabled) return;
             var store = isDirect ? adminDirectAttachmentDrafts : adminReplyAttachmentDrafts;
             var draft = store[contextKey] || { files: [] };
             discardUploadedFeedbackDraft(draft);
@@ -14114,6 +14140,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         }
 
         function removeAdminModeAttachment(contextKey, index, isDirect) {
+            if (document.getElementById((isDirect ? 'admin-direct-send-' : 'admin-reply-send-') + contextKey)?.disabled) return;
             var store = isDirect ? adminDirectAttachmentDrafts : adminReplyAttachmentDrafts;
             var draft = store[contextKey] || { files: [] };
             discardUploadedFeedbackDraft(draft);
@@ -14466,6 +14493,7 @@ function renderProductionGodStickerReceipt(anchor){
                 btn.disabled = true;
                 btn.innerText = '傳送中';
             }
+            if (input) input.disabled = true;
             try {
                 content = await prepareAdminModeAttachmentContent(contextKey, true, content, context.targetDate, status);
                 if (status) status.innerText = draft.files.length ? '附件完成，正在送出留言...' : '正在送出留言...';
@@ -14486,14 +14514,15 @@ function renderProductionGodStickerReceipt(anchor){
                 }
                 if (input) input.value = '';
                 clearAdminModeAttachmentDraft(contextKey, true);
+                delete context.clientRequestId;
                 if(status&&queuedJob.storage==='firebase'){status.innerText='留言已儲存，背景同步中，不必重送。';renderProductionMessageStatus(status);}
                 else if (status) status.innerText = queuedJobResult.browserIndexSaved
                     ? '已排入後端佇列，可安全離開；回到 Dashboard 後可在工作中心查看進度。'
                     : '已排入後端佇列，工作會繼續；但此瀏覽器無法保存進度索引，返回 Dashboard 後可能無法自動顯示。';
                 if (btn) {
-                    btn.innerText = queuedJob.storage==='firebase'?'已儲存':'已排入佇列';
-                    btn.style.background = 'var(--primary)';
+                    btn.innerText = '送出';
                 }
+                if (queuedJob.storage === 'firebase' && input?.isConnected) window.refreshProductionFeedbackView();
             } catch (err) {
                 if (btn) {
                     btn.disabled = false;
@@ -14501,6 +14530,9 @@ function renderProductionGodStickerReceipt(anchor){
                 }
                 if (status) status.innerText = '尚未確認送出結果，內容及附件仍保留；請用原內容重試查核。';
                 swalAlert('留言結果待確認', '請保留原內容及附件，重試會先查核原收據。' + (err && err.message ? ' ' + err.message : ''), 'error');
+            } finally {
+                if (btn) btn.disabled = false;
+                if (input) input.disabled = false;
             }
         }
 
@@ -15012,6 +15044,7 @@ function renderProductionGodStickerReceipt(anchor){
                 btn.disabled = true;
                 btn.innerText = '傳送中';
             }
+            if (input) input.disabled = true;
 
             try {
                 content = await prepareAdminModeAttachmentContent(contextKey, false, content, context.targetDate, status);
@@ -15034,13 +15067,17 @@ function renderProductionGodStickerReceipt(anchor){
                 }
                 if (input) input.value = '';
                 clearAdminModeAttachmentDraft(contextKey, false);
+                delete context.clientRequestId;
                 if(status&&queuedJob.storage==='firebase'){status.innerText='留言已儲存，背景同步中，不必重送。';renderProductionMessageStatus(status);}
                 else if (status) status.innerText = queuedJobResult.browserIndexSaved
                     ? '已排入後端佇列，可安全離開；回到 Dashboard 後可在工作中心查看進度。'
                     : '已排入後端佇列，工作會繼續；但此瀏覽器無法保存進度索引，返回 Dashboard 後可能無法自動顯示。';
                 if (btn) {
-                    btn.innerText = queuedJob.storage==='firebase'?'已儲存':'已排入佇列';
-                    btn.style.background = 'var(--primary)';
+                    btn.innerText = '回覆';
+                }
+                if (queuedJob.storage === 'firebase' && input?.isConnected) {
+                    ebookExpandedFeedbackThreads[context.threadDomKey] = true;
+                    window.refreshProductionFeedbackView();
                 }
             } catch (err) {
                 if (btn) {
@@ -15049,6 +15086,9 @@ function renderProductionGodStickerReceipt(anchor){
                 }
                 if (status) status.innerText = '尚未確認送出結果，內容及附件仍保留；請用原內容重試查核。';
                 swalAlert('留言結果待確認', '請保留原內容及附件，重試會先查核原收據。' + (err && err.message ? ' ' + err.message : ''), 'error');
+            } finally {
+                if (btn) btn.disabled = false;
+                if (input) input.disabled = false;
             }
         }
 
