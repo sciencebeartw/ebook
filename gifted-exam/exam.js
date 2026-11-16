@@ -141,6 +141,23 @@
   }
   function confirmSubmission() {
     const dialog = byId('confirmSubmission');
+    if (typeof dialog.showModal !== 'function') {
+      const form = dialog.querySelector('form');
+      return new Promise(resolve => {
+        form.querySelectorAll('button').forEach(button => {
+          button.onclick = event => {
+            event.preventDefault();
+            dialog.removeAttribute('open');
+            resolve(button.value === 'submit');
+          };
+        });
+        dialog.classList.add('exam-confirm-legacy');
+        dialog.setAttribute('role', 'dialog');
+        dialog.setAttribute('aria-modal', 'true');
+        dialog.setAttribute('open', '');
+        form.querySelector('[autofocus]').focus();
+      });
+    }
     dialog.returnValue = 'cancel';
     return new Promise(resolve => {
       dialog.addEventListener('close', () => resolve(dialog.returnValue === 'submit'), {once:true});

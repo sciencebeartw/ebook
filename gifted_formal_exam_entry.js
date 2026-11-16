@@ -30,7 +30,7 @@
     host.hidden = !hasFallback;
   }
   function close(clear) {
-    dialog?.close();
+    if (dialog?.open && typeof dialog.close === 'function') dialog.close();
     dialog?.remove();
     dialog = frame = null;
     if (opener?.isConnected) opener.focus();
@@ -41,7 +41,7 @@
       session?.controls.forEach(controls => controls.remove());
       session = null;
       const host = entry();
-      if (host) {host.hidden = true;host.replaceChildren();}
+      if (host) {host.hidden = true;host.textContent = '';host.removeAttribute('aria-busy');}
     }
   }
   async function ready(context) {
@@ -56,12 +56,19 @@
     const own = {auth:context.auth, uid:user.uid, callable:context.functions.httpsCallable('runEbookStudentAction',{timeout:180000}), controls:new Map()};
     session = own;
     unsubscribe = own.auth.onAuthStateChanged(user => {if (session === own && user?.uid !== own.uid) close(true);});
+    await load(own);
+  }
+  async function load(own) {
+    if (!current(own)) return;
+    const host = entry();
+    if (!host) return;
+    host.setAttribute('aria-busy', 'true');
     try {
       const details = await request(own, 'access');
       if (!current(own)) return;
       own.exam = details;
       for (const [kind, exam] of Object.entries(details)) {
-        if (!Object.hasOwn(paperAnchors, kind)) continue;
+        if (!Object.prototype.hasOwnProperty.call(paperAnchors, kind)) continue;
         const controls = document.createElement('div');
         controls.className = 'gfe-exam-controls';
         controls.dataset.formalExamKind = kind;
@@ -74,12 +81,31 @@
         if (exam.accepting) controls.append(paperForm(kind, own));
         own.controls.set(kind, controls);
       }
+      host.textContent = '';
+      host.hidden = true;
       mount();
     } catch (error) {
-      if (current(own) && !['functions/failed-precondition','functions/permission-denied'].includes(error.code)) {
-        entry().textContent = '暫時無法載入第 28 堂線上考卷，請重新整理聯絡簿。';
-        entry().hidden = false;
-      }
+      if (!current(own)) return;
+      own.controls.forEach(controls => controls.remove());
+      own.controls.clear();
+      host.textContent = '';
+      host.hidden = true;
+      if (['functions/failed-precondition','functions/permission-denied'].includes(error.code)) return;
+      const status = document.createElement('span');
+      status.setAttribute('role', 'status');
+      status.textContent = '暫時無法載入第 28 堂線上考卷。';
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.textContent = '重試載入考卷';
+      retry.onclick = async () => {
+        retry.disabled = true;
+        retry.textContent = '正在載入…';
+        await load(own);
+      };
+      host.append(status, retry);
+      host.hidden = false;
+    } finally {
+      if (current(own)) host.removeAttribute('aria-busy');
     }
   }
   function paperForm(kind, own) {
@@ -107,7 +133,7 @@
         const content = quiz ? String(input.valueAsNumber) : '錯 '+input.valueAsNumber+' 題';
         const payload = {className:pilotClass,targetDate:exam.date,targetExamColIndex:exam.colIndex,
           targetExamTitle:exam.title,targetExamId:exam.examId,type:quiz?'缺考回報':'補考結果回報',content,
-          clientRequestId:'formal_paper_'+crypto.randomUUID().replace(/-/g,'')};
+          clientRequestId:root.createClientRequestId('formal_paper')};
         const reply = await own.callable({action:'submitFeedback',data:payload});
         if (!current(own)) return;
         if (!reply.data?.result?.success) throw Error('紙本回報尚待確認。');
@@ -142,7 +168,13 @@
     dialog.append(back,frame);
     dialog.addEventListener('cancel',e=>{e.preventDefault();close(false);});
     document.body.append(dialog);
-    dialog.showModal();
+    if (typeof dialog.showModal === 'function') dialog.showModal();
+    else {
+      dialog.classList.add('gfe-dialog-legacy');
+      dialog.setAttribute('role', 'dialog');
+      dialog.setAttribute('aria-modal', 'true');
+      dialog.setAttribute('open', '');
+    }
     back.focus();
   }
   function transport(caller) {

@@ -12,3 +12,6 @@
 #confirmSubmission {max-width:min(420px,90vw);border:1px solid #c8d9cb;border-radius:14px;padding:18px 22px;color:#1c3d2c;}
 #confirmSubmission::backdrop {background:#172d22a6;}
 #confirmSubmission .actions {justify-content:flex-end;}
+
+#confirmSubmission:not([open]) {display:none;}
+#confirmSubmission.exam-confirm-legacy[open] {position:fixed;inset:0;margin:auto;width:fit-content;height:fit-content;z-index:10;background:#fff;box-shadow:0 0 0 200vmax #172d22a6;}
