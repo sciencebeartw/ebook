@@ -80,6 +80,7 @@
     const option = unit.options.find(item => item.id === answers[unit.id]);
     const references = unit.options.filter(item => row?.correctOptionIds?.includes(item.id)).map(item => item.originalLabel + '　' + item.text);
     const choice = unit.type === 'single';
+    const canRequestCorrection = kind === 'quiz' && !choice && row?.status === 'wrong';
     const content = byId('questionCard');
     const options = choice ? '<fieldset id="examOptions"><legend>' + (result ? '作答選項' : '選一個答案') + '</legend>' + unit.options.map(item =>
       '<label class="option"><input type="radio" name="answer" value="' + escape(item.id) + '"' + (answers[unit.id] === item.id ? ' checked' : '') +
@@ -89,9 +90,15 @@
     const correction = row ? '<div class="exam-result-note"><strong>' + (row.earned === null ? '待批改' :
       row.earned === row.points ? '答對' : '需訂正') + '</strong><p>你的答案　' + escape(choice && option ? option.originalLabel + '　' + option.text : row.answer || '留白') +
       '</p><p>參考答案　' + escape(choice ? references.join('、') : row.referenceAnswer) + '</p>' +
-      (row.explanation ? '<p><strong>解析</strong>　' + escape(row.explanation) + '</p>' : '') + '</div>' : '';
+      (row.explanation ? '<p><strong>解析</strong>　' + escape(row.explanation) + '</p>' : '') +
+      (canRequestCorrection ? '<button type="button" id="requestCorrection">申請判分更正</button><p role="status" id="correctionHint"></p>' : '') + '</div>' : '';
     content.innerHTML = (blocks(parent?.context, parent?.names)) + '<h3>' + escape(unit.label) + '</h3>' +
       (blocks(unit.blocks, parent?.names) || '<p>' + rich(unit.prompt, parent?.names) + '</p>') + correction + options;
+    if (canRequestCorrection) byId('requestCorrection').onclick = () => {
+      if (!transport.composeCorrection(unit.label)) {
+        byId('correctionHint').textContent = '請回到 11 月 14 日的聯絡簿，在留言區填寫題號及申請原因。';
+      }
+    };
     for (const placeholder of content.querySelectorAll('[data-image-id]')) {
       const asset = paper.assets[placeholder.dataset.imageId];
       const optionImage = placeholder.dataset.option === '1';

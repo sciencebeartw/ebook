@@ -11,18 +11,21 @@
     'functions/unavailable':'此裝置目前連不到考卷服務。',
     'functions/deadline-exceeded':'考卷服務連線逾時。',
     'functions/internal':'考卷服務沒有傳回可讀取的結果。',
+    'functions/permission-denied':'考卷服務未能確認這次登入可使用測試考卷。',
+    'functions/failed-precondition':'目前無法確認測試考卷的開放狀態。',
     'exam/access-response':'考卷資料不完整，請重試。'
   };
   const paperAnchors = {quiz:'[data-pending-exam-paper-anchor]',makeup:'[data-pending-paper-anchor]'};
   const entry = () => document.getElementById('giftedFormalExamEntry');
   const current = own => !!own && session === own && own.auth.currentUser?.uid === own.uid;
+  const findPost = () => Array.from(document.querySelectorAll('#tab-content-0 [data-pending-post-anchor]')).find(card =>
+    card.dataset.postId === postId && card.dataset.postDate === postDate && card.dataset.sourceClassKey === pilotClass);
 
   function mount() {
     const own = session;
     if (!current(own) || !own.controls.size) return;
     const host = entry();
-    const post = Array.from(document.querySelectorAll('#tab-content-0 [data-pending-post-anchor]')).find(card =>
-      card.dataset.postId === postId && card.dataset.postDate === postDate && card.dataset.sourceClassKey === pilotClass);
+    const post = findPost();
     let hasFallback = false;
     for (const [kind, controls] of own.controls) {
       const examId = own.exam[kind].examId;
@@ -55,8 +58,9 @@
   }
   async function ready(context) {
     const user = context.auth?.currentUser;
+    const identity = context.studentSession?.firebaseAuthUid === user?.uid ? context.studentSession : context.result;
     if (!user || context.preview || context.teacherView || context.result?.isAdmin ||
-        context.result?.className !== pilotClass || context.result?.studentName !== '測試學生') {
+        identity?.className !== pilotClass || identity?.studentName !== '測試學生') {
       close(true);
       return;
     }
@@ -105,7 +109,6 @@
       own.controls.clear();
       host.textContent = '';
       host.hidden = true;
-      if (['functions/failed-precondition','functions/permission-denied'].includes(error.code)) return;
       const status = document.createElement('span');
       status.setAttribute('role', 'status');
       const message = Object.prototype.hasOwnProperty.call(accessMessages, error.code) ?
@@ -151,9 +154,10 @@
         const payload = {className:pilotClass,targetDate:exam.date,targetExamColIndex:exam.colIndex,
           targetExamTitle:exam.title,targetExamId:exam.examId,type:quiz?'缺考回報':'補考結果回報',content,
           clientRequestId:root.createClientRequestId('formal_paper')};
-        const reply = await own.callable({action:'submitFeedback',data:payload});
+        const call = {action:'submitFeedback',data:payload};
+        const reply = own.direct ? await callStudentActionDirect(own, call) : (await own.callable(call)).data;
         if (!current(own)) return;
-        if (!reply.data?.result?.success) throw Error('紙本回報尚待確認。');
+        if (!reply?.result?.success) throw Error('紙本回報尚待確認。');
         status.textContent = '已回報老師，等待審查。';
         input.disabled = true;
       } catch (error) {status.textContent = error.message;}
@@ -239,7 +243,7 @@
     frame = document.createElement('iframe');
     frame.title = session.exam[kind].label;
     frame.dataset.kind = kind;
-    frame.src = 'gifted-exam/index.html?v=20261116-assessment';
+    frame.src = 'gifted-exam/index.html?v=20261116-fill';
     dialog.append(back,frame);
     dialog.addEventListener('cancel',e=>{e.preventDefault();close(false);});
     document.body.append(dialog);
@@ -259,6 +263,19 @@
       request(operation,data){
         if (frame !== active) throw Error('請重新開啟考卷。');
         return request(own,operation,{...data,kind:active.dataset.kind});
+      },
+      composeCorrection(label) {
+        if (frame !== active || !current(own) || active.dataset.kind !== 'quiz' || !/^填充[1-5]$/.test(label)) return false;
+        const field = findPost()?.querySelector('.feedback-new-message-composer .fb-input');
+        if (!field) return false;
+        const prefix = '第28堂線上小考判分更正申請｜' + label + '｜原因：';
+        close(false);
+        if (!field.value.includes(prefix)) field.value = (field.value.trim() ? field.value.trim() + '　' : '') + prefix;
+        field.dispatchEvent(new Event('input',{bubbles:true}));
+        field.scrollIntoView({block:'center'});
+        field.focus({preventScroll:true});
+        field.setSelectionRange(field.value.length,field.value.length);
+        return true;
       },
     };
   }
