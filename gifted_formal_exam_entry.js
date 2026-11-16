@@ -239,7 +239,7 @@
     frame = document.createElement('iframe');
     frame.title = session.exam[kind].label;
     frame.dataset.kind = kind;
-    frame.src = 'gifted-exam/index.html';
+    frame.src = 'gifted-exam/index.html?v=20261116-assessment';
     dialog.append(back,frame);
     dialog.addEventListener('cancel',e=>{e.preventDefault();close(false);});
     document.body.append(dialog);

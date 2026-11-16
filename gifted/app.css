@@ -41,3 +41,9 @@ button:hover:not(:disabled){border-color:var(--bear-green);filter:brightness(.98
 #answerGrid .answer-correction{font-weight:750;white-space:nowrap}#answerGrid s{color:#865059;text-decoration-thickness:2px}
 #answerGrid button.awaiting-grading{background:#fff6df;border-color:#dec78b;color:#76571d}
 #answerGridHelp{font-size:14px;color:#952d38;margin:0;line-height:1.7}
+
+
+/* Align the homework and exam mastheads with the question content. */
+header.assessment-header{display:block;padding-inline:0}
+.assessment-header-inner{max-width:960px;margin-inline:auto;padding-inline:24px;display:flex;align-items:center;justify-content:space-between;gap:20px}
+@media(max-width:600px){.assessment-header-inner{padding-inline:14px}}

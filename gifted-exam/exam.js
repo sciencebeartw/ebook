@@ -63,7 +63,8 @@
     byId('answerGrid').innerHTML = paper.units.map((unit, i) => {
       const row = result?.rows.find(item => item.id === unit.id);
       const state = row ? row.earned === null ? '待批' : row.earned === row.points ? '✓' : '✕' : answers[unit.id]?.trim() ? '✓' : '';
-      return '<button type="button" class="' + (state === '✓' ? 'answered' : '') + '" data-index="' + i + '" aria-current="' +
+      const statusClass = state === '✓' ? 'answered' : state === '✕' ? 'needs-correction' : state === '待批' ? 'awaiting-grading' : '';
+      return '<button type="button" class="' + statusClass + '" data-index="' + i + '" aria-current="' +
         (index === i) + '">' + escape(unit.label) + ' ' + state + '</button>';
     }).join('');
   }
