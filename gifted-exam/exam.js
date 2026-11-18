@@ -10,7 +10,7 @@
   const labels = {quiz:'小考', makeup:'補考'};
   let paper, result, index = 0, answers = {}, submitting = false, renderId = 0;
   const api = (action, data) => transport.request(action,data);
-  const draftKey = () => 'gifted-l28-draft:' + uid + ':' + kind + ':' + paper.revision;
+  const draftKey = () => 'gifted-l28-draft:' + uid + (transport.independentTrial ? ':ai-copy:' : ':') + kind + ':' + paper.revision;
   const media = new Map();
   function blob({contentType,base64}) {
     return new Blob([Uint8Array.from(atob(base64), char => char.charCodeAt(0))], {type:contentType});
@@ -81,6 +81,12 @@
     const references = unit.options.filter(item => row?.correctOptionIds?.includes(item.id)).map(item => item.originalLabel + '　' + item.text);
     const choice = unit.type === 'single';
     const canRequestCorrection = kind === 'quiz' && !choice && row?.status === 'wrong';
+    const review = row?.aiReview;
+    const notifyPending = review === 'credited' && row.aiReceipt === 'pending';
+    const askAI = review === 'available' || review === 'working' || notifyPending;
+    const hint = review === 'credited' ? '這格已補分。' + (notifyPending ? '可重送補分通知給老師。' : '補分通知已送達聯絡簿。') :
+      review === 'appeal' ? '這格未能確認同義。若你認為原答正確，可以申請判分更正。' :
+      review === 'working' ? '這一格正在複判。' : '';
     const content = byId('questionCard');
     const options = choice ? '<fieldset id="examOptions"><legend>' + (result ? '作答選項' : '選一個答案') + '</legend>' + unit.options.map(item =>
       '<label class="option"><input type="radio" name="answer" value="' + escape(item.id) + '"' + (answers[unit.id] === item.id ? ' checked' : '') +
@@ -91,9 +97,19 @@
       row.earned === row.points ? '答對' : '需訂正') + '</strong><p>你的答案　' + escape(choice && option ? option.originalLabel + '　' + option.text : row.answer || '留白') +
       '</p><p>參考答案　' + escape(choice ? references.join('、') : row.referenceAnswer) + '</p>' +
       (row.explanation ? '<p><strong>解析</strong>　' + escape(row.explanation) + '</p>' : '') +
+      (hint ? '<p role="status">' + escape(hint) + '</p>' : '') +
+      (askAI ? '<button type="button" id="requestAi">' + (notifyPending ? '重送補分通知' : review === 'working' ? '查看複判進度' : '申請 AI 複判') + '</button> ' : '') +
       (canRequestCorrection ? '<button type="button" id="requestCorrection">申請判分更正</button><p role="status" id="correctionHint"></p>' : '') + '</div>' : '';
     content.innerHTML = (blocks(parent?.context, parent?.names)) + '<h3>' + escape(unit.label) + '</h3>' +
       (blocks(unit.blocks, parent?.names) || '<p>' + rich(unit.prompt, parent?.names) + '</p>') + correction + options;
+    if (askAI) byId('requestAi').onclick = async event => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      button.textContent = notifyPending ? '正在確認補分通知…' : '正在確認交卷時的答案…';
+      byId('examError').textContent = '';
+      try { showResult(await api('rejudgeFill',{unitId:unit.id})); }
+      catch { byId('examError').textContent = '暫時無法確認複判結果，可再查詢或申請判分更正。'; paint(); }
+    };
     if (canRequestCorrection) byId('requestCorrection').onclick = () => {
       if (!transport.composeCorrection(unit.label)) {
         byId('correctionHint').textContent = '請回到 11 月 14 日的聯絡簿，在留言區填寫題號及申請原因。';
@@ -134,6 +150,13 @@
       'grading-pending':'填充題批改完成後，系統會自動回報。',
       'report-pending':'答案已保存。回報收據仍待確認，可用下方按鈕查核。',
     }[result.reportStatus];
+    if (result.originalEarned != null && result.originalEarned !== result.earned) {
+      byId('examStatus').textContent = '原交卷回報 ' + result.originalEarned + ' 分，複判後 ' + result.earned +
+        ' 分。正式成績依老師審查結果登記。';
+    }
+    if (transport.independentTrial) byId('examStatus').textContent = result.reportStatus === 'report-pending' ?
+      '測試卷已儲存，請按下方按鈕確認老師的收件狀態。' :
+      '獨立測試卷原分 ' + result.originalEarned + ' 分，目前 ' + result.earned + ' 分。';
     if (result.answerPdf) download(byId('answerPdf'),'answer',{revision:result.revision},'第28堂'+labels[kind]+'解答卷');
     const refresh = byId('checkReceipt');
     refresh.hidden = result.reportStatus === 'pending-review';
@@ -175,8 +198,9 @@
   function go(i) { index = Math.max(0, Math.min(i, paper.units.length - 1)); paint(); }
   async function init() {
     paper = await api('open');
-    byId('examTitle').textContent = labels[kind] + '｜' + paper.title;
+    byId('examTitle').textContent = (transport.independentTrial ? 'AI 複判獨立測試卷' : labels[kind]) + '｜' + paper.title;
     byId('examLead').textContent = '可先印題目卷，在這裡依序填答。交卷後系統會自動回報' + transport.reportType + '，你可以逐題訂正。';
+    if (transport.independentTrial) byId('examLead').textContent = '本卷單獨記錄。交卷後可點選填充題申請複判，老師會在這堂聯絡簿收到測試分數。';
     if (paper.questionPdf) download(byId('questionPdf'),'media',{token:paper.questionPdf},'第28堂'+labels[kind]+'題目卷');
     if (paper.paperReported && !paper.submitted) {byId('examLead').textContent = '這份考卷已有紙本回報，請在聯絡簿查看。';return;}
     byId('answerSection').hidden = false;

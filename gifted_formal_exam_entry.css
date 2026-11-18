@@ -13,3 +13,4 @@
 .gfe-exam-controls form {display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 6px;}
 .gfe-exam-controls input {width:85px;min-height:44px;padding:5px 8px;font:inherit;}
 .gfe-exam-controls form [role=status] {flex-basis:100%;}
+.gfe-exam-controls>button+button {margin-top:8px;background:white;color:#226143;}

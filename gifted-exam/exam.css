@@ -15,3 +15,4 @@
 
 #confirmSubmission:not([open]) {display:none;}
 #confirmSubmission.exam-confirm-legacy[open] {position:fixed;inset:0;margin:auto;width:fit-content;height:fit-content;z-index:10;background:#fff;box-shadow:0 0 0 200vmax #172d22a6;}
+.exam-result-note button {min-height:44px;max-width:100%;white-space:normal;margin:4px 4px 4px 0;}

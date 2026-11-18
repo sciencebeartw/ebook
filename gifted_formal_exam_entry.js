@@ -97,6 +97,13 @@
         button.textContent = (exam.accepting ? '線上作答' : '查看線上結果') + '｜' + title;
         button.onclick = () => open(kind,button);
         controls.append(button);
+        if (kind === 'quiz' && exam.independentTrial === true) {
+          const copy = document.createElement('button');
+          copy.type = 'button';
+          copy.textContent = 'AI 複判獨立測試卷';
+          copy.onclick = () => open(kind,copy,true);
+          controls.append(copy);
+        }
         if (exam.accepting) controls.append(paperForm(kind, own));
         own.controls.set(kind, controls);
       }
@@ -230,20 +237,22 @@
     if (!current(own)) throw formalError('functions/unauthenticated');
     return reply?.result;
   }
-  function open(kind, button) {
+  function open(kind, button, independentTrial = false) {
     close(false);
     opener = button;
     dialog = document.createElement('dialog');
     dialog.className = 'gfe-dialog';
-    dialog.setAttribute('aria-label',session.exam[kind].label);
+    const title = independentTrial ? 'AI 複判獨立測試卷' : session.exam[kind].label;
+    dialog.setAttribute('aria-label',title);
     const back = document.createElement('button');
     back.type = 'button';
     back.textContent = '返回聯絡簿';
     back.onclick = () => close(false);
     frame = document.createElement('iframe');
-    frame.title = session.exam[kind].label;
+    frame.title = title;
+    frame.dataset.independentTrial = String(independentTrial);
     frame.dataset.kind = kind;
-    frame.src = 'gifted-exam/index.html?v=20261116-fill';
+    frame.src = 'gifted-exam/index.html?v=20261118-ai-fill';
     dialog.append(back,frame);
     dialog.addEventListener('cancel',e=>{e.preventDefault();close(false);});
     document.body.append(dialog);
@@ -259,16 +268,17 @@
   function transport(caller) {
     const own = session, active = frame;
     if (!active || caller !== active.contentWindow || !current(own)) throw Error('請從正式聯絡簿開啟考卷。');
-    return {kind:active.dataset.kind, uid:own.uid, reportType:active.dataset.kind === 'quiz' ? '分數' : '錯題數',
+    const independentTrial = active.dataset.independentTrial === 'true';
+    return {kind:active.dataset.kind, independentTrial, uid:own.uid, reportType:active.dataset.kind === 'quiz' ? '分數' : '錯題數',
       request(operation,data){
         if (frame !== active) throw Error('請重新開啟考卷。');
-        return request(own,operation,{...data,kind:active.dataset.kind});
+        return request(own,operation,{...data,kind:active.dataset.kind,...(independentTrial ? {independentTrial:true} : {})});
       },
       composeCorrection(label) {
         if (frame !== active || !current(own) || active.dataset.kind !== 'quiz' || !/^填充[1-5]$/.test(label)) return false;
         const field = findPost()?.querySelector('.feedback-new-message-composer .fb-input');
         if (!field) return false;
-        const prefix = '第28堂線上小考判分更正申請｜' + label + '｜原因：';
+        const prefix = (independentTrial ? '第28堂獨立測試卷判分更正申請｜' : '第28堂線上小考判分更正申請｜') + label + '｜原因：';
         close(false);
         if (!field.value.includes(prefix)) field.value = (field.value.trim() ? field.value.trim() + '　' : '') + prefix;
         field.dispatchEvent(new Event('input',{bubbles:true}));
