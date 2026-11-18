@@ -80,12 +80,12 @@
     const option = unit.options.find(item => item.id === answers[unit.id]);
     const references = unit.options.filter(item => row?.correctOptionIds?.includes(item.id)).map(item => item.originalLabel + '　' + item.text);
     const choice = unit.type === 'single';
-    const canRequestCorrection = kind === 'quiz' && !choice && row?.status === 'wrong';
     const review = row?.aiReview;
+    const canRequestCorrection = kind === 'quiz' && !choice && row?.status === 'wrong' && review === 'appeal';
     const notifyPending = review === 'credited' && row.aiReceipt === 'pending';
     const askAI = review === 'available' || review === 'working' || notifyPending;
     const hint = review === 'credited' ? '這格已補分。' + (notifyPending ? '可重送補分通知給老師。' : '補分通知已送達聯絡簿。') :
-      review === 'appeal' ? '這格未能確認同義。若你認為原答正確，可以申請判分更正。' :
+      review === 'appeal' ? '這次複判未補分。若你認為原答案符合題意，可以請老師判斷。' :
       review === 'working' ? '這一格正在複判。' : '';
     const content = byId('questionCard');
     const options = choice ? '<fieldset id="examOptions"><legend>' + (result ? '作答選項' : '選一個答案') + '</legend>' + unit.options.map(item =>
@@ -99,7 +99,7 @@
       (row.explanation ? '<p><strong>解析</strong>　' + escape(row.explanation) + '</p>' : '') +
       (hint ? '<p role="status">' + escape(hint) + '</p>' : '') +
       (askAI ? '<button type="button" id="requestAi">' + (notifyPending ? '重送補分通知' : review === 'working' ? '查看複判進度' : '申請 AI 複判') + '</button> ' : '') +
-      (canRequestCorrection ? '<button type="button" id="requestCorrection">申請判分更正</button><p role="status" id="correctionHint"></p>' : '') + '</div>' : '';
+      (canRequestCorrection ? '<button type="button" id="requestCorrection">申請老師判斷</button><p role="status" id="correctionHint"></p>' : '') + '</div>' : '';
     content.innerHTML = (blocks(parent?.context, parent?.names)) + '<h3>' + escape(unit.label) + '</h3>' +
       (blocks(unit.blocks, parent?.names) || '<p>' + rich(unit.prompt, parent?.names) + '</p>') + correction + options;
     if (askAI) byId('requestAi').onclick = async event => {
@@ -108,7 +108,7 @@
       button.textContent = notifyPending ? '正在確認補分通知…' : '正在確認交卷時的答案…';
       byId('examError').textContent = '';
       try { showResult(await api('rejudgeFill',{unitId:unit.id})); }
-      catch { byId('examError').textContent = '暫時無法確認複判結果，可再查詢或申請判分更正。'; paint(); }
+      catch { byId('examError').textContent = '暫時無法確認複判結果，請再按一次查詢。'; paint(); }
     };
     if (canRequestCorrection) byId('requestCorrection').onclick = () => {
       if (!transport.composeCorrection(unit.label)) {
@@ -158,6 +158,9 @@
       '測試卷已儲存，請按下方按鈕確認老師的收件狀態。' :
       '獨立測試卷原分 ' + result.originalEarned + ' 分，目前 ' + result.earned + ' 分。';
     if (result.answerPdf) download(byId('answerPdf'),'answer',{revision:result.revision},'第28堂'+labels[kind]+'解答卷');
+    const trial = byId('openTrial');
+    trial.hidden = !transport.openIndependentTrial;
+    trial.onclick = transport.openIndependentTrial || null;
     const refresh = byId('checkReceipt');
     refresh.hidden = result.reportStatus === 'pending-review';
     refresh.onclick = async () => {
@@ -201,6 +204,9 @@
     byId('examTitle').textContent = (transport.independentTrial ? 'AI 複判獨立測試卷' : labels[kind]) + '｜' + paper.title;
     byId('examLead').textContent = '可先印題目卷，在這裡依序填答。交卷後系統會自動回報' + transport.reportType + '，你可以逐題訂正。';
     if (transport.independentTrial) byId('examLead').textContent = '本卷單獨記錄。交卷後可點選填充題申請複判，老師會在這堂聯絡簿收到測試分數。';
+    if (kind === 'quiz' && (transport.independentTrial || transport.openIndependentTrial)) {
+      byId('confirmSubmission').querySelector('p').textContent = '這份考卷只能交卷一次。已填答的填充題若被判錯，可先申請 AI 複判。複判後仍有疑義，再申請老師判斷。';
+    }
     if (paper.questionPdf) download(byId('questionPdf'),'media',{token:paper.questionPdf},'第28堂'+labels[kind]+'題目卷');
     if (paper.paperReported && !paper.submitted) {byId('examLead').textContent = '這份考卷已有紙本回報，請在聯絡簿查看。';return;}
     byId('answerSection').hidden = false;

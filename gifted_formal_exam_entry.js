@@ -100,6 +100,7 @@
         if (kind === 'quiz' && exam.independentTrial === true) {
           const copy = document.createElement('button');
           copy.type = 'button';
+          copy.dataset.independentTrial = 'true';
           copy.textContent = 'AI 複判獨立測試卷';
           copy.onclick = () => open(kind,copy,true);
           controls.append(copy);
@@ -252,7 +253,7 @@
     frame.title = title;
     frame.dataset.independentTrial = String(independentTrial);
     frame.dataset.kind = kind;
-    frame.src = 'gifted-exam/index.html?v=20261118-ai-fill';
+    frame.src = 'gifted-exam/index.html?v=20261118-review-order';
     dialog.append(back,frame);
     dialog.addEventListener('cancel',e=>{e.preventDefault();close(false);});
     document.body.append(dialog);
@@ -269,7 +270,12 @@
     const own = session, active = frame;
     if (!active || caller !== active.contentWindow || !current(own)) throw Error('請從正式聯絡簿開啟考卷。');
     const independentTrial = active.dataset.independentTrial === 'true';
+    const trialButton = active.dataset.kind === 'quiz' && !independentTrial &&
+      own.controls.get('quiz')?.querySelector('[data-independent-trial]');
     return {kind:active.dataset.kind, independentTrial, uid:own.uid, reportType:active.dataset.kind === 'quiz' ? '分數' : '錯題數',
+      openIndependentTrial: trialButton ? () => {
+        if (frame === active && current(own)) open('quiz', trialButton, true);
+      } : null,
       request(operation,data){
         if (frame !== active) throw Error('請重新開啟考卷。');
         return request(own,operation,{...data,kind:active.dataset.kind,...(independentTrial ? {independentTrial:true} : {})});
