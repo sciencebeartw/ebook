@@ -253,7 +253,7 @@
     frame.title = title;
     frame.dataset.independentTrial = String(independentTrial);
     frame.dataset.kind = kind;
-    frame.src = 'gifted-exam/index.html?v=20261118-review-order';
+    frame.src = 'gifted-exam/index.html?v=20261118-teacher-appeal';
     dialog.append(back,frame);
     dialog.addEventListener('cancel',e=>{e.preventDefault();close(false);});
     document.body.append(dialog);
@@ -279,19 +279,6 @@
       request(operation,data){
         if (frame !== active) throw Error('請重新開啟考卷。');
         return request(own,operation,{...data,kind:active.dataset.kind,...(independentTrial ? {independentTrial:true} : {})});
-      },
-      composeCorrection(label) {
-        if (frame !== active || !current(own) || active.dataset.kind !== 'quiz' || !/^填充[1-5]$/.test(label)) return false;
-        const field = findPost()?.querySelector('.feedback-new-message-composer .fb-input');
-        if (!field) return false;
-        const prefix = (independentTrial ? '第28堂獨立測試卷判分更正申請｜' : '第28堂線上小考判分更正申請｜') + label + '｜原因：';
-        close(false);
-        if (!field.value.includes(prefix)) field.value = (field.value.trim() ? field.value.trim() + '　' : '') + prefix;
-        field.dispatchEvent(new Event('input',{bubbles:true}));
-        field.scrollIntoView({block:'center'});
-        field.focus({preventScroll:true});
-        field.setSelectionRange(field.value.length,field.value.length);
-        return true;
       },
     };
   }

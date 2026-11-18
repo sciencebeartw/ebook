@@ -16,3 +16,6 @@
 #confirmSubmission:not([open]) {display:none;}
 #confirmSubmission.exam-confirm-legacy[open] {position:fixed;inset:0;margin:auto;width:fit-content;height:fit-content;z-index:10;background:#fff;box-shadow:0 0 0 200vmax #172d22a6;}
 .exam-result-note button {min-height:44px;max-width:100%;white-space:normal;margin:4px 4px 4px 0;}
+
+.exam-appeal textarea {display:block;box-sizing:border-box;width:100%;min-height:8rem;margin:.5rem 0;padding:.65rem;font:inherit;font-size:max(16px,1em);line-height:1.5;resize:vertical;border:1px solid #778b80;border-radius:8px;}
+.exam-appeal label {font-weight:700;}

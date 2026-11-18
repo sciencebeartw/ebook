@@ -81,10 +81,12 @@
     const references = unit.options.filter(item => row?.correctOptionIds?.includes(item.id)).map(item => item.originalLabel + '　' + item.text);
     const choice = unit.type === 'single';
     const review = row?.aiReview;
-    const canRequestCorrection = kind === 'quiz' && !choice && row?.status === 'wrong' && review === 'appeal';
+    const canRequestCorrection = kind === 'quiz' && !choice && row?.status === 'wrong' && review === 'appeal' && !row.teacherAppeal;
     const notifyPending = review === 'credited' && row.aiReceipt === 'pending';
     const askAI = review === 'available' || review === 'working' || notifyPending;
-    const hint = review === 'credited' ? '這格已補分。' + (notifyPending ? '可重送補分通知給老師。' : '補分通知已送達聯絡簿。') :
+    const appeal = row?.teacherAppeal;
+    const appealStatus = {pending:'已送出，等待老師審核',approved:'老師已核准補分',rejected:'老師未核准，本格維持原判分'};
+    const hint = appeal ? appealStatus[appeal.status] : review === 'credited' ? '這格已補分。' + (notifyPending ? '可重送補分通知給老師。' : '補分通知已送達聯絡簿。') :
       review === 'appeal' ? '這次複判未補分。若你認為原答案符合題意，可以請老師判斷。' :
       review === 'working' ? '這一格正在複判。' : '';
     const content = byId('questionCard');
@@ -93,13 +95,19 @@
       (result ? ' disabled' : '') + '><strong>' + escape(item.originalLabel) + '</strong><span class="exam-option-copy">' +
       (blocks(item.blocks, parent?.names, true) || rich(item.text, parent?.names)) + '</span></label>').join('') + '</fieldset>' :
       '<label>你的答案<input type="text" maxlength="1000" name="answer" value="' + escape(answers[unit.id]) + '"' + (result ? ' disabled' : '') + '></label>';
+    const appealForm = canRequestCorrection ? '<button type="button" id="requestCorrection" aria-expanded="false" aria-controls="appealForm">申請老師判斷</button>' +
+      '<form id="appealForm" class="exam-appeal" hidden><label for="appealReason">申請理由</label><textarea id="appealReason" rows="5" maxlength="1000" required placeholder="請說明你的原答案為什麼符合題意。"></textarea>' +
+      '<button type="submit" class="primary">送出審核申請</button> <button type="button" id="cancelAppeal">取消</button><p role="status" id="appealStatus"></p></form>' : '';
+    const appealDetails = appeal ? '<p>申請理由　' + escape(appeal.reason) + '</p>' +
+      (appeal.note ? '<p>老師說明　' + escape(appeal.note) + '</p>' : '') +
+      (appeal.status === 'pending' ? '<button type="button" id="refreshAppeal">更新審核結果</button>' : '') : '';
     const correction = row ? '<div class="exam-result-note"><strong>' + (row.earned === null ? '待批改' :
       row.earned === row.points ? '答對' : '需訂正') + '</strong><p>你的答案　' + escape(choice && option ? option.originalLabel + '　' + option.text : row.answer || '留白') +
       '</p><p>參考答案　' + escape(choice ? references.join('、') : row.referenceAnswer) + '</p>' +
       (row.explanation ? '<p><strong>解析</strong>　' + escape(row.explanation) + '</p>' : '') +
       (hint ? '<p role="status">' + escape(hint) + '</p>' : '') +
       (askAI ? '<button type="button" id="requestAi">' + (notifyPending ? '重送補分通知' : review === 'working' ? '查看複判進度' : '申請 AI 複判') + '</button> ' : '') +
-      (canRequestCorrection ? '<button type="button" id="requestCorrection">申請老師判斷</button><p role="status" id="correctionHint"></p>' : '') + '</div>' : '';
+      appealDetails + appealForm + '</div>' : '';
     content.innerHTML = (blocks(parent?.context, parent?.names)) + '<h3>' + escape(unit.label) + '</h3>' +
       (blocks(unit.blocks, parent?.names) || '<p>' + rich(unit.prompt, parent?.names) + '</p>') + correction + options;
     if (askAI) byId('requestAi').onclick = async event => {
@@ -110,10 +118,28 @@
       try { showResult(await api('rejudgeFill',{unitId:unit.id})); }
       catch { byId('examError').textContent = '暫時無法確認複判結果，請再按一次查詢。'; paint(); }
     };
-    if (canRequestCorrection) byId('requestCorrection').onclick = () => {
-      if (!transport.composeCorrection(unit.label)) {
-        byId('correctionHint').textContent = '請回到 11 月 14 日的聯絡簿，在留言區填寫題號及申請原因。';
-      }
+    if (canRequestCorrection) {
+      const toggle=byId('requestCorrection'), form=byId('appealForm'), reason=byId('appealReason'), status=byId('appealStatus');
+      toggle.onclick=()=>{form.hidden=false;toggle.hidden=true;toggle.setAttribute('aria-expanded','true');reason.focus();};
+      byId('cancelAppeal').onclick=()=>{form.hidden=true;toggle.hidden=false;toggle.setAttribute('aria-expanded','false');toggle.focus();};
+      form.onsubmit=async event=>{
+        event.preventDefault();
+        const message=reason.value.trim();
+        if (!message) {status.textContent='請填寫申請理由。';reason.focus();return;}
+        if (form.getAttribute('aria-busy')==='true') return;
+        form.setAttribute('aria-busy','true');
+        Array.from(form.elements).forEach(el=>el.disabled=true);
+        status.textContent='正在送出申請…';
+        try { showResult(await api('requestTeacherAppeal',{unitId:unit.id,reason:message})); }
+        catch (error) {status.textContent=error.message || '送出結果尚待確認，可以重試同一筆申請。';}
+        finally {form.removeAttribute('aria-busy');Array.from(form.elements).forEach(el=>el.disabled=false);}
+      };
+    }
+    if (byId('refreshAppeal')) byId('refreshAppeal').onclick = async event=>{
+      const button=event.currentTarget;
+      button.disabled=true;
+      try {showResult(await api('result'));} catch(error){byId('examError').textContent=error.message;}
+      finally {button.disabled=false;}
     };
     for (const placeholder of content.querySelectorAll('[data-image-id]')) {
       const asset = paper.assets[placeholder.dataset.imageId];
@@ -151,7 +177,7 @@
       'report-pending':'答案已保存。回報收據仍待確認，可用下方按鈕查核。',
     }[result.reportStatus];
     if (result.originalEarned != null && result.originalEarned !== result.earned) {
-      byId('examStatus').textContent = '原交卷回報 ' + result.originalEarned + ' 分，複判後 ' + result.earned +
+      byId('examStatus').textContent = '原交卷回報 ' + result.originalEarned + ' 分，調整後 ' + result.earned +
         ' 分。正式成績依老師審查結果登記。';
     }
     if (transport.independentTrial) byId('examStatus').textContent = result.reportStatus === 'report-pending' ?
