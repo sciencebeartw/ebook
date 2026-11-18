@@ -10,7 +10,7 @@
   const labels = {quiz:'小考', makeup:'補考'};
   let paper, result, index = 0, answers = {}, submitting = false, renderId = 0;
   const api = (action, data) => transport.request(action,data);
-  const draftKey = () => 'gifted-l28-draft:' + uid + (transport.independentTrial ? ':ai-copy:' : ':') + kind + ':' + paper.revision;
+  const draftKey = () => 'gifted-l28-draft:' + (transport.draftOwner || uid) + (transport.independentTrial ? ':ai-copy:' : ':') + kind + ':' + paper.revision;
   const media = new Map();
   function blob({contentType,base64}) {
     return new Blob([Uint8Array.from(atob(base64), char => char.charCodeAt(0))], {type:contentType});
@@ -241,10 +241,11 @@
   function go(i) { index = Math.max(0, Math.min(i, paper.units.length - 1)); paint(); }
   async function init() {
     paper = await api('open');
+    if (transport.pilot === false) document.querySelector('.environment').textContent = '正式作答';
     byId('examTitle').textContent = (transport.independentTrial ? 'AI 複判獨立測試卷' : labels[kind]) + '｜' + paper.title;
     byId('examLead').textContent = '可先印題目卷，在這裡依序填答。交卷後系統會自動回報' + transport.reportType + '，你可以逐題訂正。';
     if (transport.independentTrial) byId('examLead').textContent = '本卷單獨記錄。交卷後可點選填充題申請複判，老師會在這堂聯絡簿收到測試分數。';
-    if (kind === 'quiz' && (transport.independentTrial || transport.openIndependentTrial)) {
+    if (kind === 'quiz' && (transport.aiFill || transport.independentTrial || transport.openIndependentTrial)) {
       byId('confirmSubmission').querySelector('p').textContent = '這份考卷只能交卷一次。已填答的填充題若被判錯，可先申請 AI 複判。複判後仍有疑義，再申請老師判斷。';
     }
     if (paper.questionPdf) download(byId('questionPdf'),'media',{token:paper.questionPdf},'第28堂'+labels[kind]+'題目卷');
