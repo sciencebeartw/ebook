@@ -253,7 +253,7 @@
     frame.title = title;
     frame.dataset.independentTrial = String(independentTrial);
     frame.dataset.kind = kind;
-    frame.src = 'gifted-exam/index.html?v=20261118-teacher-appeal';
+    frame.src = 'gifted-exam/index.html?v=20261118-grade';
     dialog.append(back,frame);
     dialog.addEventListener('cancel',e=>{e.preventDefault();close(false);});
     document.body.append(dialog);

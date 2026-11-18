@@ -180,6 +180,20 @@
       byId('examStatus').textContent = '原交卷回報 ' + result.originalEarned + ' 分，調整後 ' + result.earned +
         ' 分。正式成績依老師審查結果登記。';
     }
+    if (kind === 'quiz' && !transport.independentTrial && Number.isFinite(result.originalEarned) && Number.isFinite(result.earned)) {
+      const approvedRows = result.rows.filter(row => row.teacherAppeal?.status === 'approved');
+      if (approvedRows.length) {
+        const teacherPoints = approvedRows.reduce((total, row) => total + row.points, 0);
+        const aiPoints = result.rows.filter(row => row.aiReview === 'credited' && row.teacherAppeal?.status !== 'approved')
+          .reduce((total, row) => total + row.points, 0);
+        const registered = approvedRows.some(row => row.teacherAppeal.registeredScore === result.earned);
+        const parts = ['原本 ' + result.originalEarned + ' 分'];
+        if (aiPoints) parts.push('AI 複判補 ' + aiPoints + ' 分');
+        parts.push('老師補 ' + teacherPoints + ' 分');
+        parts.push(registered ? '已登記 ' + result.earned + ' 分' : '目前 ' + result.earned + ' 分，登記待確認');
+        byId('examStatus').textContent = parts.join('，') + '。';
+      }
+    }
     if (transport.independentTrial) byId('examStatus').textContent = result.reportStatus === 'report-pending' ?
       '測試卷已儲存，請按下方按鈕確認老師的收件狀態。' :
       '獨立測試卷原分 ' + result.originalEarned + ' 分，目前 ' + result.earned + ' 分。';
