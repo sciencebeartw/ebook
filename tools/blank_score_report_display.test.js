@@ -50,3 +50,37 @@ test('formal teacher correction wins over an older student report', () => {
         assert.equal(ctx.getAbsenceScoreReviewStatus(score, '90'), 'teacher_corrected');
     }
 });
+
+test('science classes use verified status in the contact book and grade cards', () => {
+    ctx.window.AssessmentLabels = require('../assessment_labels');
+    for (const className of ['115小六資優自然週日下午班','115國一自然超前班']) {
+        const view = (title, raw, dueAt) => ctx.getDisplayLogic({...exam(raw), className, exam:title, date:'2026/11/14', dueAt}, []).mainScore;
+        assert.equal(view('小考', ''), '未登分');
+        assert.equal(view('小考', '假'), '缺考（請假）');
+        assert.equal(view('補考', '缺考'), '缺考');
+        assert.equal(view('回家練習卷', '未交', Date.now()+60000), '待繳');
+        assert.equal(view('假期練習卷', '未交', 1), '缺繳');
+        assert.equal(view('假期練習卷', '已繳交', 1), '未登分');
+        assert.equal(view('假期練習卷', 0, 1), 0);
+        assert.equal(view('回家練習卷', '', 1), '未登分');
+    }
+});
+test('required score reporting checks the exact paper, deadline and review receipt', () => {
+    const className = '115國一自然超前班';
+    const plan = require('../class_session_plan');
+    ctx.ClassSessionPlan = plan;
+    ctx.window.AssessmentLabels = require('../assessment_labels');
+    const paper = {...exam(''), className, storedClassKey:className, exam:'回家練習卷', assessmentKind:'homework_self_marked',
+        sourceAssignmentId:'homework_demo', reportEnabled:true, dueAt:1};
+    ctx.gData = {className, feedbackHistory:[]};
+    assert.equal(ctx.getDisplayLogic({...paper, dueAt:Date.now()+60000}, []).mainScore, '待回報分數');
+    assert.equal(ctx.getDisplayLogic(paper, []).mainScore, '缺繳');
+    ctx.isHolidayScoreReportType = () => true;
+    ctx.gData.feedbackHistory = [{sourceAssignmentId:'other', targetExamId:paper.examId, reportedScore:8}];
+    assert.equal(ctx.getDisplayLogic(paper, []).mainScore, '缺繳');
+    ctx.gData.feedbackHistory = [{sourceAssignmentId:paper.sourceAssignmentId, storedClassKey:className, reportedScore:0}];
+    const pending = ctx.getDisplayLogic(paper, []);
+    assert.equal(pending.mainScore, 0);
+    assert.match(pending.statusHtml, /待審核/);
+    assert.equal(ctx.getDisplayLogic({...paper,score:85,scoreNum:85}, []).mainScore, 85);
+});

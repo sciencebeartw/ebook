@@ -57,7 +57,42 @@
             type: (raw.slice(0, match.index) + raw.slice(match.index + match[0].length)).replace(/^[\s｜|]+|[\s｜|]+$/g, '')
         };
     }
-    const api = Object.freeze({ describe, fullTitle, paperTitle, dateParts });
+    function usesScienceScoreStatus(className) {
+        return /資優自然|自然超前/.test(className || '');
+    }
+    // Only a documented absence, receipt or deadline can make an empty grade more specific.
+    function scienceScoreStatus(exam, className, evidence = {}, now = Date.now()) {
+        if (!usesScienceScoreStatus(className)) return '';
+        const raw = String(exam.score ?? '').trim();
+        if (/\d/.test(raw)) return ''; // Both grade readers use the first number in a Sheet score.
+        if (exam.isEnrollmentExempt || raw === '免試') return '免試';
+        if (raw === '免繳') return '免繳';
+        const kind = exam.assessmentKind || '';
+        const report = /^(?:holiday|homework)_self_marked$/.test(kind)
+            || !!exam.sourceAssignmentId && !kind.startsWith('gifted_library_');
+        const type = dateParts(exam.date).type;
+        const title = type + ' ' + (exam.examName || exam.exam || '');
+        const paper = report || !!exam.giftedPlanId || /(?:回家|假期|連假|中秋)(?:練習|複習|作業)卷/.test(title) ||
+            (!/小考|補考|隨堂考|鑑定考|複習考|段考|模擬考/.test(type) && /作業/.test(title));
+        if (report && exam.reportEnabled === false) return '自行訂正';
+        if (evidence.reported || raw === '待審核') return '待審核';
+        if (evidence.submitted || /^(?:已繳交?|已交|已考|未登分|待批改)$/.test(raw)) return '未登分';
+        if (!paper) {
+            if (/^(?:假|請假|缺考[（(]請假[）)])$/.test(raw)) return '缺考（請假）';
+            return /^(?:缺考|未應考|未到考)$/.test(raw) ? '缺考' : '未登分';
+        }
+        const due = Number(evidence.dueAt ?? exam.dueAt);
+        const hasDue = Number.isFinite(due) && due > 0;
+        if (hasDue && now < due) return report ? '待回報分數' : '待繳';
+        if (/^(?:缺繳|缺交|逾期未繳)$/.test(raw)) return '缺繳';
+        const outstanding = evidence.unsubmitted === true || /^(?:未交|未繳|尚未繳交)$/.test(raw);
+        if (hasDue && outstanding) return '缺繳';
+        if (report && !hasDue) return '待回報分數';
+        if (!hasDue && outstanding) return '待繳';
+        return '未登分';
+    }
+
+    const api = Object.freeze({ describe, fullTitle, paperTitle, dateParts, usesScienceScoreStatus, scienceScoreStatus });
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     root.AssessmentLabels = api;
 })(typeof window !== 'undefined' ? window : globalThis);

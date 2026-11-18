@@ -4,7 +4,7 @@
   const records=new Map();let bindings=new Map(),postBindings=new Map(),generation=0,identity='',active=false,inflight=0;
   const text=v=>String(v==null?'':v).normalize('NFKC').replace(/\s+/g,'');
   const date=v=>{const m=/(20\d\d)[/-](\d{1,2})[/-](\d{1,2})/.exec(String(v||''));return m?`${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`:'';};
-  const missing=v=>!String(v==null?'':v).trim()||/^(?:#N\/A|尚未繳交|未繳|未交|缺交|缺繳)$/.test(String(v).trim());
+  const missing=v=>!String(v==null?'':v).trim()||/^(?:#N\/A|尚未繳交|未繳|未交|缺交|缺繳|缺考)$/.test(String(v).trim());
   const examKey=e=>JSON.stringify([e.examId||e.storedExamId||'',date(e.date),text(e.exam||e.examName),e.colIndex??null]);
   function activate(owner){if(identity!==owner){generation++;records.clear();bindings.clear();postBindings.clear();}identity=owner;active=!!owner;}
   function clear(){activate('');}
@@ -12,7 +12,7 @@
   const postId=p=>String(p.id||p.dailyPostId||'');
   const postKey=(post,slot)=>JSON.stringify([postId(post),date(post.date),slot]);
 
-  function observe(posts,grades,className){
+  function observe(posts,grades,className,dueByClass){
    const next=new Map(), nextPosts=new Map(), candidates=[];
    for(const post of posts||[]){
     if(post.isTransferFormerClass||String(post.storedClassName||post.className||className)!==className)continue;
@@ -50,6 +50,8 @@
       record.state='checking';record.attemptAt=null;
      }
     }
+    const source=post.storedClassKey||post.sourceClassKey||className;
+    record.dueAt=dueByClass?.[source]?.[postId(post)]?.dueAt || root.ClassSessionPlan?.options?.(post)?.homeworkDue?.dueAt || exam?.dueAt;
     record.materialized=exact.length===1&&/^\d+(?:\.\d+)?$/.test(String(exact[0].score??'').trim());
     for(const {slot} of slots)nextPosts.set(postKey(post,slot),record);
     if(exam)next.set(examKey(exam),record);
@@ -78,10 +80,10 @@
   function postAssignmentKey(post,slot){return postBindings.get(postKey(post,slot))?.key||'';}
 
   function postDisplay(key){
-   const result=receiptState(records.get(key));
+   const record=records.get(key),result=receiptState(record);
    if(!result)return null;
    if(result.status==='submitted')return {label:'已繳交'};
-   if(result.status==='not_submitted')return {label:'尚未繳交',key};
+   if(result.status==='not_submitted')return {label:root.AssessmentLabels?.scienceScoreStatus?.({exam:'課本作業'},record.className,{unsubmitted:true,dueAt:record.dueAt},now()) || '尚未繳交',key};
    return result;
   }
 
@@ -120,7 +122,12 @@
   function display(exam){
    const r=get(exam);if(!r)return null;
    const s=r.submission,submitted=s?.status==='submitted'&&!needsLegacyTitleCheck(r,exam);
-   if(r.state==='loaded'&&!submitted)return null;
+   if(r.state==='loaded'&&!submitted){
+    const status=receiptState(r,needsLegacyTitleCheck(r,exam));
+    if(status.status==='unconfirmed')return {key:r.key,score:null,label:'無法確認繳交狀態',note:'',retry:true};
+    const label=root.AssessmentLabels?.scienceScoreStatus?.(exam,r.className,{unsubmitted:true,dueAt:r.dueAt},now());
+    return label?{key:r.key,score:null,label,note:''}:null;
+   }
    return {key:r.key,score:submitted&&Number.isFinite(s.score)?s.score:null,
     label:submitted?(Number.isFinite(s.score)?String(s.score):'已繳交'):r.state==='unavailable'?'暫時無法確認':'確認繳交狀態中',
     note:submitted?(r.sheetStatus==='completed'?'已繳交':'已繳交・試算表同步中'):'',retry:r.state==='unavailable'};

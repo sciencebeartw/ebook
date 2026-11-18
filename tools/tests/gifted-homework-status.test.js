@@ -67,3 +67,18 @@ test('legacy same-day binding cannot clear an unrelated title without scoped con
  await matching.load(key);
  assert.equal(matching.pendingForExam(exam).status,'submitted');
 });
+
+test('gifted post and grades agree before and after the actual deadline', async()=>{
+ require('../../assessment_labels');
+ const cls='115小六資優自然週六上午班';
+ const paper={...post,id:'test-post',className:cls};
+ const grade={...exam,className:cls,giftedPostId:paper.id,giftedPlanId:planId,giftedSegmentId:'week-1'};
+ let time=99;
+ const api=create({parseAssignment:()=>assignment,readSummary:async()=>({...response('not_submitted'),classId:cls}),now:()=>time});
+ api.activate('test-student');
+ api.observe([paper],[grade],cls,{[cls]:{'test-post':{dueAt:100}}});
+ await api.load(key);
+ assert.equal(api.display(grade).label,'待繳');assert.equal(api.postDisplay(key).label,'待繳');
+ time=100;
+ assert.equal(api.display(grade).label,'缺繳');assert.equal(api.postDisplay(key).label,'缺繳');
+});
