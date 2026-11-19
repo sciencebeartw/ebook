@@ -135,7 +135,7 @@
   function valid(){if(epoch!==generation||session!==own||own.auth.currentUser?.uid!==own.uid)throw Error('LOGIN_REQUIRED');}
   return {sessionUid:own.uid,studentName:own.name,readOnly:own.readOnly,get retryInitialLoad(){return own.useCalendar;},
    async request(body){
-    if(own.readOnly&&['draft','submit'].includes(body.action))throw Error('TEACHER_VIEW_READ_ONLY');
+    if(own.readOnly&&['draft','submit','reviewFill'].includes(body.action))throw Error('TEACHER_VIEW_READ_ONLY');
     return request(own,body,()=>epoch===generation&&session===own&&own.auth.currentUser?.uid===own.uid);
    },
    async confirmWrite(action){valid();if(!own.studentPreview)return true;const ok=await root.confirmStudentPreviewAction(action==='draft'?'儲存題本草稿':'提交題本答案並登記成績');valid();return ok;}

@@ -10,8 +10,31 @@
  function stash(){if(!content||content.status==='submitted'||transport.readOnly)return;try{if(!changed&&!pending){localStorage.removeItem(key());return;}localStorage.setItem(key(),JSON.stringify({revision:content.revision,draftRevision:content.draftRevision,answers:collect(),pending}));}catch{}}
  function setAnswers(answers){for(const q of content.questions){const el=$('questions').querySelector('[data-id="'+CSS.escape(q.id)+'"]');if(q.type==='manual')inputs.restore(q,el,answers[q.id]);else{const chosen=Array.isArray(answers[q.id])?answers[q.id]:[answers[q.id]];el.querySelectorAll('input').forEach(i=>i.checked=chosen.includes(i.value));}}}
  function controls(){ $('save').disabled=$('submit').disabled=busy||transport.readOnly;$('reload').disabled=busy;$('rounds').disabled=busy;$('questions').querySelectorAll('input,textarea').forEach(el=>el.disabled=busy||transport.readOnly||content?.status==='submitted');}
+ function appendFillReviews(container, item) {
+  const chapterId=content.chapterId, revision=content.revision, generation=epoch;
+  if(transport.readOnly)return;
+  for(const {slot,label} of item.reviewSlots||[]){
+   const line=document.createElement('div'),button=document.createElement('button'),status=document.createElement('span');
+   button.type='button';button.textContent='申請複判 · '+label;
+   status.setAttribute('role','status');line.className='fill-review';line.append(button,status);container.append(line);
+   button.onclick=async()=>{
+    if(button.disabled||generation!==epoch)return;
+    button.disabled=true;status.textContent='複判中…';
+    try{
+     const result=await transport.request({action:'reviewFill',chapterId,revision,questionId:item.questionId,slot});
+     if(generation!==epoch)return;
+     if(result.status==='done'){
+      status.textContent=({equivalent:'答案等義',different:'答案不同',uncertain:'需老師確認'}[result.conclusion]||'需老師確認')+'。'+result.explanation;
+      button.textContent=label+' · 已複判';
+     }else{
+      button.disabled=false;button.textContent='查看複判結果';status.textContent='這一格已受理，稍後可查看。';
+     }
+    }catch(e){if(generation!==epoch)return;button.disabled=false;status.textContent='暫時無法取得結果，可再試一次。';}
+   };
+  }
+ }
  function showResult(result){$('actions').hidden=true;$('result').textContent='已完成作答。自動判分：'+result.earnedPoints+'／'+result.autoMaxPoints+(result.pending?'；另有 '+result.pending+' 題請自行對照解答。':'。')+'\n請核對答案，並在題本上訂正。';
-  for(const item of result.results){const q=content.questions.find(q=>q.id===item.questionId),el=$('questions').querySelector('[data-id="'+CSS.escape(item.questionId)+'"] .question-result');if(!q||!el)continue;el.hidden=false;el.dataset.outcome=item.outcome;const answer=item.acceptedAnswers?.length?item.expected:GiftedTypedQuestion.answerText(q,item.correctAnswers||[]);el.textContent=(q.type==='manual'?'請自行核對':({correct:'答對',wrong:'答錯',blank:'未作答',pending:'請自行核對'}[item.outcome]))+'\n參考答案：'+(inputs.reference(q,item)||answer||item.expected||'請參考題本解答');}
+  for(const item of result.results){const q=content.questions.find(q=>q.id===item.questionId),el=$('questions').querySelector('[data-id="'+CSS.escape(item.questionId)+'"] .question-result');if(!q||!el)continue;el.hidden=false;el.dataset.outcome=item.outcome;const answer=item.acceptedAnswers?.length?item.expected:GiftedTypedQuestion.answerText(q,item.correctAnswers||[]);el.textContent=(q.type==='manual'?'請自行核對':({correct:'答對',wrong:'答錯',blank:'未作答',pending:'請自行核對'}[item.outcome]))+'\n參考答案：'+(inputs.reference(q,item)||answer||item.expected||'請參考題本解答');appendFillReviews(el,item);}
  }
  const retryRead=$('retryRead');
  function clearRetry(){if(retryRead){retryRead.hidden=true;retryRead.onclick=null;}}

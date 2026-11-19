@@ -9,7 +9,7 @@
   const {kind, uid} = transport;
   const labels = {quiz:'小考', makeup:'補考'};
   let paper, result, index = 0, answers = {}, submitting = false, renderId = 0;
-  const api = (action, data) => transport.request(action,data);
+  const api = (action, data) => transport.request(action,action==='media' && paper ? {...data,revision:paper.revision} : data);
   const draftKey = () => 'gifted-l28-draft:' + (transport.draftOwner || uid) + (transport.independentTrial ? ':ai-copy:' : ':') + kind + ':' + paper.revision;
   const media = new Map();
   function blob({contentType,base64}) {
@@ -105,6 +105,7 @@
       row.earned === row.points ? '答對' : '需訂正') + '</strong><p>你的答案　' + escape(choice && option ? option.originalLabel + '　' + option.text : row.answer || '留白') +
       '</p><p>參考答案　' + escape(choice ? references.join('、') : row.referenceAnswer) + '</p>' +
       (row.explanation ? '<p><strong>解析</strong>　' + escape(row.explanation) + '</p>' : '') +
+      (row.aiConclusion ? '<p><strong>AI 複判</strong>　' + escape(({equivalent:'答案等義',different:'答案不同',uncertain:'需老師確認'}[row.aiConclusion] || '需老師確認') + '。' + (row.aiExplanation || '')) + '</p>' : '') +
       (hint ? '<p role="status">' + escape(hint) + '</p>' : '') +
       (askAI ? '<button type="button" id="requestAi">' + (notifyPending ? '重送補分通知' : review === 'working' ? '查看複判進度' : '申請 AI 複判') + '</button> ' : '') +
       appealDetails + appealForm + '</div>' : '';
@@ -197,7 +198,7 @@
     if (transport.independentTrial) byId('examStatus').textContent = result.reportStatus === 'report-pending' ?
       '測試卷已儲存，請按下方按鈕確認老師的收件狀態。' :
       '獨立測試卷原分 ' + result.originalEarned + ' 分，目前 ' + result.earned + ' 分。';
-    if (result.answerPdf) download(byId('answerPdf'),'answer',{revision:result.revision},'第28堂'+labels[kind]+'解答卷');
+    if (result.answerPdf) download(byId('answerPdf'),'answer',{revision:result.revision},(transport.title || labels[kind])+'解答卷');
     const trial = byId('openTrial');
     trial.hidden = !transport.openIndependentTrial;
     trial.onclick = transport.openIndependentTrial || null;
@@ -248,7 +249,7 @@
     if (kind === 'quiz' && (transport.aiFill || transport.independentTrial || transport.openIndependentTrial)) {
       byId('confirmSubmission').querySelector('p').textContent = '這份考卷只能交卷一次。已填答的填充題若被判錯，可先申請 AI 複判。複判後仍有疑義，再申請老師判斷。';
     }
-    if (paper.questionPdf) download(byId('questionPdf'),'media',{token:paper.questionPdf},'第28堂'+labels[kind]+'題目卷');
+    if (paper.questionPdf) download(byId('questionPdf'),'media',{token:paper.questionPdf},(transport.title || labels[kind])+'題目卷');
     if (paper.paperReported && !paper.submitted) {byId('examLead').textContent = '這份考卷已有紙本回報，請在聯絡簿查看。';return;}
     byId('answerSection').hidden = false;
     byId('question').innerHTML = paper.units.map((unit, i) => '<option value="' + i + '">' + escape(unit.label) + '</option>').join('');

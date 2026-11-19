@@ -1,8 +1,6 @@
 (function(root) {
   'use strict';
   let session, dialog, frame, opener, unsubscribe;
-  const pilotClass = '115小六資優自然週六上午班';
-  const releaseClasses = new Set([]); // Derived from the private class release at packaging time.
   const studentActionUrl = 'https://us-central1-sciencebear-admin.cloudfunctions.net/runEbookStudentAction';
   const retryTransportCodes = new Set(['functions/internal', 'functions/unavailable', 'functions/deadline-exceeded', 'functions/unauthenticated']);
   const accessMessages = {
@@ -27,8 +25,8 @@
     let hasFallback = false;
     for (const [kind, controls] of own.controls) {
       const examId = own.exam[kind].examId;
-      const post = findPost(own.className,own.exam[kind].postDate || '2026/11/14');
-      const anchor = post && Array.from(post.querySelectorAll(paperAnchors[kind])).find(node =>
+      const post = findPost(own.className,own.exam[kind].postDate || own.exam[kind].date);
+      const anchor = post && Array.from(post.querySelectorAll(paperAnchors[own.exam[kind].kind || kind])).find(node =>
         !!examId && (node.dataset.examId === examId || node.dataset.storedExamId === examId));
       const paper = anchor?.querySelector('a.btn-link[href]');
       if (paper) {
@@ -58,15 +56,14 @@
   async function ready(context) {
     const user = context.auth?.currentUser;
     const identity = context.studentSession?.firebaseAuthUid === user?.uid ? context.studentSession : context.result;
-    const pilot = identity?.className === pilotClass && identity?.studentName === '測試學生';
     if (!user || context.preview || context.teacherView || context.result?.isAdmin ||
-        (!pilot && !releaseClasses.has(identity?.className))) {
+        !identity?.className) {
       close(true);
       return;
     }
     if (current(session) && session.className===identity.className && session.studentName===identity.studentName && session.studentKey===identity.studentKey) {mount();return;}
     close(true);
-    const own = {className:identity.className,studentName:identity.studentName,studentKey:identity.studentKey,pilot,auth:context.auth, uid:user.uid, functions:context.functions,
+    const own = {className:identity.className,studentName:identity.studentName,studentKey:identity.studentKey,auth:context.auth, uid:user.uid, functions:context.functions,
       callable:context.functions.httpsCallable('runEbookStudentAction',{timeout:180000}), controls:new Map()};
     own.standalone = navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
     session = own;
@@ -83,7 +80,7 @@
       if (!current(own)) return;
       if (!details || typeof details !== 'object' || Array.isArray(details) ||
           Object.entries(details).some(([kind, exam]) =>
-            !Object.prototype.hasOwnProperty.call(paperAnchors,kind) || !exam?.examId || typeof exam.accepting !== 'boolean')) {
+            !Object.prototype.hasOwnProperty.call(paperAnchors,exam?.kind || kind) || !exam?.examId || typeof exam.accepting !== 'boolean')) {
         throw formalError('exam/access-response');
       }
       own.exam = details;
@@ -93,11 +90,11 @@
         controls.dataset.formalExamKind = kind;
         const button = document.createElement('button');
         button.type = 'button';
-        const title = kind === 'quiz' ? '小考' : '補考';
+        const title = exam.label || exam.title;
         button.textContent = (exam.accepting ? '線上作答' : '查看線上結果') + '｜' + title;
         button.onclick = () => open(kind,button);
         controls.append(button);
-        if (kind === 'quiz' && exam.independentTrial === true) {
+        if ((exam.kind || kind) === 'quiz' && exam.independentTrial === true) {
           const copy = document.createElement('button');
           copy.type = 'button';
           copy.dataset.independentTrial = 'true';
@@ -121,7 +118,7 @@
       status.setAttribute('role', 'status');
       const message = Object.prototype.hasOwnProperty.call(accessMessages, error.code) ?
         accessMessages[error.code] : '考卷入口顯示失敗。';
-      status.textContent = '暫時無法載入第 28 堂線上考卷。' + message;
+      status.textContent = '暫時無法載入線上考卷。' + message;
       const retry = document.createElement('button');
       retry.type = 'button';
       retry.textContent = '重試載入考卷';
@@ -139,13 +136,13 @@
   function paperForm(kind, own) {
     const details = document.createElement('details');
     const title = document.createElement('summary');
-    const quiz = kind === 'quiz';
+    const quiz = (own.exam[kind].kind || kind) === 'quiz';
     title.textContent = quiz ? '紙本小考回報' : '紙本補考回報';
     const form = document.createElement('form');
     const label = document.createElement('label');
     label.textContent = quiz ? '小考分數 ' : '補考錯題數 ';
     const input = document.createElement('input');
-    input.type = 'number'; input.required = true; input.min = '0'; input.max = quiz ? '100' : '20';
+    input.type = 'number'; input.required = true; input.min = '0'; input.max = quiz ? '100' : String(own.exam[kind].unitCount || 20);
     input.step = quiz ? 'any' : '1';
     const send = document.createElement('button'); send.type = 'submit'; send.textContent = '送出紙本回報';
     const status = document.createElement('span'); status.setAttribute('role','status');
@@ -221,7 +218,7 @@
   }
   async function request(own, operation, data = {}) {
     if (!current(own)) throw formalError('functions/unauthenticated');
-    const payload = {action:'giftedFormalExamL28',data:{...data,operation}};
+    const payload = {action:'formalExam',data:{...data,operation}};
     let reply;
     if (own.direct) {
       reply = await callStudentActionDirect(own, payload);
@@ -253,7 +250,7 @@
     frame.title = title;
     frame.dataset.independentTrial = String(independentTrial);
     frame.dataset.kind = kind;
-    frame.src = 'gifted-exam/index.html?v=20261118-cohort-v1';
+    frame.src = 'gifted-exam/index.html?v=20261120-fill-review';
     dialog.append(back,frame);
     dialog.addEventListener('cancel',e=>{e.preventDefault();close(false);});
     document.body.append(dialog);
@@ -273,14 +270,14 @@
     const trialButton = active.dataset.kind === 'quiz' && !independentTrial &&
       own.controls.get('quiz')?.querySelector('[data-independent-trial]');
     const exam = own.exam[active.dataset.kind];
-    const draftOwner = own.pilot ? own.uid : JSON.stringify([own.className,own.studentKey || own.studentName,exam.examId,own.uid]);
-    return {pilot:own.pilot, aiFill:exam.aiFill === true, draftOwner, kind:active.dataset.kind, independentTrial, uid:own.uid, reportType:active.dataset.kind === 'quiz' ? '分數' : '錯題數',
+    const draftOwner = exam.legacyDraft ? own.uid : JSON.stringify([own.className,own.studentKey || own.studentName,exam.examId,own.uid]);
+    return {pilot:exam.legacyDraft === true,title:exam.label, aiFill:exam.aiFill === true, draftOwner, kind:exam.kind || active.dataset.kind, independentTrial, uid:own.uid, reportType:(exam.kind || active.dataset.kind) === 'quiz' ? '分數' : '錯題數',
       openIndependentTrial: trialButton ? () => {
         if (frame === active && current(own)) open('quiz', trialButton, true);
       } : null,
       request(operation,data){
         if (frame !== active) throw Error('請重新開啟考卷。');
-        return request(own,operation,{...data,kind:active.dataset.kind,...(independentTrial ? {independentTrial:true} : {})});
+        return request(own,operation,{...data,kind:exam.kind || active.dataset.kind,examId:exam.examId,...(independentTrial ? {independentTrial:true} : {})});
       },
     };
   }

@@ -10,3 +10,7 @@
 .answer-inputs .answer-option input{inline-size:1.2rem;block-size:1.2rem;margin:0;accent-color:#205c44}
 .answer-inputs label.earlier-answer{display:block;width:100%}
 .answer-inputs label.earlier-answer[hidden]{display:none}
+
+.fill-review { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-block-start: .5rem; }
+.fill-review button { min-height: 44px; max-width: 100%; white-space: normal; }
+.fill-review [role="status"] { overflow-wrap: anywhere; }
