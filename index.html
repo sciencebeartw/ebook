@@ -12227,7 +12227,7 @@ async function sendProductionStudentReport(action,payload,send) {
                         : "";
                     var pendingHomeworkAttr = kind === 'homework' ? " data-pending-homework-anchor='1'" : "";
                     var labelHtml = f.hideLabel ? "" : "<div class='info-label'>" + f.label + "</div>";
-                    return "<section class='info-block info-kind-" + kind + "'" + pendingExamPaperAttr + pendingHomeworkAttr + ">" + labelHtml + noteHtml + "<div class='info-content'>" + parseBtn(f.val || "", f.linkMode || "auto", f.customLabel || "", f.linkPrefix || "", f.color || "") + (f.extra || "") + "</div></section>";
+                    return "<section class='info-block info-kind-" + kind + "'" + pendingExamPaperAttr + pendingHomeworkAttr + (f.libraryOnly ? " data-gl-homework-only" : "") + ">" + labelHtml + noteHtml + "<div class='info-content'>" + parseBtn(f.val || "", f.linkMode || "auto", f.customLabel || "", f.linkPrefix || "", f.color || "") + (f.extra || "") + "</div></section>";
                 }
                 function buildPostMakeupFields(postData, extraHtml) {
                     var lines = splitPostMultiLinkValue(postData.makeup || "");
@@ -12256,7 +12256,7 @@ async function sendProductionStudentReport(action,payload,send) {
                     var examLabel = types.length === 1 ? types[0] : "本次考卷";
                     return "<div class='quiz-answer-note'>" + examLabel + "會於課堂直接訂正與對答；缺席同學請依影片連結自行補看，不另提供答案。</div>";
                 }
-                var libraryButtons = window.GiftedLibraryEbook?.buttons(post, getStudentActionPostSourceClassName(post, gData && gData.className), isDashboardDraftPreviewMode) || "";
+                var libraryButtons = window.GiftedLibraryEbook?.buttons(post, getStudentActionPostSourceClassName(post, gData && gData.className), isDashboardDraftPreviewMode, ebookGodSessionInfo ? "" : gData?.studentName) || "";
                 var fields = [{ label: "今日課程進度", val: post.progress }].concat(buildPostQuizFields(post));
                 homeworkItems.forEach(function(item, hwIdx) {
                     var homeworkNoteMode = getDailyPostHomeworkNoteMode(post);
@@ -12274,6 +12274,7 @@ async function sendProductionStudentReport(action,payload,send) {
                         label: homeworkItems.length ? "今日作業二" : "今日作業",
                         val: "",
                         extra: libraryButtons + holidayHtml,
+                        libraryOnly: !holidayHtml && libraryButtons.includes('class="gl-calendar-post"'),
                         linkMode: "auto",
                         customLabel: "",
                         color: ""
@@ -12581,6 +12582,7 @@ async function sendProductionStudentReport(action,payload,send) {
             var toolDraftIdentity = JSON.stringify([ebookFirebaseApp.auth().currentUser?.uid || "", gData?.className || "", gData?.foundUserKey || "", !!isAdminMode]);
             var toolDraftState = window.StudentToolDrafts.capture(container, toolDraftIdentity);
             container.innerHTML = html;
+            if (gData?.studentName === '測試學生') window.GiftedLibraryEbook?.refreshPostSlots();
             window.GiftedFormalExam?.mount();
             window.syncProductionVisibleMessageWatches();
             window.syncProductionVisibleGradeWatches();
@@ -16536,7 +16538,7 @@ function renderProductionGodStickerReceipt(anchor){
             restoreRememberedStudentLogin();
         });
     </script>
-</div><link rel="stylesheet" href="gifted_library_entry.css?v=20261114-pilot"><script src="gifted_library_policy.js?v=20261109"></script><script src="gifted_library_entry.js?v=20261114-pilot"></script><link rel="stylesheet" href="gifted_formal_exam_entry.css?v=20261118-ai-fill"><script src="gifted_formal_exam_entry.js?v=20261118-cohort-v1"></script><script src="gifted_release_config.js?v=20261009-v25"></script>
+</div><link rel="stylesheet" href="gifted_library_entry.css?v=20261119-calendar"><script src="gifted_library_policy.js?v=20261109"></script><script src="gifted_library_entry.js?v=20261119-calendar"></script><link rel="stylesheet" href="gifted_formal_exam_entry.css?v=20261118-ai-fill"><script src="gifted_formal_exam_entry.js?v=20261118-cohort-v1"></script><script src="gifted_release_config.js?v=20261009-v25"></script>
 <script src="gifted_homework_status.js?v=20261118_grade_status"></script><script src="gifted_entry.js?v=20261116-pending-receipt"></script>
 </body>
 

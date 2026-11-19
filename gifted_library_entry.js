@@ -3,18 +3,24 @@
  let session=null,overlay=null,frame=null,generation=0,unsubscribe=null,opener=null,scrollY=0;
  const policy=root.GIFTED_LIBRARY_POLICY;
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const pilotHint=(className,name)=>className==='115小六資優自然週六上午班' && name==='測試學生';
+ let boundaryTimer=null,frameTimer=null,frameStatus=null;
  const pilotRoot=()=>document.getElementById('giftedLibraryPilotEntry');
  function clearPilot(){const entry=pilotRoot();if(entry){entry.hidden=true;entry.replaceChildren();}}
- function close(clear=false){generation++;unsubscribe?.();unsubscribe=null;frame?.remove();overlay?.remove();frame=overlay=null;document.documentElement.classList.remove('gl-open');document.body.style.removeProperty('--gl-scroll');if(opener){root.scrollTo(0,scrollY);if(opener.isConnected)opener.focus({preventScroll:true});opener=null;}if(clear){session=null;clearPilot();}}
+ function close(clear=false){clearTimeout(frameTimer);frameStatus=null;generation++;unsubscribe?.();unsubscribe=null;frame?.remove();overlay?.remove();frame=overlay=null;document.documentElement.classList.remove('gl-open');document.body.style.removeProperty('--gl-scroll');if(opener){root.scrollTo(0,scrollY);if(opener.isConnected)opener.focus({preventScroll:true});opener=null;}if(clear){clearTimeout(boundaryTimer);session=null;clearPilot();refreshPostSlots();}}
  function ready(context){close(true);const user=context.auth?.currentUser;const teacherView=context.teacherView===true&&['god_session','student_preview'].includes(context.mode);if(!user||context.preview||(!teacherView&&(context.result?.isAdmin||['admin_view','god_session','student_preview'].includes(context.mode))))return;
   if(!policy.classIds.includes(context.result.className))return;
   session={auth:context.auth,uid:user.uid,className:context.result.className,name:context.result.studentName||'',readOnly:teacherView&&context.mode==='god_session',studentPreview:context.mode==='student_preview'};
-  if(!teacherView&&session.className==='115小六資優自然週六上午班'&&session.name==='測試學生')showPilot(session);
+  session.calendarPreview=!teacherView && pilotHint(session.className,session.name);
+  if(session.calendarPreview)fetchCalendar(session);
   const target=new URLSearchParams(location.search).get('giftedLibrary');if(target==='mock'||/^grb-chapter-\d{2}$/.test(target||''))open(target);
  }
- function buttons(post,className,preview=false){
+ function buttons(post,className,preview=false,studentName){
   if(!policy.classIds.includes(className))return '';
   const date=String(post?.date||'').replace(/\//g,'-').split(' ')[0].split('-').map((p,i)=>i?p.padStart(2,'0'):p).join('-');
+  if(!preview && pilotHint(className,studentName)){
+   return '<div class="gl-calendar-post" data-gl-date="'+esc(date)+'"></div>';
+  }
   if(date<'2026-11-21'&&Date.now()<Date.parse(policy.mockOpensAt))return '';
   const row=policy.reviews.find(r=>r.dates[className.includes('週六')?'sat':'sun']===date);
   return '<div class="gl-entry-buttons">'+(row?link(row.chapterId,'複習題本',preview):'')+link('mock','模擬試題',preview)+'</div>';
@@ -23,16 +29,71 @@
   const url=new URL(location.href);url.search='';url.hash='';url.searchParams.set('giftedLibrary',id);
   return preview?'<button type="button" disabled>'+label+'</button>':'<a href="'+esc(url.href)+'" data-gifted-library="'+esc(id)+'">'+label+'</a>';
  }
- async function showPilot(own){
-  const current=()=>session===own&&own.auth.currentUser?.uid===own.uid;
-  try{
-   const grant=await request(own,{action:'pilotAccess'},current);
-   if(!current()||grant.reviewId!=='grb-chapter-05'||grant.mock!==true)return;
-   const entry=pilotRoot();if(!entry)return;
-   entry.innerHTML='<strong>測試學生專用</strong><div class="gl-entry-buttons">'+link(grant.reviewId,'複習題本｜第五章 聲音')+link('mock','模擬試題｜16 回')+'</div>';
-   entry.hidden=false;
-  }catch{if(current())clearPilot();}
+ // Calendar is fetched once per test session and on return from background, never once per post.
+ function serverTime(c){return c.serverNow+(performance.now()-c.received);}
+ function opening(date){return Date.parse(date+'T00:00:00+08:00');}
+ function refreshPostSlots(){
+  const slots=Array.from(document.querySelectorAll('.gl-calendar-post'));
+  const c=session?.calendar,valid=c && session.auth.currentUser?.uid===session.uid;
+  const now=valid?serverTime(c):0;
+  const dates=[...new Set(slots.map(s=>s.dataset.glDate).filter(d=>opening(d)<=now))].sort();
+  const byDate=new Map();
+  const mockStart=valid?Date.parse(c.mockOpensAt):Infinity;
+  const latestPublished=dates[dates.length-1];
+  if(valid && dates.length){
+   for(const row of c.reviews){
+    if(opening(row.date)>now)continue;
+    // 若改在兩堂課之間開放，放在開放當天可見的最近一篇聯絡簿。
+    const date=dates.filter(d=>d<=row.date).pop() || dates[0];
+    if(!byDate.has(date))byDate.set(date,[]);
+    byDate.get(date).push(row);
+   }
+  }
+  for(const slot of slots){
+   const date=slot.dataset.glDate,rows=byDate.get(date)||[];
+   const items=rows.map(row=>link(row.chapterId,rows.length===1 && row.date===date?'複習題本':'複習題本｜'+row.label));
+   if(valid && now>=mockStart && opening(date)<=now && (opening(date)>=mockStart || date===latestPublished))items.push(link('mock','模擬試題'));
+   const html=items.length?'<div class="gl-entry-buttons">'+items.join('')+'</div>':'';
+   if(slot.innerHTML!==html)slot.innerHTML=html;
+  }
  }
+ function drawCalendar(own){
+  if(session!==own || own.auth.currentUser?.uid!==own.uid)return;
+  refreshPostSlots();clearTimeout(boundaryTimer);
+  const c=own.calendar,now=serverTime(c),entry=pilotRoot(),early=c.earlyAccess;
+  clearPilot();
+  if(entry && early && now<early.expiresAt){
+   const review=c.reviews.find(r=>r.chapterId===early.reviewId);
+   entry.innerHTML='<strong>測試學生專用</strong><div class="gl-entry-buttons">'+
+    (review?link(review.chapterId,'複習題本｜'+review.label):'')+(early.mock?link('mock','模擬試題｜16 回'):'')+'</div>';
+   entry.hidden=false;
+  }
+  const next=Math.min(...[...c.reviews.map(r=>opening(r.date)),Date.parse(c.mockOpensAt),early?.expiresAt].filter(t=>t>now));
+  if(Number.isFinite(next))boundaryTimer=setTimeout(()=>drawCalendar(own),Math.min(next-now+50,2147483647));
+ }
+ async function fetchCalendar(own){
+  if(own.loading || session!==own)return;
+  own.loading=true;
+  const valid=()=>session===own && own.auth.currentUser?.uid===own.uid;
+  try{
+   const c=await request(own,{action:'entryCalendar'},valid);
+   if(!valid()||c.classId!==own.className||!Array.isArray(c.reviews)||!Number.isFinite(c.serverNow))return;
+   own.calendar={...c,received:performance.now()};
+   drawCalendar(own);
+  }catch(error){
+   if(!valid())return;
+   own.calendar=null;clearTimeout(boundaryTimer);refreshPostSlots();clearPilot();
+   const entry=pilotRoot();
+   if(entry && error.message!=='CLASS_NOT_AUTHORIZED'){
+    entry.innerHTML='<span role="status">題本課表暫時無法載入。</span> <button type="button">重試載入課表</button>';
+    entry.hidden=false;
+    entry.querySelector('button').onclick=event=>{event.currentTarget.disabled=true;fetchCalendar(own);};
+   }
+  }finally{own.loading=false;}
+ }
+ document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden && session?.calendarPreview && (!session.calendar || performance.now()-session.calendar.received>60000))fetchCalendar(session);
+ });
  async function request(own,body,valid){
   if(!valid())throw Error('LOGIN_REQUIRED');
   const token=await own.auth.currentUser.getIdToken();
@@ -50,11 +111,28 @@
   close();session=saved;opener=trigger||document.activeElement;scrollY=root.scrollY||0;document.body.style.setProperty('--gl-scroll',-scrollY+'px');document.documentElement.classList.add('gl-open');
   overlay=document.createElement('section');overlay.className='gl-overlay';overlay.setAttribute('aria-label',target==='mock'?'模擬試題':'複習題本');
   const back=document.createElement('button');back.type='button';back.textContent='返回聯絡簿';back.onclick=async()=>{if(frame?.contentWindow?.GiftedLibraryPage?.dirty()){if(!await root.swalConfirm('返回聯絡簿','尚未送出的答案已保留在此裝置，下次可繼續填寫。'))return;}close();};
-  frame=document.createElement('iframe');frame.title=target==='mock'?'模擬試題':'複習題本';const url=new URL('gifted-library/index.html',location.href);url.searchParams.set('target',target);overlay.append(back,frame);document.body.append(overlay);frame.src=url.href;back.focus();unsubscribe=saved.auth.onAuthStateChanged(u=>{if(u?.uid!==saved.uid)close(true);});return true;
+  frame=document.createElement('iframe');frame.title=target==='mock'?'模擬試題':'複習題本';const url=new URL('gifted-library/index.html',location.href);url.searchParams.set('target',target);if(saved.calendarPreview)url.searchParams.set('v','20261119-calendar');overlay.append(back,frame);document.body.append(overlay);
+  if(saved.calendarPreview)watchFrame(frame,url);
+  frame.src=url.href;back.focus();unsubscribe=saved.auth.onAuthStateChanged(u=>{if(u?.uid!==saved.uid)close(true);});return true;
+ }
+ function watchFrame(element,url){
+  const notice=document.createElement('div'),message=document.createElement('span'),retry=document.createElement('button');
+  notice.className='gl-frame-notice';notice.hidden=true;notice.setAttribute('role','status');
+  message.textContent='作答頁暫時無法載入。';retry.type='button';retry.textContent='重試';
+  notice.append(message,retry);element.before(notice);frameStatus=notice;
+  const failed=()=>{if(frame===element && frameStatus===notice)notice.hidden=false;};
+  const arm=()=>{clearTimeout(frameTimer);notice.hidden=true;frameTimer=setTimeout(failed,12000);};
+  let attempts=0;
+  retry.onclick=()=>{arm();url.searchParams.set('retry',String(++attempts));element.src=url.href;};
+  element.onerror=failed;arm();
+ }
+ function pageReady(caller){
+  if(!frameStatus || frame?.contentWindow!==caller)return;
+  clearTimeout(frameTimer);frame.onerror=null;frameStatus.remove();frameStatus=null;
  }
  function getTransport(caller){if(!frame||frame.contentWindow!==caller||!session)throw Error('LOGIN_REQUIRED');const own=session,epoch=generation;
   function valid(){if(epoch!==generation||session!==own||own.auth.currentUser?.uid!==own.uid)throw Error('LOGIN_REQUIRED');}
-  return {sessionUid:own.uid,studentName:own.name,readOnly:own.readOnly,
+  return {sessionUid:own.uid,studentName:own.name,readOnly:own.readOnly,get retryInitialLoad(){return Boolean(own.calendarPreview && own.calendar);},
    async request(body){
     if(own.readOnly&&['draft','submit'].includes(body.action))throw Error('TEACHER_VIEW_READ_ONLY');
     return request(own,body,()=>epoch===generation&&session===own&&own.auth.currentUser?.uid===own.uid);
@@ -63,5 +141,5 @@
   };
  }
  document.addEventListener('click',event=>{if(event.defaultPrevented||event.button!==0||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;const a=event.target.closest?.('a[data-gifted-library]');if(a&&open(a.dataset.giftedLibrary,a))event.preventDefault();});
- root.GiftedLibraryEbook={ready,close,buttons,getTransport};
+ root.GiftedLibraryEbook={ready,close,buttons,getTransport,pageReady,refreshPostSlots};
 })(window);

@@ -13,17 +13,26 @@
  function showResult(result){$('actions').hidden=true;$('result').textContent='已完成作答。自動判分：'+result.earnedPoints+'／'+result.autoMaxPoints+(result.pending?'；另有 '+result.pending+' 題請自行對照解答。':'。')+'\n請核對答案，並在題本上訂正。';
   for(const item of result.results){const q=content.questions.find(q=>q.id===item.questionId),el=$('questions').querySelector('[data-id="'+CSS.escape(item.questionId)+'"] .question-result');if(!q||!el)continue;el.hidden=false;el.dataset.outcome=item.outcome;const answer=item.acceptedAnswers?.length?item.expected:GiftedTypedQuestion.answerText(q,item.correctAnswers||[]);el.textContent=(q.type==='manual'?'請自行核對':({correct:'答對',wrong:'答錯',blank:'未作答',pending:'請自行核對'}[item.outcome]))+'\n參考答案：'+(inputs.reference(q,item)||answer||item.expected||'請參考題本解答');}
  }
- async function list(){const mine=++epoch;content=null;pending=null;changed=false;$('title').textContent='模擬試題';$('paper').hidden=true;$('list').hidden=true;$('rounds').hidden=true;$('status').textContent='正在讀取回次…';
-  try{const r=await transport.request({action:'list'});if(mine!==epoch)return;const rows=r.entries.filter(e=>e.kind==='mock');$('status').textContent=rows.length?'自行選擇要練習的回次；已完成的回次可以查看答案。':'模擬試題將於 11/21 開放。';$('list').hidden=false;$('list').innerHTML=rows.map(e=>'<button type="button" data-chapter="'+esc(e.id)+'"><strong>'+esc(e.label)+'</strong><small>'+ (e.progress?'已完成 · '+e.progress.score+'／'+e.progress.maxScore:'尚未作答 · '+e.questionCount+' 題')+'</small></button>').join('');$('list').querySelectorAll('button').forEach(b=>b.onclick=()=>load(b.dataset.chapter));}catch(e){if(mine===epoch)$('status').textContent=message(e);}
+ const retryRead=$('retryRead');
+ function clearRetry(){if(retryRead){retryRead.hidden=true;retryRead.onclick=null;}}
+ function readFailed(error,again){
+  $('status').textContent=message(error);
+  if(!transport?.retryInitialLoad || !retryRead || ['LOGIN_REQUIRED','ASSIGNMENT_NOT_OPEN','CLASS_NOT_AUTHORIZED','ENROLLMENT_INACTIVE'].includes(error.message))return;
+  $('status').textContent=error.message==='TRY_LATER'?'操作較頻繁，請稍後再試。':'暫時無法載入，連線恢復後可以重試。';
+  retryRead.hidden=false;
+  retryRead.onclick=()=>{clearRetry();again();};
  }
- async function load(chapterId){const mine=++epoch;busy=true;if(content)stash();pending=null;$('status').textContent='正在載入題目…';controls();
+ async function list(){clearRetry();const mine=++epoch;content=null;pending=null;changed=false;$('title').textContent='模擬試題';$('paper').hidden=true;$('list').hidden=true;$('rounds').hidden=true;$('status').textContent='正在讀取回次…';
+  try{const r=await transport.request({action:'list'});if(mine!==epoch)return;const rows=r.entries.filter(e=>e.kind==='mock');$('status').textContent=rows.length?'自行選擇要練習的回次；已完成的回次可以查看答案。':'目前還沒有開放的模擬試題。';$('list').hidden=false;$('list').innerHTML=rows.map(e=>'<button type="button" data-chapter="'+esc(e.id)+'"><strong>'+esc(e.label)+'</strong><small>'+ (e.progress?'已完成 · '+e.progress.score+'／'+e.progress.maxScore:'尚未作答 · '+e.questionCount+' 題')+'</small></button>').join('');$('list').querySelectorAll('button').forEach(b=>b.onclick=()=>load(b.dataset.chapter));}catch(e){if(mine===epoch)readFailed(e,list);}
+ }
+ async function load(chapterId){clearRetry();const mine=++epoch;busy=true;if(content)stash();pending=null;$('status').textContent='正在載入題目…';controls();
   try{const next=await transport.request({action:'task',chapterId});if(mine!==epoch)return;content=next;changed=false;BearStudentMedia.reset();$('title').textContent=mock?'模擬試題':'複習題本';$('list').hidden=true;$('paper').hidden=false;$('rounds').hidden=!mock;$('summary').textContent=next.label+' · '+next.questionCount+' 題';$('result').textContent='';$('blanks').checked=false;$('actions').hidden=next.status==='submitted';
    $('questions').innerHTML=next.questions.map(q=>'<article class="student-question" data-id="'+esc(q.id)+'">'+GiftedTypedQuestion.question(q)+(q.type==='manual'?inputs.fields(q):'')+'<div class="question-result" hidden></div></article>').join('');
    let answers=next.answers||{},notice='先作答，送出後即可核對答案。';
    try{const saved=JSON.parse(localStorage.getItem(key())||'null');if(saved&&saved.revision===next.revision&&saved.draftRevision===next.draftRevision&&next.status!=='submitted'){answers=saved.answers;pending=saved.pending||null;changed=true;notice=pending?'上次送出結果尚待確認，請按原按鈕重試。':'已恢復此裝置尚未送出的答案。';}}catch{}
    setAnswers(answers);$('status').textContent=notice;
    if(next.status==='submitted'){showResult(next.result);try{localStorage.removeItem(key());}catch{}$('status').textContent='已收到作答紀錄。';}
-  }catch(e){if(mine===epoch)$('status').textContent=message(e);}finally{if(mine===epoch){busy=false;controls();}}
+  }catch(e){if(mine===epoch)readFailed(e,()=>load(chapterId));}finally{if(mine===epoch){busy=false;controls();}}
  }
  async function write(action){if(busy||!content||transport.readOnly||content.status==='submitted')return;
   busy=true;controls();
@@ -37,5 +46,5 @@
  }
  $('questions').addEventListener('input',()=>{changed=true;stash();});$('save').onclick=()=>write('draft');$('submit').onclick=()=>write('submit');$('reload').onclick=()=>content&&load(content.chapterId);$('rounds').onclick=()=>{stash();list();};BearStudentMedia.bind($('questions'));
  window.GiftedLibraryPage={dirty:()=>changed};
- try{if(parent===window)throw Error('LOGIN_REQUIRED');transport=parent.GiftedLibraryEbook.getTransport(window);$('name').textContent=transport.studentName;mock?list():/^grb-chapter-\d{2}$/.test(target||'')?load(target):($('status').textContent='請從聯絡簿的教材按鈕進入。');}catch(e){$('status').textContent=message(e);}
+ try{if(parent===window)throw Error('LOGIN_REQUIRED');transport=parent.GiftedLibraryEbook.getTransport(window);parent.GiftedLibraryEbook.pageReady?.(window);$('name').textContent=transport.studentName;mock?list():/^grb-chapter-\d{2}$/.test(target||'')?load(target):($('status').textContent='請從聯絡簿的教材按鈕進入。');}catch(e){$('status').textContent=message(e);}
 })();
