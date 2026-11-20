@@ -5001,7 +5001,66 @@ html { background: #f3faf6; } #splash-status { margin: 22px 0 0; color: #315c44;
   <link rel="stylesheet" href="ebook_push.css?v=20261015-preview1">
     <script src="fastwrite_config.js?v=20261029_math_feedback_enabled_v1"></script>
     <script src="fastwrite_production_transport.js?v=20261107_sticker_expired_recovery_v1"></script>
-    <script src="fastwrite_message_bridge.js?v=20261031_message_admission_v1"></script>
+    <script src="feedback_revision_ui.js?v=20261121-1"></script>
+    <script src="fastwrite_message_bridge.js?v=20261121-1"></script>
+    <style>
+        .history-msg-body.has-feedback-revision-actions { position: relative; }
+        .ebook-feedback-revision-content { padding-inline-end: 34px; }
+        .ebook-feedback-revision-actions {
+            position: absolute;
+            inset-block-start: 0;
+            inset-inline-end: 2px;
+        }
+        .ebook-feedback-revision-trigger {
+            display: grid;
+            place-items: center;
+            width: 44px;
+            height: 44px;
+            list-style: none;
+            color: #475569;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        .ebook-feedback-revision-trigger::-webkit-details-marker { display: none; }
+        .ebook-feedback-revision-actions[open] { z-index: 3; }
+        .post-card:has(.ebook-feedback-revision-actions[open]) { overflow: visible; }
+        .ebook-feedback-revision-options {
+            position: absolute;
+            inset-block-start: calc(100% - 2px);
+            inset-inline-end: 2px;
+            min-width: 144px;
+            padding: 4px;
+            background: #fff;
+            border: 1px solid #dbe4e1;
+            border-radius: 12px;
+            box-shadow: 0 6px 20px rgba(15, 40, 34, .14);
+        }
+        .ebook-feedback-revision-options button {
+            display: block;
+            width: 100%;
+            min-height: 44px;
+            padding: 8px 12px;
+            border: 0;
+            border-radius: 8px;
+            background: transparent;
+            color: #243e39;
+            font: inherit;
+            font-size: .95rem;
+            font-weight: 700;
+            text-align: start;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+        .ebook-feedback-revision-actions[open] > summary,
+        .ebook-feedback-revision-options button:focus-visible { background: #e6efeb; }
+        @media (hover: hover) {
+            .ebook-feedback-revision-trigger:hover,
+            .ebook-feedback-revision-options button:hover { background: #e6efeb; }
+        }
+        .feedback-revision-history { text-align: start; overflow-wrap: anywhere; }
+        .feedback-revision-history section + section { margin-top: 12px; }
+        .feedback-revision-history section div { white-space: pre-wrap; }
+    </style>
     <script src="fastwrite_realtime.js?v=20261018"></script>
     <script src="fastwrite_ebook_realtime.js?v=20261116_confirmed_reply"></script>
     <style>.grade-preparing{min-height:180px;display:flex;align-items:center;justify-content:center;padding:24px 16px;box-sizing:border-box;color:#64748b;font-size:1rem;line-height:1.6;text-align:center;}</style>
@@ -5051,7 +5110,7 @@ html { background: #f3faf6; } #splash-status { margin: 22px 0 0; color: #315c44;
   <script src="gifted_assignment_visibility.js?v=20261011-library1"></script>
   <script src="gifted_homework_full_scores.js?v=20260720_geo3_question_count_v2"></script>
   <script src="ebook_pending_tasks_app.js?v=20261116-pending-receipt"></script>
-  <script src="ebook_feedback_threads_app.js?v=20261018-correction-reply"></script>
+  <script src="ebook_feedback_threads_app.js?v=20261121-1"></script>
   <script src="ebook_score_distribution.js?v=equal-high-score-chart-20260922"></script>
 
   <script src="resource_catalog_view.js?v=20261002_resources_time_v1"></script>
@@ -6579,7 +6638,7 @@ async function sendProductionStudentReport(action,payload,send) {
     }
 
     function buildFeedbackHistoryList(fbsObj, fastWriteContext) {
-        fbsObj=mergeProductionMessageFeedback(fbsObj,fastWriteContext);
+        fbsObj = mergeProductionMessageFeedback(fbsObj, fastWriteContext);
         var list = [];
         for (let fbid in (fbsObj || {})) {
             const fb = fbsObj[fbid];
@@ -6595,6 +6654,9 @@ async function sendProductionStudentReport(action,payload,send) {
                 targetExamId: typeof normalizeEbookFeedbackExamId === 'function' ? normalizeEbookFeedbackExamId(fb.targetExamId) : '',
                 actorRole: fb.actorRole || "",
                 source: fb.source || "",
+                feedbackRevisionVersion: fb.actorRole === 'student' ? fb.feedbackRevisionVersion : undefined,
+                verifiedFeedbackStudentSource: fb.verifiedFeedbackStudentSource || "",
+                replyWithdrawn: fb.replyWithdrawn === true,
                 replyToFeedbackKey: fb.replyToFeedbackKey || "",
                 storedStudentKey: fb.storedStudentKey || fb.sourceStudentKey || "",
                 storedClassKey: fb.storedClassKey || fb.sourceClassKey || "",
@@ -11891,6 +11953,99 @@ async function sendProductionStudentReport(action,payload,send) {
             return "<div class='grade-section'" + pendingExamAttrs + "><div class='main-exam-title'>" + examTitle + "</div><div class='main-exam-range'>" + buildAssessmentTitleHtml(exam.exam, exam.className || post.storedClassName || post.className || (gData && gData.className)) + "</div><div class='main-score'>" + scoreDisplay + "</div>" + logic.statusHtml + "<div class='score-sub'>班平均: " + exam.average + "</div>" + standardHtml + scoreReportHtml + chartHtml + refHwHtml + "</div>";
         }
 
+        function ebookStudentRevisionTarget(item) {
+            const session = ebookAuthSessionInfo;
+            if (!gData || session?.role !== 'student' || isAdminMode || isStudentPreviewMode ||
+                isDashboardDraftPreviewMode || item.actorRole !== 'student' || item.source !== 'ebook_student' ||
+                item.type !== '學生留言' || item.verifiedFeedbackStudentSource !== 'class-scoped-session-v1' ||
+                !/^[A-Za-z0-9_-]{12,128}$/.test(item.fbKey || '') || /^p\d{12}_/.test(item.fbKey)) return null;
+            const className = item.storedClassName || gData.className;
+            const classKey = item.storedClassKey || safeKey(className);
+            const studentKey = item.storedStudentKey;
+            const editable = classKey === session.safeClassKey && studentKey === session.studentKey;
+            if (!studentKey || (!editable && !item.isTransferFormerClass)) return null;
+            return { className, classKey, studentKey, feedbackKey: item.fbKey, editable };
+        }
+
+        function renderStudentFeedbackRevisionActions(item, target) {
+            if (!target || (!target.editable && !item.feedbackRevisionVersion)) return '';
+            const actions = target.editable
+                ? "<button type='button' data-feedback-operation='edit' onclick='openStudentFeedbackRevision(this)'>編輯</button>" : '';
+            const history = item.feedbackRevisionVersion
+                ? "<button type='button' data-feedback-operation='history' onclick='openStudentFeedbackRevision(this)'>修改紀錄</button>" : '';
+            return "<details class='ebook-feedback-revision-actions' data-feedback-id='" + escapeHtmlAttr(target.feedbackKey) +
+                "' data-feedback-class='" + escapeHtmlAttr(target.classKey) + "' data-feedback-student='" +
+                escapeHtmlAttr(target.studentKey) + "'>" +
+                "<summary class='ebook-feedback-revision-trigger' aria-label='留言選項'>" +
+                "<svg aria-hidden='true' width='20' height='20' viewBox='0 0 24 24' fill='currentColor'>" +
+                "<circle cx='5' cy='12' r='1.8'/><circle cx='12' cy='12' r='1.8'/><circle cx='19' cy='12' r='1.8'/>" +
+                "</svg></summary><div class='ebook-feedback-revision-options'>" + actions + history + "</div></details>";
+        }
+
+        document.addEventListener('click', event => {
+            document.querySelectorAll('.ebook-feedback-revision-actions[open]').forEach(actions => {
+                if (!actions.contains(event.target)) actions.open = false;
+            });
+        });
+
+        document.addEventListener('keydown', event => {
+            if (event.key !== 'Escape' || event.defaultPrevented) return;
+            const actions = document.querySelector('.ebook-feedback-revision-actions[open]');
+            if (!actions) return;
+            event.preventDefault();
+            actions.open = false;
+            if (actions.contains(event.target)) actions.querySelector('summary').focus();
+        });
+
+        async function openStudentFeedbackRevision(button) {
+            const actions = button.closest('.ebook-feedback-revision-actions');
+            if (!actions || actions.querySelector('button:disabled')) return;
+            const item = (gData?.feedbackHistory || []).find(row => row.fbKey === actions.dataset.feedbackId &&
+                (row.storedClassKey || safeKey(gData.className)) === actions.dataset.feedbackClass &&
+                row.storedStudentKey === actions.dataset.feedbackStudent);
+            const target = item && ebookStudentRevisionTarget(item);
+            const historyOnly = button.dataset.feedbackOperation === 'history';
+            if (!target || (!historyOnly && !target.editable)) return;
+            actions.open = false;
+            actions.querySelector('summary').focus();
+            const session = ebookAuthSessionInfo;
+            const uid = ebookFirebaseApp.auth().currentUser?.uid;
+            const active = () => !!uid && uid === ebookFirebaseApp.auth().currentUser?.uid &&
+                ebookAuthSessionInfo === session && !!ebookStudentRevisionTarget(item);
+            const request = ebookFunctions.httpsCallable('runEbookStudentAction', { timeout: 180000 });
+            const submit = async data => {
+                if (!active()) throw Error('登入已切換，請重新開啟留言。');
+                const { editable, ...binding } = target;
+                const response = await request({ action: 'feedbackRevisionV2', data: { ...binding, ...data } });
+                if (!active()) throw Error('登入已切換，請重新開啟留言。');
+                return response.data.result;
+            };
+            button.disabled = true;
+            try {
+                if (historyOnly) {
+                    await window.FeedbackRevisionUI.showHistory(Swal, submit);
+                    return;
+                }
+                const initial = await submit({ operation: 'read' });
+                const revision = await window.FeedbackRevisionUI.edit(Swal, initial, submit,
+                    () => createClientRequestId('student_feedback_edit'));
+                if (!revision || !active() || Number(item.feedbackRevisionVersion || 0) > revision.version) return;
+                item.content = revision.content;
+                item.feedbackRevisionVersion = revision.version;
+                if (actions.isConnected) {
+                    const body = actions.closest('.history-msg-body');
+                    const quote = window.EbookFeedbackThreads.parseLeadingQuote(revision.content);
+                    body.querySelector('.ebook-feedback-revision-content').innerHTML = renderGiftedFeedback(item, quote ? quote.rest : revision.content);
+                    actions.outerHTML = renderStudentFeedbackRevisionActions(item, target);
+                    body.querySelector('.ebook-feedback-revision-trigger')?.focus();
+                }
+            } catch (error) {
+                swalAlert('無法處理留言', error.message || '請稍後再試。', 'warning');
+            } finally {
+                button.disabled = false;
+            }
+        }
+
         function renderDailyPosts(posts, history, fastWriteHistoryOnly) {
             var container = document.getElementById('tab-content-0');
             if (fastWriteHistoryOnly === 'god-native-feedback' && !container.querySelector('.post-card-wrapper')) fastWriteHistoryOnly = false;
@@ -12314,10 +12469,17 @@ async function sendProductionStudentReport(action,payload,send) {
                     var bodyClass = isTeacher ? "teacher-body" : "";
                     var avatarChar = isTeacher ? teacherAvatarChar : studentAvatarChar;
                     var content = entry && entry.displayContent !== undefined ? entry.displayContent : item.content;
+                    var revisionActions = renderStudentFeedbackRevisionActions(item, ebookStudentRevisionTarget(item));
+                    var renderedContent = renderGiftedFeedback(item, content || "");
+                    if (revisionActions) {
+                        bodyClass += " has-feedback-revision-actions";
+                        renderedContent = "<div class='ebook-feedback-revision-content'>" + renderedContent + "</div>";
+                    }
                     return "<div class='history-msg" + (nested ? " feedback-thread-reply" : "") + "' data-feedback-key='" + escapeHtmlAttr(entry && entry.key || "") + "' data-feedback-role='" + (isTeacher ? "teacher" : "student") + "'>" +
                         "<div class='history-msg-avatar " + avatarClass + "'>" + escapeHtml(avatarChar) + "</div>" +
-                        "<div class='history-msg-body " + bodyClass + "'>" + renderGiftedFeedback(item, content || "") +
-                        "<div class='history-msg-time'>" + escapeHtml((item.time || "").substring(5, 16)) + "</div></div></div>";
+                        "<div class='history-msg-body " + bodyClass + "'>" + renderedContent +
+                        "<div class='history-msg-time'>" + escapeHtml((item.time || "").substring(5, 16)) + "</div>" +
+                        revisionActions + "</div></div>";
                 }
 
                 (feedbackModel.blocks || []).forEach(function(block) {

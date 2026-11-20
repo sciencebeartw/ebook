@@ -74,7 +74,12 @@
   }
   function merge(classKey,studentKey,legacy){const uid=account(),out={...(legacy||{})},existing=new Map(Object.entries(out).filter(([,r])=>r.clientRequestId).map(([id,r])=>[r.clientRequestId,r.originalFeedbackKey||id]));
    const withdrawn=Object.assign({},...([...remote.values()].filter(r=>r.loginUid===uid&&r.classKey===classKey&&r.studentKey===studentKey).map(r=>r.withdrawn||{})));
-   for(const [id,row]of Object.entries(out))if(withdrawn[id]||withdrawn[String(row.clientRequestId||'').replace(/^fw_/, '')]||Object.values(withdrawn).includes(row.originalFeedbackKey||id))delete out[id];
+   const withdrawnKeys=new Set(Object.values(withdrawn));
+   for(const [id,row]of Object.entries(out)){
+    const stable=row.originalFeedbackKey||id,alias="revision_"+stable,eventId=String(row.clientRequestId||"").replace(/^fw_/,"");
+    const markers=[withdrawn[id],withdrawn[stable],withdrawn[eventId]];
+    if(withdrawnKeys.has(stable)||markers.some(value=>value&&value!==alias))delete out[id];
+   }
    for(const row of [...remote.values()].filter(r=>r.loginUid===uid).flatMap(r=>r.rows).concat(Object.values(receipts(uid)))){if(withdrawn[row.eventId]||row.classKey!==classKey||row.studentKey!==studentKey||existing.has("fw_"+row.eventId)||out[row.eventId])continue;
     const teacher=row.mode!=="student";out[row.eventId]={time:new Date(row.committedAt).toLocaleString("sv-SE",{timeZone:"Asia/Taipei"}).replaceAll("-","/"),targetDate:row.targetDate,content:row.text,actorRole:teacher?"teacher":"student",type:teacher?(row.replyTo?"老師回覆":"老師留言"):"學生留言",source:teacher?"ebook_god_teacher":"ebook_student",replyToFeedbackKey:existing.get("fw_"+row.replyTo)||row.replyTo,clientRequestId:"fw_"+row.eventId,sourceStudentKey:row.studentKey,sourceClassKey:row.classKey,sourceClassName:row.className,fastWritePending:row.mirrorStatus!=="verified"};
    }return out;

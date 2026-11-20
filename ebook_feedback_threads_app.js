@@ -79,6 +79,7 @@
     // identified records are safe as a new student reply target.
     function isReplyableFeedback(item) {
         item = item || {};
+        if (item.replyWithdrawn) return false;
         var type = normalizedKey(item.type);
         if (STUDENT_CONVERSATION_TYPES[type]) return true;
         var actorRole = normalizedKey(item.actorRole).toLowerCase();
