@@ -5002,7 +5002,8 @@ html { background: #f3faf6; } #splash-status { margin: 22px 0 0; color: #315c44;
     <script src="fastwrite_config.js?v=20261029_math_feedback_enabled_v1"></script>
     <script src="fastwrite_production_transport.js?v=20261107_sticker_expired_recovery_v1"></script>
     <script src="feedback_revision_ui.js?v=20261121-1"></script>
-    <script src="fastwrite_message_bridge.js?v=20261121-1"></script>
+    <script src="ebook_teacher_feedback_actions.js?v=20261121-god-1"></script>
+    <script src="fastwrite_message_bridge.js?v=20261121-god-1"></script>
     <style>
         .history-msg-body.has-feedback-revision-actions { position: relative; }
         .ebook-feedback-revision-content { padding-inline-end: 34px; }
@@ -5022,7 +5023,7 @@ html { background: #f3faf6; } #splash-status { margin: 22px 0 0; color: #315c44;
             cursor: pointer;
         }
         .ebook-feedback-revision-trigger::-webkit-details-marker { display: none; }
-        .ebook-feedback-revision-actions[open] { z-index: 3; }
+        .ebook-feedback-revision-actions[open] { z-index: 2100; }
         .post-card:has(.ebook-feedback-revision-actions[open]) { overflow: visible; }
         .ebook-feedback-revision-options {
             position: absolute;
@@ -12047,6 +12048,7 @@ async function sendProductionStudentReport(action,payload,send) {
         }
 
         function renderDailyPosts(posts, history, fastWriteHistoryOnly) {
+            history = (history || []).map(window.EbookTeacherFeedbackActions.overlay);
             var container = document.getElementById('tab-content-0');
             if (fastWriteHistoryOnly === 'god-native-feedback' && !container.querySelector('.post-card-wrapper')) fastWriteHistoryOnly = false;
             window.GiftedHomeworkStatus?.observe(posts || [], gData?.grades || [], gData?.className || '', gData?.pendingPolicy?.homeworkDueByClass);
@@ -12469,7 +12471,8 @@ async function sendProductionStudentReport(action,payload,send) {
                     var bodyClass = isTeacher ? "teacher-body" : "";
                     var avatarChar = isTeacher ? teacherAvatarChar : studentAvatarChar;
                     var content = entry && entry.displayContent !== undefined ? entry.displayContent : item.content;
-                    var revisionActions = renderStudentFeedbackRevisionActions(item, ebookStudentRevisionTarget(item));
+                    var revisionActions = window.EbookTeacherFeedbackActions.render(item) ||
+                        renderStudentFeedbackRevisionActions(item, ebookStudentRevisionTarget(item));
                     var renderedContent = renderGiftedFeedback(item, content || "");
                     if (revisionActions) {
                         bodyClass += " has-feedback-revision-actions";
