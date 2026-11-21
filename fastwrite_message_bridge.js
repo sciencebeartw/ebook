@@ -136,8 +136,8 @@
    const result=await callableFor('teacher')({action:'fastWriteMessageViewV1',data:{scope:route.scopeId,epoch:route.epoch,studentKey:p.studentKey,...(p.before?{before:p.before}:{})}}),r=result?.data;
    if(account()!==uid||!r||r.scope!==route.scopeId||r.epoch!==route.epoch||r.className!==route.className||r.classKey!==route.classKey||r.studentKey!==p.studentKey||!Array.isArray(r.dates)||r.dates.length>4||new Set(r.dates).size!==r.dates.length||r.dates.some(d=>!/^\d{4}\/\d{2}\/\d{2}$/.test(d)))throw Error('invalid-message-dates');return r;
   }
-  async function nativeReference(p,messageId){
-   if(!/^p\d{12}_[a-f0-9]{64}$/.test(messageId||''))throw Error('invalid-message-reference');const uid=account(),t=await watchTarget('teacher',p),r=await t.transport.legacyReference(messageId);
+  async function nativeReference(p,messageId,mode='teacher'){
+   if(!['teacher','god'].includes(mode)||!/^p\d{12}_[a-f0-9]{64}$/.test(messageId||''))throw Error('invalid-message-reference');const uid=account(),t=await watchTarget(mode,p),r=await t.transport.legacyReference(messageId);
    if(account()!==uid||r?.messageId!==messageId||!safe(r.feedbackKey)||/^p\d{12}_/.test(r.feedbackKey)||!(r.authority==='firebase'&&r.verified===true||r.authority==='legacy'&&/^[a-f0-9]{64}$/.test(r.rollbackVerificationHash||'')))throw Error('留言仍在同步，請稍後再查核已看狀態');return r.feedbackKey;
   }
   return{handle,warm,receipts,checkReceipts,merge,watchTarget,clearRemote,dates,nativeReference,accepts:(subject,className)=>routes.has(className)&&routes.get(className).subject===subject};
