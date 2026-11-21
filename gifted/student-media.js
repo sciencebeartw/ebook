@@ -120,7 +120,8 @@
     const retryButton = image => image.parentElement?.querySelector('.student-media-retry');
     function loaded(image, source) {
       const state = states.get(source);
-      if (state && (!state.failedSurface?.isConnected || state.failedSurface === image)) state.failedSurface = null;
+      if (state && (!state.failedSurface?.isConnected || state.failedSurface === image ||
+        !surfaces(source).includes(state.failedSurface))) state.failedSurface = null;
       const button = retryButton(image);
       if (button && document.activeElement === button) {
         const focus = dialog?.contains(button) ? dialog.querySelector('[data-media-action="close"]')
