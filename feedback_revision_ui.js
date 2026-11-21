@@ -77,15 +77,23 @@
         return result.isConfirmed ? result.value?.revision : null;
     }
 
-    function preview(content, verified) {
+    function visibleContent(content) {
         const body = String(content || '').replace(/^\[quote(?::[^\]\r\n]+)?\][\s\S]*?\[\/quote\]\s*/i, '');
         const attachment = body.match(/(?:^|\r?\n)((?:📎 [^\r\n]+\r?\n)?\[附件\]https?:\/\/[^\s]+(?:\r?\n(?:📎 [^\r\n]+\r?\n)?\[附件\]https?:\/\/[^\s]+)*)\s*$/i);
-        // Handle rejection immediately even while the person is choosing an action.
+        return { text: (attachment ? body.slice(0, attachment.index) : body).trim(), hasAttachments: !!attachment };
+    }
+    function preview(content, verified) {
         const safe = Promise.resolve(verified).then(value => ({ value }), error => ({ error }));
         const ready = safe.then(result => { if (result.error) throw result.error; return result.value; });
         ready.catch(() => {});
-        return { text: (attachment ? body.slice(0, attachment.index) : body).trim(), hasAttachments: !!attachment,
-            verified: ready };
+        return { ...visibleContent(content), verified: ready };
     }
-    root.FeedbackRevisionUI = { edit, showHistory, preview };
+    function fromVisible(content, version) {
+        // The save endpoint still verifies the author and compares the stored version.
+        // A stale screen gets a conflict; no extra read is needed for a known version.
+        const state = { ...visibleContent(content), version, withdrawn: false };
+        return { ...state, verified: Promise.resolve(state) };
+    }
+
+    root.FeedbackRevisionUI = { edit, showHistory, preview, fromVisible };
 })(window);

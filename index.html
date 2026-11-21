@@ -12027,7 +12027,7 @@ async function sendProductionStudentReport(action,payload,send) {
                     await window.FeedbackRevisionUI.showHistory(Swal, submit);
                     return;
                 }
-                const initial = window.FeedbackRevisionUI.preview(item.content, submit({ operation: 'read' }));
+                const initial = window.FeedbackRevisionUI.fromVisible(item.content, Number(item.feedbackRevisionVersion || 0));
                 const revision = await window.FeedbackRevisionUI.edit(Swal, initial, submit,
                     () => createClientRequestId('student_feedback_edit'));
                 if (!revision || !active() || Number(item.feedbackRevisionVersion || 0) > revision.version) return;

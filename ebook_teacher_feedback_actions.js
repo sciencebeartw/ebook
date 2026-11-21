@@ -93,7 +93,11 @@
                 await root.FeedbackRevisionUI.showHistory(Swal, page => submit(page));
                 return;
             }
-            const initial = root.FeedbackRevisionUI.preview(item.content, submit({ operation: 'read' }));
+            const known = confirmed.get(cacheKey(item));
+            const content = known?.operation === 'edit' ? known.content : item.content;
+            const initial = known?.version !== undefined || item.contentProjection !== 'current'
+                ? root.FeedbackRevisionUI.fromVisible(content, known?.version || 0)
+                : root.FeedbackRevisionUI.preview(item.content, submit({ operation: 'read' }));
             if (button.dataset.feedbackOperation === 'withdraw') {
                 if (await swalConfirm('確定撤回這則回覆？', '撤回後，老師和家長在聯絡簿會看到「此回覆已撤回」。')) {
                     const verified = await initial.verified;
