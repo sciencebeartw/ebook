@@ -58,14 +58,15 @@
       return html({renderAs:'table',table:b},table,'題目資料表');
     }).join('');
   }
-  let dialog, previousFocus, zoom = 1, baseWidth = 0;
+  let dialog, previousFocus, viewedImage, zoom = 1, baseWidth = 0;
   function reset() { if (dialog?.open) dialog.close(); }
   function html(asset, tableHtml, label, kind = 'question') {
     const display = presentation(asset, kind);
     const isTable = asset.renderAs === 'table';
     const cols = asset.table?.rows?.[0]?.length || 4;
     const zoomWidth = isTable ? clamp(cols * 140, 560, 1000) : clamp(positive(asset.width) || 900, 560, 1200);
-    const body = isTable ? tableHtml : `<img src="${escape(asset.url)}" alt="${escape(label)}" loading="lazy">`;
+    const fingerprint = /^[a-f0-9]{64}$/.test(asset.sha256) ? ` data-media-sha="${asset.sha256}"` : '';
+    const body = isTable ? tableHtml : `<img src="${escape(asset.url)}" alt="${escape(label)}" loading="lazy"${fingerprint}>`;
     const size = display.imageWidth ? `;--student-media-image-width:${display.imageWidth};--student-media-image-height:${display.imageHeight}` : '';
     const calibrated = display.calibrated ? ' data-reading-size' : '';
     return `<figure class="student-media"${calibrated} data-media-kind="${kind === 'option' ? 'option' : 'question'}" data-student-media="${zoomWidth}" data-media-label="${escape(label)}" style="width:${display.width}${size}"><div class="student-media-preview">${body}</div><button type="button" class="student-media-open" aria-label="放大${escape(label)}">放大圖表 <span aria-hidden="true">↗</span></button></figure>`;
@@ -96,26 +97,100 @@
     dialog.querySelector('[data-media-action="minus"]').disabled = zoom <= .5;
     dialog.querySelector('[data-media-action="plus"]').disabled = zoom >= 3;
   }
-  function open(figure) {
+  function open(figure, recovery) {
     ensureDialog(); previousFocus = figure.querySelector('button'); zoom = 1;
     const source = figure.querySelector('.student-media-preview');
     const content = dialog.querySelector('.student-media-content');
-    content.replaceChildren(...[...source.childNodes].map(node => node.cloneNode(true)));
-    const image = content.querySelector('img');
-    if (image) image.loading = 'eager';
+    viewedImage = source.querySelector('img');
+    if (viewedImage) {
+      const image = viewedImage.cloneNode(true);
+      recovery?.watch(image, viewedImage);
+      image.loading = 'eager';
+      content.replaceChildren(image);
+    } else content.replaceChildren(...[...source.childNodes].map(node => node.cloneNode(true)));
     baseWidth = Number(figure.dataset.studentMedia);
     dialog.querySelector('h2').textContent = figure.dataset.mediaLabel;
     document.body.classList.add('student-media-opened'); dialog.showModal(); paintZoom();
     dialog.querySelector('.student-media-viewport').scrollTo(0, 0);
   }
-  function bind(container) {
+  function imageRecovery(container, renew) {
+    const states = new WeakMap();
+    const surfaces = source => viewedImage === source && dialog?.open
+      ? [source, dialog.querySelector('.student-media-content img')] : [source];
+    const retryButton = image => image.parentElement?.querySelector('.student-media-retry');
+    function loaded(image, source) {
+      const state = states.get(source);
+      if (state && (!state.failedSurface?.isConnected || state.failedSurface === image)) state.failedSurface = null;
+      const button = retryButton(image);
+      if (button && document.activeElement === button) {
+        const focus = dialog?.contains(button) ? dialog.querySelector('[data-media-action="close"]')
+          : image.closest('figure')?.querySelector('.student-media-open');
+        focus?.focus({preventScroll:true});
+      }
+      button?.remove();
+    }
+    function showRetry(image, source, state) {
+      const button = retryButton(image) || document.createElement('button');
+      button.type = 'button';
+      button.className = 'student-media-retry';
+      button.textContent = '重試載入題圖';
+      button.removeAttribute('aria-disabled');
+      button.onclick = event => {
+        event.preventDefault(); event.stopPropagation();
+        if (!state.pending) void recover(source, state, image);
+      };
+      if (!button.isConnected) image.after(button);
+    }
+    async function recover(source, state, failedImage) {
+      state.pending = true;
+      state.failedSurface = failedImage;
+      for (const image of surfaces(source)) {
+        const button = retryButton(image);
+        if (button) { button.textContent = '正在載入題圖…'; button.setAttribute('aria-disabled', 'true'); }
+      }
+      try {
+        const url = await renew(source);
+        if (!url || !container.contains(source)) return;
+        for (const image of surfaces(source)) {
+          if (image.src === url) image.removeAttribute('src');
+          image.src = url;
+        }
+      } catch {
+        if (container.contains(source)) for (const image of surfaces(source)) {
+          if (!image.naturalWidth) showRetry(image, source, state);
+        }
+      } finally {
+        state.pending = false;
+      }
+    }
+    function failed(image, source) {
+      if (!container.contains(source) || !source.dataset.mediaSha || !image.isConnected || image.naturalWidth) return;
+      if (!states.has(source)) states.set(source, {pending:false, failedSurface:null});
+      const state = states.get(source);
+      if (state.pending) return;
+      if (state.failedSurface) showRetry(image, source, state);
+      else void recover(source, state, image);
+    }
+    container.addEventListener('error', event => {
+      if (event.target.matches?.('img[data-media-sha]')) failed(event.target, event.target);
+    }, true);
+    container.addEventListener('load', event => {
+      if (event.target.matches?.('img[data-media-sha]')) loaded(event.target, event.target);
+    }, true);
+    return {watch(image, source) {
+      image.addEventListener('error', () => failed(image, source));
+      image.addEventListener('load', () => loaded(image, source));
+    }};
+  }
+  function bind(container, renewImage) {
     if (!container || container.dataset.mediaBound) return;
     container.dataset.mediaBound = '1';
+    const recovery = renewImage && imageRecovery(container, renewImage);
     container.addEventListener('click', event => {
       const figure = event.target.closest('[data-student-media]');
       if (!figure || !container.contains(figure)) return;
       // Image option zoom must not toggle its surrounding answer label.
-      event.preventDefault(); event.stopPropagation(); open(figure);
+      event.preventDefault(); event.stopPropagation(); open(figure, recovery);
     });
     window.addEventListener('resize', () => { if (dialog?.open) paintZoom(); });
   }

@@ -3,6 +3,43 @@
  const inputs=window.GiftedLibraryAnswerInputs;
  const target=new URLSearchParams(location.search).get('target'),mock=target==='mock';
  let transport,content=null,busy=false,changed=false,epoch=0,pending=null;
+ let renderedEpoch,mediaQueue;
+ function refreshImage(image){
+  if(!content||renderedEpoch!==epoch)return null;
+  const {chapterId,revision}=content,generation=epoch;
+  const questionId=image.closest('.student-question').dataset.id,sha256=image.dataset.mediaSha;
+  const key=JSON.stringify([questionId,sha256]);
+  if(!mediaQueue||mediaQueue.generation!==generation){
+   mediaQueue={generation,items:new Map()};
+   const queue=mediaQueue;
+   setTimeout(()=>flushMedia(queue,chapterId,revision),50);
+  }
+  if(!mediaQueue.items.has(key)){
+   const item={questionId,sha256};
+   item.promise=new Promise((resolve,reject)=>Object.assign(item,{resolve,reject}));
+   mediaQueue.items.set(key,item);
+  }
+  return mediaQueue.items.get(key).promise;
+ }
+ async function flushMedia(queue,chapterId,revision){
+  if(mediaQueue===queue)mediaQueue=null;
+  const entries=[...queue.items.values()];
+  for(let offset=0;offset<entries.length;offset+=16){
+   const batch=entries.slice(offset,offset+16);
+   if(queue.generation!==epoch){batch.forEach(item=>item.resolve(null));continue;}
+   try{
+    const items=batch.map(({questionId,sha256})=>({questionId,sha256}));
+    const response=await transport.request({action:'refreshMedia',chapterId,revision,items});
+    const urls=new Map(response.items.map(({questionId,sha256,url})=>[JSON.stringify([questionId,sha256]),url]));
+    for(const item of batch){
+     const url=urls.get(JSON.stringify([item.questionId,item.sha256]));
+     if(queue.generation!==epoch)item.resolve(null);
+     else if(url)item.resolve(url);
+     else item.reject(Error('QUESTION_MEDIA_UNAVAILABLE'));
+    }
+   }catch(error){batch.forEach(item=>queue.generation===epoch?item.reject(error):item.resolve(null));}
+  }
+ }
  const messages={ASSIGNMENT_NOT_OPEN:'這份教材尚未到開放日期。',LOGIN_REQUIRED:'登入已失效，請返回聯絡簿重新登入。',DRAFT_CONFLICT:'另一個裝置已更新答案，請重新載入最新紀錄。',FORMAL_ALREADY_SUBMITTED:'這份題本已送出，請重新載入查看結果。',ASSIGNMENT_VERSION_CHANGED:'教材版本已更新，請重新載入。',BLANKS_REQUIRE_CONFIRMATION:'尚有未填題目，請完成作答或勾選空白確認。',TEACHER_VIEW_READ_ONLY:'目前是老師唯讀檢視。',TRY_LATER:'操作較頻繁，請稍後再試。'};
  const message=e=>messages[e.message]||'連線暫時未完成，答案已保留，請重試。';
  const key=()=> 'gifted-library-draft-v1:'+transport.sessionUid+':'+content.chapterId;
@@ -50,6 +87,7 @@
  }
  async function load(chapterId){clearRetry();const mine=++epoch;busy=true;if(content)stash();pending=null;$('status').textContent='正在載入題目…';controls();
   try{const next=await transport.request({action:'task',chapterId});if(mine!==epoch)return;content=next;changed=false;BearStudentMedia.reset();$('title').textContent=mock?'模擬試題':'複習題本';$('list').hidden=true;$('paper').hidden=false;$('rounds').hidden=!mock;$('summary').textContent=next.label+' · '+next.questionCount+' 題';$('result').textContent='';$('blanks').checked=false;$('actions').hidden=next.status==='submitted';
+   renderedEpoch=mine;
    $('questions').innerHTML=next.questions.map(q=>'<article class="student-question" data-id="'+esc(q.id)+'">'+GiftedTypedQuestion.question(q)+(q.type==='manual'?inputs.fields(q):'')+'<div class="question-result" hidden></div></article>').join('');
    let answers=next.answers||{},notice='先作答，送出後即可核對答案。';
    try{const saved=JSON.parse(localStorage.getItem(key())||'null');if(saved&&saved.revision===next.revision&&saved.draftRevision===next.draftRevision&&next.status!=='submitted'){answers=saved.answers;pending=saved.pending||null;changed=true;notice=pending?'上次送出結果尚待確認，請按原按鈕重試。':'已恢復此裝置尚未送出的答案。';}}catch{}
@@ -67,7 +105,7 @@
   }catch(e){$('status').textContent=message(e);if(['BLANKS_REQUIRE_CONFIRMATION','INVALID_ANSWERS','INVALID_CHOICE'].includes(e.message))pending=null;stash();}
   finally{busy=false;controls();}
  }
- $('questions').addEventListener('input',()=>{changed=true;stash();});$('save').onclick=()=>write('draft');$('submit').onclick=()=>write('submit');$('reload').onclick=()=>content&&load(content.chapterId);$('rounds').onclick=()=>{stash();list();};BearStudentMedia.bind($('questions'));
+ $('questions').addEventListener('input',()=>{changed=true;stash();});$('save').onclick=()=>write('draft');$('submit').onclick=()=>write('submit');$('reload').onclick=()=>content&&load(content.chapterId);$('rounds').onclick=()=>{stash();list();};BearStudentMedia.bind($('questions'),refreshImage);
  window.GiftedLibraryPage={dirty:()=>changed};
  try{if(parent===window)throw Error('LOGIN_REQUIRED');transport=parent.GiftedLibraryEbook.getTransport(window);parent.GiftedLibraryEbook.pageReady?.(window);$('name').textContent=transport.studentName;mock?list():/^grb-chapter-\d{2}$/.test(target||'')?load(target):($('status').textContent='請從聯絡簿的教材按鈕進入。');}catch(e){$('status').textContent=message(e);}
 })();
