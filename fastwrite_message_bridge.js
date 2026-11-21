@@ -81,7 +81,7 @@
     if(withdrawnKeys.has(stable)||markers.some(value=>value&&value!==alias))delete out[id];
    }
    for(const row of [...remote.values()].filter(r=>r.loginUid===uid).flatMap(r=>r.rows).concat(Object.values(receipts(uid)))){if(withdrawn[row.eventId]||row.classKey!==classKey||row.studentKey!==studentKey||existing.has("fw_"+row.eventId)||out[row.eventId])continue;
-    const teacher=row.mode!=="student";out[row.eventId]={time:new Date(row.committedAt).toLocaleString("sv-SE",{timeZone:"Asia/Taipei"}).replaceAll("-","/"),targetDate:row.targetDate,content:row.text,actorRole:teacher?"teacher":"student",type:teacher?(row.replyTo?"老師回覆":"老師留言"):"學生留言",source:teacher?"ebook_god_teacher":"ebook_student",replyToFeedbackKey:existing.get("fw_"+row.replyTo)||row.replyTo,clientRequestId:"fw_"+row.eventId,sourceStudentKey:row.studentKey,sourceClassKey:row.classKey,sourceClassName:row.className,fastWritePending:row.mirrorStatus!=="verified"};
+    const teacher=row.mode!=="student";out[row.eventId]={time:new Date(row.committedAt).toLocaleString("sv-SE",{timeZone:"Asia/Taipei"}).replaceAll("-","/"),targetDate:row.targetDate,content:row.text,actorRole:teacher?"teacher":"student",type:teacher?(row.replyTo?"老師回覆":"老師留言"):"學生留言",source:teacher?"ebook_god_teacher":"ebook_student",replyToFeedbackKey:existing.get("fw_"+row.replyTo)||row.replyTo,clientRequestId:"fw_"+row.eventId,verifiedFeedbackStudentSource:"class-scoped-session-v1",sourceStudentKey:row.studentKey,sourceClassKey:row.classKey,sourceClassName:row.className,fastWritePending:row.mirrorStatus!=="verified"};
    }return out;
   }
   async function watchTarget(mode,p){

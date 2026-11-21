@@ -19,6 +19,7 @@
             classKey: item.storedClassKey || safeKey(gData.className),
             studentKey: item.storedStudentKey,
             feedbackKey: item.fbKey,
+            targetDate: productionMessageDate(item.targetDate),
         };
     }
 
@@ -88,24 +89,15 @@
         button.disabled = true;
         menu.setAttribute('aria-busy', 'true');
         try {
-            if (/^p\d{12}_/.test(target.feedbackKey)) {
-                target.feedbackKey = await getProductionMessageBridge().nativeReference({
-                    subject: BEAR_SUBJECT.replace(/^\//, ''), className: target.className,
-                    studentKey: target.studentKey, targetDate: productionMessageDate(item.targetDate),
-                }, target.feedbackKey, 'god');
-            }
             if (button.dataset.feedbackOperation === 'history') {
                 await root.FeedbackRevisionUI.showHistory(Swal, page => submit(page));
                 return;
             }
-            const initial = await submit({ operation: 'read' });
-            if (initial.withdrawn) {
-                remember({ operation: 'withdraw', version: initial.version });
-                return;
-            }
+            const initial = root.FeedbackRevisionUI.preview(item.content, submit({ operation: 'read' }));
             if (button.dataset.feedbackOperation === 'withdraw') {
                 if (await swalConfirm('確定撤回這則回覆？', '撤回後，老師和家長在聯絡簿會看到「此回覆已撤回」。')) {
-                    const saved = await submit({ operation: 'withdraw', version: initial.version,
+                    const verified = await initial.verified;
+                    const saved = await submit({ operation: 'withdraw', version: verified.version,
                         requestId: createClientRequestId('god_reply_withdraw') });
                     remember(saved.revision);
                 }

@@ -79,7 +79,7 @@
                 r && pending ? `<div class="rp-result rp-wait"><div>${received} <strong>${escape(r.score)}</strong> 分</div><div>正在背景登記，可以離開本頁。</div>${timing(r) || `<small>${formatDate(r.receivedAt)}</small>`}</div>` :
                 needsAttention ? '' :
                 r?.sheetPersisted ? `<div class="rp-result"><div>上次回報登記 <strong>${escape(r.score)}</strong> 分</div>${timing(r)}</div>` :
-                !a.canSubmit ? `<div class="rp-result rp-wait">目前尚無法確認正式成績，請重新整理或聯絡老師。${timing(r)}</div>` :
+                !a.canSubmit ? `<div class="rp-result rp-wait">${official.pending ? '資料正在背景更新，完成後會自動顯示。' : '目前尚無法確認正式成績，請重新整理或聯絡老師。'}${timing(r)}</div>` :
                 `<p class="rp-result rp-late rp-overdue" role="status" ${expired ? '' : 'hidden'}>已超過回報期限，請儘速完成並回報。本次將記錄為遲交。</p>${scoreForm(a, i, {
                     label: '我的分數', button: expired ? '補交分數' : '送出分數', value: draft(a),
                 })}<p class="rp-muted">送出後，看到「已收到」即可離開。${draft(a) ? '有尚未確認送達的分數，請確認後送出。' : ''}</p>`);
@@ -91,7 +91,7 @@
     }
     function schedule() {
         clearTimeout(timer);
-        if (!document.hidden && items.some(a => a.report && !['completed', 'needs_attention'].includes(a.report.status))) timer = setTimeout(() => {
+        if (!document.hidden && items.some(a => a.official?.pending || a.report && !['completed', 'needs_attention'].includes(a.report.status))) timer = setTimeout(() => {
             if (document.activeElement?.closest('form[data-index]')) schedule(); else load();
         }, 10000);
     }

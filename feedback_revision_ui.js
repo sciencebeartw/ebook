@@ -4,7 +4,16 @@
     async function showHistory(dialog, fetchPage) {
         let beforeVersion = 0;
         do {
-            const page = await fetchPage({ operation: 'history', beforeVersion });
+            let page;
+            let failure;
+            let loadingPopup;
+            const loading = dialog.fire({ title: '修改紀錄', text: '讀取中…', showConfirmButton: false,
+                showCancelButton: true, cancelButtonText: '關閉', didOpen: popup => { loadingPopup = popup; dialog.showLoading(); } });
+            page = await fetchPage({ operation: 'history', beforeVersion }).catch(error => { failure = error; });
+            if (!loadingPopup || dialog.getPopup() !== loadingPopup || !dialog.isVisible()) return;
+            dialog.close();
+            await loading;
+            if (failure) throw failure;
             const list = document.createElement('div');
             list.className = 'feedback-revision-history';
             for (const entry of page.entries || []) {
@@ -31,6 +40,10 @@
     }
 
     async function edit(dialog, initial, submit, requestId) {
+        let verified;
+        let verificationError;
+        const verification = Promise.resolve(initial.verified || initial).then(value => { verified = value; },
+            error => { verificationError = error; });
         let previousText;
         let id;
         const result = await dialog.fire({
@@ -46,11 +59,15 @@
             allowOutsideClick: () => !dialog.isLoading(),
             preConfirm: async value => {
                 try {
+                    await verification;
+                    if (verificationError) throw verificationError;
+                    if (verified.withdrawn) throw Error('這則留言已撤回，請關閉視窗。');
+                    if (verified.text !== initial.text) throw Error('這則留言已有更新，請關閉後重新開啟。');
                     const text = value.trim();
                     if (text === initial.text) return {};
                     if (text !== previousText) id = requestId();
                     previousText = text;
-                    return await submit({ operation: 'edit', version: initial.version, requestId: id, text });
+                    return await submit({ operation: 'edit', version: verified.version, requestId: id, text });
                 } catch (error) {
                     dialog.showValidationMessage(error.message || '留言儲存失敗，請再試一次。');
                     return false;
@@ -60,5 +77,15 @@
         return result.isConfirmed ? result.value?.revision : null;
     }
 
-    root.FeedbackRevisionUI = { edit, showHistory };
+    function preview(content, verified) {
+        const body = String(content || '').replace(/^\[quote(?::[^\]\r\n]+)?\][\s\S]*?\[\/quote\]\s*/i, '');
+        const attachment = body.match(/(?:^|\r?\n)((?:📎 [^\r\n]+\r?\n)?\[附件\]https?:\/\/[^\s]+(?:\r?\n(?:📎 [^\r\n]+\r?\n)?\[附件\]https?:\/\/[^\s]+)*)\s*$/i);
+        // Handle rejection immediately even while the person is choosing an action.
+        const safe = Promise.resolve(verified).then(value => ({ value }), error => ({ error }));
+        const ready = safe.then(result => { if (result.error) throw result.error; return result.value; });
+        ready.catch(() => {});
+        return { text: (attachment ? body.slice(0, attachment.index) : body).trim(), hasAttachments: !!attachment,
+            verified: ready };
+    }
+    root.FeedbackRevisionUI = { edit, showHistory, preview };
 })(window);
