@@ -6656,6 +6656,7 @@ async function sendProductionStudentReport(action,payload,send) {
                 actorRole: fb.actorRole || "",
                 source: fb.source || "",
                 feedbackRevisionVersion: fb.actorRole === 'student' ? fb.feedbackRevisionVersion : undefined,
+                contentProjection: fb.contentProjection === 'current' ? 'current' : undefined,
                 verifiedFeedbackStudentSource: fb.verifiedFeedbackStudentSource || "",
                 replyWithdrawn: fb.replyWithdrawn === true,
                 replyToFeedbackKey: fb.replyToFeedbackKey || "",
