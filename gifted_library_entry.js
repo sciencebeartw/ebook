@@ -10,7 +10,7 @@
  function ready(context){close(true);const user=context.auth?.currentUser;const teacherView=context.teacherView===true&&['god_session','student_preview'].includes(context.mode);if(!user||context.preview||(!teacherView&&(context.result?.isAdmin||['admin_view','god_session','student_preview'].includes(context.mode))))return;
   if(!policy.classIds.includes(context.result.className))return;
   session={auth:context.auth,uid:user.uid,className:context.result.className,name:context.result.studentName||'',readOnly:teacherView&&context.mode==='god_session',studentPreview:context.mode==='student_preview'};
-  session.useCalendar=!teacherView;
+  session.useCalendar=!teacherView || session.studentPreview;
   if(session.useCalendar)fetchCalendar(session);
   const target=new URLSearchParams(location.search).get('giftedLibrary');if(target==='mock'||/^grb-chapter-\d{2}$/.test(target||''))open(target);
  }
@@ -21,8 +21,9 @@
    return '<div class="gl-calendar-post" data-gl-class="'+esc(className)+'" data-gl-date="'+esc(date)+'"></div>';
   }
   const row=policy.reviews.find(r=>r.dates[className.includes('週六')?'sat':'sun']===date);
+  const mockStart=Date.parse(policy.mockOpensAtByClass?.[className] ?? policy.mockOpensAt);
   const items=(row && (preview || opening(date)<=Date.now())?link(row.chapterId,'複習題本',preview):'')+
-   (opening(date)>=Date.parse(policy.mockOpensAt) && (preview || opening(date)<=Date.now())?link('mock','模擬試題',preview):'');
+   (opening(date)>=mockStart && (preview || opening(date)<=Date.now())?link('mock','模擬試題',preview):'');
   return items?'<div class="gl-entry-buttons">'+items+'</div>':'';
  }
  function link(id,label,preview=false){
@@ -39,7 +40,7 @@
   const dates=[...new Set(slots.filter(s=>s.dataset.glClass===session?.className).map(s=>s.dataset.glDate).filter(d=>opening(d)<=now))].sort();
   const byDate=new Map();
   const mockStart=valid?Date.parse(c.mockOpensAt):Infinity;
-  const latestPublished=dates[dates.length-1];
+  let hasMockPost=false;
   if(valid && dates.length){
    for(const row of c.reviews){
     if(opening(row.date)>now)continue;
@@ -53,22 +54,33 @@
    if(!valid || slot.dataset.glClass!==session.className){slot.replaceChildren();continue;}
    const date=slot.dataset.glDate,rows=byDate.get(date)||[];
    const items=rows.map(row=>link(row.chapterId,rows.length===1 && row.date===date?'複習題本':'複習題本｜'+row.label));
-   if(valid && now>=mockStart && opening(date)<=now && (opening(date)>=mockStart || date===latestPublished))items.push(link('mock','模擬試題'));
+   if(valid && now>=mockStart && opening(date)>=mockStart && opening(date)<=now){
+    items.push(link('mock','模擬試題'));
+    hasMockPost=true;
+   }
    const html=items.length?'<div class="gl-entry-buttons">'+items.join('')+'</div>':'';
    if(slot.innerHTML!==html)slot.innerHTML=html;
   }
+  if(valid) refreshTopEntry(c,now,now>=mockStart && !hasMockPost);
+ }
+ function refreshTopEntry(calendar,now,showMock){
+  const entry=pilotRoot(),early=calendar.earlyAccess;
+  if(!entry)return;
+  let html='';
+  if(early && now<early.expiresAt){
+   const review=calendar.reviews.find(r=>r.chapterId===early.reviewId);
+   html='<strong>測試學生專用</strong><div class="gl-entry-buttons">'+
+    (review?link(review.chapterId,'複習題本｜'+review.label):'')+(early.mock?link('mock','模擬試題｜16 回'):'')+'</div>';
+  }else if(showMock){
+   html='<div class="gl-entry-buttons">'+link('mock','模擬試題')+'</div>';
+  }
+  if(entry.innerHTML!==html)entry.innerHTML=html;
+  entry.hidden=!html;
  }
  function drawCalendar(own){
   if(session!==own || own.auth.currentUser?.uid!==own.uid)return;
   refreshPostSlots();clearTimeout(boundaryTimer);
-  const c=own.calendar,now=serverTime(c),entry=pilotRoot(),early=c.earlyAccess;
-  clearPilot();
-  if(entry && early && now<early.expiresAt){
-   const review=c.reviews.find(r=>r.chapterId===early.reviewId);
-   entry.innerHTML='<strong>測試學生專用</strong><div class="gl-entry-buttons">'+
-    (review?link(review.chapterId,'複習題本｜'+review.label):'')+(early.mock?link('mock','模擬試題｜16 回'):'')+'</div>';
-   entry.hidden=false;
-  }
+  const c=own.calendar,now=serverTime(c),early=c.earlyAccess;
   const next=Math.min(...[...c.reviews.map(r=>opening(r.date)),Date.parse(c.mockOpensAt),early?.expiresAt].filter(t=>t>now));
   if(Number.isFinite(next))boundaryTimer=setTimeout(()=>drawCalendar(own),Math.min(next-now+50,2147483647));
  }
