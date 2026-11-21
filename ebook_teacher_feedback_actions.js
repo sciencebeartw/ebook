@@ -114,7 +114,10 @@
                     () => createClientRequestId('god_reply_edit')));
             }
         } catch (error) {
-            await swalAlert('無法處理回覆', error.message || '請稍後再試。', 'warning');
+            const message = error.code === 'functions/internal' || error.message === 'INTERNAL'
+                ? '暫時無法核對這則回覆，請稍後再試。已送出的留言仍保留，不必重新送出。'
+                : error.message || '請稍後再試。';
+            await swalAlert('無法處理回覆', message, 'warning');
         } finally {
             busy = false;
             button.disabled = false;
