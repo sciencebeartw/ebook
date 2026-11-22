@@ -85,13 +85,17 @@
  async function list(){clearRetry();const mine=++epoch;content=null;pending=null;changed=false;$('title').textContent='模擬試題';$('paper').hidden=true;$('list').hidden=true;$('rounds').hidden=true;$('status').textContent='正在讀取回次…';
   try{const r=await transport.request({action:'list'});if(mine!==epoch)return;const rows=r.entries.filter(e=>e.kind==='mock');$('status').textContent=rows.length?'自行選擇要練習的回次；已完成的回次可以查看答案。':'目前還沒有開放的模擬試題。';$('list').hidden=false;$('list').innerHTML=rows.map(e=>'<button type="button" data-chapter="'+esc(e.id)+'"><strong>'+esc(e.label)+'</strong><small>'+ (e.progress?'已完成 · '+e.progress.score+'／'+e.progress.maxScore:'尚未作答 · '+e.questionCount+' 題')+'</small></button>').join('');$('list').querySelectorAll('button').forEach(b=>b.onclick=()=>load(b.dataset.chapter));}catch(e){if(mine===epoch)readFailed(e,list);}
  }
+ async function loadTask(chapterId){
+  try{return await transport.request({action:'task',chapterId,deferMedia:true});}
+  catch(error){if(error.message!=='SERVER_OWNED_FIELD')throw error;return transport.request({action:'task',chapterId});}
+ }
  async function load(chapterId){clearRetry();const mine=++epoch;busy=true;if(content)stash();pending=null;$('status').textContent='正在載入題目…';controls();
-  try{const next=await transport.request({action:'task',chapterId});if(mine!==epoch)return;content=next;changed=false;BearStudentMedia.reset();$('title').textContent=mock?'模擬試題':'複習題本';$('list').hidden=true;$('paper').hidden=false;$('rounds').hidden=!mock;$('summary').textContent=next.label+' · '+next.questionCount+' 題';$('result').textContent='';$('blanks').checked=false;$('actions').hidden=next.status==='submitted';
+  try{const next=await loadTask(chapterId);if(mine!==epoch)return;content=next;changed=false;BearStudentMedia.reset();$('title').textContent=mock?'模擬試題':'複習題本';$('list').hidden=true;$('paper').hidden=false;$('rounds').hidden=!mock;$('summary').textContent=next.label+' · '+next.questionCount+' 題';$('result').textContent='';$('blanks').checked=false;$('actions').hidden=next.status==='submitted';
    renderedEpoch=mine;
    $('questions').innerHTML=next.questions.map(q=>'<article class="student-question" data-id="'+esc(q.id)+'">'+GiftedTypedQuestion.question(q)+(q.type==='manual'?inputs.fields(q):'')+'<div class="question-result" hidden></div></article>').join('');
    let answers=next.answers||{},notice='先作答，送出後即可核對答案。';
    try{const saved=JSON.parse(localStorage.getItem(key())||'null');if(saved&&saved.revision===next.revision&&saved.draftRevision===next.draftRevision&&next.status!=='submitted'){answers=saved.answers;pending=saved.pending||null;changed=true;notice=pending?'上次送出結果尚待確認，請按原按鈕重試。':'已恢復此裝置尚未送出的答案。';}}catch{}
-   setAnswers(answers);$('status').textContent=notice;
+   setAnswers(answers);$('status').textContent=notice;BearStudentMedia.observe($('questions'));
    if(next.status==='submitted'){showResult(next.result);try{localStorage.removeItem(key());}catch{}$('status').textContent='已收到作答紀錄。';}
   }catch(e){if(mine===epoch)readFailed(e,()=>load(chapterId));}finally{if(mine===epoch){busy=false;controls();}}
  }

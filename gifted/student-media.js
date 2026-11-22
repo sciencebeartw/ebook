@@ -3,7 +3,7 @@
   const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
   const positive = v => Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : 0;
   function readingWidth(asset) {
-    const fingerprint = String(asset.url || '').match(/(?:\/|%2f)([0-9a-f]{64})\.(?:png|svg)(?=[?#]|$)/i)?.[1];
+    const fingerprint = asset.deferred ? asset.sha256 : String(asset.url || '').match(/(?:\/|%2f)([0-9a-f]{64})\.(?:png|svg)(?=[?#]|$)/i)?.[1];
     return fingerprint ? positive(root.BearStudentMediaReadingSizes?.[fingerprint.toLowerCase()]) : 0;
   }
   function presentation(asset = {}, kind = 'question') {
@@ -66,7 +66,11 @@
     const cols = asset.table?.rows?.[0]?.length || 4;
     const zoomWidth = isTable ? clamp(cols * 140, 560, 1000) : clamp(positive(asset.width) || 900, 560, 1200);
     const fingerprint = /^[a-f0-9]{64}$/.test(asset.sha256) ? ` data-media-sha="${asset.sha256}"` : '';
-    const body = isTable ? tableHtml : `<img src="${escape(asset.url)}" alt="${escape(label)}" loading="lazy"${fingerprint}>`;
+    const deferred = asset.deferred === true && !asset.url && fingerprint;
+    const width = positive(asset.width), height = positive(asset.height);
+    const ratio = width && height ? `${width} / ${height}` : '3 / 2';
+    const source = deferred ? ` data-media-deferred style="--student-media-ratio:${ratio}"` : ` src="${escape(asset.url)}"`;
+    const body = isTable ? tableHtml : `<img${source} alt="${escape(label)}" loading="lazy"${fingerprint}>`;
     const size = display.imageWidth ? `;--student-media-image-width:${display.imageWidth};--student-media-image-height:${display.imageHeight}` : '';
     const calibrated = display.calibrated ? ' data-reading-size' : '';
     return `<figure class="student-media"${calibrated} data-media-kind="${kind === 'option' ? 'option' : 'question'}" data-student-media="${zoomWidth}" data-media-label="${escape(label)}" style="width:${display.width}${size}"><div class="student-media-preview">${body}</div><button type="button" class="student-media-open" aria-label="放大${escape(label)}">放大圖表 <span aria-hidden="true">↗</span></button></figure>`;
@@ -112,8 +116,11 @@
     dialog.querySelector('h2').textContent = figure.dataset.mediaLabel;
     document.body.classList.add('student-media-opened'); dialog.showModal(); paintZoom();
     dialog.querySelector('.student-media-viewport').scrollTo(0, 0);
+    if (viewedImage?.hasAttribute('data-media-deferred')) recovery?.load(viewedImage);
   }
+  const lazyImages = new WeakMap();
   function imageRecovery(container, renew) {
+    let observer;
     const states = new WeakMap();
     const surfaces = source => viewedImage === source && dialog?.open
       ? [source, dialog.querySelector('.student-media-content img')] : [source];
@@ -151,10 +158,12 @@
       }
       try {
         const url = await renew(source);
-        if (!url || !container.contains(source)) return;
+        if (!container.contains(source)) return;
+        if (!url) throw Error('QUESTION_MEDIA_UNAVAILABLE');
         for (const image of surfaces(source)) {
           if (image.src === url) image.removeAttribute('src');
           image.src = url;
+          delete image.dataset.mediaDeferred;
         }
       } catch {
         if (container.contains(source)) for (const image of surfaces(source)) {
@@ -178,7 +187,29 @@
     container.addEventListener('load', event => {
       if (event.target.matches?.('img[data-media-sha]')) loaded(event.target, event.target);
     }, true);
-    return {watch(image, source) {
+    function load(source) {
+      if (!container.contains(source) || !source.hasAttribute('data-media-deferred')) return;
+      if (!states.has(source)) states.set(source, {pending:false, failedSurface:null});
+      const state = states.get(source);
+      if (state.pending) return;
+      if (retryButton(source)) {
+        for (const image of surfaces(source)) if (image !== source) showRetry(image, source, state);
+      } else void recover(source, state, null);
+    }
+    function observe() {
+      const images = container.querySelectorAll('img[data-media-deferred]');
+      observer?.disconnect();
+      if (!images.length) return;
+      observer ||= new IntersectionObserver(entries => {
+        for (const {target, isIntersecting} of entries) {
+          if (!isIntersecting) continue;
+          observer.unobserve(target);
+          load(target);
+        }
+      }, {rootMargin:'160px 0px'});
+      for (const image of images) observer.observe(image);
+    }
+    return {load, observe, watch(image, source) {
       image.addEventListener('error', () => failed(image, source));
       image.addEventListener('load', () => loaded(image, source));
     }};
@@ -187,6 +218,7 @@
     if (!container || container.dataset.mediaBound) return;
     container.dataset.mediaBound = '1';
     const recovery = renewImage && imageRecovery(container, renewImage);
+    if (recovery) lazyImages.set(container, recovery);
     container.addEventListener('click', event => {
       const figure = event.target.closest('[data-student-media]');
       if (!figure || !container.contains(figure)) return;
@@ -195,7 +227,8 @@
     });
     window.addEventListener('resize', () => { if (dialog?.open) paintZoom(); });
   }
-  const api = {presentation, optionColumns, homeworkOptions, html, blocks, reset, bind};
+  function observe(container) { lazyImages.get(container)?.observe(); }
+  const api = {presentation, optionColumns, homeworkOptions, html, blocks, reset, bind, observe};
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.BearStudentMedia = api;
 })(typeof window !== 'undefined' ? window : globalThis);

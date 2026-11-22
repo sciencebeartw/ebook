@@ -65,6 +65,7 @@ function paint(){
   '<p><strong>'+esc(questionLabel(q))+'</strong></p><p>'+esc(q.prompt)+'</p>'+
   promptMedia+options;
  window.GiftedProperNames?.decorate($('questionCard'),q.prompt);
+ BearStudentMedia.observe($('questionCard'));
  $('questionCard').querySelectorAll('input[name=answer]').forEach(el=>el.onchange=()=>{if(isReadOnly())return;try{answers[q.id]=el.value;box.saveLocalDraft(answers,task.revision);$('studentStatus').textContent='已暫存本機；送出後才正式登記。';paint();}catch(e){error(e);}});
  paintAnswerGrid();
  $('previous').disabled=questionIndex===0;$('next').disabled=questionIndex===task.questions.length-1;controls();
@@ -117,7 +118,12 @@ function readResult(){
  return entry.promise;
 }
 function showConflict(server){conflictTask=server;$('conflict').hidden=false;const local=box.snapshot().draft?.answers||{};const label=(q,v)=>{const n=q.choices.indexOf(one(v));return n<0?'未答':String.fromCharCode(65+n);};const differences=task.questions.filter(q=>one(local[q.id])!==one(server.answers[q.id]));$('comparison').innerHTML=differences.length?differences.map(q=>'<p>'+esc(questionLabel(q))+'：本機 '+label(q,local[q.id])+'／已保存 '+label(q,server.answers[q.id])+'</p>').join(''):'<p>選項相同，保存版本不同；請選擇要保留的版本。</p>';$('studentStatus').textContent='另一個視窗或裝置已更新答案；請先比較版本。';controls();}
-async function load(){answerRetry?.dispose();gradeRefresh?.dispose();box?.close({erase:false});task=await student('task');submissionResult=null;latestSummary=null;$('result').innerHTML='';$('receipt').textContent='';$('resultStatus').textContent='';$('resultSection').hidden=!task.submission;$('submitSection').hidden=isReadOnly()||!!task.submission;conflictTask=null;$('conflict').hidden=true;$('workspace').hidden=false;$('login').hidden=true;$('studentName').textContent=task.classId+' · '+(transport?transport.studentName:'測試學生 '+actor.toUpperCase());$('studentTitle').innerHTML=esc(task.chapterLabel)+'<span class="scope-label">'+esc(task.label)+'</span>';$('assignmentInfo').textContent='本次 '+task.questions.length+' 題 · '+'成績只計本次範圍。';
+async function loadTask(){
+ if(!transport)return student('task');
+ try{return await student('task',{deferMedia:true});}
+ catch(error){if(error.message!=='SERVER_OWNED_FIELD')throw error;return student('task');}
+}
+async function load(){answerRetry?.dispose();gradeRefresh?.dispose();box?.close({erase:false});task=await loadTask();submissionResult=null;latestSummary=null;$('result').innerHTML='';$('receipt').textContent='';$('resultStatus').textContent='';$('resultSection').hidden=!task.submission;$('submitSection').hidden=isReadOnly()||!!task.submission;conflictTask=null;$('conflict').hidden=true;$('workspace').hidden=false;$('login').hidden=true;$('studentName').textContent=task.classId+' · '+(transport?transport.studentName:'測試學生 '+actor.toUpperCase());$('studentTitle').innerHTML=esc(task.chapterLabel)+'<span class="scope-label">'+esc(task.label)+'</span>';$('assignmentInfo').textContent='本次 '+task.questions.length+' 題 · '+'成績只計本次範圍。';
  box=null;
  if(!isReadOnly()){await reserveTab();box=GiftedAnswerOutbox.create({storage:localStorage,scope:{sessionUid:transport?transport.sessionUid:'v21-test-'+(query.get('fixture')||'default')+'-'+actor,planId:task.planId,segmentId:task.segmentId,scopeRevision:task.scopeRevision,tabId},transport:learning});}
  // 收件回覆曾遺失，但重新整理已取得正式收據時，清掉待重送狀態；不重寫伺服器首答。

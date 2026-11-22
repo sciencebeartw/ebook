@@ -59,3 +59,9 @@ body.student-media-opened{overflow:hidden}
   [data-gifted-library] .student-media[data-reading-size] { font-size: 19px }
   .correction-answers .student-media[data-reading-size] { font-size: 18px }
 }
+
+/* Keep an image's place while its private download URL is prepared. */
+.student-media-preview>img[data-media-deferred],.student-media-content>img[data-media-deferred]{
+  width:min(100%,var(--student-media-image-width,100%));aspect-ratio:var(--student-media-ratio);
+  background-color:#f1f5f9;color:transparent
+}
