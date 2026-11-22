@@ -1,3 +1,7 @@
+## 2026-11-22 課本／誤填更正題圖原地重載
+
+課本與誤填更正沿用共用 student-media 恢復機制；只更新同一 img 的 URL，保留題面、答案、本機草稿與開啟中的放大倍率。失敗圖 50ms 合批、每批至多 16 個 questionId／sha256，絕不因題圖失效重載 task 或重送答案。老師唯讀預覽也可刷新圖片。正式 `giftedStudentApi` v53 ACTIVE，由 v52 最新正式來源只疊加三檔；96 檔讀回相同，設定與 IAM 不變。前後端新增各 6 項測試通過，另 20 項發布／可見性測試通過；正式測試學生驗收接續記於主 workspace `docs/systems/homework-media-refresh-20261122.md`。未修改 GAS、Rules、登分或教材內容。
+
 ## 2026-11-21 複習／模擬題圖逾時自動重載
 
 正式學生端在圖片失敗時單圖／批次刷新，保留答案、本機草稿與放大狀態；再次失敗才提供該圖重試。後端 `giftedLibraryStudentApi` v14 ACTIVE 僅更新三檔，保留 v13 分班開放及原設定／IAM。收尾補齊「刷新中先關閉放大視窗」的狀態清除，讓下次逾時仍能自動刷新。部署與週六測試生 WebKit 820×1180／1180×820 驗收、原兩份答卷全值保持及流量範圍見主 workspace `docs/systems/gifted-reviewbook-library-20261010.md`。不新增交卷或登分，教材政策保持。

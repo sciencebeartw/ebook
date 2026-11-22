@@ -2,7 +2,7 @@
 const $=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const questionLabel=q=>q.paperLabel||'章內第 '+q.sourceIndex+' 題';
 const query=new URLSearchParams(location.search),transport=window.GiftedStudentTransport;let actor,task,box,answers={},questionIndex=0,busy=false,tabId,releaseTab,conflictTask;
-let mediaRefresh,mediaRetryAt=0,gradeRefresh,answerRetry,submissionResult=null,latestSummary=null,resultRead=null;
+let mediaRefresh,gradeRefresh,answerRetry,submissionResult=null,latestSummary=null,resultRead=null;
 // 延用 v17 的分頁鎖：重新整理保留同一草稿；複製分頁取得獨立編輯副本。
 async function reserveTab(){
  if(tabId)return;
@@ -24,18 +24,9 @@ const isReadOnly=()=>transport?.readOnly===true||task?.readOnly===true;
 const confirmWrite=action=>transport?.confirmWrite?transport.confirmWrite(action):Promise.resolve(true);
 const messages={TEACHER_VIEW_READ_ONLY:'老師查看模式只能檢視，不能替學生送出或更正答案。',IDENTITY_MAPPING_REQUIRED:'這個帳號的線上作業尚未開通，請聯絡老師協助；電子聯絡簿仍可正常使用。',PILOT_STUDENT_REQUIRED:'這個帳號的線上作業尚未開通，請聯絡老師協助。',ENROLLMENT_INACTIVE:'這個帳號的作業使用資格需要老師確認，請聯絡老師協助。',ROSTER_CHANGED:'學生資料已更新，請返回聯絡簿重新登入；若仍無法作答，請聯絡老師。',LOGIN_REQUIRED:'登入已過期，請返回聯絡簿重新登入；尚未送出的答案已保留。',ASSIGNMENT_NOT_OPEN:'這份作業目前尚未開放或已截止。',ASSIGNMENT_UNAVAILABLE:'作業尚未準備完成，請稍後再試。',PUBLISHED_POST_NOT_READY:'聯絡簿正在同步，請稍後再試。',PUBLISHED_POST_LINK_MISMATCH:'本堂作業設定已變更，請從最新聯絡簿重新開啟。',HOMEWORK_POST_CONFLICT:'本堂作業發布時間或連結已變更，請由老師確認。',TRY_LATER:'操作較頻繁，請稍後重試。',CLASS_NOT_AUTHORIZED:'這份作業不屬於目前登入的班級。',RETRY_OR_CHECK_RECEIPT:'尚未確認伺服器結果，原答案已保留，請稍後重試。'};
 function error(e){$('error').textContent=messages[e.message]||e.message;if(!task)$('login').textContent='作業暫時無法載入，請返回聯絡簿後重新開啟。';}
-async function refreshMedia(){
- if(!task||mediaRefresh)return;
- $('mediaStatus').hidden=false;
- if(Date.now()<mediaRetryAt){$('mediaMessage').textContent='圖表尚未載入，請稍候一分鐘再試；已填答案仍保留。';return;}
- const original=task;mediaRetryAt=Date.now()+60000;$('reloadMedia').disabled=true;$('mediaMessage').textContent='正在重新載入圖表，已填答案仍保留。';
- mediaRefresh=(async()=>{try{
-   const fresh=await student('task');if(task!==original)return;
-   task=GiftedMediaRefresh.refreshUrls(task,fresh);paint();
-   $('mediaMessage').textContent='圖片連結已更新；若仍未顯示，請稍後再試。';
- }catch(e){$('mediaMessage').textContent=messages[e.message]||'圖表暫時無法載入，請稍後再試；已填答案仍保留。';}
- finally{$('reloadMedia').disabled=false;mediaRefresh=null;}})();
- return mediaRefresh;
+function refreshImage(image){
+ mediaRefresh||=GiftedMediaRefresh.create({getTask:()=>task,request:body=>student('refreshMedia',body)});
+ return mediaRefresh.refreshImage(image);
 }
 function controls(){let state;try{state=box?.snapshot();}catch{state={invalid:true};}const locked=isReadOnly()||busy||!task||!!task.submission||!!state?.pending||!!conflictTask||state?.invalid;
  document.querySelectorAll('#questionCard input[name=answer]').forEach(el=>el.disabled=!!locked);
@@ -64,8 +55,8 @@ function paintAnswerGrid(){
  $('answerGridHelp').hidden=!needsCorrection;
 }
 function paint(){
- BearStudentMedia.bind($('questionCard'));BearStudentMedia.reset();
- const q=task.questions[questionIndex];$('count').textContent='已填 '+valuesCount()+' / '+task.questions.length+' 題';$('question').value=q.id;
+ BearStudentMedia.bind($('questionCard'),refreshImage);BearStudentMedia.reset();
+ const q=task.questions[questionIndex];$('questionCard').dataset.mediaQuestionId=q.id;$('count').textContent='已填 '+valuesCount()+' / '+task.questions.length+' 題';$('question').value=q.id;
  const promptMedia=BearStudentMedia.blocks(q.bodyBlocks)+q.media.map(m=>BearStudentMedia.html(m,'',questionLabel(q)+'圖表')).join('');
  const options=BearStudentMedia.homeworkOptions(q.options,o=>
   `<input type="radio" name="answer" value="${esc(o.id)}" ${one(answers[q.id])===o.id?'checked':''} ${task.submission?'disabled':''}>`
@@ -139,7 +130,7 @@ async function load(){answerRetry?.dispose();gradeRefresh?.dispose();box?.close(
  $('correctionRequest').hidden=true;$('correctionRequest').innerHTML='';
  document.querySelector('.lead').textContent=isReadOnly()?'老師查看模式：可檢視學生作業、答案與成績。':'提交後會自動登記作業成績，不必另外傳訊息回報。';
  document.querySelector('.homework-reminder').hidden=isReadOnly();
- if(!isReadOnly())GiftedCorrectionRequest.mount($('correctionRequest'),{task,scopeKey:transport?transport.sessionUid:actor,send:learning,reload:load,beforeSubmit:()=>confirmWrite('requestCorrection')});
+ if(!isReadOnly())GiftedCorrectionRequest.mount($('correctionRequest'),{task,scopeKey:transport?transport.sessionUid:actor,send:learning,reload:load,beforeSubmit:()=>confirmWrite('requestCorrection'),renewImage:refreshImage});
  startAnswerRetry();
  if(task.submission)await readResult();
 }
@@ -174,7 +165,7 @@ async function flush(){
   // 交卷後不重載 task，仍須讓更正表單取得本次正式送出的完整答案。
   task.answers=Object.fromEntries(task.questions.map(q=>{const value=answers[q.id];return [q.id,q.type==='manual'?value||'':Array.isArray(value)?[...value].sort():value?[value]:[]];}));
   showReceipt();paint();
-  GiftedCorrectionRequest.mount($('correctionRequest'),{task,scopeKey:transport?transport.sessionUid:actor,send:learning,reload:load,beforeSubmit:()=>confirmWrite('requestCorrection')});
+  GiftedCorrectionRequest.mount($('correctionRequest'),{task,scopeKey:transport?transport.sessionUid:actor,send:learning,reload:load,beforeSubmit:()=>confirmWrite('requestCorrection'),renewImage:refreshImage});
   if(response.result.result)renderResult(response.result.result);else readResult();
   startSummary();$('summary').scrollIntoView({behavior:'instant',block:'start'});
  }else if(response.status==='saved'){
@@ -185,10 +176,6 @@ async function flush(){
 async function saveOrSubmit(action){if(isReadOnly())throw Error('TEACHER_VIEW_READ_ONLY');if(action==='submit'&&valuesCount()<task.questions.length&&!$('blanks').checked)throw Error('還有未答題，請填完或勾選確認留白。');if(!await confirmWrite(action==='save'?'draft':'submit'))return;box.enqueue(action==='save'?'draft':'submit',answers,task.revision,$('blanks').checked);await flush();}
 
 function initStudent(){for(const event of ['click','keydown','touchstart','scroll'])document.addEventListener(event,()=>{try{transport?.activity?.();}catch{}},{passive:true,capture:true});$('student').hidden=false;if(!query.get('plan')){$('login').innerHTML='<p>請從電子聯絡簿的本週作業連結進入。</p>';return;}
- const mediaStatus=document.createElement('div');mediaStatus.id='mediaStatus';mediaStatus.hidden=true;mediaStatus.innerHTML='<p id="mediaMessage" role="status"></p><button type="button" id="reloadMedia">重新載入圖表</button>';$('questionCard').before(mediaStatus);
- $('reloadMedia').onclick=()=>refreshMedia();
- document.addEventListener('error',e=>{if(e.target.tagName==='IMG'&&e.target.closest('.student-media,.student-media-dialog'))refreshMedia();},true);
- document.addEventListener('load',e=>{if(e.target.tagName!=='IMG'||!e.target.closest('.student-media,.student-media-dialog'))return;const images=[...document.querySelectorAll('#questionCard img,.student-media-dialog[open] img')];if(images.length&&images.every(i=>i.complete&&i.naturalWidth>0))$('mediaStatus').hidden=true;},true);
  document.querySelectorAll('[data-actor]').forEach(el=>el.onclick=()=>run(el,async()=>{await reserveTab();actor=el.dataset.actor;await load();}));
  $('question').onchange=e=>{questionIndex=task.questions.findIndex(q=>q.id===e.target.value);paint();};$('previous').onclick=()=>{questionIndex--;paint();};$('next').onclick=()=>{questionIndex++;paint();};
  for(const action of ['save','submit'])$(action).onclick=e=>run(e.target,()=>saveOrSubmit(action));$('retry').onclick=e=>run(e.target,async()=>{answerRetry?.reset();await flush();});
