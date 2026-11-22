@@ -5000,6 +5000,7 @@ html { background: #f3faf6; } #splash-status { margin: 22px 0 0; color: #315c44;
   <link rel="stylesheet" href="ebook_resources.css?v=20261003_resources_mobile_type_v6">
   <link rel="stylesheet" href="ebook_push.css?v=20261015-preview1">
     <script src="fastwrite_config.js?v=20261029_math_feedback_enabled_v1"></script>
+    <script src="feedback_region_transport.js?v=20261122-locality"></script>
     <script src="fastwrite_production_transport.js?v=20261122-feedback-speed"></script>
     <script src="feedback_revision_ui.js?v=20261122-firebase-first"></script>
     <script src="ebook_teacher_feedback_actions.js?v=20261122-feedback-speed"></script>
@@ -5184,7 +5185,7 @@ function getProductionMessageBridge() {
  if(!productionMessageBridge)productionMessageBridge=window.MessageFastWriteBridge.create({scopes:scopes,storage:window.localStorage,
   getUid:function(){return ebookFirebaseApp.auth().currentUser?.uid;},
   getSessionId:function(){return ebookGodSessionId;},
-  callableFor:function(mode){return ebookFunctions.httpsCallable(mode==='student'?'runEbookStudentAction':mode==='god'?'runEbookGodAdminAction':'runEbookGasAdminAction',{timeout:30000});},
+  callableFor:function(mode){return window.FeedbackRegionTransport.createCallable(ebookFirebaseApp,mode==='student'?'runEbookStudentAction':mode==='god'?'runEbookGodAdminAction':'runEbookGasAdminAction',{timeout:30000});},
   hash:async function(parts){return Array.from(new Uint8Array(await window.crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(parts))))).map(function(x){return x.toString(16).padStart(2,'0');}).join('');}
  });return productionMessageBridge;
 }
@@ -12014,7 +12015,7 @@ async function sendProductionStudentReport(action,payload,send) {
             const uid = ebookFirebaseApp.auth().currentUser?.uid;
             const active = () => !!uid && uid === ebookFirebaseApp.auth().currentUser?.uid &&
                 ebookAuthSessionInfo === session && !!ebookStudentRevisionTarget(item);
-            const request = ebookFunctions.httpsCallable('runEbookStudentAction', { timeout: 180000 });
+            const request = window.FeedbackRegionTransport.createCallable(ebookFirebaseApp,'runEbookStudentAction', { timeout: 180000 });
             const submit = async data => {
                 if (!active()) throw Error('登入已切換，請重新開啟留言。');
                 const { editable, ...binding } = target;
@@ -14160,7 +14161,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         }
 
         function getGodSessionCallable(name) {
-            var original=ebookFunctions.httpsCallable(name, name === 'runEbookGodAdminAction' ? { timeout: 180000 } : undefined);
+            var original=window.FeedbackRegionTransport.createCallable(ebookFirebaseApp,name, name === 'runEbookGodAdminAction' ? { timeout: 180000 } : undefined);
             if(name!=='sendEbookGodDirectMessage'&&name!=='sendEbookGodReply')return original;
             return function(payload){return Promise.resolve().then(function(){var b=getProductionMessageBridge();if(b&&!b.accepts(BEAR_SUBJECT.replace(/^\//,''),payload.sourceClassName||payload.className||(gData&&gData.className)))b=null;var fast=b?b.handle('god',productionEbookMessageInput(payload)):null;return fast?fast.promise.then(function(r){if(r.authority==='legacy'){if(name==='sendEbookGodReply')payload.feedbackKey=r.replyToFeedbackKey||'';return original(payload);}return{data:r};}):original(payload);});};
         }
