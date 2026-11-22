@@ -66,7 +66,7 @@ async function runLoginChoice(rememberDevice) {
     console,
     firebase: { auth: { Auth: { Persistence: { LOCAL: 'LOCAL', NONE: 'NONE' } } } },
     BEAR_SUBJECT: '/science',
-    ebookFunctions: {
+    ebookRegionalFunctions: {
       httpsCallable(name) {
         assert.equal(name, 'createEbookStudentSession');
         return async payload => {
@@ -86,7 +86,7 @@ async function runLoginChoice(rememberDevice) {
       async signInWithCustomToken(token) { assert.equal(token, 'token'); },
     },
     executeFirebaseRead: async () => ({ found: true }),
-    loadEbookPendingTaskPolicy: async () => ({ status: 'ready' }),
+    loadEbookLoginPendingPolicy: async () => ({ status: 'ready' }),
     ebookAuthSessionInfo: null,
     onSuccess(value) { successValue = value; },
     onErr(error) { throw error; },

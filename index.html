@@ -5139,6 +5139,7 @@ html { background: #f3faf6; } #splash-status { margin: 22px 0 0; color: #315c44;
     const db = ebookFirebaseApp.database();
     const ebookAuth = ebookFirebaseApp.auth();
     const ebookFunctions = ebookFirebaseApp.functions();
+    const ebookRegionalFunctions = ebookFirebaseApp.functions('asia-southeast1');
     const ebookStorage = ebookFirebaseApp.storage();
     EbookSurveyAttachments.configure({storage:function(){return ebookStorage;}});
     const BEAR_SUBJECT = '/' + ebookSubjectParam;
@@ -5327,7 +5328,7 @@ async function sendProductionStudentReport(action,payload,send) {
 
     async function loadEbookPendingTaskPolicy() {
       try {
-        var callable = ebookFunctions.httpsCallable('getEbookPendingTaskPolicy');
+        var callable = ebookRegionalFunctions.httpsCallable('getEbookPendingTaskPolicy');
         var result = await callable({});
         return normalizeEbookPendingPolicyPayload(result && result.data);
       } catch (error) {
@@ -7118,7 +7119,7 @@ async function sendProductionStudentReport(action,payload,send) {
       return {
         getStudentData: async function(u, p, rememberDevice) {
            try {
-               const loginFn = ebookFunctions.httpsCallable('createEbookStudentSession');
+               const loginFn = ebookRegionalFunctions.httpsCallable('createEbookStudentSession');
                const shouldRemember = rememberDevice === true;
                const loginResult = await loginFn({
                    subjectKey: BEAR_SUBJECT.replace('/', ''),
@@ -9258,7 +9259,7 @@ async function sendProductionStudentReport(action,payload,send) {
                 var currentUser = await waitForInitialEbookAuthUser(8000);
                 if (!currentUser) return false;
                 showEbookParentLoginLoader('自動登入中');
-                var resumeFn = ebookFunctions.httpsCallable('resumeEbookStudentSession');
+                var resumeFn = ebookRegionalFunctions.httpsCallable('resumeEbookStudentSession');
                 var resumeResult = await resumeFn({ subjectKey: BEAR_SUBJECT.replace('/', ''), includePendingPolicy: true });
                 var session = resumeResult && resumeResult.data ? resumeResult.data : null;
                 if (!session || !session.firebaseCustomToken || !session.className || !session.studentKey) {
@@ -9329,7 +9330,7 @@ async function sendProductionStudentReport(action,payload,send) {
             if (checkWithdrawalSession()) return;
             queueMicrotask(function() { window.EbookPush?.ready({ session: ebookAuthSessionInfo || {}, uid: ebookAuth.currentUser && ebookAuth.currentUser.uid,
                 subject: ebookSubjectParam, preview: isStudentPreviewMode || isDashboardDraftPreviewMode || !!ebookGodSessionInfo,
-                firebaseConfig: firebaseConfig, navigate: openEbookPushTarget, findTarget: function(target) { return window.EbookPushNavigation.find(target, getEbookPushNavigationContext()); }, isReadable: function(node) { return window.EbookPushNavigation.readable(node); }, call: async function(data) { return (await ebookFunctions.httpsCallable('runEbookPushAction', { timeout: 15000 })(data)).data; } }); });
+                firebaseConfig: firebaseConfig, navigate: openEbookPushTarget, findTarget: function(target) { return window.EbookPushNavigation.find(target, getEbookPushNavigationContext()); }, isReadable: function(node) { return window.EbookPushNavigation.readable(node); }, call: async function(data) { return (await ebookRegionalFunctions.httpsCallable('runEbookPushAction', { timeout: 15000 })(data)).data; } }); });
             queueMicrotask(function() { window.GiftedEbook?.ready({ auth: ebookAuth, result: result, mode: pass, preview: isDashboardDraftPreviewMode, teacherView: !!ebookGodSessionInfo }); window.GiftedLibraryEbook?.ready({ auth: ebookAuth, result: result, mode: pass, preview: isDashboardDraftPreviewMode, teacherView: !!ebookGodSessionInfo }); window.GiftedFormalExam?.ready({ auth: ebookAuth, functions: ebookFunctions, result: result, studentSession: ebookAuthSessionInfo, preview: isStudentPreviewMode || isDashboardDraftPreviewMode, teacherView: !!ebookGodSessionInfo }); });
             activeEbookPromotionContext = result.promotionContext || null;
             resetPopupQueueForEntry();
@@ -9689,7 +9690,7 @@ async function sendProductionStudentReport(action,payload,send) {
             if (window.EbookResources) {
                 if (!isDashboardDraftPreviewMode && !isAdminMode && (ebookAuthSessionInfo || {}).role !== 'teacher') {
                     window.EbookResources.mount({ request: async function(payload) {
-                        var response = await ebookFunctions.httpsCallable('getEbookResources')(payload);
+                        var response = await ebookRegionalFunctions.httpsCallable('getEbookResources')(payload);
                         return response.data;
                     }});
                 } else window.EbookResources.reset();
@@ -9700,7 +9701,7 @@ async function sendProductionStudentReport(action,payload,send) {
                 window.EbookSurveyParent.mount({
                     preview: isStudentPreviewMode,
                     identity: [ebookAuthSessionInfo.subjectKey, ebookAuthSessionInfo.className, ebookAuthSessionInfo.studentKey].join('|'),
-                    request: async function(payload) { return (await ebookFunctions.httpsCallable('runEbookSurveyStudentAction')(payload)).data; },
+                    request: async function(payload) { return (await ebookRegionalFunctions.httpsCallable('runEbookSurveyStudentAction')(payload)).data; },
                     canRemind: function() { return !activeEmergencyAnnouncement && !popupAnnouncementQueue.length && !document.querySelector('dialog[open], .swal2-container') && !/^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || ''); }
                 });
             }
@@ -14176,7 +14177,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
             if (!force && now - ebookGodSessionLastRenewAt < 30000) return ebookGodSessionInfo;
             var previousPendingPolicy = ebookGodSessionInfo && ebookGodSessionInfo.pendingPolicy;
             var previousAllowedClassKeys = ebookGodSessionInfo && ebookGodSessionInfo.allowedClassKeys;
-            var fn = getGodSessionCallable('getEbookGodSession');
+            var fn = ebookRegionalFunctions.httpsCallable('getEbookGodSession');
             var needsFirebaseToken = !!force;
             var result = await fn({ sessionId: ebookGodSessionId, includeFirebaseToken: needsFirebaseToken, includePendingPolicy: needsFirebaseToken });
             ebookGodSessionInfo = result && result.data ? result.data : null;

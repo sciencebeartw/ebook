@@ -2,7 +2,7 @@
 (function () {
     'use strict';
     const app = firebase.initializeApp(firebaseConfig, 'report-portal-v1');
-    const auth = app.auth(), functions = app.functions();
+    const auth = app.auth(), functions = app.functions('asia-southeast1');
     const $ = id => document.getElementById(id);
     const escape = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
     const formatDate = n => n ? new Date(n).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : '';
