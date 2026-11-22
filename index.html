@@ -5107,7 +5107,7 @@ html { background: #f3faf6; } #splash-status { margin: 22px 0 0; color: #315c44;
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-functions.js"></script>
   <script src="firebase-config.js"></script>
   <script src="exam_identity_app.js?v=20261011-library1"></script>
-  <script charset="utf-8" src="withdrawal_periods.js?v=20261118"></script>
+  <script charset="utf-8" src="withdrawal_periods.js?v=20261123_return_quiz"></script>
   <script src="ebook_lifecycle_app.js?v=20260815_full_year_date_v1"></script>
   <script src="ebook_promotion_app.js?v=20260812_legacy_transfer_student_key"></script>
   <script src="gifted_assignment_visibility.js?v=20261011-library1"></script>
@@ -6778,10 +6778,17 @@ async function sendProductionStudentReport(action,payload,send) {
     }
 
     function isCurrentStudentEnrollmentExemptExam(item) {
-        if (!item || !isCurrentStudentEnrollmentDate(item)) return false;
+        if (!item) return false;
         var title = ((item.date || "") + " " + (item.exam || item.examName || "")).toString();
-        if (isHomeworkColumnTitle(title) || isHomeworkMissingScore(item.score)) return false;
-        return title.replace(/\s/g, "").indexOf("入班鑑定") === -1;
+        if (isCurrentStudentEnrollmentDate(item)) {
+            return !isHomeworkColumnTitle(title) && !isHomeworkMissingScore(item.score) && title.replace(/\s/g, "").indexOf("入班鑑定") === -1;
+        }
+        if (!gData || !WithdrawalPeriods.isQuiz(item.date, item.exam || item.examName)) return false;
+        var currentClassKey = safeKey(gData.className || "");
+        var classKey = item.sourceClassKey || item.storedClassKey || currentClassKey;
+        var studentKey = item.sourceStudentKey || (classKey === currentClassKey ? gData.foundUserKey : "");
+        var date = item.dateKey || EbookLifecycleApp.parseDateKey(item.date, { fallbackYear: new Date().getFullYear() });
+        return WithdrawalPeriods.returnedOnFromRecords(gData.studentEnrollmentIndex, classKey, studentKey, date);
     }
 
     function isDailyPostExamGrade(grade) {
