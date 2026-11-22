@@ -16,16 +16,6 @@
       const task = getTask(), questionId = image.closest('[data-media-question-id]')?.dataset.mediaQuestionId;
       const sha256 = image.dataset.mediaSha;
       if (!task || !task.questions.some(q => q.id === questionId) || !/^[a-f0-9]{64}$/.test(sha256)) return Promise.reject(Error('INVALID_MEDIA_REQUEST'));
-      const first = task.firstImage;
-      if (image.hasAttribute?.('data-media-deferred') && first?.questionId === questionId && first.sha256 === sha256) {
-        return first.load().then(url => {
-          if (getTask() !== task) return null;
-          return typeof url === 'string' && url.startsWith('blob:') ? url : refreshInScope(task, questionId, sha256);
-        });
-      }
-      return refreshInScope(task, questionId, sha256);
-    }
-    function refreshInScope(task, questionId, sha256) {
       let scope = scopes.get(task);
       if (!scope) { scope = { pending: new Map(), queue: [], timer: null }; scopes.set(task, scope); }
       const key = JSON.stringify([questionId, sha256]);

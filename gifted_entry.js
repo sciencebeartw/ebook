@@ -1,7 +1,6 @@
 /* 沿用聯絡簿登入。預設關閉；不儲存／轉送登入 token 至 URL、iframe 或 localStorage。 */
 (function(root){'use strict';
  let frame,overlay,owner,lastOwner,auth,unsubscribe,studentSession,activeAssignment,pageState,studentName='',generation=0;
- let recentFirstImage;
  const config=root.GIFTED_HOMEWORK_RELEASE,query=new URLSearchParams(location.search);
  function erase(uid){if(!uid)return;const prefix='gifted-answer-outbox-v1:'+encodeURIComponent(uid)+'|',correctionPrefix='gifted-correction-request:'+uid+':';try{for(let i=localStorage.length-1;i>=0;i--){const key=localStorage.key(i);if(key?.startsWith(prefix)||key?.startsWith(correctionPrefix))localStorage.removeItem(key);}}catch{}}
  function lockPage(opener){
@@ -17,7 +16,7 @@
   document.documentElement.classList.remove('gifted-entry-open');
   if(saved.focus?.isConnected)saved.focus.focus({preventScroll:true});
  }
- function close(clear=false){generation++;if(clear){recentFirstImage=null;erase(owner||lastOwner);lastOwner=null;studentSession=null;root.GiftedHomeworkStatus?.clear();}frame?.remove();overlay?.remove();frame=overlay=null;activeAssignment=null;unsubscribe?.();unsubscribe=null;owner=null;auth=null;unlockPage();}
+ function close(clear=false){generation++;if(clear){erase(owner||lastOwner);lastOwner=null;studentSession=null;root.GiftedHomeworkStatus?.clear();}frame?.remove();overlay?.remove();frame=overlay=null;activeAssignment=null;unsubscribe?.();unsubscribe=null;owner=null;auth=null;unlockPage();}
  function assignmentFromHref(href){
   try{
    const here=new URL(location.href),url=new URL(href,here),path=p=>p.replace(/\/index\.html$/,'/').replace(/\/$/,'');
@@ -49,7 +48,7 @@
   const back=document.createElement('button');back.type='button';back.textContent='返回聯絡簿';
   back.onclick=async()=>{if(session.readOnly){close(false);return;}const ok=await root.swalConfirm('返回聯絡簿','尚未送出的答案會保留在此裝置，下次可繼續填寫。');if(ok)close(false);};
   frame=document.createElement('iframe');frame.title='資優自然課本作業';
-  const url=new URL('gifted/index.html',location.href);url.searchParams.set('v','20261122-first-image');url.searchParams.set('plan',assignment.planId);url.searchParams.set('segment',assignment.segmentId);
+  const url=new URL('gifted/index.html',location.href);url.searchParams.set('v','20261122-first-open');url.searchParams.set('plan',assignment.planId);url.searchParams.set('segment',assignment.segmentId);
   overlay.append(back,frame);lockPage(opener);document.body.append(overlay);frame.src=url.href;back.focus({preventScroll:true});
   unsubscribe=auth.onAuthStateChanged(next=>{if(next?.uid!==owner)close(true);});
   return true;
@@ -70,46 +69,12 @@
    activity(){valid();root.markEbookGodSessionActivity?.();},
    async confirmWrite(action){valid();if(!preview)return true;const ok=await root.confirmStudentPreviewAction(action==='requestCorrection'?'送出正式答案更正申請':action==='draft'?'儲存作業草稿':'提交本週作業並登記正式成績');valid();return ok;},
    async request(body){
-    const task=await send(body);
-    if(body.action!=='task'||body.deferMedia!==true)return task;
-    const question=task.questions?.[0];
-    const first=question&&[...(question.media||[]),...(question.options||[]).flatMap(o=>o.media||[])][0];
-    if(!first?.deferred)return task;
-    const item={questionId:question.id,sha256:first.sha256};
-    const session=studentSession;
-    const key=JSON.stringify([task.planId,task.segmentId,task.scopeRevision,item.questionId,item.sha256]);
-    let pending;
-    function load(){
-     return pending??=read().catch(()=>null);
-    }
-    async function read(){
-     valid();
-     let blob=recentFirstImage?.session===session&&recentFirstImage.key===key&&recentFirstImage.until>Date.now()
-      ?recentFirstImage.blob:null;
-     if(!blob){
-      blob=await send({action:'firstImage',planId:task.planId,segmentId:task.segmentId,
-       scopeRevision:task.scopeRevision,items:[item]},true);
-      valid();
-      recentFirstImage={session,key,blob,until:Date.now()+600000};
-     }
-     return caller.URL.createObjectURL(blob);
-    }
-    return {...task,firstImage:{...item,load}};
-   }
-  });
-  async function send(body,image=false){
-   if(studentSession?.readOnly&&!['task','receipt','result','summary','refreshMedia','firstImage'].includes(body.action))throw Error('TEACHER_VIEW_READ_ONLY');
+   if(studentSession?.readOnly&&!['task','receipt','result','summary','refreshMedia'].includes(body.action))throw Error('TEACHER_VIEW_READ_ONLY');
    valid();const token=await auth.currentUser.getIdToken();valid();
    // 部分 iPad Safari 沒有 AbortSignal.timeout；保留原本 30 秒逾時。
-   const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),image?5000:30000);
+   const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),30000);
    try{
     const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify(body),signal:controller.signal});
-    if(image){
-     if(!response.ok||response.headers.get('Content-Type')!=='image/png')throw Error('QUESTION_MEDIA_UNAVAILABLE');
-     const blob=await response.blob();valid();
-     if(!blob.size||blob.size>256*1024)throw Error('QUESTION_MEDIA_UNAVAILABLE');
-     return blob;
-    }
     const value=await response.json();valid();
     if(!response.ok)throw Error(value.error||'連線失敗');
     if(activeAssignment&&body.planId===activeAssignment.planId&&body.segmentId===activeAssignment.segmentId){
@@ -120,7 +85,7 @@
     }
     return value;
    }finally{clearTimeout(timeout);}
-  }
+  }});
  }
  async function readSummary(assignment){
   const session=studentSession;
