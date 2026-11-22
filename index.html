@@ -14533,7 +14533,7 @@ function getProductionGodScoreBridge(){
  if(!Array.isArray(window.DASHBOARD_FASTWRITE_SCOPES))throw Error('極速設定未載入，請重新整理');if(!window.DASHBOARD_FASTWRITE_SCOPES.length||BEAR_SUBJECT.replace(/^\//,'')!=='science')return null;
  if(!productionGodScoreBridge)productionGodScoreBridge=window.ProductionGodScoreBridge.create({scopes:window.DASHBOARD_FASTWRITE_SCOPES,storage:localStorage,
   getIdentity:function(){return{uid:ebookFirebaseApp.auth().currentUser?.uid,sessionId:ebookGodSessionId};},
-  callable:function(input){return ebookFunctions.httpsCallable('runEbookGodAdminAction',{timeout:30000})(input);},
+  callable:window.LearningRegionTransport.createCallable(ebookFirebaseApp,'runEbookGodAdminAction',{timeout:30000}),
   hash:async function(parts){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(parts))))).map(function(n){return n.toString(16).padStart(2,'0');}).join('');},
   studentKeyFor:function(route,p){if(p.storedStudentKey&&(!p.feedbackId||route.className===p.sourceClassName))return p.storedStudentKey;var ids=getStudentKeysForClass(gData.studentKeysByClassKey,route.classKey,route.className===gData.className?gData.foundUserKey:'');return ids.length===1?ids[0]:'';}
  });return productionGodScoreBridge;
