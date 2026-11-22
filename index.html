@@ -11851,7 +11851,7 @@ async function sendProductionStudentReport(action,payload,send) {
                 if (mathGuidanceStandard && mathGuidanceStandard.guidanceThreshold > 0) {
                     standardHtml = "<div class='exam-standard-box'>" + SVG.target + " 輔導標準：" + escapeHtml(mathGuidanceStandard.guidanceThreshold) + "分</div>";
                 }
-            } else if (exam.note && exam.note !== "" && !isHomeworkExam) {
+            } else if (logic.mainScore !== "免試" && exam.note && exam.note !== "" && !isHomeworkExam) {
                 standardHtml = "<div class='exam-standard-box'>" + SVG.target + " 補考標準：" + escapeHtml(exam.note) + "</div>";
             }
             var safeDate = post.date.replace(/\//g, '-');
@@ -12812,7 +12812,7 @@ var barCols = "";
 dist.forEach((val, idx) => {
     var lbl = labels[idx] || "";
     var compactLabel = escapeHtml(String(lbl).replace(/\s*~\s*/g, '–'));
-    var isMyGroup = (!item.isMissing && idx === chartDistribution.myBucket);
+    var isMyGroup = (logic.mainScore !== "免試" && !item.isMissing && idx === chartDistribution.myBucket);
     
     var fillGrad = "#5b9bd5";
     var boxShad = "";
@@ -12858,14 +12858,14 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
                 var mathGuidanceStandard = getMathAdvancedGuidanceStandard(item);
                 var oldStandardHtml = isMathAdvancedGuidance
                     ? ((mathGuidanceStandard && mathGuidanceStandard.guidanceThreshold > 0) ? "<div class='detail-box'>" + SVG.target + " 輔導標準：" + escapeHtml(mathGuidanceStandard.guidanceThreshold) + "分</div>" : "")
-                    : ((item.note && !isHomeworkColumnTitle((item.date || "") + (item.exam || ""))) ? "<div class='detail-box'>" + SVG.target + " 補考標準：" + escapeHtml(item.note) + "</div>" : "");
+                    : ((logic.mainScore !== "免試" && item.note && !isHomeworkColumnTitle((item.date || "") + (item.exam || ""))) ? "<div class='detail-box'>" + SVG.target + " 補考標準：" + escapeHtml(item.note) + "</div>" : "");
 
                 html += `
         <div class='score-card'${pendingOldExamAttrs} onclick='toggleCard(this)'>
             <div class='class-badge'>${escapeHtml(classBadgeText)}</div>
             <div class='card-main'>
                 <div class='exam-info'><span class='exam-date'>${escapeHtml(item.date)}</span><span class='exam-name'>${buildAssessmentTitleHtml(item.exam, item.className || (gData && gData.className))}</span></div>
-                <div class='score-box'>${displayScore}${item.subNote || ""}${logic.statusHtml}<div class='avg-score'>班平均 ${escapeHtml(item.average)}</div></div>
+                <div class='score-box'>${displayScore}${logic.mainScore === "免試" ? "" : item.subNote || ""}${logic.statusHtml}<div class='avg-score'>班平均 ${escapeHtml(item.average)}</div></div>
             </div>
             <div class='expand-area'>
                 ${oldStandardHtml}
@@ -14487,7 +14487,7 @@ chartHtml = `<div class="v2-bar-chart-container">${barCols}</div>`;
         }
 
         function shouldShowGodMakeupReview(exam, logic) {
-            if (!exam || isHomeworkColumnTitle((exam.date || "") + (exam.exam || ""))) return false;
+            if (!exam || logic?.mainScore === "免試" || isHomeworkColumnTitle((exam.date || "") + (exam.exam || ""))) return false;
             if (isMathAdvancedGuidanceExam(exam)) return false;
             if (logic && logic.showReviewing) return true;
             if (getMakeupColorInfo(exam.cellColor)) return true;
