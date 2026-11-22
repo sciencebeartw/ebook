@@ -12,7 +12,8 @@
         if (!targets[name]) return original;
         const feedback = app.functions('asia-southeast1').httpsCallable(targets[name], options);
         // 不自動跨區重送。結果不明時，既有 transport 保留原 request 並查核同一收據。
-        return input => (isFeedbackRequest(input) ? feedback : original)(input);
+        const other = root.LearningRegionTransport?.createCallable(app, name, options, original) || original;
+        return input => (isFeedbackRequest(input) ? feedback : other)(input);
     }
     root.FeedbackRegionTransport = {createCallable,isFeedbackRequest};
     if (typeof module !== 'undefined') module.exports = root.FeedbackRegionTransport;

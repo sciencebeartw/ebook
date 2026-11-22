@@ -5000,7 +5000,8 @@ html { background: #f3faf6; } #splash-status { margin: 22px 0 0; color: #315c44;
   <link rel="stylesheet" href="ebook_resources.css?v=20261003_resources_mobile_type_v6">
   <link rel="stylesheet" href="ebook_push.css?v=20261015-preview1">
     <script src="fastwrite_config.js?v=20261029_math_feedback_enabled_v1"></script>
-    <script src="feedback_region_transport.js?v=20261122-locality"></script>
+    <script src="learning_region_transport.js?v=20261122-learning-region"></script>
+    <script src="feedback_region_transport.js?v=20261122-learning-region"></script>
     <script src="fastwrite_production_transport.js?v=20261122-feedback-speed"></script>
     <script src="feedback_revision_ui.js?v=20261122-firebase-first"></script>
     <script src="ebook_teacher_feedback_actions.js?v=20261122-feedback-speed"></script>
@@ -5260,7 +5261,7 @@ async function sendProductionStudentReport(action,payload,send) {
          payload.clientRequestId = pendingEbookRequestIds[requestFingerprint] || createClientRequestId(action);
          pendingEbookRequestIds[requestFingerprint] = payload.clientRequestId;
       }
-      function sendLegacyMessageAction(){return sendProductionStudentReport(action,payload,function(p){return ebookFunctions.httpsCallable("runEbookStudentAction", { timeout: 180000 })({action:action,data:p});});}
+      function sendLegacyMessageAction(){return sendProductionStudentReport(action,payload,function(p){return window.LearningRegionTransport.createCallable(ebookFirebaseApp, "runEbookStudentAction", { timeout: 180000 })({action:action,data:p});});}
       Promise.resolve().then(function(){
        var sticker=window.handleProductionStudentSticker?.(action,payload);
        if(sticker)return sticker.promise.then(function(r){return r.authority==='legacy'?sendLegacyMessageAction():{data:{result:r}};});
