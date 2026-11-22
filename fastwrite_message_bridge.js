@@ -12,7 +12,7 @@
    if(!['student','teacher','god'].includes(mode))return c.read();
    const k=preparedKey(mode,uid,route,entityId),old=prepared.get(k);
    if(old&&Date.now()-old.at<120000)return old.promise;
-   const row=remember(k,Promise.resolve().then(()=>c.read()).then(view=>{
+   const row=remember(k,Promise.resolve().then(()=>c.ready?c.ready():c.read()).then(view=>{
     if(account()!==uid)throw Error('登入帳號已變更，請重新整理');
     if(view?.authority==='legacy'||!/^p\d{12}$/.test(view?.segment||'')||!Array.isArray(view.messages))if(prepared.get(k)===row)prepared.delete(k);
     return view;

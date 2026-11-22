@@ -36,11 +36,13 @@
         const key = cacheKey(item);
         const revision = session && confirmed.get(key);
         if (!revision) return item;
-        if (Date.now() - revision.at > 30000 || (revision.operation === 'withdraw'
-            ? item.replyWithdrawn : item.content === revision.content)) {
+        const matched = revision.operation === 'withdraw' ? item.replyWithdrawn : item.content === revision.content;
+        if (Date.now() - revision.at > 120000 || (!matched && revision.synced)) {
             confirmed.delete(key);
             return item;
         }
+        if (matched) { revision.synced = true; return item; }
+        if (Date.now() - revision.at > 30000) { confirmed.delete(key); return item; }
         return { ...item, content: revision.operation === 'withdraw' ? '此回覆已撤回' : revision.content,
             replyWithdrawn: item.replyWithdrawn || revision.operation === 'withdraw' };
     }
@@ -93,6 +95,7 @@
                 await root.FeedbackRevisionUI.showHistory(Swal, page => submit(page));
                 return;
             }
+            overlay(item);
             const known = confirmed.get(cacheKey(item));
             const content = known?.operation === 'edit' ? known.content : item.content;
             const initial = known?.version !== undefined || item.contentProjection !== 'current'
