@@ -21,9 +21,9 @@
    return '<div class="gl-calendar-post" data-gl-class="'+esc(className)+'" data-gl-date="'+esc(date)+'"></div>';
   }
   const row=policy.reviews.find(r=>r.dates[className.includes('週六')?'sat':'sun']===date);
-  const mockStart=Date.parse(policy.mockOpensAtByClass?.[className] ?? policy.mockOpensAt);
+  const mockRelease=policy.mockOpensAtByClass?.[className] ?? policy.mockOpensAt;
   const items=(row && (preview || opening(date)<=Date.now())?link(row.chapterId,'複習題本',preview):'')+
-   (opening(date)>=mockStart && (preview || opening(date)<=Date.now())?link('mock','模擬試題',preview):'');
+   (mockPostIsOpen(date,mockRelease,preview?Infinity:Date.now())?link('mock','模擬試題',preview):'');
   return items?'<div class="gl-entry-buttons">'+items+'</div>':'';
  }
  function link(id,label,preview=false){
@@ -33,14 +33,17 @@
  // 同一登入共用一次課表查詢，切回前景時依時間更新。
  function serverTime(c){return c.serverNow+(performance.now()-c.received);}
  function opening(date){return Date.parse(date+'T00:00:00+08:00');}
+ // 聯絡簿的日期只有年月日；開放日當篇還要等到該班的開放時刻。
+ function mockPostIsOpen(postDate,release,now){
+  const postDay=opening(postDate),start=Date.parse(release);
+  return now>=start && now>=postDay && start<postDay+86400000;
+ }
  function refreshPostSlots(){
   const slots=Array.from(document.querySelectorAll('.gl-calendar-post'));
   const c=session?.calendar,valid=c && session.auth.currentUser?.uid===session.uid;
   const now=valid?serverTime(c):0;
   const dates=[...new Set(slots.filter(s=>s.dataset.glClass===session?.className).map(s=>s.dataset.glDate).filter(d=>opening(d)<=now))].sort();
   const byDate=new Map();
-  const mockStart=valid?Date.parse(c.mockOpensAt):Infinity;
-  let hasMockPost=false;
   if(valid && dates.length){
    for(const row of c.reviews){
     if(opening(row.date)>now)continue;
@@ -54,16 +57,15 @@
    if(!valid || slot.dataset.glClass!==session.className){slot.replaceChildren();continue;}
    const date=slot.dataset.glDate,rows=byDate.get(date)||[];
    const items=rows.map(row=>link(row.chapterId,rows.length===1 && row.date===date?'複習題本':'複習題本｜'+row.label));
-   if(valid && now>=mockStart && opening(date)>=mockStart && opening(date)<=now){
+   if(mockPostIsOpen(date,c.mockOpensAt,now)){
     items.push(link('mock','模擬試題'));
-    hasMockPost=true;
    }
    const html=items.length?'<div class="gl-entry-buttons">'+items.join('')+'</div>':'';
    if(slot.innerHTML!==html)slot.innerHTML=html;
   }
-  if(valid) refreshTopEntry(c,now,now>=mockStart && !hasMockPost);
+  if(valid) refreshTopEntry(c,now);
  }
- function refreshTopEntry(calendar,now,showMock){
+ function refreshTopEntry(calendar,now){
   const entry=pilotRoot(),early=calendar.earlyAccess;
   if(!entry)return;
   let html='';
@@ -71,8 +73,6 @@
    const review=calendar.reviews.find(r=>r.chapterId===early.reviewId);
    html='<strong>測試學生專用</strong><div class="gl-entry-buttons">'+
     (review?link(review.chapterId,'複習題本｜'+review.label):'')+(early.mock?link('mock','模擬試題｜16 回'):'')+'</div>';
-  }else if(showMock){
-   html='<div class="gl-entry-buttons">'+link('mock','模擬試題')+'</div>';
   }
   if(entry.innerHTML!==html)entry.innerHTML=html;
   entry.hidden=!html;
