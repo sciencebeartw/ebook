@@ -29,22 +29,6 @@
     }
     return line;
   }
-  // 只忽略代號清單的分隔符，保留順序、重複代號及科學符號。
-  function fillState(value,reference){
-    const a=value.trim(),b=reference.trim();
-    if(!a)return 'blank';
-    if(a===b)return 'correct';
-    const stems=/^[甲乙丙丁戊己庚辛壬癸](?:[、,，\s]*[甲乙丙丁戊己庚辛壬癸])+$/u;
-    const letters=/^[A-Z](?:[、,，\s]+[A-Z])+$/u;
-    if(!((stems.test(b)&&/^[甲乙丙丁戊己庚辛壬癸、,，\s]+$/u.test(a))||
-         (letters.test(b)&&/^[A-Z、,，\s]+$/.test(a))))return 'pending';
-    const tokens=text=>text.replace(/[、,，\s]/g,'');
-    const actual=tokens(a),key=tokens(b);
-    if(!actual)return 'pending';
-    if(actual===key)return 'correct';
-    // 只有排列的順序不同時，讓既有逐格複判依題意決定是否等義。
-    return [...actual].sort().join('')===[...key].sort().join('')?'pending':'wrong';
-  }
   function checkedLine(labels,values,expected,unanswered){
     const selected=labels.filter((_,i)=>values[i]);
     const key=labels.filter((_,i)=>expected[i]);
@@ -91,7 +75,7 @@
           i=end;
         }else{
           const original=values[i],reference=refs[i];
-          const state=fillState(original,typeof reference==='string'?reference:'');
+          const state=window.GiftedLibraryFillState(original,typeof reference==='string'?reference:'',q.id,shape.labels[i]);
           const line=answerLine(state,original,reference);
           row(shape.labels[i],line);
           slots.set(i,{line,original,reference});

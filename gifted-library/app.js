@@ -47,12 +47,34 @@
  function stash(){if(!content||content.status==='submitted'||transport.readOnly)return;try{if(!changed&&!pending){localStorage.removeItem(key());return;}localStorage.setItem(key(),JSON.stringify({revision:content.revision,draftRevision:content.draftRevision,answers:collect(),pending}));}catch{}}
  function setAnswers(answers){for(const q of content.questions){const el=$('questions').querySelector('[data-id="'+CSS.escape(q.id)+'"]');if(q.type==='manual')inputs.restore(q,el,answers[q.id]);else{const chosen=Array.isArray(answers[q.id])?answers[q.id]:[answers[q.id]];el.querySelectorAll('input').forEach(i=>i.checked=chosen.includes(i.value));}}}
  function controls(){ $('save').disabled=$('submit').disabled=busy||transport.readOnly;$('reload').disabled=busy;$('rounds').disabled=busy;$('questions').querySelectorAll('input,textarea').forEach(el=>el.disabled=busy||transport.readOnly||content?.status==='submitted');}
- function appendFillReviews(container, item, markReviewed) {
+ function addTeacherReview(line,context,feedback){
+  const ask=document.createElement('button'),form=document.createElement('form'),reason=document.createElement('textarea');
+  const title=document.createElement('label'),send=document.createElement('button'),notice=document.createElement('span');
+  ask.type='button';ask.textContent='申請老師覆判';ask.setAttribute('aria-expanded','false');
+  title.textContent='請說明你認為原答符合題意的原因';reason.required=true;reason.maxLength=500;
+  title.append(reason);send.type='submit';send.textContent='送給這堂課的老師';notice.setAttribute('role','status');
+  form.className='fill-appeal';form.hidden=true;form.append(title,send,notice);line.append(ask,form);
+  ask.onclick=()=>{form.hidden=!form.hidden;ask.setAttribute('aria-expanded',String(!form.hidden));if(!form.hidden)reason.focus();};
+  form.onsubmit=async event=>{
+   event.preventDefault();const why=reason.value.trim();if(!why){notice.textContent='請填寫申請理由。';reason.focus();return;}
+   if(send.disabled)return;send.disabled=true;reason.readOnly=true;ask.disabled=true;notice.textContent='正在送出…';
+   try{
+    const sent=await transport.requestTeacherReview({...context,message:feedback+'\n申請理由：'+why});
+    if(sent){title.hidden=true;send.hidden=true;notice.textContent='已送出。老師會在這堂課的聯絡簿留言回覆。';return;}
+    notice.textContent='已取消送出。';
+   }catch(e){notice.textContent=e.message||'暫時無法送出，可用原理由重試。';}
+   send.disabled=false;ask.disabled=false;reason.readOnly=false;
+  };
+ }
+ function appendFillReviews(container, item, markReviewed, q) {
   const chapterId=content.chapterId, revision=content.revision, generation=epoch;
   if(transport.readOnly)return;
   for(const {slot,label} of item.reviewSlots||[]){
+   const original=inputs.submittedValues(q,item.answer??content.answers?.[q.id])?.[slot];
+   const reference=item.referencePositions?.[slot];
+   if(typeof original==='string' && typeof reference==='string' && window.GiftedLibraryFillState(original,reference,q.id,label)==='correct')continue;
    const line=document.createElement('div'),button=document.createElement('button'),status=document.createElement('span');
-   button.type='button';button.textContent='申請複判 · '+label;
+   button.type='button';button.textContent='申請 AI 複判 · '+label;
    status.setAttribute('role','status');line.className='fill-review';line.append(button,status);container.append(line);
    button.onclick=async()=>{
     if(button.disabled||generation!==epoch)return;
@@ -64,6 +86,14 @@
       markReviewed(item.questionId,slot,result.conclusion);
       status.textContent=({equivalent:'答案等義',different:'答案不同',uncertain:'需老師確認'}[result.conclusion]||'需老師確認')+'。'+result.explanation;
       button.textContent=label+' · 已複判';
+      if(result.conclusion!=='equivalent' && !mock){
+       const question=q.sourceTitle?.split('｜').pop().trim()||q.label;
+       const text=['【複習題本填充題覆判】'+content.label+'｜'+question+'｜'+label,
+        '原答：'+(typeof original==='string'?original:(item.answer||'舊版合併作答')),
+        '參考：'+(typeof reference==='string'?reference:item.expected||'見題本'),
+        'AI 複判：'+status.textContent].join('\n');
+       addTeacherReview(line,{chapterId,revision,questionId:item.questionId,slot},text);
+      }
      }else{
       button.disabled=false;button.textContent='查看複判結果';status.textContent='這一格已受理，稍後可查看。';
      }
@@ -88,7 +118,7 @@
    detail.hidden=false;
    detail.dataset.outcome=item.outcome;
    detail.textContent=(outcomes[item.outcome]||'尚無判定')+'\n參考答案：'+(inputs.reference(q,item)||answer||item.expected||'請參考題本解答');
-   appendFillReviews(detail,item,markReviewed);
+   appendFillReviews(detail,item,markReviewed,q);
   }
   $('questionResults').hidden=false;
  }

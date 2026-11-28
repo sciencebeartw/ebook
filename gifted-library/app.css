@@ -17,6 +17,10 @@
 .student-media-retry { margin-block-start: .5rem; max-inline-size: 100%; padding: .35rem .5rem; font-size: 14px; }
 .student-media-retry[aria-disabled="true"] { opacity: .65; cursor: default; }
 
+.fill-appeal:not([hidden]) { display: grid; gap: .45rem; width: 100%; }
+.fill-appeal label, .fill-appeal textarea { display: block; width: 100%; box-sizing: border-box; }
+.fill-appeal textarea { min-height: 4rem; }
+.fill-appeal button { justify-self: start; }
 #questionResults { margin-block-start: 1.5rem; }
 #questionResults h2 { margin: 0; font-size: 1.25rem; }
 #questionResults p { margin: .25rem 0 .75rem; }

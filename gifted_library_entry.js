@@ -136,7 +136,7 @@
   saved.requestedTarget=null;close();session=saved;opener=trigger||document.activeElement;scrollY=root.scrollY||0;document.body.style.setProperty('--gl-scroll',-scrollY+'px');document.documentElement.classList.add('gl-open');
   overlay=document.createElement('section');overlay.className='gl-overlay';overlay.setAttribute('aria-label',target==='mock'?'模擬試題':'複習題本');
   const back=document.createElement('button');back.type='button';back.textContent='返回聯絡簿';back.onclick=async()=>{if(frame?.contentWindow?.GiftedLibraryPage?.dirty()){if(!await root.swalConfirm('返回聯絡簿','尚未送出的答案已保留在此裝置，下次可繼續填寫。'))return;}close();};
-  frame=document.createElement('iframe');frame.title=target==='mock'?'模擬試題':'複習題本';const url=new URL('gifted-library/index.html',location.href);url.searchParams.set('target',target);url.searchParams.set('v','20261128-answer-cells');overlay.append(back,frame);document.body.append(overlay);
+  frame=document.createElement('iframe');frame.title=target==='mock'?'模擬試題':'複習題本';const url=new URL('gifted-library/index.html',location.href);url.searchParams.set('target',target);url.searchParams.set('v','20261128-fill-appeals');overlay.append(back,frame);document.body.append(overlay);
   if(saved.useCalendar)watchFrame(frame,url);
   frame.src=url.href;back.focus();unsubscribe=saved.auth.onAuthStateChanged(u=>{if(u?.uid!==saved.uid)close(true);});return true;
  }
@@ -161,6 +161,21 @@
    async request(body){
     if(own.readOnly&&['draft','submit','reviewFill'].includes(body.action))throw Error('TEACHER_VIEW_READ_ONLY');
     return request(own,body,()=>epoch===generation&&session===own&&own.auth.currentUser?.uid===own.uid);
+   },
+   async requestTeacherReview({chapterId,revision,questionId,slot,message}){
+    valid();
+    if(own.readOnly||frame?.contentWindow!==caller)throw Error('TEACHER_VIEW_READ_ONLY');
+    const dates=(own.calendar?.reviews||[]).filter(r=>r.chapterId===chapterId && opening(r.date)<=serverTime(own.calendar));
+    const assigned=dates.find(r=>r.date===opener?.closest?.('.gl-calendar-post')?.dataset.glDate)||dates.at(-1);
+    if(!assigned)throw Error('這一章的聯絡簿日期暫時無法確認，請重新開啟題本。');
+    if(own.studentPreview && !await root.confirmStudentPreviewAction('送出填充題老師覆判申請'))return false;
+    const identity=[own.className,own.name,chapterId,revision,questionId,slot];
+    const hash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(identity)));
+    const clientRequestId='book_review_'+Array.from(new Uint8Array(hash),n=>n.toString(16).padStart(2,'0')).join('');
+    valid();
+    await new Promise((resolve,reject)=>root.sendFeedback('',assigned.date.replaceAll('-','/'),'學生留言',message,resolve,
+     ()=>reject(Error('送出結果待確認，請用原理由重試。')),true,{sourceClassName:own.className,clientRequestId}));
+    return true;
    },
    async confirmWrite(action){valid();if(!own.studentPreview)return true;const ok=await root.confirmStudentPreviewAction(action==='draft'?'儲存題本草稿':'提交題本答案並登記成績');valid();return ok;}
   };
