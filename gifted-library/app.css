@@ -16,3 +16,13 @@
 .fill-review [role="status"] { overflow-wrap: anywhere; }
 .student-media-retry { margin-block-start: .5rem; max-inline-size: 100%; padding: .35rem .5rem; font-size: 14px; }
 .student-media-retry[aria-disabled="true"] { opacity: .65; cursor: default; }
+
+#questionResults { margin-block-start: 1.5rem; }
+#questionResults h2 { margin: 0; font-size: 1.25rem; }
+#questionResults p { margin: .25rem 0 .75rem; }
+#resultGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: .5rem; }
+#resultGrid button { display: grid; align-content: center; gap: .15rem; padding: .5rem .75rem; font-size: 1rem; line-height: 1.4; text-align: start; overflow-wrap: anywhere; }
+#resultGrid strong { font-size: .85rem; }
+#resultGrid [data-outcome="wrong"], #resultGrid [data-outcome="blank"] { background: #fff4ec; border-color: #d6a485; color: #853929; }
+#resultGrid [data-outcome="correct"] { background: #edf6ee; color: #205e40; }
+#resultGrid button:focus-visible, .student-question:focus-visible { outline: 3px solid #39755b; outline-offset: 2px; }

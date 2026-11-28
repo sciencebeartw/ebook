@@ -71,7 +71,37 @@
   }
  }
  function showResult(result){$('actions').hidden=true;$('result').textContent='已完成作答。自動判分：'+result.earnedPoints+'／'+result.autoMaxPoints+(result.pending?'；另有 '+result.pending+' 題請自行對照解答。':'。')+'\n請核對答案，並在題本上訂正。';
-  for(const item of result.results){const q=content.questions.find(q=>q.id===item.questionId),el=$('questions').querySelector('[data-id="'+CSS.escape(item.questionId)+'"] .question-result');if(!q||!el)continue;el.hidden=false;el.dataset.outcome=item.outcome;const answer=item.acceptedAnswers?.length?item.expected:GiftedTypedQuestion.answerText(q,item.correctAnswers||[]);el.textContent=(q.type==='manual'?'請自行核對':({correct:'答對',wrong:'答錯',blank:'未作答',pending:'請自行核對'}[item.outcome]))+'\n參考答案：'+(inputs.reference(q,item)||answer||item.expected||'請參考題本解答');appendFillReviews(el,item);}
+  const byQuestion=new Map(result.results.map(item=>[item.questionId,item]));
+  const outcomes={correct:'答對',wrong:'答錯',blank:'未作答',pending:'請自行核對'};
+  const corrections=[],ungraded=[],correct=[];
+  for(const [index,q] of content.questions.entries()){
+   const item=byQuestion.get(q.id),outcome=item?.outcome;
+   const label=outcomes[outcome]||'尚無判定';
+   const article=$('questions').querySelector('[data-id="'+CSS.escape(q.id)+'"]');
+   if(item){
+    const detail=article.querySelector('.question-result');
+    const answer=item.acceptedAnswers?.length?item.expected:GiftedTypedQuestion.answerText(q,item.correctAnswers||[]);
+    detail.hidden=false;
+    detail.dataset.outcome=outcome;
+    detail.textContent=label+'\n參考答案：'+(inputs.reference(q,item)||answer||item.expected||'請參考題本解答');
+    appendFillReviews(detail,item);
+   }
+   const button=document.createElement('button'),badge=document.createElement('strong');
+   button.type='button';
+   button.dataset.outcome=outcome||'unknown';
+   const title=q.sourceTitle?.split('｜').pop().trim()||q.label||('第 '+(index+1)+' 題');
+   badge.textContent=label;
+   button.append(title+' ',badge);
+   button.onclick=()=>{
+    article.focus({preventScroll:true});
+    article.scrollIntoView({block:'start'});
+   };
+   if(outcome==='wrong'||outcome==='blank')corrections.push(button);
+   else if(outcome==='correct')correct.push(button);
+   else ungraded.push(button);
+  }
+  $('resultGrid').replaceChildren(...corrections,...ungraded,...correct);
+  $('questionResults').hidden=false;
  }
  const retryRead=$('retryRead');
  function clearRetry(){if(retryRead){retryRead.hidden=true;retryRead.onclick=null;}}
@@ -90,9 +120,9 @@
   catch(error){if(error.message!=='SERVER_OWNED_FIELD')throw error;return transport.request({action:'task',chapterId});}
  }
  async function load(chapterId){clearRetry();const mine=++epoch;busy=true;if(content)stash();pending=null;$('status').textContent='正在載入題目…';controls();
-  try{const next=await loadTask(chapterId);if(mine!==epoch)return;content=next;changed=false;BearStudentMedia.reset();$('title').textContent=mock?'模擬試題':'複習題本';$('list').hidden=true;$('paper').hidden=false;$('rounds').hidden=!mock;$('summary').textContent=next.label+' · '+next.questionCount+' 題';$('result').textContent='';$('blanks').checked=false;$('actions').hidden=next.status==='submitted';
+  try{const next=await loadTask(chapterId);if(mine!==epoch)return;content=next;changed=false;BearStudentMedia.reset();$('title').textContent=mock?'模擬試題':'複習題本';$('list').hidden=true;$('paper').hidden=false;$('rounds').hidden=!mock;$('summary').textContent=next.label+' · '+next.questionCount+' 題';$('result').textContent='';$('questionResults').hidden=true;$('resultGrid').replaceChildren();$('blanks').checked=false;$('actions').hidden=next.status==='submitted';
    renderedEpoch=mine;
-   $('questions').innerHTML=next.questions.map(q=>'<article class="student-question" data-id="'+esc(q.id)+'">'+GiftedTypedQuestion.question(q)+(q.type==='manual'?inputs.fields(q):'')+'<div class="question-result" hidden></div></article>').join('');
+   $('questions').innerHTML=next.questions.map(q=>'<article class="student-question" tabindex="-1" data-id="'+esc(q.id)+'">'+GiftedTypedQuestion.question(q)+(q.type==='manual'?inputs.fields(q):'')+'<div class="question-result" hidden></div></article>').join('');
    let answers=next.answers||{},notice='先作答，送出後即可核對答案。';
    try{const saved=JSON.parse(localStorage.getItem(key())||'null');if(saved&&saved.revision===next.revision&&saved.draftRevision===next.draftRevision&&next.status!=='submitted'){answers=saved.answers;pending=saved.pending||null;changed=true;notice=pending?'上次送出結果尚待確認，請按原按鈕重試。':'已恢復此裝置尚未送出的答案。';}}catch{}
    setAnswers(answers);$('status').textContent=notice;BearStudentMedia.observe($('questions'));
