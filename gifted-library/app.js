@@ -47,7 +47,7 @@
  function stash(){if(!content||content.status==='submitted'||transport.readOnly)return;try{if(!changed&&!pending){localStorage.removeItem(key());return;}localStorage.setItem(key(),JSON.stringify({revision:content.revision,draftRevision:content.draftRevision,answers:collect(),pending}));}catch{}}
  function setAnswers(answers){for(const q of content.questions){const el=$('questions').querySelector('[data-id="'+CSS.escape(q.id)+'"]');if(q.type==='manual')inputs.restore(q,el,answers[q.id]);else{const chosen=Array.isArray(answers[q.id])?answers[q.id]:[answers[q.id]];el.querySelectorAll('input').forEach(i=>i.checked=chosen.includes(i.value));}}}
  function controls(){ $('save').disabled=$('submit').disabled=busy||transport.readOnly;$('reload').disabled=busy;$('rounds').disabled=busy;$('questions').querySelectorAll('input,textarea').forEach(el=>el.disabled=busy||transport.readOnly||content?.status==='submitted');}
- function appendFillReviews(container, item) {
+ function appendFillReviews(container, item, markReviewed) {
   const chapterId=content.chapterId, revision=content.revision, generation=epoch;
   if(transport.readOnly)return;
   for(const {slot,label} of item.reviewSlots||[]){
@@ -61,6 +61,7 @@
      const result=await transport.request({action:'reviewFill',chapterId,revision,questionId:item.questionId,slot});
      if(generation!==epoch)return;
      if(result.status==='done'){
+      markReviewed(item.questionId,slot,result.conclusion);
       status.textContent=({equivalent:'答案等義',different:'答案不同',uncertain:'需老師確認'}[result.conclusion]||'需老師確認')+'。'+result.explanation;
       button.textContent=label+' · 已複判';
      }else{
@@ -71,36 +72,24 @@
   }
  }
  function showResult(result){$('actions').hidden=true;$('result').textContent='已完成作答。自動判分：'+result.earnedPoints+'／'+result.autoMaxPoints+(result.pending?'；另有 '+result.pending+' 題請自行對照解答。':'。')+'\n請核對答案，並在題本上訂正。';
-  const byQuestion=new Map(result.results.map(item=>[item.questionId,item]));
+  const articles=new Map(Array.from($('questions').children,article=>[article.dataset.id,article]));
+  const markReviewed=GiftedLibraryResultGrid.render($('resultGrid'),content.questions,result,content.answers,id=>{
+   const article=articles.get(id);
+   article.focus({preventScroll:true});
+   article.scrollIntoView({block:'start'});
+  });
+  const byId=new Map(content.questions.map(q=>[q.id,q]));
   const outcomes={correct:'答對',wrong:'答錯',blank:'未作答',pending:'請自行核對'};
-  const corrections=[],ungraded=[],correct=[];
-  for(const [index,q] of content.questions.entries()){
-   const item=byQuestion.get(q.id),outcome=item?.outcome;
-   const label=outcomes[outcome]||'尚無判定';
-   const article=$('questions').querySelector('[data-id="'+CSS.escape(q.id)+'"]');
-   if(item){
-    const detail=article.querySelector('.question-result');
-    const answer=item.acceptedAnswers?.length?item.expected:GiftedTypedQuestion.answerText(q,item.correctAnswers||[]);
-    detail.hidden=false;
-    detail.dataset.outcome=outcome;
-    detail.textContent=label+'\n參考答案：'+(inputs.reference(q,item)||answer||item.expected||'請參考題本解答');
-    appendFillReviews(detail,item);
-   }
-   const button=document.createElement('button'),badge=document.createElement('strong');
-   button.type='button';
-   button.dataset.outcome=outcome||'unknown';
-   const title=q.sourceTitle?.split('｜').pop().trim()||q.label||('第 '+(index+1)+' 題');
-   badge.textContent=label;
-   button.append(title+' ',badge);
-   button.onclick=()=>{
-    article.focus({preventScroll:true});
-    article.scrollIntoView({block:'start'});
-   };
-   if(outcome==='wrong'||outcome==='blank')corrections.push(button);
-   else if(outcome==='correct')correct.push(button);
-   else ungraded.push(button);
+  for(const item of result.results){
+   const q=byId.get(item.questionId);
+   if(!q)continue;
+   const detail=articles.get(q.id).querySelector('.question-result');
+   const answer=item.acceptedAnswers?.length?item.expected:GiftedTypedQuestion.answerText(q,item.correctAnswers||[]);
+   detail.hidden=false;
+   detail.dataset.outcome=item.outcome;
+   detail.textContent=(outcomes[item.outcome]||'尚無判定')+'\n參考答案：'+(inputs.reference(q,item)||answer||item.expected||'請參考題本解答');
+   appendFillReviews(detail,item,markReviewed);
   }
-  $('resultGrid').replaceChildren(...corrections,...ungraded,...correct);
   $('questionResults').hidden=false;
  }
  const retryRead=$('retryRead');

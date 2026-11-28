@@ -34,18 +34,24 @@
     const values=fields.map((field,i)=>isCheck(q.answerInputs,i)?field.checked:field.value);
     return encode(values)||element.querySelector('.earlier-answer textarea').value;
   }
+  function submittedValues(q,answer){
+    const shape=q.answerInputs;
+    if(!validShape(shape))return null;
+    const count=shape.labels.length;
+    if(answer==null||answer==='')return shape.labels.map((_,i)=>isCheck(shape,i)?false:'');
+    const values=decode(shape,count,answer);
+    if(values)return values;
+    if(typeof answer!=='string'||answer.startsWith(prefix)||shape.mode!=='blanks')return null;
+    const parts=count===1?[answer]:answer.split(/[；;\r\n]+/).map(value=>value.trim());
+    return parts.length===count?parts:null;
+  }
   function restore(q,element,answer){
     if(!validShape(q.answerInputs)){element.querySelector('textarea').value=answer||'';return;}
-    const {mode,labels}=q.answerInputs,fields=controls(element);
+    const fields=controls(element);
     const previous=element.querySelector('.earlier-answer');
     previous.hidden=true;
     previous.querySelector('textarea').value='';
-    let values=decode(q.answerInputs,fields.length,answer);
-    if(!values&&answer&&mode==='blanks'){
-      // Legacy free text can be restored when its delimiters match the original number of blanks.
-      const parts=labels.length===1?[answer]:answer.split(/[；;\r\n]+/).map(value=>value.trim());
-      if(parts.length===fields.length)values=parts;
-    }
+    const values=submittedValues(q,answer);
     if(!values&&answer){previous.hidden=false;previous.querySelector('textarea').value=answer;}
     fields.forEach((field,i)=>{if(isCheck(q.answerInputs,i))field.checked=values?.[i]===true;else field.value=values?.[i]||'';});
   }
@@ -71,5 +77,5 @@
     if(result.paperReference)lines.push(result.paperReference);
     return '\n'+lines.join('\n');
   }
-  window.GiftedLibraryAnswerInputs={fields,read,restore,reference};
+  window.GiftedLibraryAnswerInputs={fields,read,restore,reference,submittedValues};
 })();

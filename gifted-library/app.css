@@ -20,9 +20,18 @@
 #questionResults { margin-block-start: 1.5rem; }
 #questionResults h2 { margin: 0; font-size: 1.25rem; }
 #questionResults p { margin: .25rem 0 .75rem; }
-#resultGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: .5rem; }
-#resultGrid button { display: grid; align-content: center; gap: .15rem; padding: .5rem .75rem; font-size: 1rem; line-height: 1.4; text-align: start; overflow-wrap: anywhere; }
-#resultGrid strong { font-size: .85rem; }
-#resultGrid [data-outcome="wrong"], #resultGrid [data-outcome="blank"] { background: #fff4ec; border-color: #d6a485; color: #853929; }
-#resultGrid [data-outcome="correct"] { background: #edf6ee; color: #205e40; }
-#resultGrid button:focus-visible, .student-question:focus-visible { outline: 3px solid #39755b; outline-offset: 2px; }
+#resultGrid h3 { margin: .8rem 0 .35rem; font-size: 1rem; }
+.answer-cells { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; }
+.answer-cell { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 5px; max-width: 100%; min-width: 44px; min-height: 44px; padding: 4px 8px; font-family: inherit; font-size: 14px; line-height: 1.55; font-weight: 600; white-space: normal; overflow-wrap: anywhere; }
+.cell-answer { display: inline-flex; flex-wrap: wrap; gap: 0 .3em; align-items: baseline; min-width: 0; white-space: pre-line; }
+.cell-answer small { flex-basis: 100%; font-size: .85em; }
+.cell-answer b,.cell-answer s { max-width: 100%; }
+.answer-cell[data-state=correct],.manual-row .cell-answer[data-state=correct] { background: #e7f1e4; color: #245e42; }
+.answer-cell[data-state=wrong],.answer-cell[data-state=blank],.manual-row .cell-answer[data-state=wrong],.manual-row .cell-answer[data-state=blank] { background: #fff0f0; border-color: #dca0a5; color: #952d38; }
+.cell-answer s { color: #865059; text-decoration-thickness: 2px; }
+.manual-cell { display: grid; justify-content: stretch; width: 100%; text-align: start; padding: .55rem .65rem; }
+.manual-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: .15rem .5rem; }
+.manual-row .cell-answer { padding: .16rem .4rem; border-radius: .3rem; }
+.manual-row .cell-answer[data-state=pending] { background: #fff6df; color: #70521d; }
+.manual-row .slot-label { font-weight: 500; }
+.answer-cell:focus-visible,.student-question:focus-visible { outline: 3px solid #39755b; outline-offset: 2px; }
